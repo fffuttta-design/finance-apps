@@ -63,3 +63,4 @@ Thumbs.db
 # その他
 *.log
 coverage/
+.git_commit_msg.tmp
