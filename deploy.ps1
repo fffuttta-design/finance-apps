@@ -24,7 +24,9 @@ param(
   [switch]$SkipRelease
 )
 
-$ErrorActionPreference = 'Stop'
+# Native commands (flutter/adb/gh) は stderr で警告を出すことがあるが
+# それを致命エラー扱いしないため Continue にする。$LASTEXITCODE を明示チェックする。
+$ErrorActionPreference = 'Continue'
 $root = $PSScriptRoot
 Set-Location $root
 
@@ -146,13 +148,18 @@ Write-Host ""
 Write-Host "[5/5] GitHub Release 作成 (tag: $tag)..." -ForegroundColor Yellow
 
 # 既存タグがあれば削除（同じバージョンで再リリースする場合の事故防止）
-gh release view $tag --repo $repo 2>$null
+gh release view $tag --repo $repo 2>$null | Out-Null
 if ($LASTEXITCODE -eq 0) {
   Write-Host "  既存リリース $tag を削除して再作成します" -ForegroundColor Yellow
   gh release delete $tag --repo $repo --yes --cleanup-tag
 }
 
-gh release create $tag "$apkSrc#$assetName" `
+# APKをバージョン付きの名前にコピーしてからアップロード
+# (gh release create の #display-label はラベルのみ変更でURLのファイル名は元のまま)
+$apkRenamed = Join-Path $appDir "build\$assetName"
+Copy-Item -Path $apkSrc -Destination $apkRenamed -Force
+
+gh release create $tag $apkRenamed `
   --repo $repo `
   --title "FutaFinance v$fullVersion" `
   --notes $ReleaseNotes
@@ -160,7 +167,7 @@ if ($LASTEXITCODE -ne 0) {
   Write-Error "gh release create 失敗"
   exit 1
 }
-Write-Host "  OK Release作成完了" -ForegroundColor Green
+Write-Host "  OK Release作成完了 (asset: $assetName)" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "===============================================" -ForegroundColor Green
