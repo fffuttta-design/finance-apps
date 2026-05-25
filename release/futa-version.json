@@ -2,5 +2,5 @@
     "version":  "1.0.13",
     "buildNumber":  "14",
     "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.13/futa-finance-v1.0.13.apk",
-    "releaseNotes":  "GitHub Releases配信に切替 + 半自動インストールフロー実装"
+    "releaseNotes":  "GitHub Releases配信 + 半自動インストール (アセット名修正)"
 }
