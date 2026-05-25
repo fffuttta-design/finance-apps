@@ -10,7 +10,6 @@ import '../mock/dashboard_summary.dart';
 import '../mock/mock_data.dart';
 import '../widgets/annual_contracts_card.dart';
 import '../widgets/cash_flow_card.dart';
-import '../widgets/category_heat_grid.dart';
 import '../widgets/recent_transactions_card.dart';
 import 'expense_input_screen.dart';
 import 'income_input_screen.dart';
@@ -203,8 +202,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         CashFlowCard(summary: summary),
                         const SizedBox(height: 12),
-                        CategoryHeatGrid(summary: summary),
-                        const SizedBox(height: 12),
                         AnnualContractsCard(
                           contracts: summary.annualContracts,
                           today: today,
@@ -250,7 +247,7 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(4),
           ),
           child: const Text(
-            'v1.0.9+10  /  com.futa.finance',
+            'v1.0.10+11  /  com.futa.finance',
             style: TextStyle(
                 fontSize: 10,
                 color: Color(0xFF9CA3AF),

@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/transaction_repository.dart';
-import '../utils/formatters.dart';
+import '../mock/dashboard_summary.dart';
+import '../mock/mock_data.dart';
+import '../widgets/category_heat_grid.dart';
 
 class ReportScreen extends StatefulWidget {
   const ReportScreen({super.key});
@@ -59,19 +61,6 @@ class _ReportScreenState extends State<ReportScreen> {
     return result;
   }
 
-  /// 当月のカテゴリ別支出。
-  Map<String, int> get _currentMonthExpenseByCategory {
-    final now = DateTime.now();
-    final map = <String, int>{};
-    for (final t in _transactions.where((t) =>
-        t.type == core.TransactionType.expense &&
-        t.date.year == now.year &&
-        t.date.month == now.month)) {
-      map[t.category.major] = (map[t.category.major] ?? 0) + t.amount;
-    }
-    return map;
-  }
-
   @override
   Widget build(BuildContext context) {
     final monthly = _last6Months;
@@ -79,11 +68,16 @@ class _ReportScreenState extends State<ReportScreen> {
       final v = s.income > s.expense ? s.income : s.expense;
       return v > m ? v : m;
     });
-    final categoryMap = _currentMonthExpenseByCategory;
-    final sortedCategories = categoryMap.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    final categoryTotal =
-        categoryMap.values.fold<int>(0, (s, v) => s + v);
+
+    // CategoryHeatGrid 用に DashboardSummary を構築（残高情報は不要なので0でOK）
+    final today = DateTime.now();
+    final summary = DashboardSummary(
+      today: today,
+      allTransactions: _transactions,
+      monthStartBalance: 0,
+      accountName: '',
+      annualContracts: MockData.annualContracts,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -113,25 +107,8 @@ class _ReportScreenState extends State<ReportScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // 当月のカテゴリ別支出
-                  _card(
-                    title: '当月のカテゴリ別支出',
-                    icon: Icons.donut_large,
-                    child: categoryTotal == 0
-                        ? const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            child: Text('当月の支出記録がありません',
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF9CA3AF))),
-                          )
-                        : Column(
-                            children: sortedCategories
-                                .map((e) => _categoryBar(
-                                    e.key, e.value, categoryTotal))
-                                .toList(),
-                          ),
-                  ),
+                  // カテゴリ別集計（移管: ホーム → ここ）
+                  CategoryHeatGrid(summary: summary),
                 ],
               ),
       ),
@@ -189,49 +166,6 @@ class _ReportScreenState extends State<ReportScreen> {
       ),
     );
   }
-
-  Widget _categoryBar(String major, int amount, int total) {
-    final ratio = total == 0 ? 0.0 : amount / total;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(major,
-                    style: const TextStyle(
-                        fontSize: 12, color: Color(0xFF111827)),
-                    overflow: TextOverflow.ellipsis),
-              ),
-              Text(formatYen(amount),
-                  style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF111827),
-                      fontFamily: 'monospace')),
-              const SizedBox(width: 8),
-              Text('${(ratio * 100).toStringAsFixed(0)}%',
-                  style: const TextStyle(
-                      fontSize: 10, color: Color(0xFF9CA3AF))),
-            ],
-          ),
-          const SizedBox(height: 4),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(2),
-            child: LinearProgressIndicator(
-              value: ratio,
-              minHeight: 5,
-              backgroundColor: const Color(0xFFF3F4F6),
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                  Color(0xFF1A237E)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _MonthSummary {
@@ -277,8 +211,8 @@ class _MonthlyBarChart extends StatelessWidget {
                       height: inH.clamp(2, 120),
                       decoration: BoxDecoration(
                         color: const Color(0xFF16A34A),
-                        borderRadius:
-                            const BorderRadius.vertical(top: Radius.circular(2)),
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(2)),
                       ),
                     ),
                     const SizedBox(width: 3),
@@ -287,8 +221,8 @@ class _MonthlyBarChart extends StatelessWidget {
                       height: exH.clamp(2, 120),
                       decoration: BoxDecoration(
                         color: const Color(0xFFDC2626),
-                        borderRadius:
-                            const BorderRadius.vertical(top: Radius.circular(2)),
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(2)),
                       ),
                     ),
                   ],

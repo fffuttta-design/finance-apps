@@ -51,11 +51,10 @@ class CategoryHeatGrid extends StatelessWidget {
         children: [
           const Row(
             children: [
-              Icon(Icons.local_fire_department,
-                  size: 16, color: Color(0xFFEA580C)),
+              Icon(Icons.category, size: 16, color: Color(0xFF1A237E)),
               SizedBox(width: 6),
               Text(
-                'カテゴリ別熱量',
+                'カテゴリ別集計',
                 style: TextStyle(
                     fontSize: 12,
                     color: Color(0xFF6B7280),

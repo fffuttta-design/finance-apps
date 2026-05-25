@@ -7,6 +7,7 @@ import 'account_editor_screen.dart';
 import 'card_editor_screen.dart';
 import 'category_editor_screen.dart';
 import 'income_master_screen.dart';
+import 'subscription_list_screen.dart';
 
 /// 設定のトップ画面。各サブ設定への入り口を並べる。
 class SettingsScreen extends StatelessWidget {
@@ -67,6 +68,16 @@ class SettingsScreen extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                     builder: (_) => const IncomeMasterScreen()),
+              ),
+            ),
+            _tile(
+              icon: Icons.subscriptions,
+              title: 'サブスク一覧',
+              subtitle: '月払い/年払いの継続課金を一覧管理',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const SubscriptionListScreen()),
               ),
             ),
             const SizedBox(height: 8),
