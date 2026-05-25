@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../mock/mock_data.dart';
 import 'account_editor_screen.dart';
@@ -72,8 +73,8 @@ class SettingsScreen extends StatelessWidget {
             _section('データ管理'),
             _tile(
               icon: Icons.upload_file,
-              title: 'サンプルデータを投入',
-              subtitle: '2026年5月のスプシ準拠データ30件を取引に追加',
+              title: 'サンプルデータを投入（全置換）',
+              subtitle: '既存の取引を全削除し、5月実データ30件 + 住信SBI口座をセット',
               onTap: () => _seedSampleData(context),
             ),
             _tile(
@@ -94,7 +95,10 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('サンプルデータを投入'),
-        content: const Text('現在の取引に30件のサンプルデータを追加します。よろしいですか？'),
+        content: const Text(
+            '現在の取引を全て削除し、2026年5月の実データ30件で置換します。\n'
+            '住信SBI口座（月初¥10,652,701）が未登録なら同時に追加します。\n'
+            'よろしいですか？'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -106,12 +110,27 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
     if (ok != true) return;
-    final repo = TransactionRepository.instance;
-    final existing = await repo.loadAll();
-    await repo.replaceAll([...existing, ...MockData.sampleTransactions()]);
+
+    // 取引を全置換
+    await TransactionRepository.instance
+        .replaceAll(MockData.sampleTransactions());
+
+    // 銀行口座が未登録 or 住信SBIがまだない場合のみ追加
+    final settings = SettingsRepository();
+    final payments = await settings.loadPayments();
+    final hasSbi = payments.bankAccounts.any((b) => b.name == '住信SBI');
+    if (!hasSbi) {
+      await settings.savePayments(payments.copyWith(
+        bankAccounts: [...payments.bankAccounts, MockData.sampleBank],
+      ));
+    }
+
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('サンプル30件を追加しました')),
+      SnackBar(
+          content: Text(hasSbi
+              ? 'サンプル30件で置換しました'
+              : 'サンプル30件 + 住信SBI口座を投入しました')),
     );
   }
 
