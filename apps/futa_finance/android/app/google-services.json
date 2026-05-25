@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "746983928581",
+    "project_id": "futa-finance",
+    "storage_bucket": "futa-finance.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:746983928581:android:4b344d87cd2cdbce6efd6c",
+        "android_client_info": {
+          "package_name": "com.futa.finance"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "746983928581-5g5ueg00evu0ubccej0km8cbciq3kb86.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBdQMVkmrmj1Gopwa7n_ULv4babIuRyYJE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "746983928581-5g5ueg00evu0ubccej0km8cbciq3kb86.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

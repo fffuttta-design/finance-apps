@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:finance_core/finance_core.dart';
 
-void main() {
+import 'firebase_options.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const TakuharuFinanceApp());
 }
 
@@ -35,6 +42,7 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final firebaseProject = Firebase.app().options.projectId;
     return Scaffold(
       appBar: AppBar(
         title: const Text('たくはるファイナンス'),
@@ -63,9 +71,21 @@ class HomePage extends StatelessWidget {
                   color: Colors.white,
                 ),
                 child: const Text(
-                  'v1.0.0+1  /  com.takuharu.finance',
+                  'v1.0.1+2  /  com.takuharu.finance',
                   style: TextStyle(fontSize: 12, color: Color(0xFFFF6B8A), fontFamily: 'monospace'),
                 ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.check_circle, size: 14, color: Color(0xFF4CAF50)),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Firebase接続中: $firebaseProject',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF4CAF50), fontFamily: 'monospace'),
+                  ),
+                ],
               ),
             ],
           ),

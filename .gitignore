@@ -41,11 +41,12 @@ pubspec.lock
 **/ios/ServiceDefinitions.json
 **/ios/Runner/GeneratedPluginRegistrant.*
 
-# Firebase（自動生成・機密含む可能性）
-**/google-services.json
-**/GoogleService-Info.plist
-**/firebase_options.dart
-**/lib/firebase_options*.dart
+# Firebase
+# google-services.json / firebase_options.dart はクライアント側の公開IDを含むため
+# 個人/事業プロジェクトでは通常コミットしてOK（セキュリティはFirestoreルール側で守る）。
+# サービスアカウントキー等の真のシークレットは絶対にコミットしないこと。
+**/serviceAccountKey*.json
+**/firebase-adminsdk-*.json
 
 # 環境変数
 .env
