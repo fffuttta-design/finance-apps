@@ -1,0 +1,37 @@
+name: finance_apps
+publish_to: 'none'
+
+environment:
+  sdk: ">=3.11.4 <4.0.0"
+
+dev_dependencies:
+  melos: ^7.7.0
+
+workspace:
+  - packages/finance_core
+  - apps/futa_finance
+  - apps/takuharu_finance
+
+melos:
+  command:
+    bootstrap:
+      runPubGetInParallel: true
+  scripts:
+    analyze:
+      description: 全パッケージでdart analyzeを実行
+      run: melos exec -- "dart analyze ."
+    format:
+      description: 全パッケージでdart formatを実行
+      run: melos exec -- "dart format ."
+    test:
+      description: 全パッケージでテストを実行
+      run: melos exec --concurrency=1 -- "flutter test"
+    run-futa:
+      description: FutaFinanceを実機で起動
+      run: melos exec --scope="futa_finance" -- "flutter run"
+    run-takuharu:
+      description: たくはるファイナンスを実機で起動
+      run: melos exec --scope="takuharu_finance" -- "flutter run"
+    clean:
+      description: 全パッケージのbuild成果物を削除
+      run: melos exec -- "flutter clean"
