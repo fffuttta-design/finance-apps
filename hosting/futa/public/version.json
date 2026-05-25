@@ -1,0 +1,6 @@
+{
+    "version":  "1.0.12",
+    "buildNumber":  "13",
+    "downloadUrl":  null,
+    "releaseNotes":  "deploy.ps1 動作確認 (Spark対応版)"
+}
