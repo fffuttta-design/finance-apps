@@ -1,4 +1,4 @@
-package com.takuharu.takuharu_finance
+package com.takuharu.finance
 
 import io.flutter.embedding.android.FlutterActivity
 

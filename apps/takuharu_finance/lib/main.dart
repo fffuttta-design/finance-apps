@@ -71,7 +71,7 @@ class HomePage extends StatelessWidget {
                   color: Colors.white,
                 ),
                 child: const Text(
-                  'v1.0.1+2  /  com.takuharu.finance',
+                  'v1.0.2+3  /  com.takuharu.finance',
                   style: TextStyle(fontSize: 12, color: Color(0xFFFF6B8A), fontFamily: 'monospace'),
                 ),
               ),

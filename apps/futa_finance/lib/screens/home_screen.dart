@@ -87,7 +87,7 @@ class HomeScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(4),
           ),
           child: const Text(
-            'v1.0.2+3  /  com.futa.finance',
+            'v1.0.3+4  /  com.futa.finance',
             style: TextStyle(
                 fontSize: 10,
                 color: Color(0xFF6B7280),
