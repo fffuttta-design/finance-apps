@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../data/update_checker.dart';
+import '../data/update_installer.dart';
 import '../mock/mock_data.dart';
 import 'account_editor_screen.dart';
 import 'card_editor_screen.dart';
@@ -22,6 +22,8 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   UpdateCheckResult? _versionResult;
   bool _checking = false;
+  bool _downloading = false;
+  double _downloadProgress = 0;
 
   @override
   void initState() {
@@ -57,12 +59,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  Future<void> _openDownload() async {
+  Future<void> _downloadAndInstall() async {
     final url = _versionResult?.downloadUrl;
     if (url == null) return;
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+    // インストール権限チェック
+    final permStatus =
+        await UpdateInstaller.instance.ensureInstallPermission();
+    if (!mounted) return;
+    if (permStatus != InstallPermissionStatus.granted) {
+      final goSettings = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('インストール許可が必要'),
+          content: const Text(
+              'アプリの更新版を自動インストールするには、'
+              '「不明なソースからのアプリのインストール」を許可する必要があります。\n\n'
+              '設定画面を開きますか？'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('後で')),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('設定を開く')),
+          ],
+        ),
+      );
+      if (goSettings == true) {
+        await UpdateInstaller.instance.openInstallSettings();
+      }
+      return;
+    }
+
+    setState(() {
+      _downloading = true;
+      _downloadProgress = 0;
+    });
+
+    try {
+      final file = await UpdateInstaller.instance.downloadApk(
+        url,
+        onProgress: (p) {
+          if (!mounted) return;
+          setState(() => _downloadProgress = p);
+        },
+      );
+      if (!mounted) return;
+      setState(() => _downloading = false);
+
+      // OSのインストーラを起動
+      final ok = await UpdateInstaller.instance.installApk(file.path);
+      if (!mounted) return;
+      if (!ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('インストーラの起動に失敗しました')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _downloading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('更新版の取得に失敗: $e')),
+      );
     }
   }
 
@@ -233,32 +292,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ],
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _checking ? null : _checkUpdate,
-                  icon: _checking
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.refresh, size: 18),
-                  label: Text(_checking ? '確認中…' : '最新バージョンを確認'),
-                ),
+          if (_downloading) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: _downloadProgress,
+                minHeight: 6,
+                backgroundColor: const Color(0xFFF3F4F6),
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                    Color(0xFF1A237E)),
               ),
-              if (r?.hasUpdate == true && r?.downloadUrl != null) ...[
-                const SizedBox(width: 8),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'ダウンロード中… ${(_downloadProgress * 100).toStringAsFixed(0)}%',
+              style: const TextStyle(
+                  fontSize: 11, color: Color(0xFF6B7280)),
+              textAlign: TextAlign.center,
+            ),
+          ] else ...[
+            Row(
+              children: [
                 Expanded(
-                  child: FilledButton.icon(
-                    onPressed: _openDownload,
-                    icon: const Icon(Icons.download, size: 18),
-                    label: const Text('更新版を入手'),
+                  child: OutlinedButton.icon(
+                    onPressed: _checking ? null : _checkUpdate,
+                    icon: _checking
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child:
+                                CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.refresh, size: 18),
+                    label: Text(_checking ? '確認中…' : '最新バージョンを確認'),
                   ),
                 ),
+                if (r?.hasUpdate == true && r?.downloadUrl != null) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _downloadAndInstall,
+                      icon: const Icon(Icons.download, size: 18),
+                      label: const Text('更新版を入手'),
+                    ),
+                  ),
+                ],
               ],
-            ],
-          ),
+            ),
+          ],
         ],
       ),
     );

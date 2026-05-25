@@ -51,9 +51,9 @@ class UpdateChecker {
   static final UpdateChecker instance = UpdateChecker._();
 
   /// リモート version.json のURL。
-  /// Firebase Hosting にデプロイした想定。プロジェクトに合わせて差し替え。
+  /// GitHub raw 経由で release/futa-version.json を fetch。
   static const String versionUrl =
-      'https://futa-finance.web.app/version.json';
+      'https://raw.githubusercontent.com/fffuttta-design/finance-apps/main/release/futa-version.json';
 
   Future<({String version, String buildNumber})> getCurrent() async {
     final info = await PackageInfo.fromPlatform();
