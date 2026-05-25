@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
@@ -73,11 +74,55 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   }
 
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(
+    DateTime temp = _date;
+    final picked = await showModalBottomSheet<DateTime>(
       context: context,
-      initialDate: _date,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030, 12, 31),
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheet) => SafeArea(
+        child: Container(
+          height: 280,
+          color: Colors.white,
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(sheet, null),
+                    child: const Text('キャンセル',
+                        style: TextStyle(color: Color(0xFF6B7280))),
+                  ),
+                  const Text('日付を選択',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF111827))),
+                  TextButton(
+                    onPressed: () => Navigator.pop(sheet, temp),
+                    child: const Text('完了',
+                        style: TextStyle(
+                            color: Color(0xFF1A237E),
+                            fontWeight: FontWeight.w700)),
+                  ),
+                ],
+              ),
+              Container(height: 1, color: const Color(0xFFE5E7EB)),
+              Expanded(
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.date,
+                  initialDateTime: _date,
+                  minimumDate: DateTime(2020),
+                  maximumDate: DateTime(2030, 12, 31),
+                  dateOrder: DatePickerDateOrder.ymd,
+                  onDateTimeChanged: (d) => temp = d,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
     if (picked != null) setState(() => _date = picked);
   }

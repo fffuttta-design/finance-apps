@@ -250,7 +250,7 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(4),
           ),
           child: const Text(
-            'v1.0.8+9  /  com.futa.finance',
+            'v1.0.9+10  /  com.futa.finance',
             style: TextStyle(
                 fontSize: 10,
                 color: Color(0xFF9CA3AF),
