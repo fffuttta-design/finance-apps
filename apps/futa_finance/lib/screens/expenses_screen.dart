@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
+import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../mock/mock_data.dart';
+import '../utils/category_icons.dart';
 import '../utils/formatters.dart';
 import '../widgets/annual_contracts_card.dart';
 
@@ -18,8 +20,10 @@ class ExpensesScreen extends StatefulWidget {
 
 class _ExpensesScreenState extends State<ExpensesScreen> {
   final _repo = TransactionRepository.instance;
+  final _settings = SettingsRepository();
   StreamSubscription<List<core.Transaction>>? _sub;
   List<core.Transaction> _transactions = [];
+  core.CategoryConfig? _categoryConfig;
   DateTime _focused = DateTime(DateTime.now().year, DateTime.now().month);
 
   @override
@@ -40,8 +44,24 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
   Future<void> _load() async {
     final list = await _repo.loadAll();
+    final cfg = await _settings.loadCategories();
     if (!mounted) return;
-    setState(() => _transactions = list);
+    setState(() {
+      _transactions = list;
+      _categoryConfig = cfg;
+    });
+  }
+
+  /// 大カテゴリ表示名 → アイコン
+  IconData _iconFor(String majorDisplayName) {
+    final cfg = _categoryConfig;
+    if (cfg == null) return Icons.folder_outlined;
+    for (int i = 0; i < cfg.majors.length; i++) {
+      if (cfg.majors[i].displayName(i) == majorDisplayName) {
+        return iconForKey(cfg.majors[i].iconKey);
+      }
+    }
+    return Icons.folder_outlined;
   }
 
   void _prevMonth() {
@@ -202,8 +222,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           tilePadding:
               const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
           childrenPadding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
-          leading: const Icon(Icons.folder_outlined,
-              color: Color(0xFF1A237E), size: 20),
+          leading: Icon(_iconFor(major),
+              color: const Color(0xFF1A237E), size: 20),
           title: Text(major,
               style: const TextStyle(
                   fontSize: 14,

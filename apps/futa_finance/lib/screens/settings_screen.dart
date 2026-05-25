@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
+import '../data/update_checker.dart';
 import '../mock/mock_data.dart';
 import 'account_editor_screen.dart';
 import 'card_editor_screen.dart';
@@ -10,8 +12,59 @@ import 'income_master_screen.dart';
 import 'subscription_list_screen.dart';
 
 /// 設定のトップ画面。各サブ設定への入り口を並べる。
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  UpdateCheckResult? _versionResult;
+  bool _checking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentVersion();
+  }
+
+  Future<void> _loadCurrentVersion() async {
+    final c = await UpdateChecker.instance.getCurrent();
+    if (!mounted) return;
+    setState(() {
+      _versionResult = UpdateCheckResult(
+        currentVersion: c.version,
+        currentBuildNumber: c.buildNumber,
+        hasUpdate: false,
+      );
+    });
+  }
+
+  Future<void> _checkUpdate() async {
+    setState(() => _checking = true);
+    final r = await UpdateChecker.instance.check();
+    if (!mounted) return;
+    setState(() {
+      _versionResult = r;
+      _checking = false;
+    });
+    final msg = r.fetchFailed
+        ? '最新バージョン情報の取得に失敗しました'
+        : r.hasUpdate
+            ? '新しいバージョン ${r.latestFull} が利用可能です'
+            : '最新版です（${r.currentFull}）';
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _openDownload() async {
+    final url = _versionResult?.downloadUrl;
+    if (url == null) return;
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +86,7 @@ class SettingsScreen extends StatelessWidget {
             _tile(
               icon: Icons.category,
               title: 'カテゴリ編集',
-              subtitle: '大カテゴリ・小カテゴリの追加と編集',
+              subtitle: '大カテゴリ・小カテゴリ・アイコンの追加と編集',
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -81,6 +134,11 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
+
+            _section('アプリ情報'),
+            _versionCard(),
+
+            const SizedBox(height: 8),
             _section('データ管理'),
             _tile(
               icon: Icons.upload_file,
@@ -97,6 +155,111 @@ class SettingsScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _versionCard() {
+    final r = _versionResult;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: r?.hasUpdate == true
+              ? const Color(0xFF1A237E)
+              : const Color(0xFFE5E7EB),
+          width: r?.hasUpdate == true ? 2 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.info_outline, color: Color(0xFF1A237E)),
+              const SizedBox(width: 8),
+              const Text('現在のバージョン',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF6B7280),
+                      letterSpacing: 0.5)),
+              const Spacer(),
+              Text(
+                r?.currentFull ?? '取得中…',
+                style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF111827),
+                    fontFamily: 'monospace'),
+              ),
+            ],
+          ),
+          if (r?.latestVersion != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  r!.hasUpdate ? Icons.system_update : Icons.check_circle,
+                  size: 16,
+                  color: r.hasUpdate
+                      ? const Color(0xFFEA580C)
+                      : const Color(0xFF16A34A),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    r.hasUpdate
+                        ? '新しいバージョンあり: ${r.latestFull}'
+                        : '最新版です',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: r.hasUpdate
+                          ? const Color(0xFFEA580C)
+                          : const Color(0xFF16A34A),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (r.releaseNotes != null) ...[
+              const SizedBox(height: 4),
+              Text(r.releaseNotes!,
+                  style: const TextStyle(
+                      fontSize: 11, color: Color(0xFF6B7280))),
+            ],
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _checking ? null : _checkUpdate,
+                  icon: _checking
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.refresh, size: 18),
+                  label: Text(_checking ? '確認中…' : '最新バージョンを確認'),
+                ),
+              ),
+              if (r?.hasUpdate == true && r?.downloadUrl != null) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _openDownload,
+                    icon: const Icon(Icons.download, size: 18),
+                    label: const Text('更新版を入手'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -122,11 +285,9 @@ class SettingsScreen extends StatelessWidget {
     );
     if (ok != true) return;
 
-    // 取引を全置換
     await TransactionRepository.instance
         .replaceAll(MockData.sampleTransactions());
 
-    // 銀行口座が未登録 or 住信SBIがまだない場合のみ追加
     final settings = SettingsRepository();
     final payments = await settings.loadPayments();
     final hasSbi = payments.bankAccounts.any((b) => b.name == '住信SBI');

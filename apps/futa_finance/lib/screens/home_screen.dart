@@ -8,6 +8,7 @@ import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../mock/dashboard_summary.dart';
 import '../mock/mock_data.dart';
+import '../utils/formatters.dart';
 import '../widgets/cash_flow_card.dart';
 import 'expense_input_screen.dart';
 import 'income_input_screen.dart';
@@ -169,18 +170,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        actions: [
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Text(
-                '${today.year}年${today.month}月',
-                style:
-                    const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
-              ),
-            ),
-          ),
-        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: const Color(0xFF1A237E),
@@ -198,12 +187,57 @@ class _HomeScreenState extends State<HomeScreen> {
                       padding:
                           const EdgeInsets.fromLTRB(16, 8, 16, 100),
                       children: [
+                        _todayHeader(today),
+                        const SizedBox(height: 12),
                         CashFlowCard(summary: summary),
                         const SizedBox(height: 24),
                         _footer(),
                       ],
                     ),
             ),
+    );
+  }
+
+  Widget _todayHeader(DateTime today) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE0E7FF),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.today,
+                color: Color(0xFF1A237E), size: 20),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('今日',
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: Color(0xFF9CA3AF),
+                      letterSpacing: 1)),
+              const SizedBox(height: 2),
+              Text(
+                '${today.year}年${today.month}月${today.day}日（${weekdayKanji(today)}）',
+                style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF111827)),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -236,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(4),
           ),
           child: const Text(
-            'v1.0.11+12  /  com.futa.finance',
+            'v1.0.12+13  /  com.futa.finance',
             style: TextStyle(
                 fontSize: 10,
                 color: Color(0xFF9CA3AF),
