@@ -14,9 +14,16 @@ class CashFlowCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF161B26),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF1F2937), width: 1),
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -24,24 +31,27 @@ class CashFlowCard extends StatelessWidget {
           Row(
             children: [
               const Icon(Icons.account_balance_wallet,
-                  size: 16, color: Color(0xFF7986CB)),
+                  size: 16, color: Color(0xFF1A237E)),
               const SizedBox(width: 6),
               Text(
                 '資金口座（${summary.account.name}）',
                 style: const TextStyle(
-                    fontSize: 12, color: Color(0xFF9CA3AF), letterSpacing: 0.5),
+                    fontSize: 12,
+                    color: Color(0xFF6B7280),
+                    letterSpacing: 0.5),
               ),
             ],
           ),
           const SizedBox(height: 16),
           _row('月初', formatYen(summary.account.monthStartBalance),
-              const Color(0xFFE5E7EB), fontSize: 14),
+              const Color(0xFF111827),
+              fontSize: 14),
           const SizedBox(height: 6),
           _row('当月支出', formatYen(-summary.monthTotal, withSign: true),
-              const Color(0xFFEF5350),
+              const Color(0xFFDC2626),
               fontSize: 14, mono: true),
           const SizedBox(height: 8),
-          Container(height: 1, color: const Color(0xFF1F2937)),
+          Container(height: 1, color: const Color(0xFFE5E7EB)),
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -49,13 +59,13 @@ class CashFlowCard extends StatelessWidget {
               const Text('想定残高',
                   style: TextStyle(
                       fontSize: 13,
-                      color: Color(0xFFE5E7EB),
+                      color: Color(0xFF111827),
                       fontWeight: FontWeight.w500)),
               Text(
                 formatYen(summary.projectedRemaining),
                 style: const TextStyle(
                   fontSize: 22,
-                  color: Color(0xFF66BB6A),
+                  color: Color(0xFF16A34A),
                   fontWeight: FontWeight.bold,
                   fontFamily: 'monospace',
                 ),
@@ -73,7 +83,7 @@ class CashFlowCard extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF9CA3AF))),
+            style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
         Text(value,
             style: TextStyle(
               fontSize: fontSize,

@@ -23,9 +23,15 @@ class FutaFinanceApp extends StatelessWidget {
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF1A237E),
-          brightness: Brightness.dark,
+          brightness: Brightness.light,
         ),
-        scaffoldBackgroundColor: const Color(0xFF0E1116),
+        scaffoldBackgroundColor: const Color(0xFFFAFAFA),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Color(0xFF111827),
+          elevation: 0,
+          surfaceTintColor: Colors.white,
+        ),
       ),
       home: const HomeScreen(),
     );

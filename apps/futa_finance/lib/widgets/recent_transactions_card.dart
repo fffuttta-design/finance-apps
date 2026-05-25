@@ -14,21 +14,27 @@ class RecentTransactionsCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF161B26),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF1F2937), width: 1),
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x0F000000), blurRadius: 8, offset: Offset(0, 2))
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(Icons.timeline, size: 16, color: Color(0xFF7986CB)),
+              Icon(Icons.timeline, size: 16, color: Color(0xFF1A237E)),
               SizedBox(width: 6),
               Text(
                 '直近の動き',
                 style: TextStyle(
-                    fontSize: 12, color: Color(0xFF9CA3AF), letterSpacing: 0.5),
+                    fontSize: 12,
+                    color: Color(0xFF6B7280),
+                    letterSpacing: 0.5),
               ),
             ],
           ),
@@ -43,7 +49,7 @@ class RecentTransactionsCard extends StatelessWidget {
                         formatMonthDay(t.date),
                         style: const TextStyle(
                             fontSize: 11,
-                            color: Color(0xFF9CA3AF),
+                            color: Color(0xFF6B7280),
                             fontFamily: 'monospace'),
                       ),
                     ),
@@ -54,7 +60,7 @@ class RecentTransactionsCard extends StatelessWidget {
                           Text(
                             t.description,
                             style: const TextStyle(
-                                fontSize: 13, color: Color(0xFFE5E7EB)),
+                                fontSize: 13, color: Color(0xFF111827)),
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
                           ),
@@ -62,7 +68,7 @@ class RecentTransactionsCard extends StatelessWidget {
                           Text(
                             '${t.category.major.substring(2)} · ${t.paymentMethod}',
                             style: const TextStyle(
-                                fontSize: 10, color: Color(0xFF6B7280)),
+                                fontSize: 10, color: Color(0xFF9CA3AF)),
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
                           ),
@@ -73,7 +79,7 @@ class RecentTransactionsCard extends StatelessWidget {
                       formatYen(-t.amount, withSign: true),
                       style: const TextStyle(
                           fontSize: 13,
-                          color: Color(0xFFEF5350),
+                          color: Color(0xFFDC2626),
                           fontFamily: 'monospace',
                           fontWeight: FontWeight.w600),
                     ),

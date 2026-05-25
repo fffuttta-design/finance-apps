@@ -12,10 +12,10 @@ class AnnualContractsCard extends StatelessWidget {
       {super.key, required this.contracts, required this.today});
 
   Color _countdownColor(int? days) {
-    if (days == null) return const Color(0xFF6B7280);
-    if (days < 30) return const Color(0xFFEF5350);
-    if (days < 90) return const Color(0xFFFFB74D);
-    return const Color(0xFF7986CB);
+    if (days == null) return const Color(0xFF9CA3AF);
+    if (days < 30) return const Color(0xFFDC2626);
+    if (days < 90) return const Color(0xFFF59E0B);
+    return const Color(0xFF1A237E);
   }
 
   @override
@@ -23,21 +23,27 @@ class AnnualContractsCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF161B26),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF1F2937), width: 1),
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x0F000000), blurRadius: 8, offset: Offset(0, 2))
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(Icons.event_repeat, size: 16, color: Color(0xFF7986CB)),
+              Icon(Icons.event_repeat, size: 16, color: Color(0xFF1A237E)),
               SizedBox(width: 6),
               Text(
                 '年間払い契約',
                 style: TextStyle(
-                    fontSize: 12, color: Color(0xFF9CA3AF), letterSpacing: 0.5),
+                    fontSize: 12,
+                    color: Color(0xFF6B7280),
+                    letterSpacing: 0.5),
               ),
             ],
           ),
@@ -57,7 +63,7 @@ class AnnualContractsCard extends StatelessWidget {
                           c.name,
                           style: const TextStyle(
                               fontSize: 13,
-                              color: Color(0xFFE5E7EB),
+                              color: Color(0xFF111827),
                               fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 2),
@@ -74,7 +80,7 @@ class AnnualContractsCard extends StatelessWidget {
                     formatYen(c.amount),
                     style: const TextStyle(
                         fontSize: 14,
-                        color: Color(0xFFE5E7EB),
+                        color: Color(0xFF111827),
                         fontFamily: 'monospace',
                         fontWeight: FontWeight.w600),
                   ),

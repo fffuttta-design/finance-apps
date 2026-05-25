@@ -26,10 +26,10 @@ class CategoryHeatGrid extends StatelessWidget {
     final base = _baseline[major] ?? 1;
     final ratio = amount / base;
     if (ratio < 0.5) return (color: const Color(0xFF3B82F6), emoji: '🟦');
-    if (ratio < 1.1) return (color: const Color(0xFF66BB6A), emoji: '🟢');
-    if (ratio < 1.5) return (color: const Color(0xFFFFB74D), emoji: '🟡');
-    if (ratio < 2.0) return (color: const Color(0xFFFF8A65), emoji: '🟠');
-    return (color: const Color(0xFFEF5350), emoji: '🔥');
+    if (ratio < 1.1) return (color: const Color(0xFF16A34A), emoji: '🟢');
+    if (ratio < 1.5) return (color: const Color(0xFFF59E0B), emoji: '🟡');
+    if (ratio < 2.0) return (color: const Color(0xFFEA580C), emoji: '🟠');
+    return (color: const Color(0xFFDC2626), emoji: '🔥');
   }
 
   @override
@@ -38,9 +38,13 @@ class CategoryHeatGrid extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF161B26),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF1F2937), width: 1),
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x0F000000), blurRadius: 8, offset: Offset(0, 2))
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,12 +52,14 @@ class CategoryHeatGrid extends StatelessWidget {
           const Row(
             children: [
               Icon(Icons.local_fire_department,
-                  size: 16, color: Color(0xFFFFB74D)),
+                  size: 16, color: Color(0xFFEA580C)),
               SizedBox(width: 6),
               Text(
                 'カテゴリ別熱量',
                 style: TextStyle(
-                    fontSize: 12, color: Color(0xFF9CA3AF), letterSpacing: 0.5),
+                    fontSize: 12,
+                    color: Color(0xFF6B7280),
+                    letterSpacing: 0.5),
               ),
             ],
           ),
@@ -71,7 +77,7 @@ class CategoryHeatGrid extends StatelessWidget {
                     child: Text(
                       major,
                       style: const TextStyle(
-                          fontSize: 12, color: Color(0xFFE5E7EB)),
+                          fontSize: 12, color: Color(0xFF111827)),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -80,7 +86,7 @@ class CategoryHeatGrid extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 13,
                       color: amount == 0
-                          ? const Color(0xFF4B5563)
+                          ? const Color(0xFFD1D5DB)
                           : heat.color,
                       fontFamily: 'monospace',
                       fontWeight: FontWeight.w600,
