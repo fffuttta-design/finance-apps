@@ -26,9 +26,13 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   String? _subCategory;
   String? _paymentMethod;
   final _descCtrl = TextEditingController();
-  final _amountCtrl = TextEditingController();
+  final _amountCtrl = TextEditingController(); // 円金額（USD時はここに概算円）
+  final _usdAmountCtrl = TextEditingController(); // USD金額
   final _memoCtrl = TextEditingController();
   bool _saving = false;
+
+  /// 入力通貨。'JPY' or 'USD'。
+  String _currency = 'JPY';
 
   @override
   void initState() {
@@ -40,6 +44,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   void dispose() {
     _descCtrl.dispose();
     _amountCtrl.dispose();
+    _usdAmountCtrl.dispose();
     _memoCtrl.dispose();
     super.dispose();
   }
@@ -145,6 +150,18 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       return;
     }
 
+    // USDなら USD金額バリデーション
+    double? usdAmount;
+    if (_currency == 'USD') {
+      usdAmount = double.tryParse(_usdAmountCtrl.text.trim());
+      if (usdAmount == null || usdAmount <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('USD金額は0より大きい数値で入力してください')),
+        );
+        return;
+      }
+    }
+
     setState(() => _saving = true);
     final tx = core.Transaction(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -156,6 +173,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       description: _descCtrl.text.trim(),
       amount: amount,
       memo: _memoCtrl.text.trim().isEmpty ? null : _memoCtrl.text.trim(),
+      originalCurrency: _currency == 'USD' ? 'USD' : null,
+      originalAmount: usdAmount,
     );
     await TransactionRepository.instance.add(tx);
     if (!mounted) return;
@@ -288,8 +307,48 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               ),
               const SizedBox(height: 16),
 
-              // 金額
-              _label('金額（円）'),
+              // 通貨切替
+              _label('通貨'),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(
+                    value: 'JPY',
+                    label: Text('円'),
+                    icon: Icon(Icons.currency_yen),
+                  ),
+                  ButtonSegment(
+                    value: 'USD',
+                    label: Text('USD'),
+                    icon: Icon(Icons.attach_money),
+                  ),
+                ],
+                selected: {_currency},
+                onSelectionChanged: (s) =>
+                    setState(() => _currency = s.first),
+              ),
+              const SizedBox(height: 16),
+
+              if (_currency == 'USD') ...[
+                _label('USD金額（\$）'),
+                TextFormField(
+                  controller: _usdAmountCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true),
+                  decoration: _inputDecoration(),
+                  style: const TextStyle(
+                      fontFamily: 'monospace', fontSize: 16),
+                  validator: (v) {
+                    if (_currency != 'USD') return null;
+                    if (v == null || v.trim().isEmpty) return '入力してください';
+                    if (double.tryParse(v.trim()) == null) return '数値で入力';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                _label('概算金額（円）— 集計に使われる値'),
+              ] else ...[
+                _label('金額（円）'),
+              ],
               TextFormField(
                 controller: _amountCtrl,
                 keyboardType: TextInputType.number,

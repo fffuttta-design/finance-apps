@@ -40,6 +40,13 @@ class Transaction {
   /// この取引が紐づく収入マスタID（収入時のみ）。
   final String? incomeSourceId;
 
+  /// 元通貨コード（例: "USD"）。null なら JPY。
+  final String? originalCurrency;
+
+  /// 元通貨での金額（例: 94.78 USD）。null なら JPY のみ。
+  /// amount フィールド側には常に円換算値を入れる。
+  final double? originalAmount;
+
   const Transaction({
     required this.id,
     required this.date,
@@ -51,6 +58,8 @@ class Transaction {
     this.receiptUrl,
     this.memo,
     this.incomeSourceId,
+    this.originalCurrency,
+    this.originalAmount,
   });
 
   Map<String, dynamic> toJson() => {
@@ -65,6 +74,8 @@ class Transaction {
         'receiptUrl': receiptUrl,
         'memo': memo,
         'incomeSourceId': incomeSourceId,
+        'originalCurrency': originalCurrency,
+        'originalAmount': originalAmount,
       };
 
   factory Transaction.fromJson(Map<String, dynamic> j) => Transaction(
@@ -84,6 +95,8 @@ class Transaction {
         receiptUrl: j['receiptUrl'] as String?,
         memo: j['memo'] as String?,
         incomeSourceId: j['incomeSourceId'] as String?,
+        originalCurrency: j['originalCurrency'] as String?,
+        originalAmount: (j['originalAmount'] as num?)?.toDouble(),
       );
 
   Transaction copyWith({
@@ -96,6 +109,8 @@ class Transaction {
     String? receiptUrl,
     String? memo,
     String? incomeSourceId,
+    String? originalCurrency,
+    double? originalAmount,
   }) =>
       Transaction(
         id: id,
@@ -108,5 +123,7 @@ class Transaction {
         receiptUrl: receiptUrl ?? this.receiptUrl,
         memo: memo ?? this.memo,
         incomeSourceId: incomeSourceId ?? this.incomeSourceId,
+        originalCurrency: originalCurrency ?? this.originalCurrency,
+        originalAmount: originalAmount ?? this.originalAmount,
       );
 }

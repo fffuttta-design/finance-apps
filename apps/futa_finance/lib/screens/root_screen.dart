@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
 import 'calendar_screen.dart';
+import 'expenses_screen.dart';
 import 'home_screen.dart';
 import 'report_screen.dart';
 import 'settings_screen.dart';
 
-/// アプリのルートシェル。下部タブで4画面を切り替える。
+/// アプリのルートシェル。下部タブで5画面を切り替える。
 /// 状態はIndexedStackで保持（タブ遷移してもスクロール位置や入力中の値が残る）。
 class RootScreen extends StatefulWidget {
   const RootScreen({super.key});
@@ -19,6 +20,7 @@ class _RootScreenState extends State<RootScreen> {
 
   static const _tabs = <Widget>[
     HomeScreen(),
+    ExpensesScreen(),
     CalendarScreen(),
     ReportScreen(),
     SettingsScreen(),
@@ -34,11 +36,17 @@ class _RootScreenState extends State<RootScreen> {
         backgroundColor: Colors.white,
         indicatorColor: const Color(0xFFE0E7FF),
         surfaceTintColor: Colors.white,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home, color: Color(0xFF1A237E)),
             label: 'ホーム',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.receipt_long_outlined),
+            selectedIcon: Icon(Icons.receipt_long, color: Color(0xFF1A237E)),
+            label: '支出',
           ),
           NavigationDestination(
             icon: Icon(Icons.calendar_month_outlined),
