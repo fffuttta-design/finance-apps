@@ -237,8 +237,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               _label('取引内容'),
               TextFormField(
                 controller: _descCtrl,
-                decoration:
-                    _inputDecoration(hint: '例: ChatGPT, Claude Pro'),
+                decoration: _inputDecoration(),
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? '入力してください' : null,
               ),
@@ -249,7 +248,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               TextFormField(
                 controller: _amountCtrl,
                 keyboardType: TextInputType.number,
-                decoration: _inputDecoration(hint: '例: 3580'),
+                decoration: _inputDecoration(),
                 style: const TextStyle(
                     fontFamily: 'monospace', fontSize: 16),
                 validator: (v) {
@@ -265,7 +264,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               TextFormField(
                 controller: _memoCtrl,
                 maxLines: 2,
-                decoration: _inputDecoration(hint: '例: 毎月X日計上'),
+                decoration: _inputDecoration(),
               ),
               const SizedBox(height: 32),
 
