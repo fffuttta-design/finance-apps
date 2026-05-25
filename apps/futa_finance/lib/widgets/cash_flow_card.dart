@@ -34,7 +34,7 @@ class CashFlowCard extends StatelessWidget {
                   size: 16, color: Color(0xFF1A237E)),
               const SizedBox(width: 6),
               Text(
-                '資金口座（${summary.account.name}）',
+                '資金口座（${summary.accountName}）',
                 style: const TextStyle(
                     fontSize: 12,
                     color: Color(0xFF6B7280),
@@ -43,11 +43,17 @@ class CashFlowCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          _row('月初', formatYen(summary.account.monthStartBalance),
+          _row('月初', formatYen(summary.monthStartBalance),
               const Color(0xFF111827),
               fontSize: 14),
           const SizedBox(height: 6),
-          _row('当月支出', formatYen(-summary.monthTotal, withSign: true),
+          if (summary.monthIncomeTotal > 0) ...[
+            _row('当月収入', formatYen(summary.monthIncomeTotal, withSign: true),
+                const Color(0xFF16A34A),
+                fontSize: 14, mono: true),
+            const SizedBox(height: 6),
+          ],
+          _row('当月支出', formatYen(-summary.monthExpenseTotal, withSign: true),
               const Color(0xFFDC2626),
               fontSize: 14, mono: true),
           const SizedBox(height: 8),

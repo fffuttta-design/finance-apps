@@ -34,7 +34,7 @@ class CategoryHeatGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totals = summary.totalByMajor;
+    final totals = summary.expenseByMajor;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(

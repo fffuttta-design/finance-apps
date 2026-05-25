@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../data/transaction_repository.dart';
+import '../mock/mock_data.dart';
 import 'account_editor_screen.dart';
 import 'card_editor_screen.dart';
 import 'category_editor_screen.dart';
+import 'income_master_screen.dart';
 
 /// 設定のトップ画面。各サブ設定への入り口を並べる。
 class SettingsScreen extends StatelessWidget {
@@ -55,9 +58,86 @@ class SettingsScreen extends StatelessWidget {
                     builder: (_) => const CardEditorScreen()),
               ),
             ),
+            _tile(
+              icon: Icons.attach_money,
+              title: '収入マスタ',
+              subtitle: '継続収入・単発収入のテンプレート登録',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const IncomeMasterScreen()),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _section('データ管理'),
+            _tile(
+              icon: Icons.upload_file,
+              title: 'サンプルデータを投入',
+              subtitle: '2026年5月のスプシ準拠データ30件を取引に追加',
+              onTap: () => _seedSampleData(context),
+            ),
+            _tile(
+              icon: Icons.delete_sweep,
+              title: '全取引を削除',
+              subtitle: '入力済みの取引を全て消去（戻せません）',
+              onTap: () => _clearAll(context),
+              danger: true,
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _seedSampleData(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('サンプルデータを投入'),
+        content: const Text('現在の取引に30件のサンプルデータを追加します。よろしいですか？'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('投入')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final repo = TransactionRepository.instance;
+    final existing = await repo.loadAll();
+    await repo.replaceAll([...existing, ...MockData.sampleTransactions()]);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('サンプル30件を追加しました')),
+    );
+  }
+
+  Future<void> _clearAll(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('全取引を削除'),
+        content: const Text('登録されている全ての取引を削除します。\nこの操作は取り消せません。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+              style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFDC2626)),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('削除')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await TransactionRepository.instance.clear();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('全取引を削除しました')),
     );
   }
 
@@ -78,7 +158,10 @@ class SettingsScreen extends StatelessWidget {
     required String title,
     required String subtitle,
     required VoidCallback onTap,
+    bool danger = false,
   }) {
+    final iconColor =
+        danger ? const Color(0xFFDC2626) : const Color(0xFF1A237E);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -87,7 +170,7 @@ class SettingsScreen extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
       child: ListTile(
-        leading: Icon(icon, color: const Color(0xFF1A237E)),
+        leading: Icon(icon, color: iconColor),
         title: Text(title,
             style: const TextStyle(
                 fontSize: 14,
