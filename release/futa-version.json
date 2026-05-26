@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.13",
-    "buildNumber":  "14",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.13/futa-finance-v1.0.13.apk",
-    "releaseNotes":  "GitHub Releases配信 + 半自動インストール (アセット名修正)"
+    "version":  "1.0.15",
+    "buildNumber":  "16",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.15/futa-finance-v1.0.15.apk",
+    "releaseNotes":  "v1.0.15: 月末締め機能を追加（集計タブ）。設定からチェックリスト編集可能。"
 }
