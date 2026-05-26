@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.21",
-    "buildNumber":  "22",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.21/futa-finance-v1.0.21.apk",
-    "releaseNotes":  "v1.0.21: 固定費にユーザーカテゴリ追加(セクション分け)、ドラッグ並び替え、tile縦幅圧縮、毎月◯日強調、Summary整理(月額換算+年間総コスト)"
+    "version":  "1.0.22",
+    "buildNumber":  "23",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.22/futa-finance-v1.0.22.apk",
+    "releaseNotes":  "v1.0.22: カテゴリアイコンに画像URL対応、小カテゴリにもアイコン導入、BrandLogoにcacheWidth/cacheHeight追加でメモリ最適化"
 }
