@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.22",
-    "buildNumber":  "23",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.22/futa-finance-v1.0.22.apk",
-    "releaseNotes":  "v1.0.22: カテゴリアイコンに画像URL対応、小カテゴリにもアイコン導入、BrandLogoにcacheWidth/cacheHeight追加でメモリ最適化"
+    "version":  "1.0.23",
+    "buildNumber":  "24",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.23/futa-finance-v1.0.23.apk",
+    "releaseNotes":  "v1.0.23: BrandLogoのcacheサイズをDPR連動で画質劣化ゼロに / 絵文字パレットを折りたたみ式にして初期表示を軽量化"
 }
