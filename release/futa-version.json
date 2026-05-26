@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.16",
-    "buildNumber":  "17",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.16/futa-finance-v1.0.16.apk",
-    "releaseNotes":  "v1.0.16: 支出 行表示の支払方法非表示/カテゴリ表示も並び替え対応、チェックリストにサブ項目（2階層）、ホームのフローに差引（黒字/赤字）統合"
+    "version":  "1.0.17",
+    "buildNumber":  "18",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.17/futa-finance-v1.0.17.apk",
+    "releaseNotes":  "v1.0.17: 事業モードのフローを売上/経費表記に / 行表示に支出名カラム追加 / 支出にグラフ(ドーナツ円)ビュー追加"
 }
