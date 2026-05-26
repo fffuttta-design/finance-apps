@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.23",
-    "buildNumber":  "24",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.23/futa-finance-v1.0.23.apk",
-    "releaseNotes":  "v1.0.23: BrandLogoのcacheサイズをDPR連動で画質劣化ゼロに / 絵文字パレットを折りたたみ式にして初期表示を軽量化"
+    "version":  "1.0.24",
+    "buildNumber":  "25",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.24/futa-finance-v1.0.24.apk",
+    "releaseNotes":  "v1.0.24: JSONバックアップ機能を追加（設定→データ管理）。全モード全データの書き出し/復元、共有シート/ファイルピッカー連携"
 }
