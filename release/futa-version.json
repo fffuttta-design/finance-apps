@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.25",
-    "buildNumber":  "26",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.25/futa-finance-v1.0.25.apk",
-    "releaseNotes":  "v1.0.25: バックアップ取り込み時の日本語文字化け修正 (String.fromCharCodes→utf8.decode)"
+    "version":  "1.0.26",
+    "buildNumber":  "27",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.26/futa-finance-v1.0.26.apk",
+    "releaseNotes":  "v1.0.26: DEBUGバナー非表示 / FAB廃止しAppBar右上の+アイコンに統一（支出/収入/ホーム）"
 }
