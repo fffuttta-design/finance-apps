@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.19",
-    "buildNumber":  "20",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.19/futa-finance-v1.0.19.apk",
-    "releaseNotes":  "v1.0.19: 固定費編集をBottomSheet化（ハンドル/スクロール領域/固定フッター付き）"
+    "version":  "1.0.20",
+    "buildNumber":  "21",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.20/futa-finance-v1.0.20.apk",
+    "releaseNotes":  "v1.0.20: カード/銀行口座/チェックリスト編集もBottomSheet化、全入力ラベルをfloating常時表示に統一"
 }
