@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.27",
-    "buildNumber":  "28",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.27/futa-finance-v1.0.27.apk",
-    "releaseNotes":  "v1.0.27: 自動アップデート機能 - 起動時に新版検知でダイアログ→そのままDL+インストール、スキップ記憶対応"
+    "version":  "1.0.28",
+    "buildNumber":  "29",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.28/futa-finance-v1.0.28.apk",
+    "releaseNotes":  "v1.0.28: APKをreleaseビルドに変更（150MB→数十MBへ軽量化）/ バックアップ取り込みでpath優先化+UTF-8 BOM除去（文字化け根絶）"
 }
