@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.15",
-    "buildNumber":  "16",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.15/futa-finance-v1.0.15.apk",
-    "releaseNotes":  "v1.0.15: 月末締め機能を追加（集計タブ）。設定からチェックリスト編集可能。"
+    "version":  "1.0.16",
+    "buildNumber":  "17",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.16/futa-finance-v1.0.16.apk",
+    "releaseNotes":  "v1.0.16: 支出 行表示の支払方法非表示/カテゴリ表示も並び替え対応、チェックリストにサブ項目（2階層）、ホームのフローに差引（黒字/赤字）統合"
 }
