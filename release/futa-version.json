@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.18",
-    "buildNumber":  "19",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.18/futa-finance-v1.0.18.apk",
-    "releaseNotes":  "v1.0.18: 固定費tileで月額/年換算を強調表示、ロゴ正方形統一(cover)、支払方法ドロップダウン未指定削除+クリア対応、ロゴURLヒント文言削除"
+    "version":  "1.0.19",
+    "buildNumber":  "20",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.19/futa-finance-v1.0.19.apk",
+    "releaseNotes":  "v1.0.19: 固定費編集をBottomSheet化（ハンドル/スクロール領域/固定フッター付き）"
 }
