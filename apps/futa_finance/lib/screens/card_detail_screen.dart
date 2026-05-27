@@ -122,13 +122,13 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
             ],
           );
           if (constraints.maxWidth >= 900) {
-            return Align(
-              alignment: Alignment.topCenter,
-              child: SizedBox(
-                width: _kContentMaxWidth,
-                height: constraints.maxHeight,
-                child: content,
-              ),
+            // Row+Spacer で中央寄せ（Align+SizedBox(height) より安定）
+            return Row(
+              children: [
+                const Spacer(),
+                SizedBox(width: _kContentMaxWidth, child: content),
+                const Spacer(),
+              ],
             );
           }
           return content;

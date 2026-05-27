@@ -290,16 +290,18 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
               ],
             );
             if (constraints.maxWidth >= 900) {
-              // Center+ConstrainedBox(maxWidth)では高さ制約が抜けて
-              // Column内のExpandedが潰れることがあるため、SizedBoxで
-              // 明示的に width/height を与える。
-              return Align(
-                alignment: Alignment.topCenter,
-                child: SizedBox(
-                  width: _kContentMaxWidth,
-                  height: constraints.maxHeight,
-                  child: content,
-                ),
+              // Row+Spacer で中央寄せ。SizedBoxは幅だけ指定して高さは
+              // 親(Row)から受け取る形にすると、内側Columnの Expanded が
+              // finite な親制約を持って正常に動作する。
+              return Row(
+                children: [
+                  const Spacer(),
+                  SizedBox(
+                    width: _kContentMaxWidth,
+                    child: content,
+                  ),
+                  const Spacer(),
+                ],
               );
             }
             return content;
