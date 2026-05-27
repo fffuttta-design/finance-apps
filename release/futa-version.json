@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.36",
-    "buildNumber":  "37",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.36/futa-finance-v1.0.36.apk",
-    "releaseNotes":  "v1.0.36: 固定費一覧に並び順切替(手動/月額高い順/安い順) + カテゴリ表示ON/OFFトグル"
+    "version":  "1.0.37",
+    "buildNumber":  "38",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.37/futa-finance-v1.0.37.apk",
+    "releaseNotes":  "v1.0.37: 固定費月額換算文字強調 / 資金口座→ウォレットに改名 / 事業-個人モードで背景色を薄紺-薄オレンジに分離 / ホーム+ボタンに「記録」テキスト追加"
 }
