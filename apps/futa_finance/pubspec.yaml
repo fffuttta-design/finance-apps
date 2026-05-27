@@ -50,6 +50,7 @@ dependencies:
   path_provider: ^2.1.5
   share_plus: ^11.0.0
   file_picker: ^10.1.0
+  desktop_drop: ^0.6.0
 
   finance_core:
     path: ../../packages/finance_core

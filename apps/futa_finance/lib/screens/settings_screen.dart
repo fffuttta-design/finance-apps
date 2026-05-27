@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -230,6 +232,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               subtitle: 'JSONファイルを取り込んで既存データを上書き',
               onTap: () => _importBackup(context),
             ),
+            // Web 専用: D&D で取り込めるゾーン。
+            // ブラウザの仕様上、ファイルピッカーに絶対パスを指定できないため
+            // 「H:\マイドライブ\ツール開発\FutaFinance\」 をエクスプローラで
+            // 開いておき、JSONファイルをここにドロップしてもらう運用。
+            if (kIsWeb) _importDropZone(context),
             _tile(
               icon: Icons.restore,
               title: '直前の状態に戻す（自動スナップショット）',
@@ -984,7 +991,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // 優先順: path > bytes
       // Android の file_picker は path が確実に取れる場合が多い。
       // File.readAsString(encoding: utf8) は明示的に UTF-8 でデコードする。
-      if (picked.path != null) {
+      // Web では path が null になり bytes 経路に入る。
+      if (!kIsWeb && picked.path != null) {
         jsonString = await File(picked.path!).readAsString(encoding: utf8);
       } else if (picked.bytes != null) {
         jsonString = utf8.decode(picked.bytes!);
@@ -992,19 +1000,136 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (jsonString == null || jsonString.isEmpty) {
         throw const BackupException('ファイルを読み込めませんでした');
       }
-      // UTF-8 BOM が付いている場合は除去（パース失敗防止）。
-      // Windows のエディタで保存し直された JSON は BOM 付くことがある。
-      if (jsonString.startsWith('﻿')) {
-        jsonString = jsonString.substring(1);
-      }
-
       if (!context.mounted) return;
+      await _performBackupImport(context, jsonString, picked.name);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('取り込みに失敗しました: $e'),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+    }
+  }
+
+  /// 取り込みドロップゾーン（Web専用）。
+  /// JSON ファイルをこのエリアにドラッグ&ドロップで取り込む。
+  /// `H:\マイドライブ\ツール開発\FutaFinance\` をエクスプローラで
+  /// 開いておけば、そのままドラッグして即時取り込める。
+  bool _isDragHover = false;
+
+  Widget _importDropZone(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+      child: DropTarget(
+        onDragEntered: (_) => setState(() => _isDragHover = true),
+        onDragExited: (_) => setState(() => _isDragHover = false),
+        onDragDone: (details) async {
+          setState(() => _isDragHover = false);
+          if (details.files.isEmpty) return;
+          final f = details.files.first;
+          // 拡張子チェック（.json のみ受け付ける）
+          if (!f.name.toLowerCase().endsWith('.json')) {
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('JSONファイルをドロップしてください'),
+                backgroundColor: Color(0xFFDC2626),
+              ),
+            );
+            return;
+          }
+          try {
+            final bytes = await f.readAsBytes();
+            String jsonString = utf8.decode(bytes);
+            if (jsonString.startsWith('﻿')) {
+              jsonString = jsonString.substring(1);
+            }
+            if (!context.mounted) return;
+            await _performBackupImport(context, jsonString, f.name);
+          } catch (e) {
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('取り込みに失敗しました: $e'),
+                backgroundColor: const Color(0xFFDC2626),
+              ),
+            );
+          }
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+          decoration: BoxDecoration(
+            color: _isDragHover
+                ? const Color(0xFFEFF6FF)
+                : const Color(0xFFFAFAFA),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: _isDragHover
+                  ? const Color(0xFF2563EB)
+                  : const Color(0xFFD1D5DB),
+              width: _isDragHover ? 2 : 1.5,
+              style: BorderStyle.solid,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.file_download_outlined,
+                size: 28,
+                color: _isDragHover
+                    ? const Color(0xFF2563EB)
+                    : const Color(0xFF6B7280),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _isDragHover
+                          ? 'ここでドロップ'
+                          : 'JSONをここにドラッグ&ドロップで取り込み',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: _isDragHover
+                            ? const Color(0xFF2563EB)
+                            : const Color(0xFF374151),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      r'推奨フォルダ: H:\マイドライブ\ツール開発\FutaFinance\',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF6B7280),
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 取り込みの共通フロー（確認ダイアログ → importAll → 成功通知）。
+  /// ファイル選択経由と D&D 経由の両方からここを呼ぶ。
+  Future<void> _performBackupImport(
+      BuildContext context, String jsonString, String fileName) async {
+    try {
       final ok = await showDialog<bool>(
         context: context,
         builder: (_) => AlertDialog(
           title: const Text('バックアップから復元'),
           content: Text(
-            '「${picked.name}」を取り込みます。\n'
+            '「$fileName」を取り込みます。\n'
             '現在のデータは上書きされ、元に戻せません。\n\n'
             '※ 念のため事前に「バックアップを書き出す」で現状を保存しておくと安全です。',
           ),
@@ -1030,7 +1155,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await _showImportSuccessDialog(context, importResult);
 
       // ダイアログを閉じた後にも SnackBar で「完了」を明示。
-      // ダイアログ見落とし防止＆達成感のため。
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
