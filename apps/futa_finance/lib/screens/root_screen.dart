@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/app_mode.dart';
@@ -478,10 +479,20 @@ class _SideNav extends StatefulWidget {
 }
 
 class _SideNavState extends State<_SideNav> {
+  /// バージョン文字列。"v1.0.46" 形式。null=ロード中。
+  String? _versionLabel;
+
+  /// 最新版が存在するか。
+  bool _hasUpdate = false;
+
+  /// 最新バージョン文字列（あれば）。
+  String? _latestVersionLabel;
+
   @override
   void initState() {
     super.initState();
     AppModeManager.instance.addListener(_rebuild);
+    _loadVersion();
   }
 
   @override
@@ -494,6 +505,26 @@ class _SideNavState extends State<_SideNav> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _loadVersion() async {
+    try {
+      final r = await UpdateChecker.instance.check();
+      if (!mounted) return;
+      setState(() {
+        _versionLabel = r.currentFull;
+        _hasUpdate = r.hasUpdate;
+        _latestVersionLabel = r.latestVersion != null ? r.latestFull : null;
+      });
+    } catch (_) {
+      // フェッチ失敗時もパッケージ情報だけは取れるはずなので、PackageInfo
+      // から最小限取得する。
+      try {
+        final info = await PackageInfo.fromPlatform();
+        if (!mounted) return;
+        setState(() => _versionLabel = 'v${info.version}');
+      } catch (_) {}
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final current = AppModeManager.instance.current;
@@ -504,7 +535,7 @@ class _SideNavState extends State<_SideNav> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ── アプリヘッダー ──
+            // ── アプリヘッダー（アプリ名 + バージョン）──
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
               child: Row(
@@ -528,12 +559,57 @@ class _SideNavState extends State<_SideNav> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  const Text(
-                    'FutaFinance',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF111827),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'FutaFinance',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF111827),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Text(
+                              _versionLabel ?? '取得中...',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Color(0xFF9CA3AF),
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                            if (_hasUpdate) ...[
+                              const SizedBox(width: 4),
+                              Tooltip(
+                                message: _latestVersionLabel != null
+                                    ? '$_latestVersionLabel が利用可能'
+                                    : '新しいバージョンが利用可能',
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 4, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEA580C),
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                  child: const Text(
+                                    '新',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ],
