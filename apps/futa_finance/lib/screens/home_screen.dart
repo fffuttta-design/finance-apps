@@ -676,32 +676,45 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
             // 内訳: 銀行 / 現金 / 電子マネー（残高は自動計算）
             ...banks.map((b) => _balanceRow(b, currentBalanceOf(b))),
             // クレカ累積（当月利用合計を自動集計）
+            // これは来月の引き落とし予定なので、想定残高では資産から引かれる扱い
             if (cards.isNotEmpty) ...[
               const SizedBox(height: 8),
               const Divider(height: 1, color: Color(0xFFE5E7EB)),
               const SizedBox(height: 8),
               ...cards.map((c) =>
                   _cardBalanceRow(c, cardUsage[c.name] ?? 0)),
-              _subtotalRow('当月クレカ利用合計', -cardTotal,
+              _subtotalRow('予定差し引き額（クレカ引落予定）', -cardTotal,
                   color: const Color(0xFFDC2626)),
             ],
-            // 実質純資産
-            if (banks.isNotEmpty && cards.isNotEmpty) ...[
+            // 想定残高 = 総資産 − 予定差し引き額（クレカ）
+            // クレカが無い場合でも総資産 = 想定残高で表示（一貫性のため）
+            if (banks.isNotEmpty) ...[
               const SizedBox(height: 8),
               Container(height: 1, color: const Color(0xFF1A237E)),
               const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Text('実質純資産',
-                      style: TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF111827),
-                          fontWeight: FontWeight.w600)),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('想定残高',
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF111827),
+                              fontWeight: FontWeight.w700)),
+                      if (cards.isNotEmpty)
+                        const Text('（クレカ引落後）',
+                            style: TextStyle(
+                                fontSize: 10,
+                                color: Color(0xFF9CA3AF))),
+                    ],
+                  ),
                   Text(
                     formatYen(netWorth),
                     style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 22,
                         color: netWorth >= 0
                             ? const Color(0xFF16A34A)
                             : const Color(0xFFDC2626),
