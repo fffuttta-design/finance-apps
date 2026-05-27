@@ -8,6 +8,7 @@ import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 import '../widgets/brand_logo.dart';
+import 'account_detail_screen.dart';
 
 /// 資産タブ。
 /// 銀行/現金/電子マネー（=「総資産」）の動きを俯瞰する画面。
@@ -328,53 +329,68 @@ class _AssetScreenState extends State<AssetScreen> with ModeAwareMixin {
   Widget _accountRow(
       core.RegisteredBankAccount a, int balance, int total) {
     final share = total == 0 ? 0.0 : balance / total;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 16, 10),
-      child: Row(
-        children: [
-          a.iconUrl != null && a.iconUrl!.isNotEmpty
-              ? BrandLogo(iconUrl: a.iconUrl, fallbackEmoji: a.accountType.emoji, size: 32)
-              : Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(6),
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => AccountDetailScreen(account: a),
+          ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 16, 10),
+        child: Row(
+          children: [
+            a.iconUrl != null && a.iconUrl!.isNotEmpty
+                ? BrandLogo(
+                    iconUrl: a.iconUrl,
+                    fallbackEmoji: a.accountType.emoji,
+                    size: 32)
+                : Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(a.accountType.emoji,
+                        style: const TextStyle(fontSize: 18)),
                   ),
-                  alignment: Alignment.center,
-                  child: Text(a.accountType.emoji,
-                      style: const TextStyle(fontSize: 18)),
-                ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(a.name,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(a.name,
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF111827))),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${a.accountType.shortLabel}  ·  ${(share * 100).toStringAsFixed(1)}%',
                     style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF111827))),
-                const SizedBox(height: 2),
-                Text(
-                  '${a.accountType.shortLabel}  ·  ${(share * 100).toStringAsFixed(1)}%',
-                  style: const TextStyle(
-                      fontSize: 11, color: Color(0xFF9CA3AF)),
-                ),
-              ],
+                        fontSize: 11, color: Color(0xFF9CA3AF)),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Text(
-            formatYen(balance),
-            style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                fontFamily: 'monospace',
-                color: balance >= 0
-                    ? const Color(0xFF111827)
-                    : const Color(0xFFDC2626)),
-          ),
-        ],
+            Text(
+              formatYen(balance),
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'monospace',
+                  color: balance >= 0
+                      ? const Color(0xFF111827)
+                      : const Color(0xFFDC2626)),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right,
+                size: 18, color: Color(0xFF9CA3AF)),
+          ],
+        ),
       ),
     );
   }
