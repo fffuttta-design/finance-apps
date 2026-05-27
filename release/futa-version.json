@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.41",
-    "buildNumber":  "42",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.41/futa-finance-v1.0.41.apk",
-    "releaseNotes":  "v1.0.41: インポート前の自動スナップショット機能（取り込みミスからの一発復旧）/ 設定に「直前の状態に戻す」UI追加 / ドライブAPKをapks/に整理"
+    "version":  "1.0.42",
+    "buildNumber":  "43",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.42/futa-finance-v1.0.42.apk",
+    "releaseNotes":  "v1.0.42: 月末締め後の自動バックアップ提案ダイアログ追加 / GitHub Pages 自動デプロイワークフロー追加"
 }
