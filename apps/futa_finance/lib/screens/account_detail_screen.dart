@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
+import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
@@ -792,6 +793,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
           creditCards: cfg.creditCards,
         ),
       );
+      // 他画面（ホーム残高/資産タブ等）に変更を通知して再ロードさせる
+      PaymentsChangeNotifier.instance.notifyChanged();
       if (!mounted) return;
       setState(() {
         _clearPending();

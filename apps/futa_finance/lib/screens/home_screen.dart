@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/app_mode.dart';
 import '../data/monthly_snapshot_repository.dart';
+import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/emoji_palette.dart';
@@ -54,11 +55,14 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
       if (!mounted) return;
       setState(() => _transactions = list);
     });
+    // ウォレット編集や通帳画面で payments が更新された時に再ロード
+    PaymentsChangeNotifier.instance.addListener(_load);
   }
 
   @override
   void dispose() {
     _sub?.cancel();
+    PaymentsChangeNotifier.instance.removeListener(_load);
     super.dispose();
   }
 

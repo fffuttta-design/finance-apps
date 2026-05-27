@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/app_mode.dart';
+import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
@@ -42,11 +43,14 @@ class _AssetScreenState extends State<AssetScreen> with ModeAwareMixin {
       if (!mounted) return;
       setState(() => _transactions = list);
     });
+    // 通帳画面等で口座情報(startingBalance含む)が更新された時に再ロード
+    PaymentsChangeNotifier.instance.addListener(_load);
   }
 
   @override
   void dispose() {
     _sub?.cancel();
+    PaymentsChangeNotifier.instance.removeListener(_load);
     super.dispose();
   }
 
@@ -346,6 +350,7 @@ class _AssetScreenState extends State<AssetScreen> with ModeAwareMixin {
     setState(() => _payments = newPayments);
     try {
       await SettingsRepository.instance.savePayments(newPayments);
+      PaymentsChangeNotifier.instance.notifyChanged();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
