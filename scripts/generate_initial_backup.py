@@ -364,13 +364,13 @@ personal_categories = {
 }
 
 # ── 個人モードの資金口座（銀行/電子マネー）+ カード4枚
-def bank(id_, name, account_type, icon_url, memo=None):
+def bank(id_, name, account_type, icon_url, memo=None, starting_balance=None):
     """資金口座（RegisteredBankAccount）の JSON 辞書を生成。"""
     return {
         "id": id_,
         "name": name,
         "last4": None,
-        "startingBalance": None,
+        "startingBalance": starting_balance,
         "currentBalance": None,
         "accountType": account_type,  # "bank" | "cash" | "emoney"
         "iconUrl": icon_url,
@@ -380,8 +380,10 @@ def bank(id_, name, account_type, icon_url, memo=None):
 
 personal_payments = {
     "bankAccounts": [
+        # 新生銀行: 5/1 朝時点の開始残高 = 5,041,868円
+        # (取引10件後の月末残高 4,713,453円と整合)
         bank("acc-shinsei", "新生銀行", "bank",
-             fav("shinseibank.com")),
+             fav("shinseibank.com"), starting_balance=5041868),
         bank("acc-gmoaozora", "GMOあおぞらネット銀行", "bank",
              fav("gmo-aozora.com")),
         bank("acc-yucho", "ゆうちょ銀行", "bank",
@@ -519,27 +521,31 @@ personal_transactions = [
                 "ローソン昼飯", 1227, ORICO),
 ]
 
-# ── 新生銀行 入出金明細（5月分、CSV相当を手入力）
-# フタムラタクミ宛振込（-400, -149,932）は「振替」として後で別途記録するため
-# ここでは除外。8件のみ取り込む。
+# ── 新生銀行 入出金明細（5月分、全10件）
+# フタムラタクミ宛振込も含め、全件を「振込/送金」カテゴリで支出として記録。
+# (振替モデルは使わず、シンプルに新生銀行から出ていったものとして扱う)
 SHINSEI = "新生銀行"
 personal_transactions += [
     # 5/01: 住民税の引落
     transaction(iso_date(2026, 5, 1), "10.税金", "住民税",
                 "地方税", 83, SHINSEI),
-    # 5/04: ナカネハルカへの振込（他人への送金）+ 手数料(支出)+手数料還元(入金)
+    # 5/04: ナカネハルカへの振込 + 手数料(支出)+手数料還元(入金)
     transaction(iso_date(2026, 5, 4), "12.振込/送金", "他者振込",
                 "振込 ナカネ ハルカ", 178000, SHINSEI),
     transaction(iso_date(2026, 5, 4), "11.金融手数料", "振込手数料",
                 "振込手数料", 75, SHINSEI),
     transaction(iso_date(2026, 5, 4), "11.金融手数料", "手数料還元",
                 "振込手数料還元", 75, SHINSEI, type_="income"),
-    # 5/25: 手数料(支出)+手数料還元(入金) （フタムラ宛振込は除外）
+    # 5/25: フタムラタクミ宛振込 + 手数料(支出)+手数料還元(入金)
+    transaction(iso_date(2026, 5, 25), "12.振込/送金", "他者振込",
+                "振込 フタムラ タクミ", 149932, SHINSEI),
     transaction(iso_date(2026, 5, 25), "11.金融手数料", "振込手数料",
                 "振込手数料", 75, SHINSEI),
     transaction(iso_date(2026, 5, 25), "11.金融手数料", "手数料還元",
                 "振込手数料還元", 75, SHINSEI, type_="income"),
-    # 5/26: 手数料(支出)+手数料還元(入金) （フタムラ宛振込は除外）
+    # 5/26: フタムラタクミ宛振込 + 手数料(支出)+手数料還元(入金)
+    transaction(iso_date(2026, 5, 26), "12.振込/送金", "他者振込",
+                "振込 フタムラ タクミ", 400, SHINSEI),
     transaction(iso_date(2026, 5, 26), "11.金融手数料", "振込手数料",
                 "振込手数料", 75, SHINSEI),
     transaction(iso_date(2026, 5, 26), "11.金融手数料", "手数料還元",
