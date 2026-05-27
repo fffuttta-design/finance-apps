@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.32",
-    "buildNumber":  "33",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.32/futa-finance-v1.0.32.apk",
-    "releaseNotes":  "v1.0.32: 銀行口座編集UI改修（クレカと同パターン）/ 資金口座一覧を種別セクションで分割表示・バッジ削除 / 銀行残高をstartingBalance+取引集計で自動計算"
+    "version":  "1.0.33",
+    "buildNumber":  "34",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.33/futa-finance-v1.0.33.apk",
+    "releaseNotes":  "v1.0.33: DL済みAPK再利用で再DL不要化 / 起動時にDL済みAPK検出で「インストール再開」プロンプト / バックアップ復元完了SnackBar追加"
 }
