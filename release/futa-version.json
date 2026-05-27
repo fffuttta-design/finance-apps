@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.44",
-    "buildNumber":  "45",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.44/futa-finance-v1.0.44.apk",
-    "releaseNotes":  "v1.0.44: バックアップ書き出し時に「backups/」フォルダ推奨ガイド追加 / Repository層を抽象化(Firestore対応の準備) / Auth画面UI雛形追加"
+    "version":  "1.0.45",
+    "buildNumber":  "46",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.45/futa-finance-v1.0.45.apk",
+    "releaseNotes":  "v1.0.45: Firestore リアルタイム同期実装(Android/Web マルチデバイス対応) / Google Sign-In認証 / 初回ログイン時にローカルデータ自動アップロード"
 }
