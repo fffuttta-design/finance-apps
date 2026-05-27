@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.29",
-    "buildNumber":  "30",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.29/futa-finance-v1.0.29.apk",
-    "releaseNotes":  "v1.0.29: バックアップ取り込み完了画面に件数差分とnote表示（取り込み内容が一目でわかる）"
+    "version":  "1.0.30",
+    "buildNumber":  "31",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.30/futa-finance-v1.0.30.apk",
+    "releaseNotes":  "v1.0.30: 銀行口座/クレカに備考欄追加 / 個人モードに資金口座5つ(新生/GMOあおぞら/ゆうちょ/イオン/PayPay)をJSON投入"
 }
