@@ -372,17 +372,40 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   }) {
     return Container(
       color: const Color(0xFFFAFAFA),
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Column(
         children: [
+          // ── 月初/月末 残高（主役、大きく強調） ──
+          if (startBalance != null || endBalance != null) ...[
+            Row(
+              children: [
+                if (startBalance != null)
+                  _balanceHeadlineCard(
+                    label: '月初残高',
+                    value: startBalance,
+                    accent: const Color(0xFFEAB308), // 黄系
+                  ),
+                if (startBalance != null && endBalance != null)
+                  const SizedBox(width: 10),
+                if (endBalance != null)
+                  _balanceHeadlineCard(
+                    label: '月末残高',
+                    value: endBalance,
+                    accent: const Color(0xFF0EA5E9), // 水色系
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
+          // ── 入金/出金/差引（補助、小さめ） ──
           Row(
             children: [
               _summaryItem(
                   '入金合計', formatYen(inSum), const Color(0xFF16A34A)),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               _summaryItem(
                   '出金合計', formatYen(outSum), const Color(0xFFDC2626)),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               _summaryItem(
                 '差引',
                 formatYen(netDelta, withSign: true),
@@ -392,29 +415,56 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
               ),
             ],
           ),
-          if (startBalance != null || endBalance != null) ...[
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                if (startBalance != null)
-                  Text(
-                    '月初残高: ${formatYen(startBalance)}',
-                    style: const TextStyle(
-                        fontSize: 11, color: Color(0xFF6B7280)),
-                  ),
-                if (endBalance != null)
-                  Text(
-                    '月末残高: ${formatYen(endBalance)}',
-                    style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF111827),
-                        fontWeight: FontWeight.w700),
-                  ),
-              ],
+        ],
+      ),
+    );
+  }
+
+  /// 月初/月末残高の見出しカード（強調表示）。
+  Widget _balanceHeadlineCard({
+    required String label,
+    required int value,
+    required Color accent,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: accent.withValues(alpha: 0.5), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: accent.withValues(alpha: 0.08),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
             ),
           ],
-        ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: accent,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              formatYen(value),
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF111827),
+                fontFamily: 'monospace',
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
