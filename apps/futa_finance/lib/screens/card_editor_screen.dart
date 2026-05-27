@@ -4,6 +4,7 @@ import 'package:finance_core/finance_core.dart';
 import '../data/settings_repository.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/centered_body.dart';
+import 'card_detail_screen.dart';
 
 /// クレジットカードの登録CRUD。
 class CardEditorScreen extends StatefulWidget {
@@ -364,10 +365,22 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
-      // 銀行と同様に、ListTile の固定余白を避けて独自レイアウトで密度を制御。
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(4, 10, 4, 10),
-        child: Row(
+      // tile 本体タップで CardDetailScreen に遷移。
+      // 編集ボタンは別アクション（既存挙動）。
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CardDetailScreen(card: c),
+            ),
+          ),
+          // 銀行と同様に、ListTile の固定余白を避けて独自レイアウトで密度を制御。
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(4, 10, 4, 10),
+            child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // ドラッグハンドル
@@ -448,6 +461,8 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
               onPressed: onDelete,
             ),
           ],
+            ),
+          ),
         ),
       ),
     );

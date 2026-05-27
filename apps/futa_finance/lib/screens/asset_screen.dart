@@ -512,32 +512,48 @@ class _AssetScreenState extends State<AssetScreen> with ModeAwareMixin {
       headline = '${t.paymentMethod} → ${t.description}';
       signedAmount = -t.amount;
     }
+    // 表示順を「日付 → 明細 → 金額」に。日付を先頭に等幅で固定表示。
+    final dateLabel =
+        '${t.date.month.toString().padLeft(2, '0')}/${t.date.day.toString().padLeft(2, '0')}';
+    final yearLabel = '${t.date.year}';
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 16, 8),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 10),
-          Expanded(
+          // ── 日付（左端固定幅） ──
+          SizedBox(
+            width: 56,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(headline,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF111827)),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 2),
                 Text(
-                  '${t.date.year}/${t.date.month.toString().padLeft(2, '0')}/${t.date.day.toString().padLeft(2, '0')}',
+                  dateLabel,
                   style: const TextStyle(
-                      fontSize: 10, color: Color(0xFF9CA3AF)),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF111827),
+                      fontFamily: 'monospace'),
                 ),
+                Text(yearLabel,
+                    style: const TextStyle(
+                        fontSize: 9, color: Color(0xFF9CA3AF))),
               ],
             ),
           ),
+          const SizedBox(width: 10),
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          // ── 明細 ──
+          Expanded(
+            child: Text(headline,
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF111827)),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+          ),
+          // ── 金額（右端） ──
           Text(
             t.type == core.TransactionType.transfer
                 ? formatYen(t.amount)

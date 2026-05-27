@@ -15,7 +15,7 @@ import '../utils/emoji_palette.dart';
 import '../utils/formatters.dart';
 import '../widgets/brand_logo.dart';
 import 'account_detail_screen.dart';
-import 'card_editor_screen.dart';
+import 'card_detail_screen.dart';
 import 'expense_input_screen.dart';
 import 'income_input_screen.dart';
 
@@ -885,10 +885,10 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
   Widget _cardBalanceRow(RegisteredCreditCard c, int amount) {
     return InkWell(
       onTap: () {
-        // クレカ単独詳細画面はまだ無いので、設定 → クレカ編集一覧へ
+        // クレカ詳細（明細画面）に遷移
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => const CardEditorScreen(),
+            builder: (_) => CardDetailScreen(card: c),
           ),
         );
       },
