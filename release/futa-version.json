@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.31",
-    "buildNumber":  "32",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.31/futa-finance-v1.0.31.apk",
-    "releaseNotes":  "v1.0.31: カード編集UI改善（備考を下4桁直後に移動・累積額入力削除・ロゴURL ラベル簡略化・hint削除）/ ホーム画面のカード累積額を当月取引から自動計算"
+    "version":  "1.0.32",
+    "buildNumber":  "33",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.32/futa-finance-v1.0.32.apk",
+    "releaseNotes":  "v1.0.32: 銀行口座編集UI改修（クレカと同パターン）/ 資金口座一覧を種別セクションで分割表示・バッジ削除 / 銀行残高をstartingBalance+取引集計で自動計算"
 }
