@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.34",
-    "buildNumber":  "35",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.34/futa-finance-v1.0.34.apk",
-    "releaseNotes":  "v1.0.34: 備考欄を1行化(カード/銀行) / 銀行口座編集の開始時残高入力欄を削除 / カード・銀行一覧tileの余白を詰めて密度UP"
+    "version":  "1.0.35",
+    "buildNumber":  "36",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.35/futa-finance-v1.0.35.apk",
+    "releaseNotes":  "v1.0.35: クレカ一覧と銀行口座一覧にドラッグ並び替え機能追加（銀行は種別セクション内で並び替え）"
 }
