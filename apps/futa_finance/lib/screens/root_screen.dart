@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/app_mode.dart';
 import '../data/update_checker.dart';
 import '../data/update_installer.dart';
+import 'asset_screen.dart';
 import 'expense_input_screen.dart';
 import 'expenses_screen.dart';
 import 'home_screen.dart';
@@ -34,7 +35,11 @@ class _RootScreenState extends State<RootScreen> {
   /// 広い画面で開いている記録パネル。null=閉じている。
   _RecordPanelKind? _recordPanel;
 
-  // インデックス 0..4 はモバイル＆Web 共通、5 は Web 専用「テーブル」。
+  // インデックス対応:
+  //   0=Home, 1=Expenses, 2=Income, 3=Report, 4=Settings,
+  //   5=TableView (Web専用), 6=Asset
+  // ※ 既存インデックスへの影響を避けるため Asset は末尾に追加。
+  //   モバイルナビとサイドナビの表示順は別途マッピング。
   static const _tabs = <Widget>[
     HomeScreen(),
     ExpensesScreen(),
@@ -42,7 +47,12 @@ class _RootScreenState extends State<RootScreen> {
     ReportScreen(),
     SettingsScreen(),
     TableViewScreen(),
+    AssetScreen(),
   ];
+
+  /// モバイル下タブの表示順 → _tabs インデックスのマッピング。
+  /// 「資産」は集計の前に表示（残高 → 詳細集計の流れ）。
+  static const _mobileTabOrder = <int>[0, 1, 2, 6, 3, 4];
 
   /// 広い画面（Web/Tablet/Desktop）かどうかの判定しきい値。
   /// 900px 以上で NavigationRail（サイドバー）レイアウトに切替。
@@ -315,8 +325,11 @@ class _RootScreenState extends State<RootScreen> {
         ],
       ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        // _index は _tabs のインデックス。NavigationBar には mobileTabOrder
+        // 上の位置を渡し、選択時は逆引きして _tabs のインデックスに戻す。
+        selectedIndex: _mobileTabOrder.indexOf(_index).clamp(0, _mobileTabOrder.length - 1),
+        onDestinationSelected: (i) =>
+            setState(() => _index = _mobileTabOrder[i]),
         backgroundColor: Colors.white,
         indicatorColor: const Color(0xFFE0E7FF),
         surfaceTintColor: Colors.white,
@@ -336,6 +349,12 @@ class _RootScreenState extends State<RootScreen> {
             icon: Icon(Icons.savings_outlined),
             selectedIcon: Icon(Icons.savings, color: Color(0xFF16A34A)),
             label: '収入',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.account_balance_wallet_outlined),
+            selectedIcon: Icon(Icons.account_balance_wallet,
+                color: Color(0xFF1A237E)),
+            label: '資産',
           ),
           NavigationDestination(
             icon: Icon(Icons.bar_chart_outlined),
@@ -549,6 +568,8 @@ class _SideNavState extends State<_SideNav> {
                       Icons.receipt_long, '支出'),
                   _navItem(2, Icons.savings_outlined, Icons.savings, '収入',
                       selectedColor: const Color(0xFF16A34A)),
+                  _navItem(6, Icons.account_balance_wallet_outlined,
+                      Icons.account_balance_wallet, '資産'),
                   _navItem(3, Icons.bar_chart_outlined, Icons.bar_chart,
                       '集計'),
                   _navItem(5, Icons.table_chart_outlined,
