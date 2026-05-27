@@ -1,0 +1,36 @@
+rules_version = '2';
+
+// FutaFinance Firestore Security Rules
+//
+// 設計方針:
+//   - users/{uid}/ 配下のデータは、その uid 本人のみ read/write 可能
+//   - さらに、許可された UID リストに含まれるユーザーのみアクセス可能
+//     （= 君個人のアカウントだけが家計データにアクセスできる）
+//   - その他のパスは全拒否（デフォルト deny）
+//
+// 新しい家族メンバーや別アカウントを許可したい場合は、
+// `allowedOwners` の中に UID を追加すること。
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 許可されたオーナー UID 一覧
+    function allowedOwners() {
+      return [
+        '01tjdHPVTiMV7TX3HryNWBEN8wq2'  // fffuttta@gmail.com (Futa)
+      ];
+    }
+
+    // 認証済み かつ パスの uid と一致 かつ 許可リストに含まれる
+    function isAllowedOwner(uid) {
+      return request.auth != null
+          && request.auth.uid == uid
+          && uid in allowedOwners();
+    }
+
+    // users/{uid}/** へのアクセス
+    match /users/{uid}/{document=**} {
+      allow read, write: if isAllowedOwner(uid);
+    }
+  }
+}
