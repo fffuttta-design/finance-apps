@@ -350,6 +350,16 @@ personal_categories = {
         {"name": "特別出費", "iconKey": "⭐",
          "subs": ["R活動経費", "裁判費用", "高額投資"],
          "subIcons": None},
+        # 銀行入出金 CSV 取り込みのために追加した新規大カテゴリ
+        {"name": "税金", "iconKey": "🏛️",
+         "subs": ["住民税", "所得税", "固定資産税", "その他税"],
+         "subIcons": None},
+        {"name": "金融手数料", "iconKey": "🏧",
+         "subs": ["振込手数料", "ATM手数料", "手数料還元"],
+         "subIcons": None},
+        {"name": "振込/送金", "iconKey": "💸",
+         "subs": ["他者振込", "仕送り", "貸付"],
+         "subIcons": None},
     ]
 }
 
@@ -507,6 +517,33 @@ personal_transactions = [
                 "DEMI DO シャンプー詰替え用", 4633, ORICO),
     transaction(iso_date(2026, 5, 26), "1.食費", "UberEats・外食",
                 "ローソン昼飯", 1227, ORICO),
+]
+
+# ── 新生銀行 入出金明細（5月分、CSV相当を手入力）
+# フタムラタクミ宛振込（-400, -149,932）は「振替」として後で別途記録するため
+# ここでは除外。8件のみ取り込む。
+SHINSEI = "新生銀行"
+personal_transactions += [
+    # 5/01: 住民税の引落
+    transaction(iso_date(2026, 5, 1), "10.税金", "住民税",
+                "地方税", 83, SHINSEI),
+    # 5/04: ナカネハルカへの振込（他人への送金）+ 手数料(支出)+手数料還元(入金)
+    transaction(iso_date(2026, 5, 4), "12.振込/送金", "他者振込",
+                "振込 ナカネ ハルカ", 178000, SHINSEI),
+    transaction(iso_date(2026, 5, 4), "11.金融手数料", "振込手数料",
+                "振込手数料", 75, SHINSEI),
+    transaction(iso_date(2026, 5, 4), "11.金融手数料", "手数料還元",
+                "振込手数料還元", 75, SHINSEI, type_="income"),
+    # 5/25: 手数料(支出)+手数料還元(入金) （フタムラ宛振込は除外）
+    transaction(iso_date(2026, 5, 25), "11.金融手数料", "振込手数料",
+                "振込手数料", 75, SHINSEI),
+    transaction(iso_date(2026, 5, 25), "11.金融手数料", "手数料還元",
+                "振込手数料還元", 75, SHINSEI, type_="income"),
+    # 5/26: 手数料(支出)+手数料還元(入金) （フタムラ宛振込は除外）
+    transaction(iso_date(2026, 5, 26), "11.金融手数料", "振込手数料",
+                "振込手数料", 75, SHINSEI),
+    transaction(iso_date(2026, 5, 26), "11.金融手数料", "手数料還元",
+                "振込手数料還元", 75, SHINSEI, type_="income"),
 ]
 
 # ── 固定費（6件、家賃含む）
