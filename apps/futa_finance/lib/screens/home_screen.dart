@@ -644,6 +644,12 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
         cards.fold<int>(0, (s, c) => s + (cardUsage[c.name] ?? 0));
     final netWorth = assetTotal - cardTotal;
 
+    // 前月末時点の総資産（前月末比を出すため）
+    final prevMonthEnd = DateTime(today.year, today.month, 1)
+        .subtract(const Duration(seconds: 1));
+    final prevAssetTotal = _assetTotalAt(banks, prevMonthEnd);
+    final assetDelta = assetTotal - prevAssetTotal;
+
     return _card(
       icon: Icons.account_balance_wallet,
       iconColor: const Color(0xFF1A237E),
@@ -660,11 +666,15 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
               ),
             )
           else ...[
-            // 銀行 / 現金 / 電子マネー（残高は自動計算）
+            // ── 総資産センター表示（一番上に大きく） ──
+            if (banks.isNotEmpty) ...[
+              _totalAssetCenter(assetTotal, assetDelta),
+              const SizedBox(height: 10),
+              const Divider(height: 1, color: Color(0xFFE5E7EB)),
+              const SizedBox(height: 8),
+            ],
+            // 内訳: 銀行 / 現金 / 電子マネー（残高は自動計算）
             ...banks.map((b) => _balanceRow(b, currentBalanceOf(b))),
-            if (banks.isNotEmpty)
-              _subtotalRow('資産合計', assetTotal,
-                  color: const Color(0xFF111827)),
             // クレカ累積（当月利用合計を自動集計）
             if (cards.isNotEmpty) ...[
               const SizedBox(height: 8),
@@ -702,6 +712,95 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
               ),
             ],
           ],
+        ],
+      ),
+    );
+  }
+
+  /// 指定日時点の総資産を再計算（前月末比などに使用）。
+  int _assetTotalAt(
+      List<RegisteredBankAccount> banks, DateTime cutoff) {
+    final nameSet = banks.map((b) => b.name).toSet();
+    final delta = <String, int>{};
+    for (final t in _transactions) {
+      if (t.date.isAfter(cutoff)) continue;
+      if (t.type == TransactionType.transfer) {
+        final from = t.transferFromAccount;
+        final to = t.transferToAccount;
+        if (from != null && nameSet.contains(from)) {
+          delta[from] = (delta[from] ?? 0) - t.amount;
+        }
+        if (to != null && nameSet.contains(to)) {
+          delta[to] = (delta[to] ?? 0) + t.amount;
+        }
+        continue;
+      }
+      if (!nameSet.contains(t.paymentMethod)) continue;
+      if (t.type == TransactionType.income) {
+        delta[t.paymentMethod] =
+            (delta[t.paymentMethod] ?? 0) + t.amount;
+      } else {
+        delta[t.paymentMethod] =
+            (delta[t.paymentMethod] ?? 0) - t.amount;
+      }
+    }
+    int total = 0;
+    for (final b in banks) {
+      total += (b.startingBalance ?? 0) + (delta[b.name] ?? 0);
+    }
+    return total;
+  }
+
+  /// 総資産センター表示。残高セクション最上部に大きく出す。
+  Widget _totalAssetCenter(int total, int delta) {
+    final isUp = delta >= 0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Text(
+            '総資産',
+            style: TextStyle(
+                fontSize: 11,
+                color: Color(0xFF6B7280),
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            formatYen(total),
+            style: const TextStyle(
+              fontSize: 30,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF111827),
+              fontFamily: 'monospace',
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                isUp ? Icons.arrow_upward : Icons.arrow_downward,
+                size: 12,
+                color: isUp
+                    ? const Color(0xFF16A34A)
+                    : const Color(0xFFDC2626),
+              ),
+              const SizedBox(width: 2),
+              Text(
+                '前月末比 ${formatYen(delta, withSign: true)}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isUp
+                      ? const Color(0xFF16A34A)
+                      : const Color(0xFFDC2626),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
