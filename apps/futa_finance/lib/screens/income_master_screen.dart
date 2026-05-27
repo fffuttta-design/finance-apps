@@ -3,6 +3,7 @@ import 'package:finance_core/finance_core.dart';
 
 import '../data/income_source_repository.dart';
 import '../utils/formatters.dart';
+import '../widgets/centered_body.dart';
 
 /// 収入マスタのCRUD画面。
 ///
@@ -17,6 +18,9 @@ class IncomeMasterScreen extends StatefulWidget {
 class _IncomeMasterScreenState extends State<IncomeMasterScreen> {
   final _repo = IncomeSourceRepository.instance;
   IncomeSourceConfig? _config;
+
+  /// アーカイブ済みも一覧に表示するか。デフォルト false（隠す）。
+  bool _showArchived = false;
 
   @override
   void initState() {
@@ -45,10 +49,8 @@ class _IncomeMasterScreenState extends State<IncomeMasterScreen> {
   Future<IncomeSource?> _editDialog(
       BuildContext context, IncomeSource? initial) async {
     final nameCtrl = TextEditingController(text: initial?.name ?? '');
-    final clientCtrl = TextEditingController(text: initial?.clientName ?? '');
-    final amountCtrl = TextEditingController(
-        text: initial?.expectedAmount?.toString() ?? '');
     final memoCtrl = TextEditingController(text: initial?.memo ?? '');
+    // 取引先 / 想定金額 は UI から廃止。既存値は initial 経由で保持。
     final dayCtrl =
         TextEditingController(text: initial?.dayOfMonth?.toString() ?? '');
     IncomeCycle cycle = initial?.cycle ?? IncomeCycle.monthly;
@@ -71,18 +73,15 @@ class _IncomeMasterScreenState extends State<IncomeMasterScreen> {
               Navigator.pop(ctx, null);
               return;
             }
-            final amount = int.tryParse(amountCtrl.text.trim());
             final day = int.tryParse(dayCtrl.text.trim());
-            final clientName = clientCtrl.text.trim().isEmpty
-                ? null
-                : clientCtrl.text.trim();
             final memo =
                 memoCtrl.text.trim().isEmpty ? null : memoCtrl.text.trim();
+            // 取引先 / 想定金額 は UI 廃止。既存値があれば維持。
             final result = IncomeSource(
               id: initial?.id ?? _genId(),
               name: name,
-              clientName: clientName,
-              expectedAmount: amount,
+              clientName: initial?.clientName,
+              expectedAmount: initial?.expectedAmount,
               cycle: cycle,
               dayOfMonth: cycle == IncomeCycle.oneTime ? null : day,
               memo: memo,
@@ -146,25 +145,6 @@ class _IncomeMasterScreenState extends State<IncomeMasterScreen> {
                                   FloatingLabelBehavior.always,
                             ),
                             onChanged: (_) => setLocal(() {}),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: clientCtrl,
-                            decoration: const InputDecoration(
-                              labelText: '取引先（任意）',
-                              floatingLabelBehavior:
-                                  FloatingLabelBehavior.always,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: amountCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: '想定金額 円（任意）',
-                              floatingLabelBehavior:
-                                  FloatingLabelBehavior.always,
-                            ),
                           ),
                           const SizedBox(height: 16),
                           const Text('発生サイクル',
@@ -302,6 +282,13 @@ class _IncomeMasterScreenState extends State<IncomeMasterScreen> {
     _update(list);
   }
 
+  /// アーカイブ状態を切り替え（archived ⇔ active）。
+  void _toggleArchive(int i) {
+    final list = [..._config!.sources];
+    list[i] = list[i].copyWith(archived: !list[i].archived);
+    _update(list);
+  }
+
   @override
   Widget build(BuildContext context) {
     final config = _config;
@@ -314,52 +301,131 @@ class _IncomeMasterScreenState extends State<IncomeMasterScreen> {
                 color: Color(0xFF111827))),
         actions: [
           IconButton(
+            icon: Icon(
+              _showArchived
+                  ? Icons.archive
+                  : Icons.archive_outlined,
+              color: _showArchived
+                  ? const Color(0xFFEA580C)
+                  : const Color(0xFF6B7280),
+            ),
+            tooltip: _showArchived
+                ? 'アーカイブを隠す'
+                : 'アーカイブも表示',
+            onPressed: () => setState(() => _showArchived = !_showArchived),
+          ),
+          IconButton(
             icon: const Icon(Icons.add, color: Color(0xFF1A237E)),
             tooltip: '収入マスタを追加',
             onPressed: config == null ? null : _add,
           ),
         ],
       ),
-      body: config == null
-          ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-              child: config.sources.isEmpty
-                  ? _empty()
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: config.sources.length,
-                      itemBuilder: (context, i) {
-                        final s = config.sources[i];
-                        return _tile(s, () => _edit(i), () => _delete(i));
-                      },
-                    ),
+      body: CenteredBody(
+        child: Builder(builder: (ctx) {
+          if (config == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          // フィルタ: 表示モードに応じて actives / all を切替。
+          // インデックスは _config.sources 上の元位置を保つ（edit/delete用）。
+          final visibleIdx = <int>[];
+          for (var i = 0; i < config.sources.length; i++) {
+            if (_showArchived || !config.sources[i].archived) {
+              visibleIdx.add(i);
+            }
+          }
+          if (visibleIdx.isEmpty) return _empty();
+          return SafeArea(
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: visibleIdx.length,
+              itemBuilder: (ctx, i) {
+                final origIdx = visibleIdx[i];
+                final s = config.sources[origIdx];
+                return _tile(
+                  s,
+                  () => _edit(origIdx),
+                  () => _delete(origIdx),
+                  () => _toggleArchive(origIdx),
+                );
+              },
             ),
+          );
+        }),
+      ),
     );
   }
 
-  Widget _tile(IncomeSource s, VoidCallback onEdit, VoidCallback onDelete) {
+  Widget _tile(IncomeSource s, VoidCallback onEdit, VoidCallback onDelete,
+      VoidCallback onArchiveToggle) {
+    final archived = s.archived;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: archived ? const Color(0xFFF9FAFB) : Colors.white,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(
+            color: archived
+                ? const Color(0xFFE5E7EB)
+                : const Color(0xFFE5E7EB)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.attach_money,
-                  size: 18, color: Color(0xFF16A34A)),
+              Icon(Icons.attach_money,
+                  size: 18,
+                  color: archived
+                      ? const Color(0xFF9CA3AF)
+                      : const Color(0xFF16A34A)),
               const SizedBox(width: 6),
               Expanded(
-                child: Text(s.name,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        color: Color(0xFF111827))),
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(s.name,
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              color: archived
+                                  ? const Color(0xFF9CA3AF)
+                                  : const Color(0xFF111827),
+                              decoration: archived
+                                  ? TextDecoration.lineThrough
+                                  : null),
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                    if (archived) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE5E7EB),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text('アーカイブ',
+                            style: TextStyle(
+                                fontSize: 9,
+                                color: Color(0xFF6B7280),
+                                fontWeight: FontWeight.w700)),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                    archived
+                        ? Icons.unarchive_outlined
+                        : Icons.archive_outlined,
+                    size: 18,
+                    color: const Color(0xFFEA580C)),
+                tooltip: archived ? 'アーカイブ解除' : 'アーカイブ',
+                onPressed: onArchiveToggle,
               ),
               IconButton(
                 visualDensity: VisualDensity.compact,

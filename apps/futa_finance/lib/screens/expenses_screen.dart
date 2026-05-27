@@ -668,6 +668,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
           bottom: BorderSide(color: Color(0xFFE5E7EB)),
         ),
       ),
+      // 列順: 日付 → カテゴリ → 支出名 → 金額
       child: const Row(
         children: [
           Expanded(
@@ -676,13 +677,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
           ),
           SizedBox(width: 3),
           Expanded(
-            flex: _colFlexDesc,
-            child: Text('支出名', style: headerStyle),
+            flex: _colFlexCategory,
+            child: Text('カテゴリ', style: headerStyle),
           ),
           SizedBox(width: 3),
           Expanded(
-            flex: _colFlexCategory,
-            child: Text('カテゴリ', style: headerStyle),
+            flex: _colFlexDesc,
+            child: Text('支出名', style: headerStyle),
           ),
           SizedBox(width: 3),
           Expanded(
@@ -722,6 +723,18 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
               ),
             ),
             const SizedBox(width: 3),
+            // カテゴリ(大/小)
+            Expanded(
+              flex: _colFlexCategory,
+              child: Text(
+                _categoryLabel(t),
+                style: const TextStyle(
+                    fontSize: 10, color: Color(0xFF6B7280)),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ),
+            const SizedBox(width: 3),
             // 支出名
             Expanded(
               flex: _colFlexDesc,
@@ -731,18 +744,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
                     fontSize: 11,
                     color: Color(0xFF111827),
                     fontWeight: FontWeight.w500),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
-            ),
-            const SizedBox(width: 3),
-            // カテゴリ(大/小)
-            Expanded(
-              flex: _colFlexCategory,
-              child: Text(
-                _categoryLabel(t),
-                style: const TextStyle(
-                    fontSize: 10, color: Color(0xFF6B7280)),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
               ),

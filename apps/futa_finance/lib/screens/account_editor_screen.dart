@@ -3,6 +3,7 @@ import 'package:finance_core/finance_core.dart';
 
 import '../data/settings_repository.dart';
 import '../widgets/brand_logo.dart';
+import '../widgets/centered_body.dart';
 
 /// ウォレット（銀行口座/現金/電子マネー）の登録CRUD。
 class AccountEditorScreen extends StatefulWidget {
@@ -329,13 +330,15 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
           ),
         ],
       ),
-      body: config == null
-          ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-              child: config.bankAccounts.isEmpty
-                  ? _empty()
-                  : _sectionedList(config.bankAccounts),
-            ),
+      body: CenteredBody(
+        child: config == null
+            ? const Center(child: CircularProgressIndicator())
+            : SafeArea(
+                child: config.bankAccounts.isEmpty
+                    ? _empty()
+                    : _sectionedList(config.bankAccounts),
+              ),
+      ),
     );
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart';
 
 import '../data/checklist_repository.dart';
+import '../widgets/centered_body.dart';
 
 /// 月末締めチェックリストのCRUD画面。
 /// - メイン項目（親）を並べ替え可能
@@ -335,22 +336,24 @@ class _ChecklistEditorScreenState extends State<ChecklistEditorScreen> {
           ),
         ],
       ),
-      body: config == null
-          ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-              child: config.items.isEmpty
-                  ? _empty()
-                  : ReorderableListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: config.items.length,
-                      onReorder: _reorder,
-                      buildDefaultDragHandles: false,
-                      itemBuilder: (context, i) {
-                        final item = config.items[i];
-                        return _parentCard(item, i);
-                      },
-                    ),
-            ),
+      body: CenteredBody(
+        child: config == null
+            ? const Center(child: CircularProgressIndicator())
+            : SafeArea(
+                child: config.items.isEmpty
+                    ? _empty()
+                    : ReorderableListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: config.items.length,
+                        onReorder: _reorder,
+                        buildDefaultDragHandles: false,
+                        itemBuilder: (context, i) {
+                          final item = config.items[i];
+                          return _parentCard(item, i);
+                        },
+                      ),
+              ),
+      ),
     );
   }
 

@@ -41,6 +41,11 @@ class IncomeSource {
   /// 備考。
   final String? memo;
 
+  /// アーカイブ済みフラグ。
+  /// true の場合は通常一覧に出さない（「もう取引しない収入源」を非表示にする運用）。
+  /// 過去取引との紐付けは残るため、データは削除されない。
+  final bool archived;
+
   const IncomeSource({
     required this.id,
     required this.name,
@@ -49,6 +54,7 @@ class IncomeSource {
     this.cycle = IncomeCycle.monthly,
     this.dayOfMonth,
     this.memo,
+    this.archived = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -59,6 +65,7 @@ class IncomeSource {
         'cycle': cycle.name,
         'dayOfMonth': dayOfMonth,
         'memo': memo,
+        'archived': archived,
       };
 
   factory IncomeSource.fromJson(Map<String, dynamic> j) => IncomeSource(
@@ -72,6 +79,7 @@ class IncomeSource {
         ),
         dayOfMonth: j['dayOfMonth'] as int?,
         memo: j['memo'] as String?,
+        archived: j['archived'] as bool? ?? false,
       );
 
   IncomeSource copyWith({
@@ -81,6 +89,7 @@ class IncomeSource {
     IncomeCycle? cycle,
     int? dayOfMonth,
     String? memo,
+    bool? archived,
   }) =>
       IncomeSource(
         id: id,
@@ -90,6 +99,7 @@ class IncomeSource {
         cycle: cycle ?? this.cycle,
         dayOfMonth: dayOfMonth ?? this.dayOfMonth,
         memo: memo ?? this.memo,
+        archived: archived ?? this.archived,
       );
 
   String get cycleLabel {

@@ -6,6 +6,7 @@ import '../data/settings_repository.dart';
 import '../data/subscription_repository.dart';
 import '../utils/formatters.dart';
 import '../widgets/brand_logo.dart';
+import '../widgets/centered_body.dart';
 
 /// 並び順モード。
 /// - manual: ユーザーがドラッグで並べた順（永続化される配列の順）
@@ -593,22 +594,24 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
           ),
         ],
       ),
-      body: config == null
-          ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-              child: Column(
-                children: [
-                  _summaryBar(config),
-                  Expanded(
-                    child: config.subscriptions.isEmpty
-                        ? _empty()
-                        : (_groupByCategory
-                            ? _categorizedList(config)
-                            : _flatList(config)),
-                  ),
-                ],
+      body: CenteredBody(
+        child: config == null
+            ? const Center(child: CircularProgressIndicator())
+            : SafeArea(
+                child: Column(
+                  children: [
+                    _summaryBar(config),
+                    Expanded(
+                      child: config.subscriptions.isEmpty
+                          ? _empty()
+                          : (_groupByCategory
+                              ? _categorizedList(config)
+                              : _flatList(config)),
+                    ),
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 

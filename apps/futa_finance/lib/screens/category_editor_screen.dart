@@ -3,6 +3,7 @@ import 'package:finance_core/finance_core.dart';
 
 import '../data/settings_repository.dart';
 import '../utils/emoji_palette.dart';
+import '../widgets/centered_body.dart';
 import '../widgets/emoji_picker_dialog.dart';
 import 'category_sub_editor_screen.dart';
 
@@ -152,7 +153,8 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
           ),
         ],
       ),
-      body: config == null
+      body: CenteredBody(
+        child: config == null
           ? const Center(child: CircularProgressIndicator())
           : SafeArea(
               child: ReorderableListView.builder(
@@ -258,6 +260,7 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
                 },
               ),
             ),
+      ),
     );
   }
 }

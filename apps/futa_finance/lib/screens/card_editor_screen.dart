@@ -3,6 +3,7 @@ import 'package:finance_core/finance_core.dart';
 
 import '../data/settings_repository.dart';
 import '../widgets/brand_logo.dart';
+import '../widgets/centered_body.dart';
 
 /// クレジットカードの登録CRUD。
 class CardEditorScreen extends StatefulWidget {
@@ -310,7 +311,8 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
           ),
         ],
       ),
-      body: config == null
+      body: CenteredBody(
+        child: config == null
           ? const Center(child: CircularProgressIndicator())
           : SafeArea(
               child: config.creditCards.isEmpty
@@ -332,6 +334,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                       },
                     ),
             ),
+      ),
     );
   }
 

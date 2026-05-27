@@ -812,11 +812,14 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
           return AlertDialog(
             title: const Text('取引を編集',
                 style: TextStyle(fontWeight: FontWeight.w700)),
+            // SingleChildScrollView でラップして広い画面でも content が
+            // 縮退しないようにする（Web ではこの保険がないと中身が消える）
             content: SizedBox(
               width: 360,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                   // 取引日
                   ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -909,6 +912,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                       ),
                     ),
                 ],
+                ),
               ),
             ),
             actions: [
