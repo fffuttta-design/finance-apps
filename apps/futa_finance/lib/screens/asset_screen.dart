@@ -255,7 +255,7 @@ class _AssetScreenState extends State<AssetScreen> with ModeAwareMixin {
     );
   }
 
-  // ── 口座別残高リスト ──
+  // ── 口座別残高リスト（ドラッグ並び替え可） ──
   Widget _accountListCard(
       List<core.RegisteredBankAccount> accounts,
       Map<String, int> balances,
@@ -278,21 +278,7 @@ class _AssetScreenState extends State<AssetScreen> with ModeAwareMixin {
       );
     }
 
-    // 銀行 → 電子マネー → 現金 の順、各種類内では残高降順
-    final byType = <core.AccountType, List<core.RegisteredBankAccount>>{};
-    for (final a in accounts) {
-      byType.putIfAbsent(a.accountType, () => []).add(a);
-    }
-    for (final list in byType.values) {
-      list.sort((a, b) =>
-          (balances[b.name] ?? 0).compareTo(balances[a.name] ?? 0));
-    }
-    final ordered = [
-      ...?byType[core.AccountType.bank],
-      ...?byType[core.AccountType.emoney],
-      ...?byType[core.AccountType.cash],
-    ];
-
+    // 並び順は payments.bankAccounts のリスト順そのまま（ユーザー編集可能）
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -313,83 +299,148 @@ class _AssetScreenState extends State<AssetScreen> with ModeAwareMixin {
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF111827))),
+                Spacer(),
+                Icon(Icons.drag_indicator,
+                    color: Color(0xFFD1D5DB), size: 14),
+                SizedBox(width: 4),
+                Text('ドラッグで並び替え',
+                    style: TextStyle(
+                        fontSize: 10, color: Color(0xFF9CA3AF))),
               ],
             ),
           ),
           const Divider(height: 1),
-          for (var i = 0; i < ordered.length; i++) ...[
-            if (i > 0) const Divider(height: 1, indent: 64),
-            _accountRow(ordered[i], balances[ordered[i].name] ?? 0, total),
-          ],
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            itemCount: accounts.length,
+            itemBuilder: (ctx, i) {
+              final a = accounts[i];
+              return _accountRow(
+                key: ValueKey(a.id),
+                index: i,
+                a: a,
+                balance: balances[a.name] ?? 0,
+                total: total,
+              );
+            },
+            onReorder: _onReorderAccounts,
+          ),
         ],
       ),
     );
   }
 
-  Widget _accountRow(
-      core.RegisteredBankAccount a, int balance, int total) {
+  Future<void> _onReorderAccounts(int oldIndex, int newIndex) async {
+    if (newIndex > oldIndex) newIndex--;
+    final p = _payments;
+    if (p == null) return;
+    final list = List<core.RegisteredBankAccount>.from(p.bankAccounts);
+    final item = list.removeAt(oldIndex);
+    list.insert(newIndex, item);
+    final newPayments = core.PaymentMethodsConfig(
+      bankAccounts: list,
+      creditCards: p.creditCards,
+    );
+    setState(() => _payments = newPayments);
+    try {
+      await SettingsRepository.instance.savePayments(newPayments);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('並び順の保存に失敗しました: $e')),
+      );
+    }
+  }
+
+  Widget _accountRow({
+    required Key key,
+    required int index,
+    required core.RegisteredBankAccount a,
+    required int balance,
+    required int total,
+  }) {
     final share = total == 0 ? 0.0 : balance / total;
-    return InkWell(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => AccountDetailScreen(account: a),
-          ),
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 16, 10),
-        child: Row(
-          children: [
-            a.iconUrl != null && a.iconUrl!.isNotEmpty
-                ? BrandLogo(
-                    iconUrl: a.iconUrl,
-                    fallbackEmoji: a.accountType.emoji,
-                    size: 32)
-                : Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF3F4F6),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(a.accountType.emoji,
-                        style: const TextStyle(fontSize: 18)),
-                  ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(a.name,
-                      style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF111827))),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${a.accountType.shortLabel}  ·  ${(share * 100).toStringAsFixed(1)}%',
-                    style: const TextStyle(
-                        fontSize: 11, color: Color(0xFF9CA3AF)),
-                  ),
-                ],
+    return Container(
+      key: key,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFF3F4F6), width: 1),
+        ),
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => AccountDetailScreen(account: a),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(4, 10, 16, 10),
+          child: Row(
+            children: [
+              // ドラッグハンドル
+              ReorderableDragStartListener(
+                index: index,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  child: Icon(Icons.drag_indicator,
+                      color: Color(0xFFD1D5DB), size: 20),
+                ),
               ),
-            ),
-            Text(
-              formatYen(balance),
-              style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  fontFamily: 'monospace',
-                  color: balance >= 0
-                      ? const Color(0xFF111827)
-                      : const Color(0xFFDC2626)),
-            ),
-            const SizedBox(width: 4),
-            const Icon(Icons.chevron_right,
-                size: 18, color: Color(0xFF9CA3AF)),
-          ],
+              a.iconUrl != null && a.iconUrl!.isNotEmpty
+                  ? BrandLogo(
+                      iconUrl: a.iconUrl,
+                      fallbackEmoji: a.accountType.emoji,
+                      size: 32)
+                  : Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3F4F6),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(a.accountType.emoji,
+                          style: const TextStyle(fontSize: 18)),
+                    ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(a.name,
+                        style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF111827))),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${a.accountType.shortLabel}  ·  ${(share * 100).toStringAsFixed(1)}%',
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF9CA3AF)),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                formatYen(balance),
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'monospace',
+                    color: balance >= 0
+                        ? const Color(0xFF111827)
+                        : const Color(0xFFDC2626)),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right,
+                  size: 18, color: Color(0xFF9CA3AF)),
+            ],
+          ),
         ),
       ),
     );

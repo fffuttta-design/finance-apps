@@ -15,7 +15,10 @@ import '../utils/formatters.dart';
 ///
 /// モバイル: モーダル表示。Web: 右側ドロワーで埋め込み表示。
 class TransferInputScreen extends StatefulWidget {
-  const TransferInputScreen({super.key});
+  const TransferInputScreen({super.key, this.initialFromAccount});
+
+  /// 起動時に移動元口座をプリセット（口座詳細画面から呼ばれた時など）。
+  final String? initialFromAccount;
 
   @override
   State<TransferInputScreen> createState() => _TransferInputScreenState();
@@ -48,7 +51,12 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
   Future<void> _load() async {
     final p = await _settings.loadPayments();
     if (!mounted) return;
-    setState(() => _payments = p);
+    setState(() {
+      _payments = p;
+      if (_fromAccount == null && widget.initialFromAccount != null) {
+        _fromAccount = widget.initialFromAccount;
+      }
+    });
   }
 
   /// 移動元/先の候補リスト。

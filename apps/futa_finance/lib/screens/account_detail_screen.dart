@@ -6,6 +6,9 @@ import 'package:finance_core/finance_core.dart' as core;
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 import '../widgets/brand_logo.dart';
+import 'expense_input_screen.dart';
+import 'income_input_screen.dart';
+import 'transfer_input_screen.dart';
 
 /// 口座詳細（通帳）画面。
 /// 単一口座に関連する取引を時系列で表示し、各時点の残高を逆算する。
@@ -49,6 +52,74 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     final list = await TransactionRepository.instance.loadAll();
     if (!mounted) return;
     setState(() => _all = list);
+  }
+
+  /// 「+」ボタン押下時のアクションシート。
+  /// この口座をプリセットした入力モーダルを呼び出す。
+  Future<void> _showAddMenu() async {
+    final accountName = widget.account.name;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetCtx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.arrow_downward,
+                    color: Color(0xFF16A34A)),
+                title: const Text('入金（収入）を記録'),
+                subtitle: Text('入金先: $accountName'),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => IncomeInputScreen(
+                          initialReceiveAccount: accountName),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.arrow_upward,
+                    color: Color(0xFFDC2626)),
+                title: const Text('出金（支出）を記録'),
+                subtitle: Text('支払元: $accountName'),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ExpenseInputScreen(
+                          initialPaymentMethod: accountName),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.swap_horiz,
+                    color: Color(0xFFEA580C)),
+                title: const Text('振替（他口座へ移動）を記録'),
+                subtitle: Text('移動元: $accountName'),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TransferInputScreen(
+                          initialFromAccount: accountName),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   /// この口座に関連する取引のみを抽出（収入/支出/振替）。
@@ -149,6 +220,13 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_circle, color: Color(0xFF1A237E)),
+            tooltip: '取引を追加',
+            onPressed: _showAddMenu,
+          ),
+        ],
       ),
       body: Column(
         children: [

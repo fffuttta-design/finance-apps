@@ -39,7 +39,10 @@ Future<bool?> showIncomeInputModal(BuildContext context) {
 /// - 残高編集 → 入金額自動更新（残高 - 現残高）
 /// 保存時は選択銀行の currentBalance を新残高で上書きする。
 class IncomeInputScreen extends StatefulWidget {
-  const IncomeInputScreen({super.key});
+  const IncomeInputScreen({super.key, this.initialReceiveAccount});
+
+  /// 起動時に入金先口座をプリセット（口座詳細画面から呼ばれた時など）。
+  final String? initialReceiveAccount;
 
   @override
   State<IncomeInputScreen> createState() => _IncomeInputScreenState();
@@ -95,6 +98,12 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
     setState(() {
       _sources = s;
       _payments = p;
+      // 呼び出し元から入金先プリセットがあれば適用
+      if (_receiveAccount == null &&
+          widget.initialReceiveAccount != null) {
+        _receiveAccount = widget.initialReceiveAccount;
+        _onReceiveAccountChanged(_receiveAccount);
+      }
     });
   }
 

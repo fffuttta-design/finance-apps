@@ -38,7 +38,10 @@ Future<bool?> showExpenseInputModal(BuildContext context) {
 /// 保存時は該当銀行のcurrentBalanceを新残高で上書き。
 /// クレジットカード選択時は残高欄を表示しない。
 class ExpenseInputScreen extends StatefulWidget {
-  const ExpenseInputScreen({super.key});
+  const ExpenseInputScreen({super.key, this.initialPaymentMethod});
+
+  /// 起動時に支払方法をプリセット（口座詳細画面から呼ばれた時など）。
+  final String? initialPaymentMethod;
 
   @override
   State<ExpenseInputScreen> createState() => _ExpenseInputScreenState();
@@ -121,6 +124,11 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     setState(() {
       _categories = c;
       _payments = p;
+      // 呼び出し元から支払方法プリセットがあれば適用
+      if (_paymentMethod == null && widget.initialPaymentMethod != null) {
+        _paymentMethod = widget.initialPaymentMethod;
+        _onPaymentMethodChanged(_paymentMethod);
+      }
     });
   }
 
