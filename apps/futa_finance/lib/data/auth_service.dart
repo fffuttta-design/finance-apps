@@ -22,10 +22,13 @@ class AuthService {
   bool _initialized = false;
 
   /// 起動時に1回だけ呼ぶ。google_sign_in の初期化。
+  /// Web では google_sign_in は使わず Firebase Auth の signInWithPopup を
+  /// 直接呼ぶため、初期化はスキップ（Web 用 clientId 設定不要）。
   Future<void> init() async {
     if (_initialized) return;
-    // google_sign_in 7.x は初期化APIあり。Web 含め共通。
-    await GoogleSignIn.instance.initialize();
+    if (!kIsWeb) {
+      await GoogleSignIn.instance.initialize();
+    }
     _initialized = true;
   }
 
@@ -43,7 +46,15 @@ class AuthService {
     if (!_initialized) await init();
 
     try {
-      // Google アカウント選択（ネイティブダイアログ起動）。
+      if (kIsWeb) {
+        // Web: Firebase Auth の signInWithPopup を直接利用。
+        // google_sign_in の Web 用 client_id 設定が不要になる。
+        final provider = GoogleAuthProvider();
+        final userCred = await _auth.signInWithPopup(provider);
+        return userCred.user;
+      }
+
+      // Android/iOS: google_sign_in 経由でネイティブのアカウント選択を起動。
       final account = await GoogleSignIn.instance.authenticate();
 
       // idToken を取得
@@ -71,9 +82,11 @@ class AuthService {
       // Firebase 側
       await _auth.signOut();
       // Google 側（次回サインイン時にアカウント選択を再表示するため）
-      try {
-        await GoogleSignIn.instance.signOut();
-      } catch (_) {}
+      if (!kIsWeb) {
+        try {
+          await GoogleSignIn.instance.signOut();
+        } catch (_) {}
+      }
     } catch (e) {
       if (kDebugMode) {
         debugPrint('サインアウトエラー: $e');
