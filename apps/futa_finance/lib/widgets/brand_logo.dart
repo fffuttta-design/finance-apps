@@ -1,4 +1,9 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+
+// 条件付きインポート: Web では dart:html を使うため別実装、Non-Web は stub。
+import 'brand_logo_stub.dart'
+    if (dart.library.html) 'brand_logo_web.dart' as web_image;
 
 /// ブランドロゴ画像を表示するウィジェット。
 ///
@@ -40,15 +45,16 @@ class BrandLogo extends StatelessWidget {
     // 画像のアスペクト比に関わらず常に正方形（size x size）で表示する。
     // 縦横比が異なる画像は中央でクロップ（BoxFit.cover）。背景色も敷いて
     // 透過PNG / 余白多めのfaviconでも統一感が出るようにする。
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: fallbackBgColor,
-        borderRadius: BorderRadius.circular(borderRadius),
-      ),
-      clipBehavior: Clip.hardEdge,
-      child: Image.network(
+    //
+    // Web では Image.network が CORS で失敗する画像（Google Favicon等）が
+    // 多いため、HtmlElementView 経由で <img> タグを使う（CORS 不要）。
+    // この場合 errorBuilder/loadingBuilder は使えないが、ブラウザ標準の
+    // 画像読込挙動になるので体験的に大差なし。
+    final Widget imageChild;
+    if (kIsWeb) {
+      imageChild = web_image.buildWebImage(url, size);
+    } else {
+      imageChild = Image.network(
         url,
         width: size,
         height: size,
@@ -70,7 +76,17 @@ class BrandLogo extends StatelessWidget {
             ),
           );
         },
+      );
+    }
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: fallbackBgColor,
+        borderRadius: BorderRadius.circular(borderRadius),
       ),
+      clipBehavior: Clip.hardEdge,
+      child: imageChild,
     );
   }
 
