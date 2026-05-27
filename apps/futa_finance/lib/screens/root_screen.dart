@@ -394,13 +394,18 @@ class _RootScreenState extends State<RootScreen> {
           ),
           const VerticalDivider(width: 1, thickness: 1),
           Expanded(
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints:
-                    const BoxConstraints(maxWidth: _wideContentMaxWidth),
-                child: IndexedStack(index: _index, children: _tabs),
-              ),
+            // Align+ConstrainedBox(maxWidth)では子のScaffold/ListViewに
+            // 高さ制約が伝わらずグレーアウトすることがあるため、
+            // Row+Spacer+SizedBox(width only) パターンで中央寄せ
+            child: Row(
+              children: [
+                const Spacer(),
+                SizedBox(
+                  width: _wideContentMaxWidth,
+                  child: IndexedStack(index: _index, children: _tabs),
+                ),
+                const Spacer(),
+              ],
             ),
           ),
           if (_recordPanel != null) ...[
