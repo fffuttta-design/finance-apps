@@ -13,6 +13,9 @@ import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/emoji_palette.dart';
 import '../utils/formatters.dart';
+import '../widgets/brand_logo.dart';
+import 'account_detail_screen.dart';
+import 'card_editor_screen.dart';
 import 'expense_input_screen.dart';
 import 'income_input_screen.dart';
 
@@ -820,80 +823,119 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
   }
 
   Widget _balanceRow(RegisteredBankAccount b, int balance) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        children: [
-          Text(b.accountType.emoji, style: const TextStyle(fontSize: 14)),
-          const SizedBox(width: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF3F4F6),
-              borderRadius: BorderRadius.circular(3),
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => AccountDetailScreen(account: b),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 2),
+        child: Row(
+          children: [
+            // ロゴ画像（iconUrl があれば画像、無ければ種別の絵文字フォールバック）
+            BrandLogo(
+              iconUrl: b.iconUrl,
+              fallbackEmoji: b.accountType.emoji,
+              size: 20,
+              borderRadius: 4,
             ),
-            child: Text(
-              b.accountType.shortLabel,
-              style:
-                  const TextStyle(fontSize: 9, color: Color(0xFF6B7280)),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: Text(
+                b.accountType.shortLabel,
+                style:
+                    const TextStyle(fontSize: 9, color: Color(0xFF6B7280)),
+              ),
             ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(b.name,
-                style: const TextStyle(
-                    fontSize: 13, color: Color(0xFF111827)),
-                overflow: TextOverflow.ellipsis),
-          ),
-          Text(
-            formatYen(balance),
-            style: TextStyle(
-                fontSize: 13,
-                color: balance >= 0
-                    ? const Color(0xFF111827)
-                    : const Color(0xFFDC2626),
-                fontFamily: 'monospace',
-                fontWeight: FontWeight.w600),
-          ),
-        ],
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(b.name,
+                  style: const TextStyle(
+                      fontSize: 13, color: Color(0xFF111827)),
+                  overflow: TextOverflow.ellipsis),
+            ),
+            Text(
+              formatYen(balance),
+              style: TextStyle(
+                  fontSize: 13,
+                  color: balance >= 0
+                      ? const Color(0xFF111827)
+                      : const Color(0xFFDC2626),
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(width: 2),
+            const Icon(Icons.chevron_right,
+                size: 14, color: Color(0xFFD1D5DB)),
+          ],
+        ),
       ),
     );
   }
 
   Widget _cardBalanceRow(RegisteredCreditCard c, int amount) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        children: [
-          const Text('💳', style: TextStyle(fontSize: 14)),
-          const SizedBox(width: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFEE2E2),
-              borderRadius: BorderRadius.circular(3),
+    return InkWell(
+      onTap: () {
+        // クレカ単独詳細画面はまだ無いので、設定 → クレカ編集一覧へ
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const CardEditorScreen(),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 2),
+        child: Row(
+          children: [
+            // ロゴ画像（iconUrl があれば画像、無ければ 💳 フォールバック）
+            BrandLogo(
+              iconUrl: c.iconUrl,
+              fallbackEmoji: '💳',
+              size: 20,
+              borderRadius: 4,
             ),
-            child: const Text(
-              '当月',
-              style: TextStyle(fontSize: 9, color: Color(0xFFDC2626)),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEE2E2),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: const Text(
+                '当月',
+                style: TextStyle(fontSize: 9, color: Color(0xFFDC2626)),
+              ),
             ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(c.name,
-                style: const TextStyle(
-                    fontSize: 13, color: Color(0xFF111827)),
-                overflow: TextOverflow.ellipsis),
-          ),
-          Text(
-            formatYen(-amount, withSign: true),
-            style: const TextStyle(
-                fontSize: 13,
-                color: Color(0xFFDC2626),
-                fontFamily: 'monospace',
-                fontWeight: FontWeight.w600),
-          ),
-        ],
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(c.name,
+                  style: const TextStyle(
+                      fontSize: 13, color: Color(0xFF111827)),
+                  overflow: TextOverflow.ellipsis),
+            ),
+            Text(
+              formatYen(-amount, withSign: true),
+              style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFFDC2626),
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(width: 2),
+            const Icon(Icons.chevron_right,
+                size: 14, color: Color(0xFFD1D5DB)),
+          ],
+        ),
       ),
     );
   }
