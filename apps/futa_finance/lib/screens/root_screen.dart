@@ -341,6 +341,10 @@ class _RootScreenState extends State<RootScreen> {
   }
 
   // ── 広い画面（Web/Desktop） サイドバー固定レイアウト ──
+  /// メインコンテンツの最大幅。これ以上はサイドバーとの間に余白を作る。
+  /// 画面が広くてもコンテンツが横にダラっと伸びないようにする。
+  static const double _wideContentMaxWidth = 1080;
+
   Widget _buildWideLayout() {
     return Scaffold(
       body: Row(
@@ -350,7 +354,16 @@ class _RootScreenState extends State<RootScreen> {
             onDestinationSelected: (i) => setState(() => _index = i),
           ),
           const VerticalDivider(width: 1, thickness: 1),
-          Expanded(child: IndexedStack(index: _index, children: _tabs)),
+          Expanded(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints:
+                    const BoxConstraints(maxWidth: _wideContentMaxWidth),
+                child: IndexedStack(index: _index, children: _tabs),
+              ),
+            ),
+          ),
         ],
       ),
     );
