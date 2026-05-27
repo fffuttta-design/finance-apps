@@ -389,8 +389,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: const Text('サンプルデータを投入'),
         content: const Text(
             '現在の取引を全て削除し、2026年5月の実データ30件で置換します。\n'
-            '住信SBI口座（月初¥10,652,701）が未登録なら同時に追加します。\n'
-            'よろしいですか？'),
+            '住信SBI口座（月初¥10,652,701）が未登録なら同時に追加します。\n\n'
+            '※ 実行直前の状態は自動スナップショットとして保存されます。\n'
+            '「設定 → 直前の状態に戻す」でいつでも復元可能です。'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -402,6 +403,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
     if (ok != true) return;
+
+    // 破壊的操作前に自動スナップショット（誤実行からの一発復旧用）
+    await BackupRepository.instance.savePreImportSnapshot();
 
     await TransactionRepository.instance
         .replaceAll(MockData.sampleTransactions());
@@ -429,7 +433,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('全取引を削除'),
-        content: const Text('登録されている全ての取引を削除します。\nこの操作は取り消せません。'),
+        content: const Text(
+            '登録されている全ての取引を削除します。\n\n'
+            '※ 実行直前の状態は自動スナップショットとして保存されます。\n'
+            '「設定 → 直前の状態に戻す」でいつでも復元可能です。'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -443,10 +450,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
     if (ok != true) return;
+
+    // 破壊的操作前に自動スナップショット
+    await BackupRepository.instance.savePreImportSnapshot();
+
     await TransactionRepository.instance.clear();
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('全取引を削除しました')),
+      const SnackBar(content: Text('全取引を削除しました（直前の状態に戻せます）')),
     );
   }
 
