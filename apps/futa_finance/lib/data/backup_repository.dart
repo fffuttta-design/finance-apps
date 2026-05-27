@@ -1,10 +1,20 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:finance_core/finance_core.dart' as core;
+import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'app_mode.dart';
+import 'checklist_repository.dart';
+import 'income_source_repository.dart';
+import 'month_closing_repository.dart';
+import 'monthly_snapshot_repository.dart';
+import 'settings_repository.dart';
+import 'subscription_repository.dart';
+import 'transaction_repository.dart';
 
 /// アプリ全データを 1 つの JSON にエクスポート/インポートする。
 ///
@@ -222,22 +232,41 @@ class BackupRepository {
     int totalKeys = 0;
     final restoredModes = <String>[];
 
+    // ── 現在の AppMode を退避（取り込み中にモード切替するため）
+    final originalMode = AppModeManager.instance.current;
+
     for (final entry in _modes.entries) {
       final modePrefix = entry.key;
       final modeLabel = entry.value;
+      final mode = modePrefix == 'b' ? AppMode.business : AppMode.personal;
       final modeData = data[modeLabel];
       if (modeData is! Map<String, dynamic>) continue;
+
+      // Repository.instance は AppMode 依存のキー/コレクションを使うため、
+      // 取り込み対象のモードに一時的に切り替える必要がある。
+      if (AppModeManager.instance.current != mode) {
+        await AppModeManager.instance.setMode(mode);
+      }
 
       int modeKeyCount = 0;
       for (final key in _targetKeys) {
         if (!modeData.containsKey(key)) continue;
         final value = modeData[key];
         final encoded = value is String ? value : jsonEncode(value);
+        // (1) SharedPreferences (Local Repository が見る場所) を更新
         await prefs.setString(_fullKey(modePrefix, key), encoded);
+        // (2) 現在アクティブな Repository (Firestore / Local) にも書く
+        //     これで Firestore 同期環境でも UI に即反映される
+        await _writeToActiveRepository(key, value);
         modeKeyCount++;
         totalKeys++;
       }
       if (modeKeyCount > 0) restoredModes.add(modeLabel);
+    }
+
+    // モードを元に戻す
+    if (AppModeManager.instance.current != originalMode) {
+      await AppModeManager.instance.setMode(originalMode);
     }
 
     // ── 取り込み後の件数スナップショット
@@ -252,6 +281,63 @@ class BackupRepository {
       beforeCounts: beforeCounts,
       afterCounts: afterCounts,
     );
+  }
+
+  /// 取り込んだデータを現在アクティブな Repository (Firestore or Local) に書き込む。
+  /// AppMode は事前に呼び出し側で対象モードに切替されている前提。
+  ///
+  /// 個別キーで失敗しても他のキー取り込みは続行（best-effort）。
+  Future<void> _writeToActiveRepository(String key, dynamic value) async {
+    try {
+      // Config 系の fromJsonString に渡す文字列。
+      // バックアップ JSON では Config は文字列で格納されている形式と
+      // 直接ネストオブジェクトの形式の両方があり得るのでケアする。
+      final source = value is String ? value : jsonEncode(value);
+
+      switch (key) {
+        case 'transactions':
+          // 取引はリスト構造（文字列なら decode してリスト化）。
+          final decoded = value is String ? jsonDecode(value) : value;
+          final list = (decoded as List)
+              .map((e) =>
+                  core.Transaction.fromJson(e as Map<String, dynamic>))
+              .toList();
+          await TransactionRepository.instance.replaceAll(list);
+          break;
+        case 'categories':
+          final config = core.CategoryConfig.fromJsonString(source);
+          await SettingsRepository.instance.saveCategories(config);
+          break;
+        case 'payments':
+          final config = core.PaymentMethodsConfig.fromJsonString(source);
+          await SettingsRepository.instance.savePayments(config);
+          break;
+        case 'subscriptions':
+          final config = core.SubscriptionConfig.fromJsonString(source);
+          await SubscriptionRepository.instance.save(config);
+          break;
+        case 'income_sources':
+          final config = core.IncomeSourceConfig.fromJsonString(source);
+          await IncomeSourceRepository.instance.save(config);
+          break;
+        case 'monthly_snapshots':
+          final config = core.MonthlySnapshotConfig.fromJsonString(source);
+          await MonthlySnapshotRepository.instance.save(config);
+          break;
+        case 'month_closing':
+          final config = core.MonthClosingConfig.fromJsonString(source);
+          await MonthClosingRepository.instance.save(config);
+          break;
+        case 'checklist':
+          final config = core.ChecklistConfig.fromJsonString(source);
+          await ChecklistRepository.instance.save(config);
+          break;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Repository write failed for $key: $e');
+      }
+    }
   }
 
   /// 現在の SharedPreferences から各モード x 各キー の「件数」を抜き出す。
