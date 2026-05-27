@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.30",
-    "buildNumber":  "31",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.30/futa-finance-v1.0.30.apk",
-    "releaseNotes":  "v1.0.30: 銀行口座/クレカに備考欄追加 / 個人モードに資金口座5つ(新生/GMOあおぞら/ゆうちょ/イオン/PayPay)をJSON投入"
+    "version":  "1.0.31",
+    "buildNumber":  "32",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.31/futa-finance-v1.0.31.apk",
+    "releaseNotes":  "v1.0.31: カード編集UI改善（備考を下4桁直後に移動・累積額入力削除・ロゴURL ラベル簡略化・hint削除）/ ホーム画面のカード累積額を当月取引から自動計算"
 }
