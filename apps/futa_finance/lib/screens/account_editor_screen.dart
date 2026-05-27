@@ -43,11 +43,12 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
   Future<RegisteredBankAccount?> _editDialog(
       BuildContext context, RegisteredBankAccount? initial) async {
     final nameCtrl = TextEditingController(text: initial?.name ?? '');
-    final last4Ctrl = TextEditingController(text: initial?.last4 ?? '');
     final iconUrlCtrl =
         TextEditingController(text: initial?.iconUrl ?? '');
     final memoCtrl = TextEditingController(text: initial?.memo ?? '');
     AccountType selectedType = initial?.accountType ?? AccountType.bank;
+    // last4 は UI 入力廃止。既存値があれば保持して破壊しない。
+    final initialLast4 = initial?.last4;
 
     final result = await showModalBottomSheet<RegisteredBankAccount?>(
       context: context,
@@ -59,8 +60,6 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
       ),
       builder: (sheetCtx) => StatefulBuilder(
         builder: (ctx, setLocal) {
-          final isBank = selectedType == AccountType.bank;
-          final isEmoney = selectedType == AccountType.emoney;
           final isValid = nameCtrl.text.trim().isNotEmpty;
 
           void onSave() {
@@ -69,9 +68,8 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
               Navigator.pop(ctx, null);
               return;
             }
-            final last4 = last4Ctrl.text.trim().isEmpty
-                ? null
-                : last4Ctrl.text.trim();
+            // last4 は UI から入力できないため、initial の値をそのまま維持。
+            final last4 = initialLast4;
             final iconUrl = iconUrlCtrl.text.trim().isEmpty
                 ? null
                 : iconUrlCtrl.text.trim();
@@ -177,33 +175,13 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
                               autofocus: initial == null,
                               decoration: InputDecoration(
                                 labelText: '${selectedType.label}名（必須）',
-                                hintText: isBank
-                                    ? '住信SBI / 三井住友 など'
-                                    : isEmoney
-                                        ? 'PayPay / Suica など'
-                                        : '財布 / 小銭入れ など',
                                 floatingLabelBehavior:
                                     FloatingLabelBehavior.always,
                               ),
                               onChanged: (_) => setLocal(() {})),
-                          if (isBank || isEmoney) ...[
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: last4Ctrl,
-                              keyboardType: TextInputType.number,
-                              maxLength: 4,
-                              decoration: InputDecoration(
-                                labelText: isBank
-                                    ? '口座番号 下4桁（任意）'
-                                    : 'ID 下4桁（任意）',
-                                counterText: '',
-                                floatingLabelBehavior:
-                                    FloatingLabelBehavior.always,
-                              ),
-                            ),
-                          ],
                           const SizedBox(height: 12),
-                          // 備考欄を下4桁の直下に配置（1行）
+                          // 下4桁の入力は UI から廃止（last4 モデルは互換のため残す）。
+                          // 備考欄を直接配置。
                           TextField(
                             controller: memoCtrl,
                             maxLines: 1,
