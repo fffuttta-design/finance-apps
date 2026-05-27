@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.40",
-    "buildNumber":  "41",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.40/futa-finance-v1.0.40.apk",
-    "releaseNotes":  "v1.0.40: バージョン表記を大きく/紺色で目立たせる / チェックリストの↳矢印アイコン削除 / バックアップ堅牢化ロードマップをNOTES.mdに記録"
+    "version":  "1.0.41",
+    "buildNumber":  "42",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.41/futa-finance-v1.0.41.apk",
+    "releaseNotes":  "v1.0.41: インポート前の自動スナップショット機能（取り込みミスからの一発復旧）/ 設定に「直前の状態に戻す」UI追加 / ドライブAPKをapks/に整理"
 }
