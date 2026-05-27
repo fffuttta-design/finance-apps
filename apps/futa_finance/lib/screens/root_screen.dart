@@ -14,6 +14,7 @@ import 'income_input_screen.dart';
 import 'income_screen.dart';
 import 'report_screen.dart';
 import 'settings_screen.dart';
+import 'table_view_screen.dart';
 
 /// アプリのルートシェル。下部タブで6画面を切り替える + 上部にモード切替ストリップ。
 class RootScreen extends StatefulWidget {
@@ -32,12 +33,14 @@ class _RootScreenState extends State<RootScreen> {
   /// 広い画面で開いている記録パネル。null=閉じている。
   _RecordPanelKind? _recordPanel;
 
+  // インデックス 0..4 はモバイル＆Web 共通、5 は Web 専用「テーブル」。
   static const _tabs = <Widget>[
     HomeScreen(),
     ExpensesScreen(),
     IncomeScreen(),
     ReportScreen(),
     SettingsScreen(),
+    TableViewScreen(),
   ];
 
   /// 広い画面（Web/Tablet/Desktop）かどうかの判定しきい値。
@@ -545,6 +548,8 @@ class _SideNavState extends State<_SideNav> {
                       selectedColor: const Color(0xFF16A34A)),
                   _navItem(3, Icons.bar_chart_outlined, Icons.bar_chart,
                       '集計'),
+                  _navItem(5, Icons.table_chart_outlined,
+                      Icons.table_chart, 'テーブル'),
                   _navItem(4, Icons.settings_outlined, Icons.settings,
                       '設定'),
                 ],
