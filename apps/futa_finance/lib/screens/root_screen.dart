@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -31,10 +32,17 @@ class _RootScreenState extends State<RootScreen> {
     SettingsScreen(),
   ];
 
+  /// 広い画面（Web/Tablet/Desktop）かどうかの判定しきい値。
+  /// 900px 以上で NavigationRail（サイドバー）レイアウトに切替。
+  static const double _wideBreakpoint = 900;
+
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 2), _checkForUpdateAtStartup);
+    // Web ではアプリ内アップデート確認（APK配信）は無意味なのでスキップ。
+    if (!kIsWeb) {
+      Future.delayed(const Duration(seconds: 2), _checkForUpdateAtStartup);
+    }
   }
 
   // ユーザーが「スキップ」したバージョンを覚えるキー。
@@ -277,6 +285,16 @@ class _RootScreenState extends State<RootScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= _wideBreakpoint;
+        return wide ? _buildWideLayout() : _buildMobileLayout();
+      },
+    );
+  }
+
+  // ── モバイル/狭い画面（既存のレイアウト） ──
+  Widget _buildMobileLayout() {
     return Scaffold(
       body: Column(
         children: [
@@ -318,6 +336,225 @@ class _RootScreenState extends State<RootScreen> {
             label: '設定',
           ),
         ],
+      ),
+    );
+  }
+
+  // ── 広い画面（Web/Desktop） サイドバー固定レイアウト ──
+  Widget _buildWideLayout() {
+    return Scaffold(
+      body: Row(
+        children: [
+          _SideNav(
+            selectedIndex: _index,
+            onDestinationSelected: (i) => setState(() => _index = i),
+          ),
+          const VerticalDivider(width: 1, thickness: 1),
+          Expanded(child: IndexedStack(index: _index, children: _tabs)),
+        ],
+      ),
+    );
+  }
+}
+
+/// 広い画面用のサイドナビ。
+/// アプリ名 + モード切替 + 5タブを縦に並べる。
+class _SideNav extends StatefulWidget {
+  const _SideNav({
+    required this.selectedIndex,
+    required this.onDestinationSelected,
+  });
+
+  final int selectedIndex;
+  final ValueChanged<int> onDestinationSelected;
+
+  @override
+  State<_SideNav> createState() => _SideNavState();
+}
+
+class _SideNavState extends State<_SideNav> {
+  @override
+  void initState() {
+    super.initState();
+    AppModeManager.instance.addListener(_rebuild);
+  }
+
+  @override
+  void dispose() {
+    AppModeManager.instance.removeListener(_rebuild);
+    super.dispose();
+  }
+
+  void _rebuild() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final current = AppModeManager.instance.current;
+    return Container(
+      width: 240,
+      color: Colors.white,
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── アプリヘッダー ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: current.accentColor,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        '財',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'FutaFinance',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+
+            // ── モード切替 ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Column(
+                children: [
+                  _modeButton(AppMode.business, current),
+                  const SizedBox(height: 6),
+                  _modeButton(AppMode.personal, current),
+                ],
+              ),
+            ),
+
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Divider(height: 1),
+            ),
+
+            // ── ナビアイテム ──
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                children: [
+                  _navItem(0, Icons.home_outlined, Icons.home, 'ホーム'),
+                  _navItem(1, Icons.receipt_long_outlined,
+                      Icons.receipt_long, '支出'),
+                  _navItem(2, Icons.savings_outlined, Icons.savings, '収入',
+                      selectedColor: const Color(0xFF16A34A)),
+                  _navItem(3, Icons.bar_chart_outlined, Icons.bar_chart,
+                      '集計'),
+                  _navItem(4, Icons.settings_outlined, Icons.settings,
+                      '設定'),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _modeButton(AppMode mode, AppMode current) {
+    final selected = mode == current;
+    final color = mode.accentColor;
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: selected ? null : () => AppModeManager.instance.setMode(mode),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? color.withValues(alpha: 0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? color : const Color(0xFFE5E7EB),
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(mode.icon,
+                size: 16, color: selected ? color : const Color(0xFF9CA3AF)),
+            const SizedBox(width: 8),
+            Text(
+              '${mode.label}モード',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? color : const Color(0xFF6B7280),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _navItem(
+    int index,
+    IconData iconOutlined,
+    IconData iconFilled,
+    String label, {
+    Color selectedColor = const Color(0xFF1A237E),
+  }) {
+    final selected = widget.selectedIndex == index;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => widget.onDestinationSelected(index),
+        child: Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: selected
+                ? const Color(0xFFE0E7FF)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                selected ? iconFilled : iconOutlined,
+                size: 20,
+                color: selected ? selectedColor : const Color(0xFF6B7280),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight:
+                      selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected
+                      ? selectedColor
+                      : const Color(0xFF374151),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
