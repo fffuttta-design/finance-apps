@@ -145,7 +145,8 @@ class RegisteredCreditCard {
   /// カード番号下4桁。
   final String? last4;
 
-  /// ブランドカラー（HEX値、UIで色分け表示するため）。
+  /// ブランドカラー（HEX値）。レガシー。新UIでは未使用だが、既存データの
+  /// 互換性のためにフィールド自体は残してある（読み書きはする）。
   final int? brandColorValue;
 
   /// 累積利用額（円）。当月の請求がまだ落ちていない分の合計。
@@ -158,6 +159,10 @@ class RegisteredCreditCard {
   /// 備考（任意）。「サブスク専用」「高額利用専用」など、カードの役割を補足する。
   final String? memo;
 
+  /// 月の引き落とし日（1〜31）。null は未設定。
+  /// 月末締めチェックリスト等で「来月X日に引き落とし」のリマインド用。
+  final int? paymentDay;
+
   const RegisteredCreditCard({
     required this.id,
     required this.name,
@@ -166,6 +171,7 @@ class RegisteredCreditCard {
     this.currentBalance,
     this.iconUrl,
     this.memo,
+    this.paymentDay,
   });
 
   /// 表示用の累積額（null は 0扱い）。
@@ -179,6 +185,7 @@ class RegisteredCreditCard {
         'currentBalance': currentBalance,
         'iconUrl': iconUrl,
         'memo': memo,
+        'paymentDay': paymentDay,
       };
 
   factory RegisteredCreditCard.fromJson(Map<String, dynamic> j) =>
@@ -190,6 +197,7 @@ class RegisteredCreditCard {
         currentBalance: j['currentBalance'] as int?,
         iconUrl: j['iconUrl'] as String?,
         memo: j['memo'] as String?,
+        paymentDay: j['paymentDay'] as int?,
       );
 
   RegisteredCreditCard copyWith({
@@ -199,7 +207,9 @@ class RegisteredCreditCard {
     int? currentBalance,
     String? iconUrl,
     String? memo,
+    int? paymentDay,
     bool clearMemo = false,
+    bool clearPaymentDay = false,
   }) =>
       RegisteredCreditCard(
         id: id,
@@ -209,6 +219,8 @@ class RegisteredCreditCard {
         currentBalance: currentBalance ?? this.currentBalance,
         iconUrl: iconUrl ?? this.iconUrl,
         memo: clearMemo ? null : (memo ?? this.memo),
+        paymentDay:
+            clearPaymentDay ? null : (paymentDay ?? this.paymentDay),
       );
 }
 
