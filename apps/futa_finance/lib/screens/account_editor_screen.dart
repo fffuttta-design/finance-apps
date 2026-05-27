@@ -46,6 +46,9 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
     final iconUrlCtrl =
         TextEditingController(text: initial?.iconUrl ?? '');
     final memoCtrl = TextEditingController(text: initial?.memo ?? '');
+    // 開始残高(任意): 通帳画面の月初/月末残高をユーザーが直したい時用に復活。
+    final startingCtrl = TextEditingController(
+        text: initial?.startingBalance?.toString() ?? '');
     AccountType selectedType = initial?.accountType ?? AccountType.bank;
     // last4 は UI 入力廃止。既存値があれば保持して破壊しない。
     final initialLast4 = initial?.last4;
@@ -75,8 +78,11 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
                 : iconUrlCtrl.text.trim();
             final memo =
                 memoCtrl.text.trim().isEmpty ? null : memoCtrl.text.trim();
-            // 開始時残高はこの画面では編集しない（別画面で実装予定）。
-            // 既存の startingBalance は initial.copyWith で保持される。
+            // 開始残高: 空欄は null（未設定）扱い。
+            final startingRaw = startingCtrl.text.trim();
+            final starting = startingRaw.isEmpty
+                ? null
+                : int.tryParse(startingRaw.replaceAll(',', ''));
             if (initial == null) {
               Navigator.pop(
                   ctx,
@@ -84,20 +90,25 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
                     id: _genId(),
                     name: name,
                     last4: last4,
+                    startingBalance: starting,
                     accountType: selectedType,
                     iconUrl: iconUrl,
                     memo: memo,
                   ));
             } else {
+              // copyWith は null 渡し時に既存値が残るため、startingBalance を
+              // 明示的にクリア(null)できるよう全フィールド指定で再構築する。
               Navigator.pop(
                   ctx,
-                  initial.copyWith(
+                  RegisteredBankAccount(
+                    id: initial.id,
                     name: name,
                     last4: last4,
+                    startingBalance: starting,
+                    currentBalance: initial.currentBalance,
                     accountType: selectedType,
                     iconUrl: iconUrl,
                     memo: memo,
-                    clearMemo: memo == null,
                   ));
             }
           }
@@ -179,6 +190,21 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
                                     FloatingLabelBehavior.always,
                               ),
                               onChanged: (_) => setLocal(() {})),
+                          const SizedBox(height: 12),
+                          // 開始残高(任意)。
+                          // 全期間の残高計算の基準値。通帳画面の月初/月末残高が
+                          // ズレた時、ここで補正できる。空欄なら 0 として扱う。
+                          TextField(
+                            controller: startingCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: '開始残高（任意・円）',
+                              prefixText: '¥ ',
+                              helperText: '全期間の残高計算の基準値。空欄=0扱い',
+                              floatingLabelBehavior:
+                                  FloatingLabelBehavior.always,
+                            ),
+                          ),
                           const SizedBox(height: 12),
                           // 下4桁の入力は UI から廃止（last4 モデルは互換のため残す）。
                           // 備考欄を直接配置。
