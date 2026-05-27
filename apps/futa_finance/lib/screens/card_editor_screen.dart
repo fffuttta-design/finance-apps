@@ -167,7 +167,6 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                               autofocus: initial == null,
                               decoration: const InputDecoration(
                                 labelText: 'カード名（必須）',
-                                hintText: '三井住友カード / 楽天カード など',
                                 floatingLabelBehavior:
                                     FloatingLabelBehavior.always,
                               ),
