@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
+import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 import '../widgets/brand_logo.dart';
@@ -39,6 +40,22 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
 
   /// 月フィルタ。null = 全期間。
   DateTime? _selectedMonth;
+
+  // ─── 未保存編集の管理 ─────────────────────
+  /// ユーザーが手入力で上書きした月初残高（保存前のローカル状態）。
+  int? _pendingMonthStartBalance;
+
+  /// ユーザーが手入力で上書きした月末残高（保存前のローカル状態）。
+  int? _pendingMonthEndBalance;
+
+  bool get _hasPendingEdit =>
+      _pendingMonthStartBalance != null ||
+      _pendingMonthEndBalance != null;
+
+  void _clearPending() {
+    _pendingMonthStartBalance = null;
+    _pendingMonthEndBalance = null;
+  }
 
   @override
   void initState() {
@@ -143,18 +160,20 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     final displayRows = filteredAsc.reversed.toList();
 
     // 月初残高/月末残高（月選択時のみ）
-    int? monthStartBalance;
-    int? monthEndBalance;
+    int? autoMonthStartBalance;
+    int? autoMonthEndBalance;
     if (_selectedMonth != null) {
       final m = _selectedMonth!;
       final monthFirst = DateTime(m.year, m.month, 1);
       final monthLast = DateTime(m.year, m.month + 1, 1)
           .subtract(const Duration(seconds: 1));
-      // 月初残高 = 月1日0時の残高 = 月1日0時より前 (前日23:59:59) までの累計
       final beforeMonth = monthFirst.subtract(const Duration(seconds: 1));
-      monthStartBalance = _balanceAt(ascAll, beforeMonth);
-      monthEndBalance = _balanceAt(ascAll, monthLast);
+      autoMonthStartBalance = _balanceAt(ascAll, beforeMonth);
+      autoMonthEndBalance = _balanceAt(ascAll, monthLast);
     }
+    // 表示用: pending があればそれを使う
+    final dispStart = _pendingMonthStartBalance ?? autoMonthStartBalance;
+    final dispEnd = _pendingMonthEndBalance ?? autoMonthEndBalance;
 
     // サマリー
     final inSum = filteredAsc
@@ -165,68 +184,140 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         .fold<int>(0, (s, r) => s + (-r.signedAmount));
     final netDelta = inSum - outSum;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            if (widget.account.iconUrl != null &&
-                widget.account.iconUrl!.isNotEmpty)
-              BrandLogo(
-                  iconUrl: widget.account.iconUrl,
-                  fallbackEmoji: widget.account.accountType.emoji,
-                  size: 26),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(widget.account.name,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                  overflow: TextOverflow.ellipsis),
+    return PopScope(
+      canPop: !_hasPendingEdit,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final confirm = await _confirmDiscardEdits();
+        if (confirm && mounted) {
+          _clearPending();
+          if (!context.mounted) return;
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Row(
+            children: [
+              if (widget.account.iconUrl != null &&
+                  widget.account.iconUrl!.isNotEmpty)
+                BrandLogo(
+                    iconUrl: widget.account.iconUrl,
+                    fallbackEmoji: widget.account.accountType.emoji,
+                    size: 26),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(widget.account.name,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                    overflow: TextOverflow.ellipsis),
+              ),
+              if (_hasPendingEdit) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEA580C),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text('未保存',
+                      style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            // 保存ボタン: 未保存編集がある時のみ強調表示
+            if (_hasPendingEdit)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 4, vertical: 8),
+                child: FilledButton.icon(
+                  icon: const Icon(Icons.save, size: 16),
+                  label: const Text('保存'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFEA580C),
+                  ),
+                  onPressed: () => _saveBalanceEdits(
+                    autoStart: autoMonthStartBalance,
+                    autoEnd: autoMonthEndBalance,
+                    inSum: inSum,
+                    outSum: outSum,
+                    ascAll: ascAll,
+                  ),
+                ),
+              ),
+            IconButton(
+              icon: const Icon(Icons.add_circle, color: Color(0xFF1A237E)),
+              tooltip: '取引を追加',
+              onPressed: _showAddMenu,
             ),
           ],
         ),
+        // メインカラムレイアウト: 広い画面では中央寄せ + 最大幅
+        body: LayoutBuilder(
+          builder: (ctx, constraints) {
+            final content = Column(
+              children: [
+                _monthSelector(),
+                _summaryCard(
+                  inSum: inSum,
+                  outSum: outSum,
+                  netDelta: netDelta,
+                  startBalance: dispStart,
+                  endBalance: dispEnd,
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: _ledgerTable(
+                    displayRows: displayRows,
+                    monthStartBalance: dispStart,
+                    monthEndBalance: dispEnd,
+                  ),
+                ),
+              ],
+            );
+            if (constraints.maxWidth >= 900) {
+              return Center(
+                child: ConstrainedBox(
+                  constraints:
+                      const BoxConstraints(maxWidth: _kContentMaxWidth),
+                  child: content,
+                ),
+              );
+            }
+            return content;
+          },
+        ),
+      ),
+    );
+  }
+
+  /// 未保存編集を破棄して離脱する確認ダイアログ。
+  Future<bool> _confirmDiscardEdits() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('保存していない編集があります'),
+        content: const Text(
+            '月初/月末残高の編集が未保存です。\n破棄してこの画面を離れますか？'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add_circle, color: Color(0xFF1A237E)),
-            tooltip: '取引を追加',
-            onPressed: _showAddMenu,
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('破棄して離れる'),
           ),
         ],
       ),
-      // メインカラムレイアウト: 広い画面では中央寄せ + 最大幅
-      body: LayoutBuilder(
-        builder: (ctx, constraints) {
-          final content = Column(
-            children: [
-              _monthSelector(),
-              _summaryCard(
-                inSum: inSum,
-                outSum: outSum,
-                netDelta: netDelta,
-                startBalance: monthStartBalance,
-                endBalance: monthEndBalance,
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: _ledgerTable(
-                  displayRows: displayRows,
-                  monthStartBalance: monthStartBalance,
-                  monthEndBalance: monthEndBalance,
-                ),
-              ),
-            ],
-          );
-          if (constraints.maxWidth >= 900) {
-            return Center(
-              child: ConstrainedBox(
-                constraints:
-                    const BoxConstraints(maxWidth: _kContentMaxWidth),
-                child: content,
-              ),
-            );
-          }
-          return content;
-        },
-      ),
     );
+    return ok == true;
   }
 
   Widget _monthSelector() {
@@ -248,7 +339,15 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                 child: Text(label),
               );
             }).toList(),
-            onChanged: (v) => setState(() => _selectedMonth = v),
+            onChanged: (v) async {
+              // 未保存編集があったら確認
+              if (_hasPendingEdit) {
+                final ok = await _confirmDiscardEdits();
+                if (!ok) return;
+                _clearPending();
+              }
+              setState(() => _selectedMonth = v);
+            },
           ),
         ],
       ),
@@ -383,6 +482,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                       _selectedMonth!.month + 1, 0),
                   balance: monthEndBalance,
                   background: const Color(0xFFE0F2FE),
+                  isMonthStart: false,
+                  isEdited: _pendingMonthEndBalance != null,
                 ),
               // 通常の取引行
               for (final row in displayRows) _txnRow(row),
@@ -394,6 +495,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                       _selectedMonth!.year, _selectedMonth!.month, 1),
                   balance: monthStartBalance,
                   background: const Color(0xFFFEF3C7),
+                  isMonthStart: true,
+                  isEdited: _pendingMonthStartBalance != null,
                 ),
             ],
           ),
@@ -402,12 +505,16 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     );
   }
 
-  /// 月初/月末残高の仮想行（編集不可、背景色付き）。
+  /// 月初/月末残高の仮想行（残高セルをタップで手入力編集可能）。
+  /// [isMonthStart] true=月初残高、false=月末残高
+  /// [isEdited] true なら pending 編集中（オレンジ枠で強調）
   DataRow _virtualBalanceRow({
     required String label,
     required DateTime date,
     required int balance,
     required Color background,
+    required bool isMonthStart,
+    required bool isEdited,
   }) {
     return DataRow(
       color: WidgetStateProperty.all(background),
@@ -423,16 +530,214 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                 color: Color(0xFF374151)))),
         const DataCell(Text('')),
         const DataCell(Text('')),
-        DataCell(Text(
-          formatYen(balance),
-          style: const TextStyle(
-              color: Color(0xFF111827),
-              fontWeight: FontWeight.w700,
-              fontFamily: 'monospace'),
-        )),
+        DataCell(
+          InkWell(
+            onTap: () => _editVirtualBalance(isMonthStart, balance),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 6, vertical: 4),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: isEdited
+                      ? const Color(0xFFEA580C)
+                      : Colors.transparent,
+                  width: 1.5,
+                ),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    formatYen(balance),
+                    style: TextStyle(
+                        color: isEdited
+                            ? const Color(0xFFEA580C)
+                            : const Color(0xFF111827),
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'monospace'),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.edit,
+                      size: 11,
+                      color: isEdited
+                          ? const Color(0xFFEA580C)
+                          : const Color(0xFF9CA3AF)),
+                ],
+              ),
+            ),
+          ),
+        ),
         const DataCell(SizedBox.shrink()),
       ],
     );
+  }
+
+  Future<void> _editVirtualBalance(bool isMonthStart, int currentValue) async {
+    final ctrl =
+        TextEditingController(text: currentValue.toString());
+    final newValue = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isMonthStart ? '月初残高を修正' : '月末残高を修正'),
+        content: SizedBox(
+          width: 280,
+          child: TextField(
+            controller: ctrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: '残高（円）',
+              prefixText: '¥ ',
+              floatingLabelBehavior: FloatingLabelBehavior.always,
+            ),
+            autofocus: true,
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('キャンセル')),
+          FilledButton(
+            onPressed: () {
+              final v = int.tryParse(ctrl.text.replaceAll(',', ''));
+              if (v != null) Navigator.pop(ctx, v);
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+    if (newValue == null) return;
+    setState(() {
+      if (isMonthStart) {
+        _pendingMonthStartBalance = newValue;
+      } else {
+        _pendingMonthEndBalance = newValue;
+      }
+    });
+  }
+
+  /// 保存ボタン押下時: 整合性チェック → startingBalance を逆算して保存。
+  Future<void> _saveBalanceEdits({
+    required int? autoStart,
+    required int? autoEnd,
+    required int inSum,
+    required int outSum,
+    required List<_LedgerRow> ascAll,
+  }) async {
+    if (_selectedMonth == null) return;
+    if (autoStart == null) return;
+    final newStart = _pendingMonthStartBalance ?? autoStart;
+    final newEnd = _pendingMonthEndBalance ?? autoEnd ?? 0;
+
+    // 整合性チェック: 月初 + 入金合計 - 出金合計 = 期待月末残高
+    final expectedEnd = newStart + inSum - outSum;
+    if (expectedEnd != newEnd) {
+      final diff = newEnd - expectedEnd;
+      final action = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning, color: Color(0xFFDC2626)),
+              SizedBox(width: 8),
+              Text('整合性エラー'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('計算が合いません。',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              Text('月初残高: ${formatYen(newStart)}'),
+              Text('+ 入金合計: ${formatYen(inSum)}'),
+              Text('- 出金合計: ${formatYen(outSum)}'),
+              const Divider(),
+              Text('= 期待月末残高: ${formatYen(expectedEnd)}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A237E))),
+              const SizedBox(height: 8),
+              Text('入力された月末残高: ${formatYen(newEnd)}',
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(
+                '差額: ${formatYen(diff, withSign: true)}',
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFFDC2626)),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '取引漏れ or 月初/月末残高の入力ミスの可能性があります。',
+                style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, 'cancel'),
+                child: const Text('修正に戻る')),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFEA580C)),
+              onPressed: () => Navigator.pop(ctx, 'force'),
+              child: const Text('月初優先で強制保存'),
+            ),
+          ],
+        ),
+      );
+      if (action != 'force') return;
+    }
+
+    // 月初残高 → startingBalance を逆算
+    // 月初前までの取引差分（自動計算ベース）= autoStart - 現在のstartingBalance
+    final currentStarting = widget.account.startingBalance ?? 0;
+    final deltaBeforeMonth = autoStart - currentStarting;
+    final newStartingBalance = newStart - deltaBeforeMonth;
+
+    try {
+      final cfg = await SettingsRepository.instance.loadPayments();
+      final updated = <core.RegisteredBankAccount>[];
+      for (final a in cfg.bankAccounts) {
+        if (a.id == widget.account.id) {
+          updated.add(core.RegisteredBankAccount(
+            id: a.id,
+            name: a.name,
+            last4: a.last4,
+            startingBalance: newStartingBalance,
+            currentBalance: a.currentBalance,
+            accountType: a.accountType,
+            iconUrl: a.iconUrl,
+            memo: a.memo,
+          ));
+        } else {
+          updated.add(a);
+        }
+      }
+      await SettingsRepository.instance.savePayments(
+        core.PaymentMethodsConfig(
+          bankAccounts: updated,
+          creditCards: cfg.creditCards,
+        ),
+      );
+      if (!mounted) return;
+      setState(_clearPending);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              '残高を更新しました（開始残高: ${formatYen(newStartingBalance)}）'),
+          backgroundColor: const Color(0xFF16A34A),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('保存に失敗しました: $e')),
+      );
+    }
   }
 
   DataRow _txnRow(_LedgerRow row) {
