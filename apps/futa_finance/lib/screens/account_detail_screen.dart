@@ -38,6 +38,10 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   StreamSubscription<List<core.Transaction>>? _sub;
   List<core.Transaction> _all = [];
 
+  /// 編集可能な口座スナップショット。保存後に startingBalance を反映できる
+  /// よう mutable で保持（_account は immutable のため）。
+  late core.RegisteredBankAccount _account;
+
   /// 月フィルタ。null = 全期間。
   DateTime? _selectedMonth;
 
@@ -60,6 +64,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _account = _account;
     final now = DateTime.now();
     _selectedMonth = DateTime(now.year, now.month);
     _load();
@@ -88,7 +93,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   /// この口座に関連する取引（昇順）から、各時点の残高を計算した行を返す。
   /// 月フィルタは未適用（全期間ベースで残高を計算）。
   List<_LedgerRow> _buildLedgerAllPeriod() {
-    final name = widget.account.name;
+    final name = _account.name;
     final related = <_RelatedTxn>[];
     for (final t in _all) {
       if (t.type == core.TransactionType.transfer) {
@@ -104,7 +109,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     }
     related.sort((a, b) => a.txn.date.compareTo(b.txn.date));
 
-    int balance = widget.account.startingBalance ?? 0;
+    int balance = _account.startingBalance ?? 0;
     final asc = <_LedgerRow>[];
     for (final r in related) {
       balance += r.signedAmount;
@@ -119,7 +124,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
 
   /// 指定日時点（その日の終わり）での残高を返す。
   int _balanceAt(List<_LedgerRow> ascAll, DateTime cutoff) {
-    int balance = widget.account.startingBalance ?? 0;
+    int balance = _account.startingBalance ?? 0;
     for (final row in ascAll) {
       if (row.txn.date.isAfter(cutoff)) break;
       balance = row.balanceAfter;
@@ -127,10 +132,14 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     return balance;
   }
 
-  /// 月選択肢: 取引がある年月（降順）+ 全期間。
+  /// 月選択肢: 取引がある年月（降順）+ 全期間 + 当月（常に含める）。
+  /// 取引が0件の口座でも残高編集ができるよう、当月は無条件で選択肢に出す。
   List<DateTime?> _availableMonths() {
-    final name = widget.account.name;
+    final name = _account.name;
     final set = <DateTime>{};
+    // 当月は無条件で含める
+    final now = DateTime.now();
+    set.add(DateTime(now.year, now.month));
     for (final t in _all) {
       final isRelated = (t.type == core.TransactionType.transfer)
           ? (t.transferFromAccount == name || t.transferToAccount == name)
@@ -199,15 +208,15 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         appBar: AppBar(
           title: Row(
             children: [
-              if (widget.account.iconUrl != null &&
-                  widget.account.iconUrl!.isNotEmpty)
+              if (_account.iconUrl != null &&
+                  _account.iconUrl!.isNotEmpty)
                 BrandLogo(
-                    iconUrl: widget.account.iconUrl,
-                    fallbackEmoji: widget.account.accountType.emoji,
+                    iconUrl: _account.iconUrl,
+                    fallbackEmoji: _account.accountType.emoji,
                     size: 26),
               const SizedBox(width: 8),
               Flexible(
-                child: Text(widget.account.name,
+                child: Text(_account.name,
                     style: const TextStyle(fontWeight: FontWeight.w700),
                     overflow: TextOverflow.ellipsis),
               ),
@@ -693,16 +702,17 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
 
     // 月初残高 → startingBalance を逆算
     // 月初前までの取引差分（自動計算ベース）= autoStart - 現在のstartingBalance
-    final currentStarting = widget.account.startingBalance ?? 0;
+    final currentStarting = _account.startingBalance ?? 0;
     final deltaBeforeMonth = autoStart - currentStarting;
     final newStartingBalance = newStart - deltaBeforeMonth;
 
     try {
       final cfg = await SettingsRepository.instance.loadPayments();
       final updated = <core.RegisteredBankAccount>[];
+      core.RegisteredBankAccount? updatedSelf;
       for (final a in cfg.bankAccounts) {
-        if (a.id == widget.account.id) {
-          updated.add(core.RegisteredBankAccount(
+        if (a.id == _account.id) {
+          final newA = core.RegisteredBankAccount(
             id: a.id,
             name: a.name,
             last4: a.last4,
@@ -711,7 +721,9 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
             accountType: a.accountType,
             iconUrl: a.iconUrl,
             memo: a.memo,
-          ));
+          );
+          updated.add(newA);
+          updatedSelf = newA;
         } else {
           updated.add(a);
         }
@@ -723,7 +735,13 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         ),
       );
       if (!mounted) return;
-      setState(_clearPending);
+      setState(() {
+        _clearPending();
+        // 自分自身の最新値で _account も更新して画面に反映させる
+        if (updatedSelf != null) {
+          _account = updatedSelf;
+        }
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -798,7 +816,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   Future<void> _showEditDialog(core.Transaction t) async {
     final isTransfer = t.type == core.TransactionType.transfer;
     final isOut = (t.type == core.TransactionType.expense) ||
-        (isTransfer && t.transferFromAccount == widget.account.name);
+        (isTransfer && t.transferFromAccount == _account.name);
 
     DateTime editingDate = t.date;
     final descCtrl = TextEditingController(text: t.description);
@@ -987,7 +1005,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   // ───────────────────────────────────────────────────────────
 
   Future<void> _showAddMenu() async {
-    final accountName = widget.account.name;
+    final accountName = _account.name;
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
