@@ -129,9 +129,45 @@ business_categories = {
     ]
 }
 
-# ── カード（三井住友のみ。VS税務顧問の引落口座は未登録、paymentMethod文字列で対応）
+# ── 銀行口座（事業用）+ カード（三井住友メイン）
+# ロゴURLはユーザー指定（gstatic/typeshukatsu）。
+B_GMOAOZORA_ICON = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTNPayB53fbtJRfNDHDMtHzCS-teEeUvpaSsw&s"
+B_SBI_ICON = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRR8VnOMXkDO5mRRZZsZck9z4W6vSenaHJW5w&s"
+B_SMBC_BANK_ICON = "https://typeshukatsu.jp/image?table=m_company&column=logo_image&id=1136"
+
 business_payments = {
-    "bankAccounts": [],
+    "bankAccounts": [
+        {
+            "id": "b-acc-gmoaozora",
+            "name": "GMOあおぞらネット銀行",
+            "last4": None,
+            "startingBalance": None,
+            "currentBalance": None,
+            "accountType": "bank",
+            "iconUrl": B_GMOAOZORA_ICON,
+            "memo": "事業用",
+        },
+        {
+            "id": "b-acc-sbi",
+            "name": "住信SBIネット銀行",
+            "last4": None,
+            "startingBalance": None,
+            "currentBalance": None,
+            "accountType": "bank",
+            "iconUrl": B_SBI_ICON,
+            "memo": "事業用",
+        },
+        {
+            "id": "b-acc-smbc-bank",
+            "name": "三井住友銀行",
+            "last4": None,
+            "startingBalance": None,
+            "currentBalance": None,
+            "accountType": "bank",
+            "iconUrl": B_SMBC_BANK_ICON,
+            "memo": "事業用",
+        },
+    ],
     "creditCards": [
         {
             "id": "card-smbc",
