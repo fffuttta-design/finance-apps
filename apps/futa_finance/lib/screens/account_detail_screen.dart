@@ -38,9 +38,12 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   StreamSubscription<List<core.Transaction>>? _sub;
   List<core.Transaction> _all = [];
 
-  /// 編集可能な口座スナップショット。保存後に startingBalance を反映できる
-  /// よう mutable で保持（_account は immutable のため）。
-  late core.RegisteredBankAccount _account;
+  /// 編集後の口座スナップショット（startingBalance を保存後に反映するため）。
+  /// null の場合は widget.account を使う。late を使うと初期化漏れで
+  /// LateInitializationError になることがあるため nullable + getter にした。
+  core.RegisteredBankAccount? _updatedAccount;
+  core.RegisteredBankAccount get _account =>
+      _updatedAccount ?? widget.account;
 
   /// 月フィルタ。null = 全期間。
   DateTime? _selectedMonth;
@@ -64,7 +67,6 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _account = _account;
     final now = DateTime.now();
     _selectedMonth = DateTime(now.year, now.month);
     _load();
@@ -795,7 +797,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         _clearPending();
         // 自分自身の最新値で _account も更新して画面に反映させる
         if (updatedSelf != null) {
-          _account = updatedSelf;
+          _updatedAccount = updatedSelf;
         }
       });
       ScaffoldMessenger.of(context).showSnackBar(
