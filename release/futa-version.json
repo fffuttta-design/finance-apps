@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.42",
-    "buildNumber":  "43",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.42/futa-finance-v1.0.42.apk",
-    "releaseNotes":  "v1.0.42: 月末締め後の自動バックアップ提案ダイアログ追加 / GitHub Pages 自動デプロイワークフロー追加"
+    "version":  "1.0.43",
+    "buildNumber":  "44",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.43/futa-finance-v1.0.43.apk",
+    "releaseNotes":  "v1.0.43: 破壊的操作（全取引削除/サンプル投入）の前に自動スナップショットを取得して安全化"
 }
