@@ -9,6 +9,7 @@ import '../data/app_mode.dart';
 import '../data/update_checker.dart';
 import '../data/update_installer.dart';
 import 'asset_screen.dart';
+import 'cards_screen.dart';
 import 'expense_input_screen.dart';
 import 'expenses_screen.dart';
 import 'home_screen.dart';
@@ -38,8 +39,8 @@ class _RootScreenState extends State<RootScreen> {
 
   // インデックス対応:
   //   0=Home, 1=Expenses, 2=Income, 3=Report, 4=Settings,
-  //   5=TableView (Web専用), 6=Asset
-  // ※ 既存インデックスへの影響を避けるため Asset は末尾に追加。
+  //   5=TableView (Web専用), 6=Asset, 7=Cards (Web専用)
+  // ※ 既存インデックスへの影響を避けるため新タブは末尾に追加。
   //   モバイルナビとサイドナビの表示順は別途マッピング。
   static const _tabs = <Widget>[
     HomeScreen(),
@@ -49,6 +50,7 @@ class _RootScreenState extends State<RootScreen> {
     SettingsScreen(),
     TableViewScreen(),
     AssetScreen(),
+    CardsScreen(),
   ];
 
   /// モバイル下タブの表示順 → _tabs インデックスのマッピング。
@@ -651,6 +653,9 @@ class _SideNavState extends State<_SideNav> {
                       selectedColor: const Color(0xFF16A34A)),
                   _navItem(6, Icons.account_balance_wallet_outlined,
                       Icons.account_balance_wallet, '資産'),
+                  _navItem(7, Icons.credit_card_outlined,
+                      Icons.credit_card, 'クレカ',
+                      selectedColor: const Color(0xFFDC2626)),
                   _navItem(3, Icons.bar_chart_outlined, Icons.bar_chart,
                       '集計'),
                   _navItem(5, Icons.table_chart_outlined,
