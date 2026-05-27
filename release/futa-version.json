@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.37",
-    "buildNumber":  "38",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.37/futa-finance-v1.0.37.apk",
-    "releaseNotes":  "v1.0.37: 固定費月額換算文字強調 / 資金口座→ウォレットに改名 / 事業-個人モードで背景色を薄紺-薄オレンジに分離 / ホーム+ボタンに「記録」テキスト追加"
+    "version":  "1.0.38",
+    "buildNumber":  "39",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.38/futa-finance-v1.0.38.apk",
+    "releaseNotes":  "v1.0.38: 収入マスタBottomSheet化+UI改修 / チェックリストに動的リンク機能(銀行/クレカ自動展開)"
 }
