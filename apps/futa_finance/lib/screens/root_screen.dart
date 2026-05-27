@@ -15,6 +15,7 @@ import 'income_screen.dart';
 import 'report_screen.dart';
 import 'settings_screen.dart';
 import 'table_view_screen.dart';
+import 'transfer_input_screen.dart';
 
 /// アプリのルートシェル。下部タブで6画面を切り替える + 上部にモード切替ストリップ。
 class RootScreen extends StatefulWidget {
@@ -25,7 +26,7 @@ class RootScreen extends StatefulWidget {
 }
 
 /// 広い画面で開く記録パネルの種類。
-enum _RecordPanelKind { expense, income }
+enum _RecordPanelKind { expense, income, transfer }
 
 class _RootScreenState extends State<RootScreen> {
   int _index = 0;
@@ -419,6 +420,8 @@ class _RecordPanel extends StatelessWidget {
                   return const ExpenseInputScreen();
                 case _RecordPanelKind.income:
                   return const IncomeInputScreen();
+                case _RecordPanelKind.transfer:
+                  return const TransferInputScreen();
               }
             },
           ),
@@ -596,6 +599,13 @@ class _SideNavState extends State<_SideNav> {
                     Icons.add_circle_outline,
                     '収入を記録',
                     const Color(0xFF16A34A),
+                  ),
+                  const SizedBox(height: 6),
+                  _recordButton(
+                    _RecordPanelKind.transfer,
+                    Icons.swap_horiz,
+                    '振替を記録',
+                    const Color(0xFFEA580C),
                   ),
                 ],
               ),

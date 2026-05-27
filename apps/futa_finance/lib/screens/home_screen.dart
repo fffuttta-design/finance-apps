@@ -593,9 +593,21 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
 
     // 銀行/現金/電子マネーの現在残高 = startingBalance + 全期間の取引集計（入金 - 出金）
     // ユーザーは startingBalance だけ手動入力し、以降は取引から自動増減。
+    // 振替(transfer)は from を減、to を増として残高に反映。
     final bankNameSet = banks.map((b) => b.name).toSet();
     final bankDelta = <String, int>{};
     for (final t in _transactions) {
+      if (t.type == TransactionType.transfer) {
+        final from = t.transferFromAccount;
+        final to = t.transferToAccount;
+        if (from != null && bankNameSet.contains(from)) {
+          bankDelta[from] = (bankDelta[from] ?? 0) - t.amount;
+        }
+        if (to != null && bankNameSet.contains(to)) {
+          bankDelta[to] = (bankDelta[to] ?? 0) + t.amount;
+        }
+        continue;
+      }
       if (!bankNameSet.contains(t.paymentMethod)) continue;
       if (t.type == TransactionType.income) {
         bankDelta[t.paymentMethod] =

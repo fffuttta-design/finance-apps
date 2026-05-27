@@ -7,6 +7,11 @@ enum TransactionType {
 
   /// 収入（売上・入金など）。
   income,
+
+  /// 振替（口座間移動）。収支には影響せず、口座の残高だけが付け替わる。
+  /// transferFromAccount / transferToAccount を必ず指定する。
+  /// 例: GMOあおぞら → 三井住友、銀行 → 現金、銀行 → クレカ累積額への引落 など。
+  transfer,
 }
 
 /// 1件の取引（収支記録）。
@@ -47,6 +52,13 @@ class Transaction {
   /// amount フィールド側には常に円換算値を入れる。
   final double? originalAmount;
 
+  /// 振替元（type=transfer のみ使用）。
+  /// 銀行口座名/カード名/「現金」等。paymentMethod と同じ命名規則。
+  final String? transferFromAccount;
+
+  /// 振替先（type=transfer のみ使用）。
+  final String? transferToAccount;
+
   const Transaction({
     required this.id,
     required this.date,
@@ -60,6 +72,8 @@ class Transaction {
     this.incomeSourceId,
     this.originalCurrency,
     this.originalAmount,
+    this.transferFromAccount,
+    this.transferToAccount,
   });
 
   Map<String, dynamic> toJson() => {
@@ -76,6 +90,8 @@ class Transaction {
         'incomeSourceId': incomeSourceId,
         'originalCurrency': originalCurrency,
         'originalAmount': originalAmount,
+        'transferFromAccount': transferFromAccount,
+        'transferToAccount': transferToAccount,
       };
 
   factory Transaction.fromJson(Map<String, dynamic> j) => Transaction(
@@ -97,6 +113,8 @@ class Transaction {
         incomeSourceId: j['incomeSourceId'] as String?,
         originalCurrency: j['originalCurrency'] as String?,
         originalAmount: (j['originalAmount'] as num?)?.toDouble(),
+        transferFromAccount: j['transferFromAccount'] as String?,
+        transferToAccount: j['transferToAccount'] as String?,
       );
 
   Transaction copyWith({
@@ -111,6 +129,8 @@ class Transaction {
     String? incomeSourceId,
     String? originalCurrency,
     double? originalAmount,
+    String? transferFromAccount,
+    String? transferToAccount,
   }) =>
       Transaction(
         id: id,
@@ -125,5 +145,7 @@ class Transaction {
         incomeSourceId: incomeSourceId ?? this.incomeSourceId,
         originalCurrency: originalCurrency ?? this.originalCurrency,
         originalAmount: originalAmount ?? this.originalAmount,
+        transferFromAccount: transferFromAccount ?? this.transferFromAccount,
+        transferToAccount: transferToAccount ?? this.transferToAccount,
       );
 }

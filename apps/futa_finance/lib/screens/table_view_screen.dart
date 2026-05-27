@@ -63,7 +63,7 @@ extension _PeriodX on _Period {
 }
 
 /// フロー絞り込み。
-enum _FlowFilter { all, expense, income }
+enum _FlowFilter { all, expense, income, transfer }
 
 extension _FlowFilterX on _FlowFilter {
   String get label {
@@ -71,9 +71,11 @@ extension _FlowFilterX on _FlowFilter {
       case _FlowFilter.all:
         return 'すべて';
       case _FlowFilter.expense:
-        return '支出のみ';
+        return '支出';
       case _FlowFilter.income:
-        return '収入のみ';
+        return '収入';
+      case _FlowFilter.transfer:
+        return '振替';
     }
   }
 }
@@ -135,6 +137,10 @@ class _TableViewScreenState extends State<TableViewScreen>
       }
       if (_flow == _FlowFilter.income &&
           t.type != core.TransactionType.income) {
+        return false;
+      }
+      if (_flow == _FlowFilter.transfer &&
+          t.type != core.TransactionType.transfer) {
         return false;
       }
       // テキスト
@@ -446,10 +452,11 @@ class _TableViewScreenState extends State<TableViewScreen>
   }
 
   Widget _typeBadge(core.TransactionType type) {
-    final isIncome = type == core.TransactionType.income;
-    final color =
-        isIncome ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
-    final label = isIncome ? '収入' : '支出';
+    final (color, label) = switch (type) {
+      core.TransactionType.income => (const Color(0xFF16A34A), '収入'),
+      core.TransactionType.expense => (const Color(0xFFDC2626), '支出'),
+      core.TransactionType.transfer => (const Color(0xFFEA580C), '振替'),
+    };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
