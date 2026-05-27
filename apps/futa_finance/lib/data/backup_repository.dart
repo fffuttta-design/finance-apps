@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -72,7 +73,12 @@ class BackupRepository {
   /// 取り込み実行直前に呼ぶ。現在の SharedPreferences を JSON 化して
   /// auto_snapshots/ にタイムスタンプ付きで保存。
   /// 失敗しても取り込み本体は止めない（best-effort）。
+  ///
+  /// Web では path_provider が File API を提供しないためスキップ。
+  /// （Firestore 同期環境では取り込みデータの上書きも別端末から復旧可能なので、
+  ///  Web 側のローカルスナップショットが無くても運用上は問題なし）
   Future<File?> savePreImportSnapshot() async {
+    if (kIsWeb) return null;
     try {
       final json = await exportAll();
       final dir = await _autoSnapshotDir();
@@ -113,7 +119,9 @@ class BackupRepository {
   }
 
   /// 保存済みスナップショット一覧（新しい順）。
+  /// Web では常に空。
   Future<List<AutoSnapshotInfo>> listAutoSnapshots() async {
+    if (kIsWeb) return [];
     final dir = await _autoSnapshotDir();
     final files = dir
         .listSync()
