@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.38",
-    "buildNumber":  "39",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.38/futa-finance-v1.0.38.apk",
-    "releaseNotes":  "v1.0.38: 収入マスタBottomSheet化+UI改修 / チェックリストに動的リンク機能(銀行/クレカ自動展開)"
+    "version":  "1.0.39",
+    "buildNumber":  "40",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.39/futa-finance-v1.0.39.apk",
+    "releaseNotes":  "v1.0.39: バージョン表記をv1.0.Xだけに整理(+ビルド番号は非表示) / ホームのフッターを動的バージョン取得に"
 }
