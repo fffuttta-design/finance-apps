@@ -324,7 +324,8 @@ class _MonthClosingViewState extends State<MonthClosingView>
         ShareParams(
           files: [XFile(file.path, mimeType: 'application/json')],
           subject: 'FutaFinance $monthLabel 締めバックアップ',
-          text: '$monthLabel の月末締めデータです。',
+          text: '$monthLabel の月末締めデータです。\n'
+              '保存先推奨: マイドライブ/ツール開発/FutaFinance/backups/',
         ),
       );
     } catch (e) {

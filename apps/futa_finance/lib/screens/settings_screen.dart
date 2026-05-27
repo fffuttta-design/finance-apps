@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../data/auth_service.dart';
 import '../data/backup_repository.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
@@ -244,14 +245,115 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _tile(
               icon: Icons.delete_sweep,
               title: '全取引を削除',
-              subtitle: '入力済みの取引を全て消去（戻せません）',
+              subtitle: '入力済みの取引を全て消去（自動スナップショットから復元可）',
               onTap: () => _clearAll(context),
               danger: true,
             ),
+
+            const SizedBox(height: 8),
+            _section('アカウント'),
+            _accountTile(),
           ],
         ),
       ),
     );
+  }
+
+  /// アカウント情報＋サインアウトボタン。
+  Widget _accountTile() {
+    final user = AuthService.instance.currentUser;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Row(
+        children: [
+          // アバター
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE0E7FF),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: user?.photoURL != null
+                ? ClipOval(
+                    child: Image.network(
+                      user!.photoURL!,
+                      width: 36,
+                      height: 36,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : const Icon(Icons.person, color: Color(0xFF1A237E)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user?.displayName ?? user?.email ?? '未ログイン',
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w700),
+                ),
+                if (user?.email != null)
+                  Text(
+                    user!.email!,
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF6B7280)),
+                  ),
+              ],
+            ),
+          ),
+          TextButton.icon(
+            onPressed: () => _signOut(context),
+            icon: const Icon(Icons.logout, size: 16),
+            label: const Text('サインアウト',
+                style: TextStyle(fontSize: 12)),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF6B7280),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _signOut(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('サインアウト'),
+        content: const Text(
+            'サインアウトすると、サインインするまでアプリが使えなくなります。\n'
+            'クラウドのデータはそのまま保持されます。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+              style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFEA580C)),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('サインアウト')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await AuthService.instance.signOut();
+      // authStateChanges 発火 → AuthGate が自動で AuthScreen に切替
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('サインアウトに失敗: $e')),
+      );
+    }
   }
 
   Widget _versionCard() {
@@ -482,7 +584,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           subject: 'FutaFinance バックアップ ($stamp)',
           text:
               'FutaFinance のデータバックアップ ($stamp)。\n'
-              'Google Drive 等に保存し、復元時はそのファイルを取り込んでください。',
+              '保存先推奨: マイドライブ/ツール開発/FutaFinance/backups/',
         ),
       );
     } catch (e) {

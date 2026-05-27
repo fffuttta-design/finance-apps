@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "746983928581-asn3s0jfi9umdnaabcgjrr9b9mdqbuqm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.futa.finance",
+            "certificate_hash": "fd9e8f9893d93d2afc64ebed2365a7aee9d2ca85"
+          }
+        },
+        {
           "client_id": "746983928581-5g5ueg00evu0ubccej0km8cbciq3kb86.apps.googleusercontent.com",
           "client_type": 3
         }

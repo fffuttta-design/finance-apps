@@ -5,108 +5,143 @@
 
 ---
 
-## 🛡️ データバックアップ堅牢化ロードマップ
+## 🌐 マルチデバイス前提の設計（最重要）
 
-現状の仕組み:
-- 設定 → データ管理 → JSON書き出し / 取り込み（ユーザー手動）
-- スクリプト `scripts/generate_initial_backup.py` で開発者側からも生成
-- ドライブの `archive/` に過去版を自動退避
+**FutaFinance はマルチネイティブ前提**:
+- Android（現在メイン）
+- Web（GitHub Pages 公開予定）
+- Windows デスクトップ（後日対応）
 
-依存度が増すにつれて、データ保全の堅牢化が必要。下記を段階的に検討する。
-
-### Tier 1（近い将来）
-
-- [ ] **月末締め完了時の自動エクスポート提案**
-  - 締めボタン押下後に「現状をバックアップしますか？」ダイアログ
-  - ワンタップで共有シート起動
-  - 月1回の自然な保存タイミング
-
-- [ ] **自動バックアップリマインダー**
-  - 最終バックアップから N 日（例: 14日）経過したら起動時に通知
-  - 「最後の書き出しから 14日経ちました。バックアップを取りますか？」
-
-- [ ] **インポート前の自動スナップショット**
-  - バックアップから復元する直前に、現状を `archive/auto-pre-import-{timestamp}.json` に自動保存
-  - ロールバック手段の確保
-  - ユーザーがミスっても1タップで戻せる
-
-### Tier 2（中期）
-
-- [ ] **複数世代スナップショット（アプリ内）**
-  - SharedPreferences に直近 N 世代（例: 5世代）のスナップショットを保持
-  - クラッシュ時の自動復旧
-  - 「ひとつ前に戻す」機能
-
-- [ ] **データ整合性チェック**
-  - 起動時に SharedPreferences の各キーをパース検証
-  - 壊れていたら警告 → 最新スナップショットからの復元案内
-
-- [ ] **JSON書き出しに署名/ハッシュ追加**
-  - SHA-256 ハッシュをファイルに同梱
-  - 取り込み時に検証して改ざん/破損を検知
-
-### Tier 3（長期）
-
-- [ ] **Firestore リアルタイム同期**
-  - 機種変・複数端末対応
-  - Spark プラン無料枠で運用可能
-  - 認証は Google Sign-In
-  - 既存の SharedPreferences ベースを「キャッシュ層」として残し、Firestore を SoT に
-
-- [ ] **暗号化対応**（必要なら）
-  - JSON 書き出し時にパスワード暗号化
-  - 取り込み時にパスワード解除
-
-- [ ] **変更履歴（changelog）**
-  - 何をいつ追加・編集・削除したかの履歴を内部に保持
-  - undo/redo 機能
-  - 「先週の◯◯を消したい」みたいな操作可能に
+**同じデータをどの端末でも扱う**ため、**クラウド同期は前提条件**（Tier 0 / 最優先）。
 
 ---
 
-## 📊 スプシ書き込み運用（将来検討中）
+## 🛡️ データ保護/同期ロードマップ
 
-**コンセプト**: アプリ内の取引/サブスク/口座データを、Google Sheets にもリアルタイム or 定期で書き込み、**履歴として残す**。
+### Tier 0（最優先・実装中）
+
+- [ ] **Firestore リアルタイム同期**
+  - Auth: Google Sign-In のみ
+  - データ構造: `users/{uid}/business/...` と `users/{uid}/personal/...`
+  - FutaFinance（事業+個人）は `futa-finance` プロジェクト
+  - たくはるファイナンスは `takuharu-finance` プロジェクト（別アプリ）
+  - オフライン対応: Firestore SDK built-in
+  - 競合解決: ドキュメント単位 last-write-wins (updatedAt フィールド)
+  - 認証必須（未ログインだとアプリ使えない）
+
+### Tier 1（Tier 0 完了後）
+
+- [x] **インポート前の自動スナップショット** ✅ v1.0.41
+- [x] **月末締め完了時の自動エクスポート提案** ✅ v1.0.42
+- [x] **破壊的操作の前に自動スナップショット** ✅ v1.0.43
+- [ ] **14日経過リマインダー**
+  - 最終バックアップから14日経過 → 起動時に通知
+
+### Tier 2（中期）
+
+- [ ] **複数世代スナップショット（クラウド側）**
+  - Firestore に履歴コレクション
+  - 月1スナップショット自動取得
+  - 1年間保持
+
+- [ ] **データ整合性チェック**
+  - 起動時にパース検証
+  - 壊れていたら警告 → 自動復元案内
+
+- [ ] **JSON書き出しに署名/ハッシュ追加**
+  - SHA-256 添付
+  - 改ざん/破損検知
+
+- [ ] **スプシ書き込み運用**
+  - データを Google Sheets にも書き込み（履歴・俯瞰・保険）
+  - Google Sheets API v4
+  - Tier 0 完成後の追加層として実装
+
+### Tier 3（長期）
+
+- [ ] **暗号化対応**
+- [ ] **変更履歴（changelog）+ undo/redo**
+
+---
+
+## 🔐 Firestore データモデル設計
+
+### futa-finance プロジェクト
+
+```
+users/{uid}/
+  business/                       ← 事業モード
+    transactions/{txId}             ← 1取引1ドキュメント
+    config/payments                 ← bankAccounts + creditCards
+    config/categories               ← CategoryConfig
+    config/subscriptions            ← SubscriptionConfig
+    config/income_sources           ← IncomeSourceConfig
+    config/checklist                ← ChecklistConfig
+    monthly_snapshots/{yyyy-MM}     ← 月初残高
+    month_closings/{yyyy-MM}        ← 月末締め
+  personal/                       ← 個人モード（同じ構造）
+    transactions/...
+    config/...
+```
+
+設計判断:
+- 個別取引は1ドキュメント1取引（数百〜数千件のため）
+- 設定系（カテゴリ・支払方法・サブスク等）は config 配下に1ドキュメント
+- 月別データは {yyyy-MM} を key に
+
+### Repository アーキテクチャ
+
+```
+abstract class XxxRepository {
+  static XxxRepository instance = LocalXxxRepository();
+  static void useLocal() { ... }
+  static void useFirestore(String uid) { ... } // 後で
+}
+
+class LocalXxxRepository implements XxxRepository {
+  // SharedPreferences ベース（既存）
+}
+
+class FirestoreXxxRepository implements XxxRepository {
+  // Firestore + offline cache（後で）
+}
+```
+
+UI 側は `XxxRepository.instance.foo()` のままで、起動時にどちらを使うか切替。
+
+---
+
+## 📊 スプシ書き込み運用（Tier 2 候補）
+
+**コンセプト**: アプリ内の取引/サブスク/口座データを Google Sheets にもリアルタイム or 定期で書き込み、**履歴として残す**。
+
+Tier 0（Firestore 同期）完成後に検討。
 
 ### 利点
 - スプシは長年使い慣れているツール（俯瞰しやすい、ピボット集計等）
-- アプリが壊れてもスプシにデータが残る → 究極の保険
+- Firestore + スプシで二重保管 → 最強保険
 - スプシ側で月次/年次サマリを自由に作れる
-- 過去履歴の追跡が容易
 
 ### 想定構成
-- 認証: Google Sign-In（既存の Firebase 認証と連動）
-- API: Google Sheets API v4
-- 書き込みトリガー候補:
-  - リアルタイム（取引追加・編集・削除の都度）
-  - 日次バッチ（その日の変更分をまとめて）
-  - 月末締め時にまとめて
-- スプシ構成案:
-  - 「取引履歴」シート: 1行1取引、列はTransactionの全フィールド
-  - 「サブスク」シート: 1行1サブスク
-  - 「口座」「カード」シート
-  - 「変更履歴」シート: いつ何を変更したか
-
-### 課題
-- Google Sheets API のレート制限（100 requests / 100 seconds / user）
-- 認証フロー（OAuth 2.0、トークン管理）
-- 競合（複数端末から同時書き込み）
-- 削除の伝搬（アプリ側削除 → スプシ側もどうする？）
-
-### 現状
-**まだ着手しない**。Tier 1〜2 を先にやってから検討。  
-ユーザーが「やりたい」と言ったら設計から始める。
+- Google Sheets API v4
+- リアルタイム or 日次バッチ
+- シート構成:
+  - 「取引履歴」シート: 1行1取引
+  - 「サブスク」「口座」「カード」シート
+  - 「変更履歴」シート
 
 ---
 
 ## 🗃️ JSON バックアップファイル命名規則（運用ルール）
 
+Tier 0 実装後も、念のためのアーカイブとして JSON 書き出しは残す（年次保険）。
+
 ```
 H:\マイドライブ\ツール開発\FutaFinance\
-├── futa-finance-data-{概要}.json          ← 最新（アプリの取り込み先固定）
-├── futa-finance-v1.0.XX.apk × N
+├── futa-finance-data-{概要}.json       ← 最新（アプリ取り込み先）
+├── apks\                               ← APK 一式
 └── archive\
-    └── data-{YYYYMMDD-HHMM}-{元タグ}.json ← 過去スナップショット
+    └── data-{YYYYMMDD-HHMM}-{元タグ}.json
 ```
 
 スクリプト実行時の概要タグの付け方:
@@ -117,13 +152,14 @@ H:\マイドライブ\ツール開発\FutaFinance\
 
 ---
 
-## 📝 その他の小ネタ・将来アイデア
+## 📝 その他の将来アイデア
 
 - 事業モードの税金予測機能（長年の夢、優先度低）
-- OCR レシート読み取り（Gemini API、Tier 1 候補にあったが保留）
+- OCR レシート読み取り（Gemini API、Tier 1 候補だったが保留）
 - カレンダー連携（Google Calendar に予定された支出を出す）
 - 通知連動（家賃引落日の前日にプッシュ通知）
+- Windows デスクトップ対応（Flutter Desktop で）
 
 ---
 
-最終更新: アプリv1.0.39 リリース時点
+最終更新: v1.0.43 リリース後、Firestore 同期 Phase A 完了時点
