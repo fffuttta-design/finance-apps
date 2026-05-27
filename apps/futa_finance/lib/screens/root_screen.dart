@@ -7,8 +7,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/app_mode.dart';
 import '../data/update_checker.dart';
 import '../data/update_installer.dart';
+import 'expense_input_screen.dart';
 import 'expenses_screen.dart';
 import 'home_screen.dart';
+import 'income_input_screen.dart';
 import 'income_screen.dart';
 import 'report_screen.dart';
 import 'settings_screen.dart';
@@ -21,8 +23,14 @@ class RootScreen extends StatefulWidget {
   State<RootScreen> createState() => _RootScreenState();
 }
 
+/// 広い画面で開く記録パネルの種類。
+enum _RecordPanelKind { expense, income }
+
 class _RootScreenState extends State<RootScreen> {
   int _index = 0;
+
+  /// 広い画面で開いている記録パネル。null=閉じている。
+  _RecordPanelKind? _recordPanel;
 
   static const _tabs = <Widget>[
     HomeScreen(),
@@ -352,6 +360,13 @@ class _RootScreenState extends State<RootScreen> {
           _SideNav(
             selectedIndex: _index,
             onDestinationSelected: (i) => setState(() => _index = i),
+            onRecord: (kind) {
+              setState(() {
+                // 同じパネルを押したら閉じる、違う種類なら切替
+                _recordPanel = _recordPanel == kind ? null : kind;
+              });
+            },
+            recordPanelKind: _recordPanel,
           ),
           const VerticalDivider(width: 1, thickness: 1),
           Expanded(
@@ -364,7 +379,55 @@ class _RootScreenState extends State<RootScreen> {
               ),
             ),
           ),
+          if (_recordPanel != null) ...[
+            const VerticalDivider(width: 1, thickness: 1),
+            _RecordPanel(
+              kind: _recordPanel!,
+              onClose: () => setState(() => _recordPanel = null),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+/// 広い画面用、右側にスライドする記録パネル。
+/// 中身は ExpenseInputScreen / IncomeInputScreen をそのまま埋め込み、
+/// 内部 Navigator の pop（保存完了 or キャンセル）でパネルを閉じる。
+class _RecordPanel extends StatelessWidget {
+  const _RecordPanel({required this.kind, required this.onClose});
+
+  final _RecordPanelKind kind;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 420,
+      child: Container(
+        color: const Color(0xFFFAFAFA),
+        child: Navigator(
+          onGenerateRoute: (settings) => MaterialPageRoute(
+            settings: const RouteSettings(name: '/record'),
+            builder: (_) {
+              switch (kind) {
+                case _RecordPanelKind.expense:
+                  return const ExpenseInputScreen();
+                case _RecordPanelKind.income:
+                  return const IncomeInputScreen();
+              }
+            },
+          ),
+          // onGenerateRoute と組み合わせる場合は onPopPage を使う必要がある。
+          // ignore: deprecated_member_use
+          onPopPage: (route, result) {
+            // 内側 Navigator が pop した（保存 or AppBar の戻る）
+            // パネルごと閉じる。リストは Stream で自動同期されるので明示更新不要。
+            WidgetsBinding.instance.addPostFrameCallback((_) => onClose());
+            return route.didPop(result);
+          },
+        ),
       ),
     );
   }
@@ -376,10 +439,14 @@ class _SideNav extends StatefulWidget {
   const _SideNav({
     required this.selectedIndex,
     required this.onDestinationSelected,
+    required this.onRecord,
+    required this.recordPanelKind,
   });
 
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
+  final ValueChanged<_RecordPanelKind> onRecord;
+  final _RecordPanelKind? recordPanelKind;
 
   @override
   State<_SideNav> createState() => _SideNavState();
@@ -483,6 +550,93 @@ class _SideNavState extends State<_SideNav> {
                 ],
               ),
             ),
+
+            // ── 記録ボタン（広い画面専用、右側パネルをトグル） ──
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Divider(height: 1),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.edit_note,
+                      size: 14, color: Color(0xFF9CA3AF)),
+                  const SizedBox(width: 6),
+                  Text(
+                    '記録',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF9CA3AF),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding:
+                  const EdgeInsets.fromLTRB(12, 4, 12, 16),
+              child: Column(
+                children: [
+                  _recordButton(
+                    _RecordPanelKind.expense,
+                    Icons.remove_circle_outline,
+                    '支出を記録',
+                    const Color(0xFF1A237E),
+                  ),
+                  const SizedBox(height: 6),
+                  _recordButton(
+                    _RecordPanelKind.income,
+                    Icons.add_circle_outline,
+                    '収入を記録',
+                    const Color(0xFF16A34A),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _recordButton(
+    _RecordPanelKind kind,
+    IconData icon,
+    String label,
+    Color color,
+  ) {
+    final active = widget.recordPanelKind == kind;
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => widget.onRecord(kind),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: active ? color : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: active ? color : color.withValues(alpha: 0.4),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: active ? Colors.white : color),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: active ? Colors.white : color,
+                ),
+              ),
+            ),
+            if (active)
+              const Icon(Icons.close, size: 16, color: Colors.white),
           ],
         ),
       ),
