@@ -15,6 +15,8 @@ import '../data/transaction_repository.dart';
 import '../data/update_checker.dart';
 import '../data/update_installer.dart';
 import '../mock/mock_data.dart';
+import '../utils/web_reload_stub.dart'
+    if (dart.library.html) '../utils/web_reload_web.dart';
 import 'account_editor_screen.dart';
 import 'card_editor_screen.dart';
 import 'category_editor_screen.dart';
@@ -1158,20 +1160,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Row(
+          content: Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.white, size: 18),
-              SizedBox(width: 8),
+              const Icon(Icons.check_circle, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
               Expanded(
-                child: Text('バックアップから復元しました（アプリ再起動で完全反映）'),
+                child: Text(kIsWeb
+                    ? 'バックアップから復元しました（自動でリロードします）'
+                    : 'バックアップから復元しました'),
               ),
             ],
           ),
           backgroundColor: const Color(0xFF16A34A),
-          duration: const Duration(seconds: 4),
+          duration: const Duration(seconds: 3),
           behavior: SnackBarBehavior.floating,
         ),
       );
+
+      // Web は自動でリロードして取り込み内容を完全反映する。
+      // モバイルは Firestore Stream で各画面が自動更新されるため何もしない。
+      if (kIsWeb) {
+        await Future.delayed(const Duration(milliseconds: 1500));
+        reloadApp();
+      }
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
