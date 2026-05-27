@@ -46,12 +46,11 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
   Future<RegisteredCreditCard?> _editDialog(
       BuildContext context, RegisteredCreditCard? initial) async {
     final nameCtrl = TextEditingController(text: initial?.name ?? '');
-    final last4Ctrl = TextEditingController(text: initial?.last4 ?? '');
     final iconUrlCtrl =
         TextEditingController(text: initial?.iconUrl ?? '');
     final memoCtrl = TextEditingController(text: initial?.memo ?? '');
-    final paymentDayCtrl = TextEditingController(
-        text: initial?.paymentDay?.toString() ?? '');
+    // 引き落とし日は Dropdown 選択。null = 未設定。
+    int? selectedPaymentDay = initial?.paymentDay;
 
     // BottomSheet で編集フォーム表示（subscription_list と同じパターン）。
     final result = await showModalBottomSheet<RegisteredCreditCard?>(
@@ -72,29 +71,19 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
               Navigator.pop(ctx, null);
               return;
             }
-            final last4 = last4Ctrl.text.trim().isEmpty
-                ? null
-                : last4Ctrl.text.trim();
             final iconUrl = iconUrlCtrl.text.trim().isEmpty
                 ? null
                 : iconUrlCtrl.text.trim();
             final memo =
                 memoCtrl.text.trim().isEmpty ? null : memoCtrl.text.trim();
-            // 引き落とし日: 1〜31 の範囲外は無効化（null扱い）
-            final paymentDayRaw =
-                int.tryParse(paymentDayCtrl.text.trim());
-            final paymentDay = (paymentDayRaw != null &&
-                    paymentDayRaw >= 1 &&
-                    paymentDayRaw <= 31)
-                ? paymentDayRaw
-                : null;
+            final paymentDay = selectedPaymentDay;
             if (initial == null) {
               Navigator.pop(
                   ctx,
                   RegisteredCreditCard(
                     id: _genId(),
                     name: name,
-                    last4: last4,
+                    // last4 入力UIは廃止、新規は null
                     // brandColorValue は新規入力UIから削除。null で保存。
                     // 累積利用額はホーム画面で取引から自動計算する
                     iconUrl: iconUrl,
@@ -106,7 +95,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                   ctx,
                   initial.copyWith(
                     name: name,
-                    last4: last4,
+                    // last4 は initial 値を維持（破壊しない）
                     // brandColorValue は initial 値を維持（破壊しない）
                     iconUrl: iconUrl,
                     memo: memo,
@@ -175,19 +164,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                               ),
                               onChanged: (_) => setLocal(() {})),
                           const SizedBox(height: 12),
-                          TextField(
-                            controller: last4Ctrl,
-                            keyboardType: TextInputType.number,
-                            maxLength: 4,
-                            decoration: const InputDecoration(
-                              labelText: 'カード番号 下4桁（任意）',
-                              counterText: '',
-                              floatingLabelBehavior:
-                                  FloatingLabelBehavior.always,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          // 備考欄を下4桁直後に配置（1行）
+                          // 備考欄（1行）
                           TextField(
                             controller: memoCtrl,
                             maxLines: 1,
@@ -198,19 +175,29 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          // 引き落とし日（1〜31）。任意。
-                          TextField(
-                            controller: paymentDayCtrl,
-                            keyboardType: TextInputType.number,
-                            maxLength: 2,
+                          // 引き落とし日: Dropdown 選択（1〜31 or 未設定）
+                          DropdownButtonFormField<int?>(
+                            initialValue: selectedPaymentDay,
                             decoration: const InputDecoration(
                               labelText: '引き落とし日（任意）',
-                              counterText: '',
-                              suffixText: '日',
-                              helperText: '1〜31 を入力（範囲外は無視）',
                               floatingLabelBehavior:
                                   FloatingLabelBehavior.always,
                             ),
+                            items: <DropdownMenuItem<int?>>[
+                              const DropdownMenuItem<int?>(
+                                value: null,
+                                child: Text('— 未設定 —',
+                                    style: TextStyle(
+                                        color: Color(0xFF9CA3AF))),
+                              ),
+                              for (var d = 1; d <= 31; d++)
+                                DropdownMenuItem<int?>(
+                                  value: d,
+                                  child: Text('$d 日'),
+                                ),
+                            ],
+                            onChanged: (v) =>
+                                setLocal(() => selectedPaymentDay = v),
                           ),
                           const SizedBox(height: 12),
                           _logoUrlField(iconUrlCtrl, '💳', setLocal),
@@ -415,28 +402,14 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                           color: Color(0xFF111827))),
-                  if (c.last4 != null || c.paymentDay != null) ...[
+                  // 引き落とし日（任意）。last4 表示はUIから廃止。
+                  if (c.paymentDay != null) ...[
                     const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        if (c.last4 != null)
-                          Text('****${c.last4}',
-                              style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFF6B7280))),
-                        if (c.last4 != null && c.paymentDay != null)
-                          const Text(' · ',
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFFD1D5DB))),
-                        if (c.paymentDay != null)
-                          Text('毎月${c.paymentDay}日引落',
-                              style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFF1A237E),
-                                  fontWeight: FontWeight.w600)),
-                      ],
-                    ),
+                    Text('毎月${c.paymentDay}日引落',
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF1A237E),
+                            fontWeight: FontWeight.w600)),
                   ],
                   if (c.memo != null && c.memo!.isNotEmpty) ...[
                     const SizedBox(height: 2),
