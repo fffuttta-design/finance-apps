@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart';
 
 import '../data/settings_repository.dart';
-import '../utils/category_icons.dart';
+import '../utils/emoji_palette.dart';
+import '../widgets/emoji_picker_dialog.dart';
 
 /// 1つの大カテゴリのサブカテゴリ専用CRUD画面。
 ///
@@ -40,11 +41,16 @@ class _CategorySubEditorScreenState extends State<CategorySubEditorScreen> {
 
   MajorCategory get _major => _config!.majors[widget.majorIndex];
 
-  void _updateSubs(List<String> newSubs) {
+  /// MajorCategory 全体を置き換え（subs + subIcons 同時更新用）
+  void _updateMajor(MajorCategory newMajor) {
     final majors = [..._config!.majors];
-    majors[widget.majorIndex] = _major.copyWith(subs: newSubs);
+    majors[widget.majorIndex] = newMajor;
     setState(() => _config = _config!.copyWith(majors: majors));
     _save();
+  }
+
+  void _updateSubs(List<String> newSubs) {
+    _updateMajor(_major.copyWith(subs: newSubs));
   }
 
   Future<String?> _promptText(
@@ -78,19 +84,36 @@ class _CategorySubEditorScreenState extends State<CategorySubEditorScreen> {
   }
 
   Future<void> _rename(int i) async {
+    final oldName = _major.subs[i];
     final name = await _promptText(
-        title: '小カテゴリ名を変更', label: '名前', initial: _major.subs[i]);
+        title: '小カテゴリ名を変更', label: '名前', initial: oldName);
     if (name == null || name.trim().isEmpty) return;
+    final newName = name.trim();
+    if (newName == oldName) return;
+
     final subs = [..._major.subs];
-    subs[i] = name.trim();
-    _updateSubs(subs);
+    subs[i] = newName;
+
+    // アイコンマップのキーを移行（古い名前→新しい名前）
+    Map<String, String>? newIcons;
+    if (_major.subIcons != null && _major.subIcons!.containsKey(oldName)) {
+      newIcons = {..._major.subIcons!};
+      final iconValue = newIcons.remove(oldName);
+      if (iconValue != null) newIcons[newName] = iconValue;
+    }
+
+    _updateMajor(_major.copyWith(
+      subs: subs,
+      subIcons: newIcons ?? _major.subIcons,
+    ));
   }
 
   Future<void> _delete(int i) async {
+    final subName = _major.subs[i];
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('${_major.subs[i]} を削除？'),
+        title: Text('$subName を削除？'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -104,8 +127,38 @@ class _CategorySubEditorScreenState extends State<CategorySubEditorScreen> {
       ),
     );
     if (ok != true) return;
+
     final subs = [..._major.subs]..removeAt(i);
-    _updateSubs(subs);
+
+    // アイコンマップから該当キーを削除
+    Map<String, String>? newIcons;
+    if (_major.subIcons != null && _major.subIcons!.containsKey(subName)) {
+      newIcons = {..._major.subIcons!}..remove(subName);
+    }
+
+    _updateMajor(_major.copyWith(
+      subs: subs,
+      subIcons: newIcons ?? _major.subIcons,
+    ));
+  }
+
+  /// 小カテゴリのアイコンを選択（絵文字 or 画像URL）。
+  Future<void> _editIcon(int i) async {
+    final subName = _major.subs[i];
+    final current = _major.iconForSub(subName);
+    final picked =
+        await showEmojiPickerDialog(context, currentEmoji: current);
+    // ダイアログでキャンセル時は null。「クリア」の場合も null が返るので
+    // 区別するため、ここでは「null = キャンセル」として扱う。
+    if (picked == null) return;
+
+    final newIcons = {...(_major.subIcons ?? <String, String>{})};
+    if (picked.isEmpty) {
+      newIcons.remove(subName);
+    } else {
+      newIcons[subName] = picked;
+    }
+    _updateMajor(_major.copyWith(subIcons: newIcons));
   }
 
   void _reorder(int oldIndex, int newIndex) {
@@ -127,7 +180,7 @@ class _CategorySubEditorScreenState extends State<CategorySubEditorScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            Icon(iconForKey(_major.iconKey),
+            categoryIconWidget(_major.iconKey,
                 color: const Color(0xFF1A237E), size: 22),
             const SizedBox(width: 8),
             Text(_major.displayName(widget.majorIndex),
@@ -164,30 +217,58 @@ class _CategorySubEditorScreenState extends State<CategorySubEditorScreen> {
                       border:
                           Border.all(color: const Color(0xFFE5E7EB)),
                     ),
-                    child: ListTile(
-                      leading: ReorderableDragStartListener(
-                        index: i,
-                        child: const Icon(Icons.drag_indicator,
-                            color: Color(0xFF9CA3AF)),
-                      ),
-                      title: Text(sub,
-                          style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF111827))),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 4),
+                      child: Row(
                         children: [
+                          ReorderableDragStartListener(
+                            index: i,
+                            child: const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(Icons.drag_indicator,
+                                  color: Color(0xFF9CA3AF)),
+                            ),
+                          ),
+                          // アイコン（タップで編集）
+                          InkWell(
+                            onTap: () => _editIcon(i),
+                            borderRadius: BorderRadius.circular(6),
+                            child: Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF3F4F6),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              alignment: Alignment.center,
+                              child: categoryIconWidget(
+                                _major.iconForSub(sub),
+                                color: const Color(0xFF6B7280),
+                                size: 22,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(sub,
+                                style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Color(0xFF111827))),
+                          ),
                           IconButton(
                             visualDensity: VisualDensity.compact,
                             icon: const Icon(Icons.edit,
                                 size: 18, color: Color(0xFF6B7280)),
                             onPressed: () => _rename(i),
+                            tooltip: '名前変更',
                           ),
                           IconButton(
                             visualDensity: VisualDensity.compact,
                             icon: const Icon(Icons.delete_outline,
                                 size: 18, color: Color(0xFFDC2626)),
                             onPressed: () => _delete(i),
+                            tooltip: '削除',
                           ),
                         ],
                       ),

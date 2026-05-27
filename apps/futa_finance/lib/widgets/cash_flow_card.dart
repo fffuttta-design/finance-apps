@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../mock/dashboard_summary.dart';
 import '../utils/formatters.dart';
 
-/// 資金口座の月初→当月支出→想定残高 のフロー表示。
+/// ウォレットの月初→当月支出→想定残高 のフロー表示。
 class CashFlowCard extends StatelessWidget {
   final DashboardSummary summary;
 
@@ -34,7 +34,7 @@ class CashFlowCard extends StatelessWidget {
                   size: 16, color: Color(0xFF1A237E)),
               const SizedBox(width: 6),
               Text(
-                '資金口座（${summary.accountName}）',
+                'ウォレット（${summary.accountName}）',
                 style: const TextStyle(
                     fontSize: 12,
                     color: Color(0xFF6B7280),
@@ -43,7 +43,7 @@ class CashFlowCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          _row('月初', formatYen(summary.monthStartBalance),
+          _row('現在残高', formatYen(summary.monthStartBalance),
               const Color(0xFF111827),
               fontSize: 14),
           const SizedBox(height: 6),

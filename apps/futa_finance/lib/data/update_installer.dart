@@ -39,18 +39,27 @@ class UpdateInstaller {
 
   /// APK を端末のキャッシュディレクトリにダウンロードしてファイルパスを返す。
   /// onProgress: 0.0〜1.0 のダウンロード進捗（受信中に随時呼ばれる）
+  ///
+  /// 既に同名 APK が一時ディレクトリにある場合は **再ダウンロードせず即返す**。
+  /// 「インストール画面を間違えて閉じた」場合の再起動時に、再 DL の無駄を回避。
+  /// ファイル名はリリース URL に `v1.0.X` が含まれるので、URL ごとに別パスになる。
   Future<File> downloadApk(
     String url, {
     void Function(double progress)? onProgress,
   }) async {
-    final dir = await getTemporaryDirectory();
-    final fileName =
-        url.split('/').last.split('?').first; // クエリ除去したファイル名
-    final filePath = '${dir.path}/$fileName';
-
-    // 既存ファイルがあれば削除（前回のリーク対策）
+    final filePath = await _localApkPath(url);
     final f = File(filePath);
-    if (await f.exists()) await f.delete();
+
+    // 既存ファイルが「実質1MB以上」あれば DL 済みとみなして再利用
+    if (await f.exists()) {
+      final len = await f.length();
+      if (len > 1024 * 1024) {
+        onProgress?.call(1.0);
+        return f;
+      }
+      // 途中で切れた壊れファイル → 削除して新規 DL
+      await f.delete();
+    }
 
     await _dio.download(
       url,
@@ -67,6 +76,24 @@ class UpdateInstaller {
     );
 
     return File(filePath);
+  }
+
+  /// 与えられた URL に対応する DL 済み APK が一時ディレクトリにあれば返す。
+  /// 「インストール再開」プロンプト用。
+  Future<File?> getCachedApk(String url) async {
+    final filePath = await _localApkPath(url);
+    final f = File(filePath);
+    if (!await f.exists()) return null;
+    final len = await f.length();
+    if (len <= 1024 * 1024) return null;
+    return f;
+  }
+
+  /// 一時ディレクトリ上のローカル APK のパスを生成する。
+  Future<String> _localApkPath(String url) async {
+    final dir = await getTemporaryDirectory();
+    final fileName = url.split('/').last.split('?').first;
+    return '${dir.path}/$fileName';
   }
 
   /// ダウンロード済の APK を OS のインストーラで開く（半自動インストール）。

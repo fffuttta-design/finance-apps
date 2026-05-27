@@ -1,21 +1,33 @@
 import 'package:finance_core/finance_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_mode.dart';
+
 /// 設定（カテゴリ・支払方法）のローカル永続化レイヤ。
 ///
 /// Dフェーズで Firestore + Auth に置き換える前提。
+/// AppMode (事業/個人) ごとにキーが分かれる。
 class SettingsRepository {
-  static const _kCategories = 'futa.categories';
-  static const _kPayments = 'futa.payments';
+  String get _kCategories =>
+      'futa.${AppModeManager.instance.current.keyPrefix}.categories';
+  String get _kPayments =>
+      'futa.${AppModeManager.instance.current.keyPrefix}.payments';
+
+  /// モード別のデフォルトカテゴリを返す。
+  CategoryConfig _defaultsForCurrentMode() {
+    return AppModeManager.instance.current == AppMode.business
+        ? CategoryConfig.businessDefaults()
+        : CategoryConfig.personalDefaults();
+  }
 
   Future<CategoryConfig> loadCategories() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_kCategories);
-    if (raw == null) return CategoryConfig.futaDefaults();
+    if (raw == null) return _defaultsForCurrentMode();
     try {
       return CategoryConfig.fromJsonString(raw);
     } catch (_) {
-      return CategoryConfig.futaDefaults();
+      return _defaultsForCurrentMode();
     }
   }
 

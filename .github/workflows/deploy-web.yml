@@ -1,0 +1,59 @@
+name: Deploy Web (FutaFinance)
+
+# main ブランチ更新 or 手動実行で Flutter Web をビルドして gh-pages へデプロイ。
+# 公開URL: https://fffuttta-design.github.io/finance-apps/
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/futa_finance/**'
+      - 'packages/finance_core/**'
+      - '.github/workflows/deploy-web.yml'
+  workflow_dispatch: # 手動実行も可能
+
+permissions:
+  contents: write
+
+concurrency:
+  group: 'pages-deploy'
+  cancel-in-progress: true
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.6'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies (monorepo root)
+        run: flutter pub get
+        working-directory: ./
+
+      - name: Install dependencies (futa_finance)
+        run: flutter pub get
+        working-directory: apps/futa_finance
+
+      - name: Build Web (release)
+        # GitHub Pages のサブパスに合わせて base-href を /finance-apps/ に
+        run: |
+          flutter build web --release \
+            --base-href "/finance-apps/" \
+            --pwa-strategy=none
+        working-directory: apps/futa_finance
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./apps/futa_finance/build/web
+          publish_branch: gh-pages
+          force_orphan: true
+          commit_message: 'deploy web: ${{ github.sha }}'

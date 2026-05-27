@@ -6,7 +6,37 @@ import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 
+/// 支出入力モーダルを表示する。保存成功時は true を返す。
+Future<bool?> showExpenseInputModal(BuildContext context) {
+  return showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (sheetCtx) {
+      return Padding(
+        padding: EdgeInsets.only(
+            bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
+        child: Container(
+          height: MediaQuery.of(sheetCtx).size.height * 0.95,
+          decoration: const BoxDecoration(
+            color: Color(0xFFFAFAFA),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: const ExpenseInputScreen(),
+        ),
+      );
+    },
+  );
+}
+
 /// 支出を1件入力する画面。
+///
+/// 支払方法に銀行口座を選んだ場合、支出後残高が自動計算される：
+/// - 金額編集 → 残高自動更新（現残高 - 支出額）
+/// - 残高編集 → 金額自動更新（現残高 - 残高）
+/// 保存時は該当銀行のcurrentBalanceを新残高で上書き。
+/// クレジットカード選択時は残高欄を表示しない。
 class ExpenseInputScreen extends StatefulWidget {
   const ExpenseInputScreen({super.key});
 
@@ -28,16 +58,48 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   final _descCtrl = TextEditingController();
   final _amountCtrl = TextEditingController(); // 円金額（USD時はここに概算円）
   final _usdAmountCtrl = TextEditingController(); // USD金額
+  final _balanceAfterCtrl = TextEditingController();
   final _memoCtrl = TextEditingController();
+  final _amountFocus = FocusNode();
+  final _balanceFocus = FocusNode();
   bool _saving = false;
 
   /// 入力通貨。'JPY' or 'USD'。
   String _currency = 'JPY';
 
+  /// 選択中の支払い元の現在値。銀行/現金/電子マネーなら残高、カードなら累積額。
+  int? _currentBalance;
+
+  /// 選択中の支払い元がクレジットカードなら true。
+  /// (true: 支出は累積額に +、false: 支出は残高から -)
+  bool _selectedIsCard = false;
+
+  /// 双方向同期の再帰呼び出し防止フラグ。
+  bool _syncing = false;
+
+  /// 選択中の支払元がクレカ。null は未選択。
+  core.RegisteredCreditCard? _cardFor(String? name) {
+    if (name == null || _payments == null) return null;
+    for (final c in _payments!.creditCards) {
+      if (c.name == name) return c;
+    }
+    return null;
+  }
+
+  /// Dropdown のKeyを切り替えるカウンタ。"+ 新規追加"後にウィジェットを
+  /// 再生成して内部state(sentinel選択状態)を捨てるために使用。
+  int _majorDropdownNonce = 0;
+  int _subDropdownNonce = 0;
+
+  /// "+ 新規追加" のセンチネル値（実カテゴリ名と衝突しない一意な文字列）。
+  static const _kAddNewSentinel = '__add_new__';
+
   @override
   void initState() {
     super.initState();
     _load();
+    _amountCtrl.addListener(_syncBalanceFromAmount);
+    _balanceAfterCtrl.addListener(_syncAmountFromBalance);
   }
 
   @override
@@ -45,7 +107,10 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     _descCtrl.dispose();
     _amountCtrl.dispose();
     _usdAmountCtrl.dispose();
+    _balanceAfterCtrl.dispose();
     _memoCtrl.dispose();
+    _amountFocus.dispose();
+    _balanceFocus.dispose();
     super.dispose();
   }
 
@@ -63,7 +128,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     final cfg = _categories;
     final major = _majorCategory;
     if (cfg == null || major == null) return const [];
-    final idx = cfg.majors.indexWhere((m) => m.displayName(cfg.majors.indexOf(m)) == major);
+    final idx = cfg.majors.indexWhere(
+        (m) => m.displayName(cfg.majors.indexOf(m)) == major);
     if (idx < 0) return const [];
     return cfg.majors[idx].subs;
   }
@@ -76,6 +142,184 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       ...p.bankAccounts.map((b) => b.name),
       ...p.creditCards.map((c) => c.name),
     ];
+  }
+
+  /// 選択中の支払い方法が銀行口座ならその口座を返す。カードなら null。
+  core.RegisteredBankAccount? _bankFor(String? name) {
+    if (name == null || _payments == null) return null;
+    for (final b in _payments!.bankAccounts) {
+      if (b.name == name) return b;
+    }
+    return null;
+  }
+
+  void _onPaymentMethodChanged(String? name) {
+    setState(() => _paymentMethod = name);
+    final bank = _bankFor(name);
+    final card = _cardFor(name);
+    if (bank != null) {
+      setState(() {
+        _currentBalance = bank.displayBalance ?? 0;
+        _selectedIsCard = false;
+      });
+    } else if (card != null) {
+      setState(() {
+        _currentBalance = card.displayBalance;
+        _selectedIsCard = true;
+      });
+    } else {
+      setState(() {
+        _currentBalance = null;
+        _selectedIsCard = false;
+      });
+      _syncing = true;
+      _balanceAfterCtrl.text = '';
+      _syncing = false;
+      return;
+    }
+    final amount = int.tryParse(_amountCtrl.text) ?? 0;
+    _syncing = true;
+    _balanceAfterCtrl.text = _computeAfter(amount).toString();
+    _syncing = false;
+  }
+
+  /// 支出金額から「支出後の値」を計算。
+  /// 銀行系: 残高 - 支出 / カード: 累積額 + 支出
+  int _computeAfter(int amount) {
+    if (_selectedIsCard) {
+      return _currentBalance! + amount;
+    }
+    return _currentBalance! - amount;
+  }
+
+  /// 「支出後の値」から支出金額を逆算。
+  int _computeAmount(int after) {
+    if (_selectedIsCard) {
+      return after - _currentBalance!;
+    }
+    return _currentBalance! - after;
+  }
+
+  void _syncBalanceFromAmount() {
+    if (_syncing) return;
+    if (_currentBalance == null) return;
+    if (!_amountFocus.hasFocus) return;
+    final amount = int.tryParse(_amountCtrl.text) ?? 0;
+    final newBalance = _computeAfter(amount).toString();
+    if (_balanceAfterCtrl.text != newBalance) {
+      _syncing = true;
+      _balanceAfterCtrl.text = newBalance;
+      _syncing = false;
+    }
+  }
+
+  void _syncAmountFromBalance() {
+    if (_syncing) return;
+    if (_currentBalance == null) return;
+    if (!_balanceFocus.hasFocus) return;
+    final balance = int.tryParse(_balanceAfterCtrl.text) ?? 0;
+    final newAmount = _computeAmount(balance).toString();
+    if (_amountCtrl.text != newAmount) {
+      _syncing = true;
+      _amountCtrl.text = newAmount;
+      _syncing = false;
+    }
+  }
+
+  /// 大カテゴリの新規追加ダイアログ → 保存 → ドロップダウン選択。
+  Future<void> _addNewMajorCategory() async {
+    final ctrl = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Row(children: [
+          Icon(Icons.add_circle_outline, color: Color(0xFF1A237E)),
+          SizedBox(width: 8),
+          Text('新しい大カテゴリ'),
+        ]),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: '名前'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('キャンセル')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+              child: const Text('追加')),
+        ],
+      ),
+    );
+    // ダイアログを閉じたタイミングで dropdown を再生成（sentinel選択状態を捨てる）
+    setState(() => _majorDropdownNonce++);
+    if (name == null || name.isEmpty) return;
+
+    final cfg = _categories!;
+    final newMajor = core.MajorCategory(name: name, subs: const []);
+    final updated =
+        cfg.copyWith(majors: [...cfg.majors, newMajor]);
+    await _settings.saveCategories(updated);
+    if (!mounted) return;
+    final newIndex = updated.majors.length - 1;
+    setState(() {
+      _categories = updated;
+      _majorCategory = newMajor.displayName(newIndex);
+      _subCategory = null;
+      _majorDropdownNonce++;
+      _subDropdownNonce++;
+    });
+  }
+
+  /// 小カテゴリの新規追加ダイアログ → 保存 → ドロップダウン選択。
+  Future<void> _addNewSubCategory() async {
+    final majorDisplayName = _majorCategory;
+    if (majorDisplayName == null) return;
+
+    final ctrl = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Row(children: [
+          Icon(Icons.add_circle_outline, color: Color(0xFF1A237E)),
+          SizedBox(width: 8),
+          Text('新しい小カテゴリ'),
+        ]),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: '名前'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('キャンセル')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+              child: const Text('追加')),
+        ],
+      ),
+    );
+    setState(() => _subDropdownNonce++);
+    if (name == null || name.isEmpty) return;
+
+    final cfg = _categories!;
+    final majorIdx = cfg.majors.indexWhere(
+        (m) => m.displayName(cfg.majors.indexOf(m)) == majorDisplayName);
+    if (majorIdx < 0) return;
+    final newSubs = [...cfg.majors[majorIdx].subs, name];
+    final updatedMajors = [...cfg.majors];
+    updatedMajors[majorIdx] =
+        cfg.majors[majorIdx].copyWith(subs: newSubs);
+    final updated = cfg.copyWith(majors: updatedMajors);
+    await _settings.saveCategories(updated);
+    if (!mounted) return;
+    setState(() {
+      _categories = updated;
+      _subCategory = name;
+      _subDropdownNonce++;
+    });
   }
 
   Future<void> _pickDate() async {
@@ -150,7 +394,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       return;
     }
 
-    // USDなら USD金額バリデーション
     double? usdAmount;
     if (_currency == 'USD') {
       usdAmount = double.tryParse(_usdAmountCtrl.text.trim());
@@ -161,6 +404,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         return;
       }
     }
+
+    final balanceAfter = int.tryParse(_balanceAfterCtrl.text.trim());
 
     setState(() => _saving = true);
     final tx = core.Transaction(
@@ -177,6 +422,32 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       originalAmount: usdAmount,
     );
     await TransactionRepository.instance.add(tx);
+
+    // 銀行/カードの残高/累積額を更新
+    if (_currentBalance != null && balanceAfter != null && _payments != null) {
+      if (_selectedIsCard) {
+        // クレジットカードの累積額を更新
+        final updatedCards = _payments!.creditCards.map((c) {
+          if (c.name == _paymentMethod) {
+            return c.copyWith(currentBalance: balanceAfter);
+          }
+          return c;
+        }).toList();
+        await _settings
+            .savePayments(_payments!.copyWith(creditCards: updatedCards));
+      } else {
+        // 銀行/現金/電子マネーの残高を更新
+        final updated = _payments!.bankAccounts.map((b) {
+          if (b.name == _paymentMethod) {
+            return b.copyWith(currentBalance: balanceAfter);
+          }
+          return b;
+        }).toList();
+        await _settings
+            .savePayments(_payments!.copyWith(bankAccounts: updated));
+      }
+    }
+
     if (!mounted) return;
     Navigator.pop(context, true);
   }
@@ -190,12 +461,12 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
           body: Center(child: CircularProgressIndicator()));
     }
 
-    // 表示用の大カテゴリ名（インデックス付き）
-    final majorNames = List.generate(
-        categories.majors.length,
+    final majorNames = List.generate(categories.majors.length,
         (i) => categories.majors[i].displayName(i));
 
     final paymentMethods = _availablePaymentMethods;
+    final hasBalanceTracking = _currentBalance != null;
+    final isCard = _selectedIsCard;
 
     return Scaffold(
       appBar: AppBar(
@@ -215,7 +486,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // 日付
               _label('日付'),
               InkWell(
                 onTap: _pickDate,
@@ -239,39 +509,75 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               ),
               const SizedBox(height: 16),
 
-              // 大カテゴリ
               _label('大カテゴリ'),
               DropdownButtonFormField<String>(
+                key: ValueKey('major-$_majorDropdownNonce'),
                 initialValue: _majorCategory,
-                items: majorNames
-                    .map((m) =>
-                        DropdownMenuItem(value: m, child: Text(m)))
-                    .toList(),
-                onChanged: (v) => setState(() {
-                  _majorCategory = v;
-                  _subCategory = null;
-                }),
+                items: [
+                  ...majorNames.map((m) =>
+                      DropdownMenuItem(value: m, child: Text(m))),
+                  const DropdownMenuItem(
+                    value: _kAddNewSentinel,
+                    child: Row(
+                      children: [
+                        Icon(Icons.add_circle_outline,
+                            size: 18, color: Color(0xFF1A237E)),
+                        SizedBox(width: 8),
+                        Text('新しい大カテゴリを追加',
+                            style: TextStyle(color: Color(0xFF1A237E))),
+                      ],
+                    ),
+                  ),
+                ],
+                onChanged: (v) async {
+                  if (v == _kAddNewSentinel) {
+                    await _addNewMajorCategory();
+                  } else {
+                    setState(() {
+                      _majorCategory = v;
+                      _subCategory = null;
+                    });
+                  }
+                },
                 decoration: _inputDecoration(hint: '選択してください'),
               ),
               const SizedBox(height: 16),
 
-              // 小カテゴリ
               _label('小カテゴリ'),
               DropdownButtonFormField<String>(
+                key: ValueKey('sub-$_majorCategory-$_subDropdownNonce'),
                 initialValue: _subCategory,
-                items: _availableSubs
-                    .map((s) =>
-                        DropdownMenuItem(value: s, child: Text(s)))
-                    .toList(),
+                items: [
+                  ..._availableSubs.map((s) =>
+                      DropdownMenuItem(value: s, child: Text(s))),
+                  if (_majorCategory != null)
+                    const DropdownMenuItem(
+                      value: _kAddNewSentinel,
+                      child: Row(
+                        children: [
+                          Icon(Icons.add_circle_outline,
+                              size: 18, color: Color(0xFF1A237E)),
+                          SizedBox(width: 8),
+                          Text('新しい小カテゴリを追加',
+                              style: TextStyle(color: Color(0xFF1A237E))),
+                        ],
+                      ),
+                    ),
+                ],
                 onChanged: _majorCategory == null
                     ? null
-                    : (v) => setState(() => _subCategory = v),
+                    : (v) async {
+                        if (v == _kAddNewSentinel) {
+                          await _addNewSubCategory();
+                        } else {
+                          setState(() => _subCategory = v);
+                        }
+                      },
                 decoration: _inputDecoration(
                     hint: _majorCategory == null ? '先に大カテゴリを選択' : '選択してください'),
               ),
               const SizedBox(height: 16),
 
-              // 支払方法
               _label('支払方法'),
               if (paymentMethods.isEmpty)
                 Container(
@@ -292,12 +598,24 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                       .map((p) =>
                           DropdownMenuItem(value: p, child: Text(p)))
                       .toList(),
-                  onChanged: (v) => setState(() => _paymentMethod = v),
+                  onChanged: _onPaymentMethodChanged,
                   decoration: _inputDecoration(hint: '選択してください'),
                 ),
+              if (hasBalanceTracking) ...[
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Text(
+                    isCard
+                        ? '現在の累積額: ${formatYen(_currentBalance!)}'
+                        : '現在残高: ${formatYen(_currentBalance!)}',
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF6B7280)),
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
 
-              // 内容
               _label('取引内容'),
               TextFormField(
                 controller: _descCtrl,
@@ -307,7 +625,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               ),
               const SizedBox(height: 16),
 
-              // 通貨切替
               _label('通貨'),
               SegmentedButton<String>(
                 segments: const [
@@ -351,6 +668,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               ],
               TextFormField(
                 controller: _amountCtrl,
+                focusNode: _amountFocus,
                 keyboardType: TextInputType.number,
                 decoration: _inputDecoration(),
                 style: const TextStyle(
@@ -361,9 +679,36 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                   return null;
                 },
               ),
+
+              if (hasBalanceTracking) ...[
+                const SizedBox(height: 16),
+                _label(isCard
+                    ? '累積後の利用額（円）— 自動計算・編集可'
+                    : '支出後の残高（円）— 自動計算・編集可'),
+                TextFormField(
+                  controller: _balanceAfterCtrl,
+                  focusNode: _balanceFocus,
+                  keyboardType: TextInputType.number,
+                  decoration: _inputDecoration().copyWith(
+                    prefixIcon: Icon(
+                      isCard ? Icons.credit_card : Icons.account_balance,
+                      size: 18,
+                      color: isCard
+                          ? const Color(0xFF7C3AED)
+                          : const Color(0xFFDC2626),
+                    ),
+                  ),
+                  style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 16,
+                      color: isCard
+                          ? const Color(0xFF7C3AED)
+                          : const Color(0xFFDC2626),
+                      fontWeight: FontWeight.bold),
+                ),
+              ],
               const SizedBox(height: 16),
 
-              // 備考
               _label('備考（任意）'),
               TextFormField(
                 controller: _memoCtrl,

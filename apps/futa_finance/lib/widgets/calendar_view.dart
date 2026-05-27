@@ -7,20 +7,21 @@ import '../data/app_mode.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 
-class CalendarScreen extends StatefulWidget {
-  const CalendarScreen({super.key});
+/// カレンダーグリッド + 月計サマリ。
+/// 元々 CalendarScreen だった内容を Scaffold無しの再利用可能ウィジェット化したもの。
+class CalendarView extends StatefulWidget {
+  const CalendarView({super.key});
 
   @override
-  State<CalendarScreen> createState() => _CalendarScreenState();
+  State<CalendarView> createState() => _CalendarViewState();
 }
 
-class _CalendarScreenState extends State<CalendarScreen> with ModeAwareMixin {
+class _CalendarViewState extends State<CalendarView> with ModeAwareMixin {
   @override
   void onModeChanged() => _load();
 
   final _repo = TransactionRepository.instance;
   StreamSubscription<List<core.Transaction>>? _sub;
-
   List<core.Transaction> _transactions = [];
   DateTime _focused = DateTime(DateTime.now().year, DateTime.now().month);
 
@@ -54,13 +55,11 @@ class _CalendarScreenState extends State<CalendarScreen> with ModeAwareMixin {
     setState(() => _focused = DateTime(_focused.year, _focused.month + 1));
   }
 
-  /// 表示中月の取引のみ。
   List<core.Transaction> get _currentMonthTxns => _transactions
       .where((t) =>
           t.date.year == _focused.year && t.date.month == _focused.month)
       .toList();
 
-  /// 日 → その日の取引リスト。
   Map<int, List<core.Transaction>> get _byDay {
     final map = <int, List<core.Transaction>>{};
     for (final t in _currentMonthTxns) {
@@ -69,12 +68,14 @@ class _CalendarScreenState extends State<CalendarScreen> with ModeAwareMixin {
     return map;
   }
 
-  int _monthIncome(int day) => _byDay[day]
+  int _dayIncome(int day) =>
+      _byDay[day]
           ?.where((t) => t.type == core.TransactionType.income)
           .fold(0, (s, t) => s! + t.amount) ??
       0;
 
-  int _monthExpense(int day) => _byDay[day]
+  int _dayExpense(int day) =>
+      _byDay[day]
           ?.where((t) => t.type == core.TransactionType.expense)
           .fold(0, (s, t) => s! + t.amount) ??
       0;
@@ -129,26 +130,14 @@ class _CalendarScreenState extends State<CalendarScreen> with ModeAwareMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'カレンダー',
-          style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF111827)),
-        ),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _header(),
-            _weekdaysRow(),
-            Expanded(child: _grid()),
-            _monthSummary(),
-          ],
-        ),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _header(),
+        _weekdaysRow(),
+        _grid(),
+        _monthSummary(),
+      ],
     );
   }
 
@@ -212,7 +201,6 @@ class _CalendarScreenState extends State<CalendarScreen> with ModeAwareMixin {
     final firstDay = DateTime(_focused.year, _focused.month, 1);
     final daysInMonth =
         DateTime(_focused.year, _focused.month + 1, 0).day;
-    // weekday: Mon=1..Sun=7 → 日始まりに合わせるため (weekday % 7) で日=0..土=6
     final leadingBlanks = firstDay.weekday % 7;
     final totalCells = ((leadingBlanks + daysInMonth) / 7).ceil() * 7;
     final today = DateTime.now();
@@ -220,6 +208,8 @@ class _CalendarScreenState extends State<CalendarScreen> with ModeAwareMixin {
         today.year == _focused.year && today.month == _focused.month;
 
     return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 7,
@@ -239,8 +229,8 @@ class _CalendarScreenState extends State<CalendarScreen> with ModeAwareMixin {
   }
 
   Widget _dayCell(int day, List<core.Transaction> txns, bool isToday) {
-    final expense = _monthExpense(day);
-    final income = _monthIncome(day);
+    final expense = _dayExpense(day);
+    final income = _dayIncome(day);
     final hasData = txns.isNotEmpty;
     final dayOfWeek =
         DateTime(_focused.year, _focused.month, day).weekday % 7;
@@ -322,11 +312,12 @@ class _CalendarScreenState extends State<CalendarScreen> with ModeAwareMixin {
       child: Row(
         children: [
           Expanded(
-            child: _sumBlock('収入', formatYen(income), const Color(0xFF16A34A)),
+            child:
+                _sumBlock('収入', formatYen(income), const Color(0xFF16A34A)),
           ),
           Expanded(
-            child:
-                _sumBlock('支出', formatYen(-expense), const Color(0xFFDC2626)),
+            child: _sumBlock(
+                '支出', formatYen(-expense), const Color(0xFFDC2626)),
           ),
           Expanded(
             child: _sumBlock('差引', formatYen(net),
@@ -335,25 +326,6 @@ class _CalendarScreenState extends State<CalendarScreen> with ModeAwareMixin {
         ],
       ),
     );
-  }
-
-  /// カレンダーセル用のコンパクト金額表記。
-  /// - 1万未満は ¥1,234 形式
-  /// - 1万以上は 1.2万 形式（端数は1桁丸め、ぴったりは整数）
-  String _compactYen(int amount) {
-    if (amount.abs() < 10000) {
-      // カンマ区切り
-      final str = amount.abs().toString().replaceAllMapped(
-            RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-            (m) => '${m[1]},',
-          );
-      return '¥$str';
-    }
-    final man = amount.abs() / 10000;
-    if (man == man.roundToDouble()) {
-      return '${man.toInt()}万';
-    }
-    return '${man.toStringAsFixed(1)}万';
   }
 
   Widget _sumBlock(String label, String value, Color color) => Column(
@@ -424,5 +396,19 @@ class _CalendarScreenState extends State<CalendarScreen> with ModeAwareMixin {
         ],
       ),
     );
+  }
+
+  String _compactYen(int amount) {
+    if (amount.abs() < 10000) {
+      return amount.abs().toString().replaceAllMapped(
+            RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+            (m) => '${m[1]},',
+          );
+    }
+    final man = amount.abs() / 10000;
+    if (man == man.roundToDouble()) {
+      return '${man.toInt()}万';
+    }
+    return '${man.toStringAsFixed(1)}万';
   }
 }

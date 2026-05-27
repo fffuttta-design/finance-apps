@@ -32,7 +32,9 @@ Set-Location $root
 
 # --- 共通設定 ---
 $appDir = Join-Path $root "apps\futa_finance"
-$apkSrc = Join-Path $appDir "build\app\outputs\flutter-apk\app-debug.apk"
+# release ビルドの APK（debugキーで署名されたreleaseビルド）
+# 1/3〜1/4 のサイズになり、起動・実行も速い
+$apkSrc = Join-Path $appDir "build\app\outputs\flutter-apk\app-release.apk"
 $versionJson = Join-Path $root "release\futa-version.json"
 $repo = "fffuttta-design/finance-apps"
 
@@ -66,9 +68,9 @@ if ([string]::IsNullOrWhiteSpace($ReleaseNotes)) {
 }
 
 # === 2. APKビルド ===
-Write-Host "[1/5] APKビルド..." -ForegroundColor Yellow
+Write-Host "[1/5] APKビルド (release)..." -ForegroundColor Yellow
 Set-Location $appDir
-flutter build apk --debug
+flutter build apk --release
 if ($LASTEXITCODE -ne 0) {
   Set-Location $root
   Write-Error "ビルド失敗"

@@ -5,8 +5,15 @@ import 'package:finance_core/finance_core.dart';
 import '../data/settings_repository.dart';
 import '../data/subscription_repository.dart';
 import '../utils/formatters.dart';
+import '../widgets/brand_logo.dart';
 
-/// サブスク一覧のCRUD画面。月払い/年払いを統一管理。
+/// 並び順モード。
+/// - manual: ユーザーがドラッグで並べた順（永続化される配列の順）
+/// - amountDesc: 月額換算の高い順
+/// - amountAsc: 月額換算の安い順
+enum _SortMode { manual, amountDesc, amountAsc }
+
+/// 固定費一覧のCRUD画面。月払い/年払い・定額/変動を統一管理。
 class SubscriptionListScreen extends StatefulWidget {
   const SubscriptionListScreen({super.key});
 
@@ -19,6 +26,12 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
   final _settings = SettingsRepository();
   SubscriptionConfig? _config;
   PaymentMethodsConfig? _payments;
+
+  /// 並び順モード。デフォルトは手動（永続化された順序）。
+  _SortMode _sortMode = _SortMode.manual;
+
+  /// カテゴリ別グルーピング表示。デフォルトは ON（セクション分け）。
+  bool _groupByCategory = true;
 
   @override
   void initState() {
@@ -65,7 +78,13 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     final billingDayCtrl =
         TextEditingController(text: initial?.billingDay?.toString() ?? '');
     final memoCtrl = TextEditingController(text: initial?.memo ?? '');
+    final iconUrlCtrl =
+        TextEditingController(text: initial?.iconUrl ?? '');
+    final categoryCtrl =
+        TextEditingController(text: initial?.category ?? '');
     SubscriptionCycle cycle = initial?.cycle ?? SubscriptionCycle.monthly;
+    SubscriptionAmountType amountType =
+        initial?.amountType ?? SubscriptionAmountType.fixed;
     DateTime? nextDate = initial?.nextBillingDate;
     String? paymentMethod = initial?.paymentMethod;
 
@@ -117,150 +136,359 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
       if (picked != null) setLocal(() => nextDate = picked);
     }
 
-    return showDialog<Subscription?>(
+    // 編集フォームを BottomSheet で表示する。
+    // - 上端のハンドルでドラッグ可能感を出す
+    // - 高さは画面の92%、内部は SingleChildScrollView でスクロール
+    // - 「キャンセル/保存」は下端に固定（スクロールしても常に見える）
+    return showModalBottomSheet<Subscription?>(
       context: context,
-      builder: (dialogCtx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          title: Text(initial == null ? 'サブスクを追加' : 'サブスクを編集'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                    controller: nameCtrl,
-                    autofocus: true,
-                    decoration: const InputDecoration(
-                        labelText: 'サービス名（必須）',
-                        hintText: '例: ChatGPT, Claude Pro')),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: amountCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '金額 円（必須）'),
-                ),
-                const SizedBox(height: 12),
-                // サイクル切替
-                const Text('請求サイクル',
-                    style: TextStyle(
-                        fontSize: 12, color: Color(0xFF6B7280))),
-                const SizedBox(height: 4),
-                SegmentedButton<SubscriptionCycle>(
-                  segments: const [
-                    ButtonSegment(
-                      value: SubscriptionCycle.monthly,
-                      label: Text('月払い'),
-                      icon: Icon(Icons.calendar_view_month),
-                    ),
-                    ButtonSegment(
-                      value: SubscriptionCycle.annually,
-                      label: Text('年払い'),
-                      icon: Icon(Icons.calendar_today),
-                    ),
-                  ],
-                  selected: {cycle},
-                  onSelectionChanged: (s) =>
-                      setLocal(() => cycle = s.first),
-                ),
-                const SizedBox(height: 12),
-                // サイクルごとの追加フィールド
-                if (cycle == SubscriptionCycle.monthly) ...[
-                  TextField(
-                    controller: billingDayCtrl,
-                    keyboardType: TextInputType.number,
-                    maxLength: 2,
-                    decoration: const InputDecoration(
-                      labelText: '毎月の請求日（1〜31、任意）',
-                      counterText: '',
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          // フォーム入力可否（バリデーション）
+          final isValid = nameCtrl.text.trim().isNotEmpty &&
+              (int.tryParse(amountCtrl.text.trim()) ?? 0) > 0;
+
+          void onSave() {
+            final name = nameCtrl.text.trim();
+            final amount = int.tryParse(amountCtrl.text.trim());
+            if (name.isEmpty || amount == null || amount <= 0) {
+              Navigator.pop(ctx, null);
+              return;
+            }
+            final billingDay = int.tryParse(billingDayCtrl.text.trim());
+            final memo = memoCtrl.text.trim().isEmpty
+                ? null
+                : memoCtrl.text.trim();
+            final iconUrl = iconUrlCtrl.text.trim().isEmpty
+                ? null
+                : iconUrlCtrl.text.trim();
+            final category = categoryCtrl.text.trim().isEmpty
+                ? null
+                : categoryCtrl.text.trim();
+            final result = Subscription(
+              id: initial?.id ?? _genId(),
+              name: name,
+              amount: amount,
+              cycle: cycle,
+              amountType: amountType,
+              billingDay:
+                  cycle == SubscriptionCycle.monthly ? billingDay : null,
+              nextBillingDate:
+                  cycle == SubscriptionCycle.annually ? nextDate : null,
+              paymentMethod: paymentMethod,
+              memo: memo,
+              iconUrl: iconUrl,
+              category: category,
+            );
+            Navigator.pop(ctx, result);
+          }
+
+          return Padding(
+            // キーボード分のpadding（IME表示時にコンテンツが隠れない）
+            padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: FractionallySizedBox(
+              heightFactor: 0.92,
+              child: Column(
+                children: [
+                  // ハンドル（ドラッグ可能感を視覚化）
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD1D5DB),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                ] else ...[
-                  InkWell(
-                    onTap: () => pickAnnualDate(setLocal),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 14),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.calendar_today,
-                              size: 16, color: Color(0xFF6B7280)),
-                          const SizedBox(width: 8),
-                          Text(
-                            nextDate == null
-                                ? '次回請求日を選択'
-                                : '${nextDate!.year}年${nextDate!.month}月${nextDate!.day}日',
-                            style: TextStyle(
-                                fontSize: 14,
-                                color: nextDate == null
-                                    ? const Color(0xFF9CA3AF)
-                                    : const Color(0xFF111827)),
+                  const SizedBox(height: 12),
+                  // タイトル
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            initial == null ? '固定費を追加' : '固定費を編集',
+                            style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF111827)),
                           ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close,
+                              color: Color(0xFF9CA3AF)),
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => Navigator.pop(ctx, null),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                  // スクロール領域
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                              controller: nameCtrl,
+                              autofocus: initial == null,
+                              decoration: const InputDecoration(
+                                  labelText: '名前（必須）',
+                                  hintText: '例: ChatGPT, 電気代',
+                                  floatingLabelBehavior:
+                                      FloatingLabelBehavior.always),
+                              onChanged: (_) => setLocal(() {})),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: amountCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText:
+                                  amountType == SubscriptionAmountType.fixed
+                                      ? '金額 円（必須）'
+                                      : '目安金額 円（必須）',
+                              helperText:
+                                  amountType == SubscriptionAmountType.variable
+                                      ? '実際の請求額は月により変動'
+                                      : null,
+                              floatingLabelBehavior:
+                                  FloatingLabelBehavior.always,
+                            ),
+                            onChanged: (_) => setLocal(() {}),
+                          ),
+                          const SizedBox(height: 16),
+                          // 金額タイプ
+                          const Text('金額タイプ',
+                              style: TextStyle(
+                                  fontSize: 12, color: Color(0xFF6B7280))),
+                          const SizedBox(height: 4),
+                          SegmentedButton<SubscriptionAmountType>(
+                            segments: const [
+                              ButtonSegment(
+                                value: SubscriptionAmountType.fixed,
+                                label: Text('定額'),
+                                icon: Icon(Icons.lock_outline),
+                              ),
+                              ButtonSegment(
+                                value: SubscriptionAmountType.variable,
+                                label: Text('変動'),
+                                icon: Icon(Icons.trending_up),
+                              ),
+                            ],
+                            selected: {amountType},
+                            onSelectionChanged: (s) =>
+                                setLocal(() => amountType = s.first),
+                          ),
+                          const SizedBox(height: 16),
+                          // サイクル切替
+                          const Text('請求サイクル',
+                              style: TextStyle(
+                                  fontSize: 12, color: Color(0xFF6B7280))),
+                          const SizedBox(height: 4),
+                          SegmentedButton<SubscriptionCycle>(
+                            segments: const [
+                              ButtonSegment(
+                                value: SubscriptionCycle.monthly,
+                                label: Text('月払い'),
+                                icon: Icon(Icons.calendar_view_month),
+                              ),
+                              ButtonSegment(
+                                value: SubscriptionCycle.annually,
+                                label: Text('年払い'),
+                                icon: Icon(Icons.calendar_today),
+                              ),
+                            ],
+                            selected: {cycle},
+                            onSelectionChanged: (s) =>
+                                setLocal(() => cycle = s.first),
+                          ),
+                          const SizedBox(height: 16),
+                          // サイクルごとの追加フィールド
+                          if (cycle == SubscriptionCycle.monthly) ...[
+                            TextField(
+                              controller: billingDayCtrl,
+                              keyboardType: TextInputType.number,
+                              maxLength: 2,
+                              decoration: const InputDecoration(
+                                labelText: '毎月の請求日（1〜31、任意）',
+                                counterText: '',
+                                floatingLabelBehavior:
+                                    FloatingLabelBehavior.always,
+                              ),
+                            ),
+                          ] else ...[
+                            InkWell(
+                              onTap: () => pickAnnualDate(setLocal),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 14),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                      color: const Color(0xFFE5E7EB)),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.calendar_today,
+                                        size: 16,
+                                        color: Color(0xFF6B7280)),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      nextDate == null
+                                          ? '次回請求日を選択'
+                                          : '${nextDate!.year}年${nextDate!.month}月${nextDate!.day}日',
+                                      style: TextStyle(
+                                          fontSize: 14,
+                                          color: nextDate == null
+                                              ? const Color(0xFF9CA3AF)
+                                              : const Color(0xFF111827)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                          if (_paymentMethods.isNotEmpty)
+                            DropdownButtonFormField<String>(
+                              initialValue: paymentMethod,
+                              decoration: InputDecoration(
+                                labelText: '支払方法（任意）',
+                                floatingLabelBehavior:
+                                    FloatingLabelBehavior.always,
+                                suffixIcon: paymentMethod != null
+                                    ? IconButton(
+                                        icon: const Icon(Icons.clear,
+                                            size: 18),
+                                        visualDensity:
+                                            VisualDensity.compact,
+                                        tooltip: '支払方法をクリア',
+                                        onPressed: () => setLocal(
+                                            () => paymentMethod = null),
+                                      )
+                                    : null,
+                              ),
+                              items: _paymentMethods
+                                  .map((p) => DropdownMenuItem(
+                                      value: p, child: Text(p)))
+                                  .toList(),
+                              onChanged: (v) =>
+                                  setLocal(() => paymentMethod = v),
+                            ),
+                          const SizedBox(height: 16),
+                          // カテゴリ（自由入力 + 既存カテゴリのワンタップ補完）
+                          TextField(
+                            controller: categoryCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'カテゴリ（任意）',
+                              hintText: '例: 住居系 / 娯楽系 / 通信',
+                              floatingLabelBehavior:
+                                  FloatingLabelBehavior.always,
+                              helperText: '同じカテゴリ名でまとめてセクション表示されます',
+                            ),
+                            onChanged: (_) => setLocal(() {}),
+                          ),
+                          if (_config != null &&
+                              _config!.categoriesInOrder
+                                  .where((c) =>
+                                      c !=
+                                      SubscriptionConfig
+                                          .uncategorizedKey)
+                                  .isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: _config!.categoriesInOrder
+                                  .where((c) =>
+                                      c !=
+                                      SubscriptionConfig
+                                          .uncategorizedKey)
+                                  .map((c) => ActionChip(
+                                        label: Text(c,
+                                            style: const TextStyle(
+                                                fontSize: 11)),
+                                        visualDensity:
+                                            VisualDensity.compact,
+                                        materialTapTargetSize:
+                                            MaterialTapTargetSize
+                                                .shrinkWrap,
+                                        onPressed: () => setLocal(
+                                            () => categoryCtrl.text = c),
+                                      ))
+                                  .toList(),
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                          _logoUrlField(iconUrlCtrl, '🔁', setLocal),
+                          const SizedBox(height: 12),
+                          TextField(
+                              controller: memoCtrl,
+                              maxLines: 2,
+                              decoration: const InputDecoration(
+                                  labelText: '備考（任意）',
+                                  floatingLabelBehavior:
+                                      FloatingLabelBehavior.always)),
+                          // 下端のフッターに被らないようのpadding
+                          const SizedBox(height: 8),
                         ],
                       ),
                     ),
                   ),
-                ],
-                const SizedBox(height: 12),
-                if (_paymentMethods.isNotEmpty)
-                  DropdownButtonFormField<String>(
-                    initialValue: paymentMethod,
-                    decoration: const InputDecoration(
-                        labelText: '支払方法（任意）'),
-                    items: [
-                      const DropdownMenuItem<String>(
-                          value: null, child: Text('（未指定）')),
-                      ..._paymentMethods.map((p) => DropdownMenuItem(
-                          value: p, child: Text(p))),
-                    ],
-                    onChanged: (v) => setLocal(() => paymentMethod = v),
+                  // 固定フッター
+                  Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      border: Border(
+                        top: BorderSide(color: Color(0xFFE5E7EB)),
+                      ),
+                    ),
+                    padding:
+                        const EdgeInsets.fromLTRB(20, 10, 20, 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(ctx, null),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 12),
+                            ),
+                            child: const Text('キャンセル'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: FilledButton(
+                            onPressed: isValid ? onSave : null,
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 12),
+                            ),
+                            child: const Text('保存',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w700)),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                const SizedBox(height: 8),
-                TextField(
-                    controller: memoCtrl,
-                    maxLines: 2,
-                    decoration: const InputDecoration(
-                        labelText: '備考（任意）')),
-              ],
+                ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, null),
-                child: const Text('キャンセル')),
-            FilledButton(
-              onPressed: () {
-                final name = nameCtrl.text.trim();
-                final amount = int.tryParse(amountCtrl.text.trim());
-                if (name.isEmpty || amount == null || amount <= 0) {
-                  Navigator.pop(ctx, null);
-                  return;
-                }
-                final billingDay =
-                    int.tryParse(billingDayCtrl.text.trim());
-                final memo =
-                    memoCtrl.text.trim().isEmpty ? null : memoCtrl.text.trim();
-                final result = Subscription(
-                  id: initial?.id ?? _genId(),
-                  name: name,
-                  amount: amount,
-                  cycle: cycle,
-                  billingDay:
-                      cycle == SubscriptionCycle.monthly ? billingDay : null,
-                  nextBillingDate:
-                      cycle == SubscriptionCycle.annually ? nextDate : null,
-                  paymentMethod: paymentMethod,
-                  memo: memo,
-                );
-                Navigator.pop(ctx, result);
-              },
-              child: const Text('保存'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -307,15 +535,60 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     final config = _config;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('サブスク一覧',
+        title: const Text('固定費一覧',
             style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF111827))),
         actions: [
+          // カテゴリ表示ON/OFF
+          IconButton(
+            tooltip: _groupByCategory ? 'カテゴリ表示OFF' : 'カテゴリ表示ON',
+            icon: Icon(
+              _groupByCategory
+                  ? Icons.folder
+                  : Icons.folder_off_outlined,
+              color: const Color(0xFF1A237E),
+            ),
+            onPressed: () =>
+                setState(() => _groupByCategory = !_groupByCategory),
+          ),
+          // 並び順
+          PopupMenuButton<_SortMode>(
+            tooltip: '並び順',
+            icon: const Icon(Icons.sort, color: Color(0xFF1A237E)),
+            initialValue: _sortMode,
+            onSelected: (v) => setState(() => _sortMode = v),
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: _SortMode.manual,
+                child: Row(children: [
+                  Icon(Icons.drag_indicator, size: 18),
+                  SizedBox(width: 8),
+                  Text('手動（ドラッグ並び替え）'),
+                ]),
+              ),
+              PopupMenuItem(
+                value: _SortMode.amountDesc,
+                child: Row(children: [
+                  Icon(Icons.south, size: 18),
+                  SizedBox(width: 8),
+                  Text('月額の高い順'),
+                ]),
+              ),
+              PopupMenuItem(
+                value: _SortMode.amountAsc,
+                child: Row(children: [
+                  Icon(Icons.north, size: 18),
+                  SizedBox(width: 8),
+                  Text('月額の安い順'),
+                ]),
+              ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.add, color: Color(0xFF1A237E)),
-            tooltip: 'サブスクを追加',
+            tooltip: '固定費を追加',
             onPressed: config == null ? null : _add,
           ),
         ],
@@ -329,15 +602,9 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                   Expanded(
                     child: config.subscriptions.isEmpty
                         ? _empty()
-                        : ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: config.subscriptions.length,
-                            itemBuilder: (context, i) {
-                              final s = config.subscriptions[i];
-                              return _tile(
-                                  s, () => _edit(i), () => _delete(i));
-                            },
-                          ),
+                        : (_groupByCategory
+                            ? _categorizedList(config)
+                            : _flatList(config)),
                   ),
                 ],
               ),
@@ -345,22 +612,259 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     );
   }
 
+  /// 月額換算で並び替え（手動モードなら変更しない）。
+  List<Subscription> _applySort(List<Subscription> items) {
+    if (_sortMode == _SortMode.manual) return items;
+    final sorted = [...items];
+    sorted.sort((a, b) {
+      final cmp = a.monthlyEquivalent.compareTo(b.monthlyEquivalent);
+      return _sortMode == _SortMode.amountDesc ? -cmp : cmp;
+    });
+    return sorted;
+  }
+
+  /// カテゴリ別セクション表示。
+  /// - 手動モード: 各セクション内は ReorderableListView でドラッグ並び替え可
+  /// - 月額昇/降順: 各セクション内をソートして表示（並び替え不可）
+  Widget _categorizedList(SubscriptionConfig config) {
+    final categories = config.categoriesInOrder;
+    final grouped = config.groupedByCategory;
+    final isManual = _sortMode == _SortMode.manual;
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: categories.length,
+      itemBuilder: (context, ci) {
+        final category = categories[ci];
+        final rawItems = grouped[category] ?? const <Subscription>[];
+        final items = _applySort(rawItems);
+        final sectionMonthly =
+            items.fold<int>(0, (s, sub) => s + sub.monthlyEquivalent);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _sectionHeader(category, items.length, sectionMonthly),
+              const SizedBox(height: 6),
+              if (isManual)
+                ReorderableListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  buildDefaultDragHandles: false,
+                  itemCount: items.length,
+                  onReorder: (oldIndex, newIndex) =>
+                      _reorderInCategory(category, oldIndex, newIndex),
+                  itemBuilder: (context, i) {
+                    final s = items[i];
+                    return _tile(
+                      key: ValueKey('sub-${s.id}'),
+                      s: s,
+                      dragIndex: i,
+                      draggable: true,
+                      onEdit: () => _editById(s.id),
+                      onDelete: () => _deleteById(s.id),
+                    );
+                  },
+                )
+              else
+                Column(
+                  children: items
+                      .map((s) => _tile(
+                            key: ValueKey('sub-${s.id}'),
+                            s: s,
+                            dragIndex: 0,
+                            draggable: false,
+                            onEdit: () => _editById(s.id),
+                            onDelete: () => _deleteById(s.id),
+                          ))
+                      .toList(),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// カテゴリ無視のフラット表示。
+  Widget _flatList(SubscriptionConfig config) {
+    final items = _applySort(config.subscriptions);
+    final isManual = _sortMode == _SortMode.manual;
+    if (isManual) {
+      return ReorderableListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: items.length,
+        onReorder: _reorderFlat,
+        buildDefaultDragHandles: false,
+        itemBuilder: (context, i) {
+          final s = items[i];
+          return _tile(
+            key: ValueKey('sub-${s.id}'),
+            s: s,
+            dragIndex: i,
+            draggable: true,
+            onEdit: () => _editById(s.id),
+            onDelete: () => _deleteById(s.id),
+          );
+        },
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: items.length,
+      itemBuilder: (context, i) {
+        final s = items[i];
+        return _tile(
+          key: ValueKey('sub-${s.id}'),
+          s: s,
+          dragIndex: 0,
+          draggable: false,
+          onEdit: () => _editById(s.id),
+          onDelete: () => _deleteById(s.id),
+        );
+      },
+    );
+  }
+
+  /// フラット表示時のドラッグ並び替え（subscriptions 配列の順序を直接更新）。
+  void _reorderFlat(int oldIndex, int newIndex) {
+    if (newIndex > oldIndex) newIndex--;
+    final list = [..._config!.subscriptions];
+    final item = list.removeAt(oldIndex);
+    list.insert(newIndex, item);
+    _update(list);
+  }
+
+  Widget _sectionHeader(String category, int count, int monthlyTotal) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      child: Row(
+        children: [
+          Container(
+            width: 3,
+            height: 16,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A237E),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            category,
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF111827)),
+          ),
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 6, vertical: 1),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE0E7FF),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text('$count',
+                style: const TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF1A237E),
+                    fontWeight: FontWeight.w700)),
+          ),
+          const Spacer(),
+          // 月額換算（強調表示）
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              const Text(
+                '月額換算 ',
+                style: TextStyle(
+                    fontSize: 10, color: Color(0xFF9CA3AF)),
+              ),
+              Text(
+                formatYen(monthlyTotal),
+                style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A237E),
+                    fontFamily: 'monospace'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// カテゴリ内の並び替え。subscriptions の全体リストを保ちつつ、
+  /// 該当カテゴリのスライスのみを並び替えて元の位置に戻す。
+  void _reorderInCategory(String category, int oldIndex, int newIndex) {
+    if (newIndex > oldIndex) newIndex--;
+    final all = [..._config!.subscriptions];
+
+    bool matches(Subscription s) {
+      final c = s.category;
+      if (category == SubscriptionConfig.uncategorizedKey) {
+        return c == null || c.isEmpty;
+      }
+      return c == category;
+    }
+
+    // カテゴリ内アイテムを集めて並び替え
+    final categoryItems = all.where(matches).toList();
+    if (oldIndex < 0 ||
+        oldIndex >= categoryItems.length ||
+        newIndex < 0 ||
+        newIndex >= categoryItems.length) {
+      return;
+    }
+    final moved = categoryItems.removeAt(oldIndex);
+    categoryItems.insert(newIndex, moved);
+
+    // all を再構築（カテゴリ位置は維持、カテゴリ内のみ並び替え）
+    int catIdx = 0;
+    final rebuilt = <Subscription>[];
+    for (final s in all) {
+      if (matches(s)) {
+        rebuilt.add(categoryItems[catIdx++]);
+      } else {
+        rebuilt.add(s);
+      }
+    }
+    _update(rebuilt);
+  }
+
+  /// id ベースで編集（カテゴリ別表示時はインデックスがズレるので id で特定）
+  Future<void> _editById(String id) async {
+    final idx =
+        _config!.subscriptions.indexWhere((s) => s.id == id);
+    if (idx < 0) return;
+    await _edit(idx);
+  }
+
+  Future<void> _deleteById(String id) async {
+    final idx =
+        _config!.subscriptions.indexWhere((s) => s.id == id);
+    if (idx < 0) return;
+    await _delete(idx);
+  }
+
+  /// Summary bar:
+  /// - 月額換算（月払い + 年払い÷12）→ 毎月いくらかかってる感覚値
+  /// - 年間総コスト（月払い×12 + 年払い）→ 年でいくら払ってるかの強調指標
   Widget _summaryBar(SubscriptionConfig config) {
     if (config.subscriptions.isEmpty) return const SizedBox.shrink();
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       color: Colors.white,
       child: Row(
         children: [
           Expanded(
               child: _sumBlock(
-                  '月額合計', formatYen(config.monthlyTotal))),
+                  '月額換算', formatYen(config.monthlyEquivalentTotal))),
           Container(
-              width: 1, height: 32, color: const Color(0xFFE5E7EB)),
-          Expanded(
-              child: _sumBlock('年額合計', formatYen(config.annualTotal))),
-          Container(
-              width: 1, height: 32, color: const Color(0xFFE5E7EB)),
+              width: 1, height: 36, color: const Color(0xFFE5E7EB)),
           Expanded(
               child: _sumBlock(
                   '年間総コスト', formatYen(config.totalAnnualCost),
@@ -376,10 +880,10 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
           Text(label,
               style: const TextStyle(
                   fontSize: 10, color: Color(0xFF6B7280))),
-          const SizedBox(height: 2),
+          const SizedBox(height: 3),
           Text(value,
               style: TextStyle(
-                  fontSize: 13,
+                  fontSize: highlight ? 18 : 15,
                   fontWeight: FontWeight.bold,
                   color: highlight
                       ? const Color(0xFFDC2626)
@@ -388,115 +892,239 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
         ],
       );
 
-  Widget _tile(
-      Subscription s, VoidCallback onEdit, VoidCallback onDelete) {
+  /// 固定費tile（コンパクト版）。
+  /// - 左端: ドラッグハンドル（並び替え用、手動モード時のみ表示）
+  /// - ロゴ
+  /// - 中央: 名前 + 請求日（強調）+ サブメタ
+  /// - 右端: 月額/年額 + 換算バッジ
+  /// - タップで編集、長押しメニュー的に削除 (実装は IconButton)
+  Widget _tile({
+    required Key key,
+    required Subscription s,
+    required int dragIndex,
+    required VoidCallback onEdit,
+    required VoidCallback onDelete,
+    bool draggable = true,
+  }) {
     final isMonthly = s.cycle == SubscriptionCycle.monthly;
     final cycleColor =
         isMonthly ? const Color(0xFF1A237E) : const Color(0xFF7C3AED);
+    final variableColor = const Color(0xFFEA580C);
+    final mainLabel = isMonthly ? '月額' : '年額';
+    final mainValue = formatYen(s.amount);
+    final subLabel = isMonthly ? '年換算' : '月換算';
+    final subValue = isMonthly
+        ? formatYen(s.annualEquivalent)
+        : formatYen(s.monthlyEquivalent);
+
+    // 「毎月◯日」「次回 ◯月◯日」の強調テキスト
+    String? scheduleText;
+    if (isMonthly && s.billingDay != null) {
+      scheduleText = '毎月${s.billingDay}日';
+    } else if (!isMonthly && s.nextBillingDate != null) {
+      scheduleText =
+          '次回 ${s.nextBillingDate!.month}/${s.nextBillingDate!.day}';
+    }
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
+      key: key,
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.fromLTRB(4, 8, 10, 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: cycleColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(4),
+      child: InkWell(
+        onTap: onEdit,
+        borderRadius: BorderRadius.circular(10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // ドラッグハンドル（手動モード時のみ表示）
+            if (draggable)
+              ReorderableDragStartListener(
+                index: dragIndex,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 2),
+                  child: Icon(Icons.drag_indicator,
+                      color: Color(0xFFD1D5DB), size: 22),
                 ),
-                child: Text(
-                  s.cycleLabel,
-                  style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: cycleColor),
-                ),
-              ),
+              )
+            else
               const SizedBox(width: 8),
-              Expanded(
-                child: Text(s.name,
+            // ロゴ
+            BrandLogo(
+                iconUrl: s.iconUrl, fallbackEmoji: '🔁', size: 36),
+            const SizedBox(width: 8),
+            // 中央
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(s.name,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: Color(0xFF111827)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 2),
+                  // 請求日（強調）+ バッジ群を1行に
+                  Row(
+                    children: [
+                      if (scheduleText != null) ...[
+                        Icon(
+                          isMonthly
+                              ? Icons.event_repeat
+                              : Icons.event,
+                          size: 13,
+                          color: const Color(0xFF1A237E),
+                        ),
+                        const SizedBox(width: 3),
+                        Text(scheduleText,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF1A237E))),
+                        const SizedBox(width: 6),
+                      ],
+                      // サイクル/タイプ バッジ
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: cycleColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: Text(
+                          s.cycleLabel,
+                          style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: cycleColor),
+                        ),
+                      ),
+                      if (s.isVariable) ...[
+                        const SizedBox(width: 3),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color:
+                                variableColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Text('変動',
+                              style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  color: variableColor)),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (s.paymentMethod != null) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        const Icon(Icons.payment,
+                            size: 10, color: Color(0xFF9CA3AF)),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(s.paymentMethod!,
+                              style: const TextStyle(
+                                  fontSize: 10,
+                                  color: Color(0xFF9CA3AF)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            // 右端: 月額/年額 + 換算
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(mainLabel,
                     style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        color: Color(0xFF111827)),
-                    overflow: TextOverflow.ellipsis),
-              ),
-              Text(
-                formatYen(s.amount),
-                style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Color(0xFF111827)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 12,
-            runSpacing: 2,
-            children: [
-              if (isMonthly && s.billingDay != null)
-                _chip(Icons.event, '毎月${s.billingDay}日'),
-              if (!isMonthly && s.nextBillingDate != null)
-                _chip(Icons.calendar_today,
-                    '次回 ${s.nextBillingDate!.year}/${s.nextBillingDate!.month}/${s.nextBillingDate!.day}'),
-              if (s.paymentMethod != null)
-                _chip(Icons.payment, s.paymentMethod!),
-              if (isMonthly)
-                _chip(Icons.show_chart, '年換算 ${formatYen(s.annualEquivalent)}',
-                    color: const Color(0xFF9CA3AF))
-              else
-                _chip(Icons.show_chart, '月換算 ${formatYen(s.monthlyEquivalent)}',
-                    color: const Color(0xFF9CA3AF)),
-            ],
-          ),
-          if (s.memo != null) ...[
-            const SizedBox(height: 4),
-            Text(s.memo!,
-                style: const TextStyle(
-                    fontSize: 11, color: Color(0xFF9CA3AF))),
+                        fontSize: 9, color: Color(0xFF9CA3AF))),
+                Text(mainValue,
+                    style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: Color(0xFF111827))),
+                const SizedBox(height: 1),
+                Text('$subLabel $subValue',
+                    style: const TextStyle(
+                        fontSize: 10,
+                        color: Color(0xFFB45309),
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.w600)),
+              ],
+            ),
+            const SizedBox(width: 4),
+            // 削除ボタン（編集はカード全体タップ）
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints:
+                  const BoxConstraints(minWidth: 28, minHeight: 28),
+              icon: const Icon(Icons.delete_outline,
+                  size: 18, color: Color(0xFFDC2626)),
+              onPressed: onDelete,
+            ),
           ],
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.edit,
-                    size: 18, color: Color(0xFF6B7280)),
-                onPressed: onEdit,
-              ),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.delete_outline,
-                    size: 18, color: Color(0xFFDC2626)),
-                onPressed: onDelete,
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _chip(IconData icon, String label, {Color? color}) {
-    final c = color ?? const Color(0xFF6B7280);
+  /// ロゴURL入力欄（共通）。
+  Widget _logoUrlField(TextEditingController ctrl, String fallbackEmoji,
+      void Function(VoidCallback fn) setLocal) {
+    void convertDomain() {
+      final input = ctrl.text.trim();
+      if (input.isEmpty) return;
+      if (input.contains('favicon') ||
+          RegExp(r'\.(png|jpg|jpeg|svg|gif|webp|ico)(\?|$)',
+                  caseSensitive: false)
+              .hasMatch(input)) {
+        return;
+      }
+      final url = domainToFaviconUrl(input);
+      if (url != null) setLocal(() => ctrl.text = url);
+    }
+
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 12, color: c),
-        const SizedBox(width: 2),
-        Text(label, style: TextStyle(fontSize: 11, color: c)),
+        Expanded(
+          child: TextField(
+            controller: ctrl,
+            decoration: InputDecoration(
+              labelText: 'ロゴURL or ドメイン（任意）',
+              isDense: true,
+              floatingLabelBehavior: FloatingLabelBehavior.always,
+              suffixIcon: IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.travel_explore, size: 18),
+                tooltip: 'ドメインを favicon URL に変換',
+                onPressed: convertDomain,
+              ),
+            ),
+            onChanged: (_) => setLocal(() {}),
+          ),
+        ),
+        const SizedBox(width: 10),
+        BrandLogo(
+          iconUrl: ctrl.text.trim().isEmpty ? null : ctrl.text.trim(),
+          fallbackEmoji: fallbackEmoji,
+          size: 40,
+        ),
       ],
     );
   }
@@ -508,16 +1136,16 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
             const Icon(Icons.subscriptions,
                 size: 64, color: Color(0xFFD1D5DB)),
             const SizedBox(height: 12),
-            const Text('サブスクが未登録です',
+            const Text('固定費が未登録です',
                 style: TextStyle(fontSize: 14, color: Color(0xFF6B7280))),
             const SizedBox(height: 4),
-            const Text('ChatGPT・Claude Pro・GMOバーチャルオフィスなどを登録',
+            const Text('ChatGPT・電気代・家賃などを登録',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
             const SizedBox(height: 16),
             FilledButton.icon(
               icon: const Icon(Icons.add),
-              label: const Text('サブスクを追加'),
+              label: const Text('固定費を追加'),
               onPressed: _add,
             ),
           ],

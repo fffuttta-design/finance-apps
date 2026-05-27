@@ -5,7 +5,7 @@ import 'package:finance_core/finance_core.dart';
 
 import '../data/settings_repository.dart';
 import '../mock/dashboard_summary.dart';
-import '../utils/category_icons.dart';
+import '../utils/emoji_palette.dart';
 import '../utils/formatters.dart';
 
 /// カテゴリ別の集計グリッド（旧: カテゴリ別熱量）。
@@ -125,7 +125,7 @@ class _CategoryHeatGridState extends State<CategoryHeatGrid> {
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
                 children: [
-                  Icon(iconForKey(major.iconKey),
+                  categoryIconWidget(major.iconKey,
                       size: 18, color: heat.color),
                   const SizedBox(width: 8),
                   Text(heat.emoji, style: const TextStyle(fontSize: 12)),

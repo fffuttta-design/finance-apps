@@ -4,15 +4,20 @@ import 'dart:convert';
 import 'package:finance_core/finance_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_mode.dart';
+
 /// 取引データのローカル永続化（shared_preferences のJSON配列）。
 ///
 /// シングルトン。Dフェーズで Firestore に置き換える前提。
 /// データ変更時は [stream] に通知し、各画面が再読込できるようにする。
+/// AppMode (事業/個人) ごとにキーが分かれ、データは完全分離される。
 class TransactionRepository {
   TransactionRepository._();
   static final instance = TransactionRepository._();
 
-  static const _key = 'futa.transactions';
+  /// 現モード依存のキー。
+  String get _key =>
+      'futa.${AppModeManager.instance.current.keyPrefix}.transactions';
 
   final _controller = StreamController<List<Transaction>>.broadcast();
 

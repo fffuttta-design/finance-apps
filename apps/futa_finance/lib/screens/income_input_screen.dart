@@ -8,7 +8,36 @@ import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 import 'income_master_screen.dart';
 
+/// 収入入力モーダルを表示する。保存成功時は true を返す。
+Future<bool?> showIncomeInputModal(BuildContext context) {
+  return showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (sheetCtx) {
+      return Padding(
+        padding: EdgeInsets.only(
+            bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
+        child: Container(
+          height: MediaQuery.of(sheetCtx).size.height * 0.95,
+          decoration: const BoxDecoration(
+            color: Color(0xFFFAFAFA),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: const IncomeInputScreen(),
+        ),
+      );
+    },
+  );
+}
+
 /// 収入を1件入力する画面（マスタから選択）。
+///
+/// 入金額と入金後残高は双方向同期：
+/// - 入金額編集 → 残高自動更新（現残高 + 入金額）
+/// - 残高編集 → 入金額自動更新（残高 - 現残高）
+/// 保存時は選択銀行の currentBalance を新残高で上書きする。
 class IncomeInputScreen extends StatefulWidget {
   const IncomeInputScreen({super.key});
 
@@ -28,20 +57,34 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
   String? _receiveAccount;
   final _descCtrl = TextEditingController();
   final _amountCtrl = TextEditingController();
+  final _balanceAfterCtrl = TextEditingController();
   final _memoCtrl = TextEditingController();
+  final _amountFocus = FocusNode();
+  final _balanceFocus = FocusNode();
   bool _saving = false;
+
+  /// 選択中の銀行口座の現在残高。
+  int _currentBalance = 0;
+
+  /// 双方向同期の再帰呼び出し防止フラグ。
+  bool _syncing = false;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _amountCtrl.addListener(_syncBalanceFromAmount);
+    _balanceAfterCtrl.addListener(_syncAmountFromBalance);
   }
 
   @override
   void dispose() {
     _descCtrl.dispose();
     _amountCtrl.dispose();
+    _balanceAfterCtrl.dispose();
     _memoCtrl.dispose();
+    _amountFocus.dispose();
+    _balanceFocus.dispose();
     super.dispose();
   }
 
@@ -65,6 +108,51 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
         }
       }
     });
+  }
+
+  void _onReceiveAccountChanged(String? name) {
+    setState(() => _receiveAccount = name);
+    if (name == null) {
+      _currentBalance = 0;
+      _balanceAfterCtrl.text = '';
+      return;
+    }
+    final bank = _payments?.bankAccounts.firstWhere(
+      (b) => b.name == name,
+      orElse: () => const core.RegisteredBankAccount(id: '', name: ''),
+    );
+    setState(() {
+      _currentBalance = bank?.displayBalance ?? 0;
+    });
+    // 既に入金額が入ってればそれを反映、空なら現残高そのまま
+    final amount = int.tryParse(_amountCtrl.text) ?? 0;
+    _syncing = true;
+    _balanceAfterCtrl.text = (_currentBalance + amount).toString();
+    _syncing = false;
+  }
+
+  void _syncBalanceFromAmount() {
+    if (_syncing) return;
+    if (!_amountFocus.hasFocus) return;
+    final amount = int.tryParse(_amountCtrl.text) ?? 0;
+    final newBalance = (_currentBalance + amount).toString();
+    if (_balanceAfterCtrl.text != newBalance) {
+      _syncing = true;
+      _balanceAfterCtrl.text = newBalance;
+      _syncing = false;
+    }
+  }
+
+  void _syncAmountFromBalance() {
+    if (_syncing) return;
+    if (!_balanceFocus.hasFocus) return;
+    final balance = int.tryParse(_balanceAfterCtrl.text) ?? 0;
+    final newAmount = (balance - _currentBalance).toString();
+    if (_amountCtrl.text != newAmount) {
+      _syncing = true;
+      _amountCtrl.text = newAmount;
+      _syncing = false;
+    }
   }
 
   Future<void> _pickDate() async {
@@ -136,13 +224,13 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       );
       return;
     }
+    final balanceAfter = int.tryParse(_balanceAfterCtrl.text.trim());
 
     setState(() => _saving = true);
     final tx = core.Transaction(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       date: _date,
       type: core.TransactionType.income,
-      // 収入の category は固定で "収入" + sub に取引先 or マスタ名
       category: core.Category(
         major: '収入',
         sub: _selectedSource!.clientName ?? _selectedSource!.name,
@@ -154,6 +242,19 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       incomeSourceId: _selectedSource!.id,
     );
     await TransactionRepository.instance.add(tx);
+
+    // 銀行口座の currentBalance を更新
+    if (balanceAfter != null && _payments != null) {
+      final updated = _payments!.bankAccounts.map((b) {
+        if (b.name == _receiveAccount) {
+          return b.copyWith(currentBalance: balanceAfter);
+        }
+        return b;
+      }).toList();
+      await _settings
+          .savePayments(_payments!.copyWith(bankAccounts: updated));
+    }
+
     if (!mounted) return;
     Navigator.pop(context, true);
   }
@@ -251,26 +352,38 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                             .map((b) => DropdownMenuItem(
                                 value: b.name, child: Text(b.name)))
                             .toList(),
-                        onChanged: (v) =>
-                            setState(() => _receiveAccount = v),
+                        onChanged: _onReceiveAccountChanged,
                         decoration: _inputDecoration(hint: '選択してください'),
                       ),
+
+                    if (_receiveAccount != null) ...[
+                      const SizedBox(height: 6),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4),
+                        child: Text(
+                          '現在残高: ${formatYen(_currentBalance)}',
+                          style: const TextStyle(
+                              fontSize: 11, color: Color(0xFF6B7280)),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 16),
 
-                    _label('内容'),
+                    _label('理由・内容'),
                     TextFormField(
                       controller: _descCtrl,
-                      decoration: _inputDecoration(hint: '例: 5月分顧問料'),
+                      decoration: _inputDecoration(),
                       validator: (v) =>
                           (v == null || v.trim().isEmpty) ? '入力してください' : null,
                     ),
                     const SizedBox(height: 16),
 
-                    _label('金額（円）'),
+                    _label('入金額（円）'),
                     TextFormField(
                       controller: _amountCtrl,
+                      focusNode: _amountFocus,
                       keyboardType: TextInputType.number,
-                      decoration: _inputDecoration(hint: '例: 100000'),
+                      decoration: _inputDecoration(),
                       style: const TextStyle(
                           fontFamily: 'monospace', fontSize: 16),
                       validator: (v) {
@@ -281,11 +394,28 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                     ),
                     const SizedBox(height: 16),
 
+                    _label('入金後の残高（円）— 自動計算・編集可'),
+                    TextFormField(
+                      controller: _balanceAfterCtrl,
+                      focusNode: _balanceFocus,
+                      keyboardType: TextInputType.number,
+                      decoration: _inputDecoration().copyWith(
+                        prefixIcon: const Icon(Icons.account_balance,
+                            size: 18, color: Color(0xFF16A34A)),
+                      ),
+                      style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 16,
+                          color: Color(0xFF16A34A),
+                          fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+
                     _label('備考（任意）'),
                     TextFormField(
                       controller: _memoCtrl,
                       maxLines: 2,
-                      decoration: _inputDecoration(hint: ''),
+                      decoration: _inputDecoration(),
                     ),
                     const SizedBox(height: 32),
 

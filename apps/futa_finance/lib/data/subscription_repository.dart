@@ -1,12 +1,16 @@
 import 'package:finance_core/finance_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_mode.dart';
+
 /// サブスクリプション設定のローカル永続化。シングルトン。
+/// AppMode (事業/個人) ごとにキーが分かれる。
 class SubscriptionRepository {
   SubscriptionRepository._();
   static final SubscriptionRepository instance = SubscriptionRepository._();
 
-  static const _key = 'futa.subscriptions';
+  String get _key =>
+      'futa.${AppModeManager.instance.current.keyPrefix}.subscriptions';
 
   Future<SubscriptionConfig> load() async {
     final prefs = await SharedPreferences.getInstance();

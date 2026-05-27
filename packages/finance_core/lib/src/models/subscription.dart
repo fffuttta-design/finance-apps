@@ -9,18 +9,31 @@ enum SubscriptionCycle {
   annually,
 }
 
-/// サブスクリプションの登録情報。
+/// 金額の性質。
+enum SubscriptionAmountType {
+  /// 定額（毎回同じ金額。例: ChatGPT $20/月）
+  fixed,
+
+  /// 変動（月によって金額が変わる。例: 電気代）
+  variable,
+}
+
+/// 固定費(継続課金)の登録情報。
 ///
-/// 月払い/年払いの継続課金を一覧管理し、次回請求日や合計コストを把握する。
+/// 月払い/年払いの継続課金を一覧管理。金額タイプ(定額/変動)で振り分け。
+/// 旧称はサブスクリプションだが、電気代などの変動費も含むため "固定費" として運用。
 class Subscription {
   final String id;
   final String name;
 
-  /// 1回の請求金額（円）。
+  /// 1回の請求金額（円）。変動費の場合は目安額。
   final int amount;
 
   /// 請求サイクル。
   final SubscriptionCycle cycle;
+
+  /// 金額の性質（定額 vs 変動）。デフォルトは fixed。
+  final SubscriptionAmountType amountType;
 
   /// 月払いの場合の請求日（1〜31）。年払いでは未使用。
   final int? billingDay;
@@ -34,20 +47,36 @@ class Subscription {
   /// 備考。
   final String? memo;
 
+  /// ロゴ画像URL（任意）。中部電力/ChatGPT/Netflix等のサービスロゴ。
+  final String? iconUrl;
+
+  /// ユーザー定義カテゴリ（任意。例: "住居系", "娯楽系", "通信"）。
+  /// 一覧画面のセクション分けに使用。null/空欄なら「未分類」扱い。
+  final String? category;
+
   const Subscription({
     required this.id,
     required this.name,
     required this.amount,
     required this.cycle,
+    this.amountType = SubscriptionAmountType.fixed,
     this.billingDay,
     this.nextBillingDate,
     this.paymentMethod,
     this.memo,
+    this.iconUrl,
+    this.category,
   });
 
   /// サイクル表示名。
   String get cycleLabel =>
       cycle == SubscriptionCycle.monthly ? '月払い' : '年払い';
+
+  /// 金額タイプ表示名。
+  String get amountTypeLabel =>
+      amountType == SubscriptionAmountType.fixed ? '定額' : '変動';
+
+  bool get isVariable => amountType == SubscriptionAmountType.variable;
 
   /// 月あたり換算金額（年払いは ÷12）。
   int get monthlyEquivalent =>
@@ -62,10 +91,13 @@ class Subscription {
         'name': name,
         'amount': amount,
         'cycle': cycle.name,
+        'amountType': amountType.name,
         'billingDay': billingDay,
         'nextBillingDate': nextBillingDate?.toIso8601String(),
         'paymentMethod': paymentMethod,
         'memo': memo,
+        'iconUrl': iconUrl,
+        'category': category,
       };
 
   factory Subscription.fromJson(Map<String, dynamic> j) => Subscription(
@@ -76,32 +108,45 @@ class Subscription {
           (c) => c.name == (j['cycle'] as String? ?? 'monthly'),
           orElse: () => SubscriptionCycle.monthly,
         ),
+        amountType: SubscriptionAmountType.values.firstWhere(
+          (t) => t.name == (j['amountType'] as String? ?? 'fixed'),
+          orElse: () => SubscriptionAmountType.fixed,
+        ),
         billingDay: j['billingDay'] as int?,
         nextBillingDate: j['nextBillingDate'] == null
             ? null
             : DateTime.parse(j['nextBillingDate'] as String),
         paymentMethod: j['paymentMethod'] as String?,
         memo: j['memo'] as String?,
+        iconUrl: j['iconUrl'] as String?,
+        category: j['category'] as String?,
       );
 
   Subscription copyWith({
     String? name,
     int? amount,
     SubscriptionCycle? cycle,
+    SubscriptionAmountType? amountType,
     int? billingDay,
     DateTime? nextBillingDate,
     String? paymentMethod,
     String? memo,
+    String? iconUrl,
+    String? category,
+    bool clearCategory = false,
   }) =>
       Subscription(
         id: id,
         name: name ?? this.name,
         amount: amount ?? this.amount,
         cycle: cycle ?? this.cycle,
+        amountType: amountType ?? this.amountType,
         billingDay: billingDay ?? this.billingDay,
         nextBillingDate: nextBillingDate ?? this.nextBillingDate,
         paymentMethod: paymentMethod ?? this.paymentMethod,
         memo: memo ?? this.memo,
+        iconUrl: iconUrl ?? this.iconUrl,
+        category: clearCategory ? null : (category ?? this.category),
       );
 }
 
@@ -127,6 +172,44 @@ class SubscriptionConfig {
   /// 年間総コスト（月払い×12 + 年払い）。
   int get totalAnnualCost => subscriptions.fold(
       0, (sum, s) => sum + s.annualEquivalent);
+
+  /// 月額換算の合計（月払いはそのまま、年払いは ÷12）。
+  int get monthlyEquivalentTotal => subscriptions
+      .fold(0, (sum, s) => sum + s.monthlyEquivalent);
+
+  /// 未分類用のキー（UI内部で使う擬似カテゴリ名）。
+  static const uncategorizedKey = '未分類';
+
+  /// カテゴリの登場順（最初に現れた順）でユニーク化したリスト。
+  /// 「未分類」（category == null）の場合は uncategorizedKey が末尾に追加される。
+  List<String> get categoriesInOrder {
+    final seen = <String>{};
+    final list = <String>[];
+    var hasUncategorized = false;
+    for (final s in subscriptions) {
+      final c = s.category;
+      if (c == null || c.isEmpty) {
+        hasUncategorized = true;
+        continue;
+      }
+      if (seen.add(c)) list.add(c);
+    }
+    if (hasUncategorized) list.add(uncategorizedKey);
+    return list;
+  }
+
+  /// カテゴリ別にグルーピングしたマップ（カテゴリ未指定は uncategorizedKey）。
+  /// 各値の List は subscriptions の元の順序を保つ。
+  Map<String, List<Subscription>> get groupedByCategory {
+    final map = <String, List<Subscription>>{};
+    for (final s in subscriptions) {
+      final key = (s.category == null || s.category!.isEmpty)
+          ? uncategorizedKey
+          : s.category!;
+      map.putIfAbsent(key, () => []).add(s);
+    }
+    return map;
+  }
 
   String toJsonString() => jsonEncode({
         'subscriptions':

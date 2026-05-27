@@ -1,12 +1,16 @@
 import 'package:finance_core/finance_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_mode.dart';
+
 /// 収入マスタのローカル永続化。シングルトン。
+/// AppMode (事業/個人) ごとにキーが分かれる。
 class IncomeSourceRepository {
   IncomeSourceRepository._();
   static final IncomeSourceRepository instance = IncomeSourceRepository._();
 
-  static const _key = 'futa.income_sources';
+  String get _key =>
+      'futa.${AppModeManager.instance.current.keyPrefix}.income_sources';
 
   Future<IncomeSourceConfig> load() async {
     final prefs = await SharedPreferences.getInstance();

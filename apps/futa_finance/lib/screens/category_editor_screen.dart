@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart';
 
 import '../data/settings_repository.dart';
-import '../utils/category_icons.dart';
-import '../widgets/icon_picker_dialog.dart';
+import '../utils/emoji_palette.dart';
+import '../widgets/emoji_picker_dialog.dart';
 import 'category_sub_editor_screen.dart';
 
 /// 大カテゴリのCRUD + アイコン設定画面。
@@ -124,10 +124,11 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
 
   Future<void> _pickIcon(int index) async {
     final current = _config!.majors[index].iconKey;
-    final newKey = await showIconPickerDialog(context, currentKey: current);
-    if (newKey == null) return;
+    final newEmoji =
+        await showEmojiPickerDialog(context, currentEmoji: current);
+    if (newEmoji == null) return;
     final list = [..._config!.majors];
-    list[index] = list[index].copyWith(iconKey: newKey);
+    list[index] = list[index].copyWith(iconKey: newEmoji);
     _update(list);
   }
 
@@ -203,8 +204,8 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
                                   color: const Color(0xFFE0E7FF),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: Icon(
-                                  iconForKey(major.iconKey),
+                                child: categoryIconWidget(
+                                  major.iconKey,
                                   color: const Color(0xFF1A237E),
                                   size: 22,
                                 ),

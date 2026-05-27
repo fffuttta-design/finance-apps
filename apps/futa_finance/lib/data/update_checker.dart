@@ -26,10 +26,15 @@ class UpdateCheckResult {
     this.fetchFailed = false,
   });
 
-  String get currentFull => '$currentVersion+$currentBuildNumber';
-  String get latestFull => latestVersion == null
-      ? '取得失敗'
-      : '$latestVersion${latestBuildNumber != null ? "+$latestBuildNumber" : ""}';
+  /// ユーザー表示用：「v1.0.38」のような短い表記（build 番号は隠す）。
+  /// 内部判定や互換性のため [currentVersion]+[currentBuildNumber] は別途参照可。
+  String get currentFull => 'v$currentVersion';
+  String get latestFull =>
+      latestVersion == null ? '取得失敗' : 'v$latestVersion';
+
+  /// 詳細表示用：build 番号込み（設定画面の「アプリ情報」等で使用）。
+  String get currentDetailed =>
+      'v$currentVersion (build $currentBuildNumber)';
 }
 
 /// アプリのバージョン自動チェック。
