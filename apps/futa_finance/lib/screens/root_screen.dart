@@ -10,6 +10,7 @@ import '../data/update_checker.dart';
 import '../data/update_installer.dart';
 import 'asset_screen.dart';
 import 'cards_screen.dart';
+import 'dev_lab_screen.dart';
 import 'expense_input_screen.dart';
 import 'expenses_screen.dart';
 import 'home_screen.dart';
@@ -36,7 +37,8 @@ class _RootScreenState extends State<RootScreen> {
 
   // インデックス対応:
   //   0=Home, 1=Expenses, 2=Income, 3=Report, 4=Settings,
-  //   5=TableView (Web専用), 6=Asset, 7=Cards (Web専用)
+  //   5=TableView (旧Web専用, 現在は集計内に統合), 6=Asset, 7=Cards (Web専用)
+  //   8=DevLab (🧪 事業モード専用の開発中タブ)
   // ※ 既存インデックスへの影響を避けるため新タブは末尾に追加。
   //   モバイルナビとサイドナビの表示順は別途マッピング。
   static const _tabs = <Widget>[
@@ -48,6 +50,7 @@ class _RootScreenState extends State<RootScreen> {
     TableViewScreen(),
     AssetScreen(),
     CardsScreen(),
+    DevLabScreen(),
   ];
 
   /// モバイル下タブの表示順 → _tabs インデックスのマッピング。
@@ -658,6 +661,12 @@ class _SideNavState extends State<_SideNav> {
                   // テーブルビューは「集計」→「テーブル」モード内に統合。
                   _navItem(4, Icons.settings_outlined, Icons.settings,
                       '設定'),
+                  // 🧪 開発中ラボ（事業モードのみ表示）。
+                  // PL/BS のプロトタイプ・予算管理の Phase 構成を並べる場所。
+                  if (AppModeManager.instance.current == AppMode.business)
+                    _navItem(8, Icons.science_outlined, Icons.science,
+                        '🧪 開発中',
+                        selectedColor: const Color(0xFFEA580C)),
                 ],
               ),
             ),
