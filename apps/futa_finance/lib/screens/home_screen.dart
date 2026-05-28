@@ -10,6 +10,7 @@ import '../data/monthly_snapshot_repository.dart';
 import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
+import '../data/ui_preferences.dart';
 import '../utils/formatters.dart';
 import '../widgets/brand_logo.dart';
 import 'account_detail_screen.dart';
@@ -53,13 +54,20 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
     });
     // ウォレット編集や通帳画面で payments が更新された時に再ロード
     PaymentsChangeNotifier.instance.addListener(_load);
+    // 「残高0を隠す」設定の変更で再描画
+    UiPreferences.instance.addListener(_onUiPrefsChanged);
   }
 
   @override
   void dispose() {
     _sub?.cancel();
     PaymentsChangeNotifier.instance.removeListener(_load);
+    UiPreferences.instance.removeListener(_onUiPrefsChanged);
     super.dispose();
+  }
+
+  void _onUiPrefsChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _load() async {
@@ -587,13 +595,16 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
   // ===================== Section: 残高 =====================
 
   Widget _balanceSummary() {
-    final banks = _payments.bankAccounts;
+    final allBanks = _payments.bankAccounts;
     final today = DateTime.now();
+    final hideZero = UiPreferences.instance.hideZeroBalance;
 
     // 銀行/現金/電子マネーの現在残高 = startingBalance + 全期間の取引集計（入金 - 出金）
     // ユーザーは startingBalance だけ手動入力し、以降は取引から自動増減。
     // 振替(transfer)は from を減、to を増として残高に反映。
-    final bankNameSet = banks.map((b) => b.name).toSet();
+    // 注: bankNameSet は集計用なので「全銀行」を対象にする（hideZero フィルタは
+    //     最終的な表示・合計の段階だけに適用、計算ロジック自体は素通し）。
+    final bankNameSet = allBanks.map((b) => b.name).toSet();
     final bankDelta = <String, int>{};
     for (final t in _transactions) {
       if (t.type == TransactionType.transfer) {
@@ -633,9 +644,19 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
     }
 
     // 当月利用が 0 のカードはホーム画面には表示しない（残高表示の混雑回避）。
+    // さらに hideZero=ON なら累積額 0 のカードを「休眠中」として除外。
     final cards = _payments.creditCards
-        .where((c) => (cardUsage[c.name] ?? 0) > 0)
+        .where((c) {
+          final usage = cardUsage[c.name] ?? 0;
+          if (usage <= 0) return false;
+          return true;
+        })
         .toList();
+
+    // 表示対象の銀行: hideZero=ON なら現在残高 0 を除外。
+    final banks = hideZero
+        ? allBanks.where((b) => currentBalanceOf(b) != 0).toList()
+        : allBanks;
 
     final assetTotal =
         banks.fold<int>(0, (s, b) => s + currentBalanceOf(b));

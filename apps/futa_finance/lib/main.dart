@@ -7,6 +7,7 @@ import 'data/app_mode.dart';
 import 'data/auth_service.dart';
 import 'data/data_migration_service.dart';
 import 'data/repository_provider.dart';
+import 'data/ui_preferences.dart';
 import 'firebase_options.dart';
 import 'screens/auth_screen.dart';
 import 'screens/root_screen.dart';
@@ -15,6 +16,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // AppMode (事業/個人) の初期化 + 旧データの移行
   await AppModeManager.instance.init();
+  // UI 表示設定（残高0隠す等）を SharedPreferences から復元
+  await UiPreferences.instance.load();
   // Firebase 初期化（Web/Android 両対応、flutterfire configure 済み前提）
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,

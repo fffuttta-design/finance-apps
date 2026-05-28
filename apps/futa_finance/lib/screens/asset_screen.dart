@@ -7,6 +7,7 @@ import '../data/app_mode.dart';
 import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
+import '../data/ui_preferences.dart';
 import '../utils/formatters.dart';
 import '../widgets/brand_logo.dart';
 import 'account_detail_screen.dart';
@@ -45,13 +46,20 @@ class _AssetScreenState extends State<AssetScreen> with ModeAwareMixin {
     });
     // 通帳画面等で口座情報(startingBalance含む)が更新された時に再ロード
     PaymentsChangeNotifier.instance.addListener(_load);
+    // 「残高0を隠す」設定の変更で再描画
+    UiPreferences.instance.addListener(_onUiPrefsChanged);
   }
 
   @override
   void dispose() {
     _sub?.cancel();
     PaymentsChangeNotifier.instance.removeListener(_load);
+    UiPreferences.instance.removeListener(_onUiPrefsChanged);
     super.dispose();
+  }
+
+  void _onUiPrefsChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _load() async {
@@ -154,8 +162,15 @@ class _AssetScreenState extends State<AssetScreen> with ModeAwareMixin {
         body: Center(child: CircularProgressIndicator()),
       );
     }
-    final accounts = p.bankAccounts;
-    final balances = _currentBalances(accounts);
+    // 計算は全口座でやってから、表示直前に hideZero フィルタを掛ける。
+    final allAccounts = p.bankAccounts;
+    final allBalances = _currentBalances(allAccounts);
+    final hideZero = UiPreferences.instance.hideZeroBalance;
+    final accounts = hideZero
+        ? allAccounts.where((a) => (allBalances[a.name] ?? 0) != 0).toList()
+        : allAccounts;
+    final balances = Map<String, int>.fromEntries(
+        accounts.map((a) => MapEntry(a.name, allBalances[a.name] ?? 0)));
     final total = balances.values.fold<int>(0, (s, v) => s + v);
 
     // 前月末時点の残高で前月比を計算

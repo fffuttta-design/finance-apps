@@ -12,6 +12,7 @@ import '../data/auth_service.dart';
 import '../data/backup_repository.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
+import '../data/ui_preferences.dart';
 import '../data/update_checker.dart';
 import '../data/update_installer.dart';
 import '../mock/mock_data.dart';
@@ -215,6 +216,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     builder: (_) => const ChecklistEditorScreen()),
               ),
             ),
+            const SizedBox(height: 8),
+
+            _section('表示'),
+            _hideZeroBalanceTile(),
+
             const SizedBox(height: 8),
 
             _section('アプリ情報'),
@@ -1206,6 +1212,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
               letterSpacing: 1),
         ),
       );
+
+  /// 「残高0のウォレット/口座/クレカを隠す」スイッチ。
+  /// UiPreferences の変更を listen している各画面が自動でフィルタを再適用する。
+  Widget _hideZeroBalanceTile() {
+    return AnimatedBuilder(
+      animation: UiPreferences.instance,
+      builder: (context, _) {
+        final value = UiPreferences.instance.hideZeroBalance;
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: SwitchListTile(
+            value: value,
+            onChanged: (v) => UiPreferences.instance.setHideZeroBalance(v),
+            secondary: const Icon(Icons.visibility_off,
+                color: Color(0xFF1A237E)),
+            title: const Text('残高0のウォレット/カードを隠す',
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF111827))),
+            subtitle: const Text(
+                'ホーム残高セクションや資産タブで休眠中の項目を非表示にする',
+                style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+          ),
+        );
+      },
+    );
+  }
 
   Widget _tile({
     required IconData icon,

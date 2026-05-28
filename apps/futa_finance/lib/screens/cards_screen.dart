@@ -7,6 +7,7 @@ import '../data/app_mode.dart';
 import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
+import '../data/ui_preferences.dart';
 import '../utils/formatters.dart';
 import '../widgets/brand_logo.dart';
 import 'card_detail_screen.dart';
@@ -41,13 +42,19 @@ class _CardsScreenState extends State<CardsScreen> with ModeAwareMixin {
       setState(() => _transactions = list);
     });
     PaymentsChangeNotifier.instance.addListener(_load);
+    UiPreferences.instance.addListener(_onUiPrefsChanged);
   }
 
   @override
   void dispose() {
     _sub?.cancel();
     PaymentsChangeNotifier.instance.removeListener(_load);
+    UiPreferences.instance.removeListener(_onUiPrefsChanged);
     super.dispose();
+  }
+
+  void _onUiPrefsChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _load() async {
@@ -83,9 +90,18 @@ class _CardsScreenState extends State<CardsScreen> with ModeAwareMixin {
         body: Center(child: CircularProgressIndicator()),
       );
     }
-    final cards = p.creditCards;
-    final usage = _monthlyUsage(cards);
+    // 計算は全カードで実施 → 表示直前に hideZero フィルタ。
+    // 累積額（当月利用 + 過去請求の入力分）が 0 のカードは「休眠中」として除外。
+    final allCards = p.creditCards;
+    final usage = _monthlyUsage(allCards);
     final monthTotal = usage.values.fold<int>(0, (s, v) => s + v);
+    final hideZero = UiPreferences.instance.hideZeroBalance;
+    final cards = hideZero
+        ? allCards.where((c) {
+            final accum = (usage[c.name] ?? 0) + c.displayBalance;
+            return accum != 0;
+          }).toList()
+        : allCards;
 
     return Scaffold(
       appBar: AppBar(

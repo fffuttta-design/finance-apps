@@ -495,6 +495,24 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
 
   /// グラフビュー: 円グラフ + 凡例（カテゴリ別の割合）。
   Widget _chartView(List<MapEntry<String, int>> totals, int total) {
+    // エンゲル係数: 食費合計 ÷ 総支出 ×100。
+    // カテゴリ名に「食」を含む大カテゴリの合計を分子とする
+    // （「食費」「食事」「飲食」「外食」等を網羅）。該当が無ければ null。
+    int foodSum = 0;
+    bool hasFoodCategory = false;
+    for (final e in totals) {
+      final name = e.key.contains('.')
+          ? e.key.substring(e.key.indexOf('.') + 1)
+          : e.key;
+      if (name.contains('食')) {
+        foodSum += e.value;
+        hasFoodCategory = true;
+      }
+    }
+    final engelRatio = (total > 0 && hasFoodCategory)
+        ? foodSum / total * 100
+        : null;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -553,7 +571,51 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+          // エンゲル係数（食費 ÷ 総支出）。
+          // 該当カテゴリが無い月は表示しない。
+          if (engelRatio != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7ED),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFED7AA)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.restaurant,
+                      size: 14, color: Color(0xFFEA580C)),
+                  const SizedBox(width: 6),
+                  const Text('エンゲル係数',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF7C2D12),
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${engelRatio.toStringAsFixed(1)}%',
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFEA580C),
+                        fontFamily: 'monospace'),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '(${formatYen(foodSum)} / ${formatYen(total)})',
+                    style: const TextStyle(
+                        fontSize: 10,
+                        color: Color(0xFF9CA3AF),
+                        fontFamily: 'monospace'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           // 凡例
           ...totals.asMap().entries.map((e) {
             final color = _chartColors[e.key % _chartColors.length];
