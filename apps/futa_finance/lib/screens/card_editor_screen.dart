@@ -53,6 +53,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
     final memoCtrl = TextEditingController(text: initial?.memo ?? '');
     // 引き落とし日は Dropdown 選択。null = 未設定。
     int? selectedPaymentDay = initial?.paymentDay;
+    bool selectedInactive = initial?.inactive ?? false;
 
     // BottomSheet で編集フォーム表示（subscription_list と同じパターン）。
     final result = await showModalBottomSheet<RegisteredCreditCard?>(
@@ -91,6 +92,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                     iconUrl: iconUrl,
                     memo: memo,
                     paymentDay: paymentDay,
+                    inactive: selectedInactive,
                   ));
             } else {
               Navigator.pop(
@@ -104,6 +106,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                     clearMemo: memo == null,
                     paymentDay: paymentDay,
                     clearPaymentDay: paymentDay == null,
+                    inactive: selectedInactive,
                   ));
             }
           }
@@ -203,6 +206,25 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                           ),
                           const SizedBox(height: 12),
                           _logoUrlField(iconUrlCtrl, '💳', setLocal),
+                          const SizedBox(height: 12),
+                          // 未使用フラグ。設定の「未使用を隠す」が ON のとき
+                          // ホーム/資産/クレカタブ から除外される。
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: selectedInactive,
+                            onChanged: (v) =>
+                                setLocal(() => selectedInactive = v),
+                            title: const Text('未使用（休眠中）',
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF111827))),
+                            subtitle: const Text(
+                                '当月利用が偶々 0 のカードと区別するためのフラグ',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF6B7280))),
+                          ),
                           const SizedBox(height: 8),
                         ],
                       ),

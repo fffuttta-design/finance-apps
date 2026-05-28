@@ -90,17 +90,14 @@ class _CardsScreenState extends State<CardsScreen> with ModeAwareMixin {
         body: Center(child: CircularProgressIndicator()),
       );
     }
-    // 計算は全カードで実施 → 表示直前に hideZero フィルタ。
-    // 累積額（当月利用 + 過去請求の入力分）が 0 のカードは「休眠中」として除外。
+    // 計算は全カードで実施 → 表示直前に hideInactive フィルタ。
+    // 「未使用」フラグが立ったカードを除外する（残高 0 でも明示フラグが無ければ表示）。
     final allCards = p.creditCards;
     final usage = _monthlyUsage(allCards);
     final monthTotal = usage.values.fold<int>(0, (s, v) => s + v);
-    final hideZero = UiPreferences.instance.hideZeroBalance;
-    final cards = hideZero
-        ? allCards.where((c) {
-            final accum = (usage[c.name] ?? 0) + c.displayBalance;
-            return accum != 0;
-          }).toList()
+    final hideInactive = UiPreferences.instance.hideInactive;
+    final cards = hideInactive
+        ? allCards.where((c) => !c.inactive).toList()
         : allCards;
 
     return Scaffold(

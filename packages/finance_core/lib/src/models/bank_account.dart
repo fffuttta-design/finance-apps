@@ -75,6 +75,11 @@ class RegisteredBankAccount {
   /// 備考（任意）。「家賃振込専用」「貯蓄用」など、口座の役割を補足する。
   final String? memo;
 
+  /// 未使用フラグ。true=休眠中。
+  /// 残高がたまたま 0 のアクティブ口座と区別するため、明示的に設定する。
+  /// UI 設定で「未使用を隠す」が ON の時に表示から除外される。
+  final bool inactive;
+
   const RegisteredBankAccount({
     required this.id,
     required this.name,
@@ -84,6 +89,7 @@ class RegisteredBankAccount {
     this.accountType = AccountType.bank,
     this.iconUrl,
     this.memo,
+    this.inactive = false,
   });
 
   /// 表示用の現在残高（currentBalance > startingBalance の優先順）。
@@ -98,6 +104,7 @@ class RegisteredBankAccount {
         'accountType': accountType.name,
         'iconUrl': iconUrl,
         'memo': memo,
+        'inactive': inactive,
       };
 
   factory RegisteredBankAccount.fromJson(Map<String, dynamic> j) =>
@@ -113,6 +120,7 @@ class RegisteredBankAccount {
         ),
         iconUrl: j['iconUrl'] as String?,
         memo: j['memo'] as String?,
+        inactive: j['inactive'] as bool? ?? false,
       );
 
   RegisteredBankAccount copyWith({
@@ -123,6 +131,7 @@ class RegisteredBankAccount {
     AccountType? accountType,
     String? iconUrl,
     String? memo,
+    bool? inactive,
     bool clearMemo = false,
   }) =>
       RegisteredBankAccount(
@@ -134,6 +143,7 @@ class RegisteredBankAccount {
         accountType: accountType ?? this.accountType,
         iconUrl: iconUrl ?? this.iconUrl,
         memo: clearMemo ? null : (memo ?? this.memo),
+        inactive: inactive ?? this.inactive,
       );
 }
 
@@ -163,6 +173,10 @@ class RegisteredCreditCard {
   /// 月末締めチェックリスト等で「来月X日に引き落とし」のリマインド用。
   final int? paymentDay;
 
+  /// 未使用フラグ。true=休眠中。
+  /// 当月利用が偶々 0 円のアクティブカードと区別するため明示設定。
+  final bool inactive;
+
   const RegisteredCreditCard({
     required this.id,
     required this.name,
@@ -172,6 +186,7 @@ class RegisteredCreditCard {
     this.iconUrl,
     this.memo,
     this.paymentDay,
+    this.inactive = false,
   });
 
   /// 表示用の累積額（null は 0扱い）。
@@ -186,6 +201,7 @@ class RegisteredCreditCard {
         'iconUrl': iconUrl,
         'memo': memo,
         'paymentDay': paymentDay,
+        'inactive': inactive,
       };
 
   factory RegisteredCreditCard.fromJson(Map<String, dynamic> j) =>
@@ -198,6 +214,7 @@ class RegisteredCreditCard {
         iconUrl: j['iconUrl'] as String?,
         memo: j['memo'] as String?,
         paymentDay: j['paymentDay'] as int?,
+        inactive: j['inactive'] as bool? ?? false,
       );
 
   RegisteredCreditCard copyWith({
@@ -208,6 +225,7 @@ class RegisteredCreditCard {
     String? iconUrl,
     String? memo,
     int? paymentDay,
+    bool? inactive,
     bool clearMemo = false,
     bool clearPaymentDay = false,
   }) =>
@@ -221,6 +239,7 @@ class RegisteredCreditCard {
         memo: clearMemo ? null : (memo ?? this.memo),
         paymentDay:
             clearPaymentDay ? null : (paymentDay ?? this.paymentDay),
+        inactive: inactive ?? this.inactive,
       );
 }
 

@@ -51,6 +51,7 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
     final startingCtrl = TextEditingController(
         text: initial?.startingBalance?.toString() ?? '');
     AccountType selectedType = initial?.accountType ?? AccountType.bank;
+    bool selectedInactive = initial?.inactive ?? false;
     // last4 は UI 入力廃止。既存値があれば保持して破壊しない。
     final initialLast4 = initial?.last4;
 
@@ -95,6 +96,7 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
                     accountType: selectedType,
                     iconUrl: iconUrl,
                     memo: memo,
+                    inactive: selectedInactive,
                   ));
             } else {
               // copyWith は null 渡し時に既存値が残るため、startingBalance を
@@ -110,6 +112,7 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
                     accountType: selectedType,
                     iconUrl: iconUrl,
                     memo: memo,
+                    inactive: selectedInactive,
                   ));
             }
           }
@@ -221,6 +224,25 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
                           const SizedBox(height: 16),
                           _logoUrlField(
                               iconUrlCtrl, selectedType.emoji, setLocal),
+                          const SizedBox(height: 12),
+                          // 未使用フラグ。ON にすると「未使用を隠す」設定下で
+                          // 各画面（ホーム/資産/クレカ）の表示から除外される。
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: selectedInactive,
+                            onChanged: (v) =>
+                                setLocal(() => selectedInactive = v),
+                            title: const Text('未使用（休眠中）',
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF111827))),
+                            subtitle: const Text(
+                                '残高 0 のアクティブ口座と区別するためのフラグ',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF6B7280))),
+                          ),
                           const SizedBox(height: 8),
                         ],
                       ),

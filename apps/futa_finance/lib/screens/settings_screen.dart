@@ -219,7 +219,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 8),
 
             _section('表示'),
-            _hideZeroBalanceTile(),
+            _hideInactiveTile(),
 
             const SizedBox(height: 8),
 
@@ -1239,13 +1239,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       );
 
-  /// 「残高0のウォレット/口座/クレカを隠す」スイッチ。
+  /// 「未使用のウォレット/口座/クレカを隠す」スイッチ。
+  /// 各ウォレット/カード編集で「未使用」フラグを立てた項目だけが対象。
   /// UiPreferences の変更を listen している各画面が自動でフィルタを再適用する。
-  Widget _hideZeroBalanceTile() {
+  Widget _hideInactiveTile() {
     return AnimatedBuilder(
       animation: UiPreferences.instance,
       builder: (context, _) {
-        final value = UiPreferences.instance.hideZeroBalance;
+        final value = UiPreferences.instance.hideInactive;
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
           decoration: BoxDecoration(
@@ -1255,16 +1256,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           child: SwitchListTile(
             value: value,
-            onChanged: (v) => UiPreferences.instance.setHideZeroBalance(v),
+            onChanged: (v) => UiPreferences.instance.setHideInactive(v),
             secondary: const Icon(Icons.visibility_off,
                 color: Color(0xFF1A237E)),
-            title: const Text('残高0のウォレット/カードを隠す',
+            title: const Text('未使用のウォレット/カードを隠す',
                 style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF111827))),
             subtitle: const Text(
-                'ホーム残高セクションや資産タブで休眠中の項目を非表示にする',
+                '各ウォレット/クレカ編集で「未使用」フラグを立てた項目を非表示にする',
                 style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
           ),
         );

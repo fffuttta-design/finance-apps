@@ -178,12 +178,12 @@ class _AssetScreenState extends State<AssetScreen> with ModeAwareMixin {
         body: Center(child: CircularProgressIndicator()),
       );
     }
-    // 計算は全口座でやってから、表示直前に hideZero フィルタを掛ける。
+    // 計算は全口座でやってから、表示直前に hideInactive フィルタを掛ける。
     final allAccounts = p.bankAccounts;
     final allBalances = _currentBalances(allAccounts);
-    final hideZero = UiPreferences.instance.hideZeroBalance;
-    final accounts = hideZero
-        ? allAccounts.where((a) => (allBalances[a.name] ?? 0) != 0).toList()
+    final hideInactive = UiPreferences.instance.hideInactive;
+    final accounts = hideInactive
+        ? allAccounts.where((a) => !a.inactive).toList()
         : allAccounts;
     final balances = Map<String, int>.fromEntries(
         accounts.map((a) => MapEntry(a.name, allBalances[a.name] ?? 0)));

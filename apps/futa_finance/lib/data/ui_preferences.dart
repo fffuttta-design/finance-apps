@@ -10,30 +10,45 @@ class UiPreferences extends ChangeNotifier {
   UiPreferences._();
   static final UiPreferences instance = UiPreferences._();
 
-  static const _kHideZeroBalance = 'futa.ui.hide_zero_balance';
+  /// 新キー（v1.0.65〜）: 未使用フラグ ON のものを隠す
+  static const _kHideInactive = 'futa.ui.hide_inactive';
 
-  bool _hideZeroBalance = false;
+  /// 旧キー（〜v1.0.64）: 残高 0 のものを隠す。
+  /// 起動時に値があれば新キーへ引き継いで削除する。
+  static const _kLegacyHideZero = 'futa.ui.hide_zero_balance';
+
+  bool _hideInactive = false;
   bool _loaded = false;
 
-  /// 残高 / 累積額が 0 のウォレット・口座・クレカを表示系画面で隠すか。
+  /// 「未使用」フラグの立っているウォレット・口座・クレカを表示系画面で隠すか。
   /// デフォルトは false（=表示）。
-  bool get hideZeroBalance => _hideZeroBalance;
+  bool get hideInactive => _hideInactive;
   bool get loaded => _loaded;
 
   /// 起動時に一度呼ぶ。多重呼び出しは無害（最初の値を保持）。
+  /// 旧キー（hide_zero_balance）が残っている場合は新キーへマイグレーション。
   Future<void> load() async {
     if (_loaded) return;
     final prefs = await SharedPreferences.getInstance();
-    _hideZeroBalance = prefs.getBool(_kHideZeroBalance) ?? false;
+    // 新キー優先、無ければ旧キーをフォールバック + 移行
+    if (prefs.containsKey(_kHideInactive)) {
+      _hideInactive = prefs.getBool(_kHideInactive) ?? false;
+    } else if (prefs.containsKey(_kLegacyHideZero)) {
+      _hideInactive = prefs.getBool(_kLegacyHideZero) ?? false;
+      await prefs.setBool(_kHideInactive, _hideInactive);
+      await prefs.remove(_kLegacyHideZero);
+    } else {
+      _hideInactive = false;
+    }
     _loaded = true;
     notifyListeners();
   }
 
-  Future<void> setHideZeroBalance(bool v) async {
-    if (_hideZeroBalance == v) return;
-    _hideZeroBalance = v;
+  Future<void> setHideInactive(bool v) async {
+    if (_hideInactive == v) return;
+    _hideInactive = v;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_kHideZeroBalance, v);
+    await prefs.setBool(_kHideInactive, v);
     notifyListeners();
   }
 }

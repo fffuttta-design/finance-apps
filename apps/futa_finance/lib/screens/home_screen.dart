@@ -696,12 +696,12 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
   Widget _balanceSummary() {
     final allBanks = _payments.bankAccounts;
     final today = DateTime.now();
-    final hideZero = UiPreferences.instance.hideZeroBalance;
+    final hideInactive = UiPreferences.instance.hideInactive;
 
     // 銀行/現金/電子マネーの現在残高 = startingBalance + 全期間の取引集計（入金 - 出金）
     // ユーザーは startingBalance だけ手動入力し、以降は取引から自動増減。
     // 振替(transfer)は from を減、to を増として残高に反映。
-    // 注: bankNameSet は集計用なので「全銀行」を対象にする（hideZero フィルタは
+    // 注: bankNameSet は集計用なので「全銀行」を対象にする（hideInactive フィルタは
     //     最終的な表示・合計の段階だけに適用、計算ロジック自体は素通し）。
     final bankNameSet = allBanks.map((b) => b.name).toSet();
     final bankDelta = <String, int>{};
@@ -743,18 +743,19 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
     }
 
     // 当月利用が 0 のカードはホーム画面には表示しない（残高表示の混雑回避）。
-    // さらに hideZero=ON なら累積額 0 のカードを「休眠中」として除外。
+    // さらに hideInactive=ON なら「未使用」フラグが立ったカードも除外。
     final cards = _payments.creditCards
         .where((c) {
+          if (hideInactive && c.inactive) return false;
           final usage = cardUsage[c.name] ?? 0;
           if (usage <= 0) return false;
           return true;
         })
         .toList();
 
-    // 表示対象の銀行: hideZero=ON なら現在残高 0 を除外。
-    final banks = hideZero
-        ? allBanks.where((b) => currentBalanceOf(b) != 0).toList()
+    // 表示対象の銀行: hideInactive=ON なら inactive フラグの立った口座を除外。
+    final banks = hideInactive
+        ? allBanks.where((b) => !b.inactive).toList()
         : allBanks;
 
     final assetTotal =
