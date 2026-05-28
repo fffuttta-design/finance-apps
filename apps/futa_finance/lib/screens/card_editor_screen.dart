@@ -379,14 +379,23 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
     final color = c.brandColorValue == null
         ? const Color(0xFF6B7280)
         : Color(c.brandColorValue!);
+    // 休眠中（inactive）は背景を薄いグレー、文字を薄める。
+    // ただし完全に隠さず、編集導線として一覧には残す。
+    final isInactive = c.inactive;
     return Container(
       key: key,
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isInactive ? const Color(0xFFF3F4F6) : Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
+      foregroundDecoration: isInactive
+          ? BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              color: Colors.white.withValues(alpha: 0.35),
+            )
+          : null,
       // tile 本体タップで CardDetailScreen に遷移。
       // 編集ボタンは別アクション（既存挙動）。
       child: Material(
@@ -435,11 +444,36 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(c.name,
-                      style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF111827))),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(c.name,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF111827))),
+                      ),
+                      if (isInactive) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE5E7EB),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: const Text(
+                            '休眠中',
+                            style: TextStyle(
+                                fontSize: 9,
+                                color: Color(0xFF6B7280),
+                                fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                   // 引き落とし日（任意）。last4 表示はUIから廃止。
                   if (c.paymentDay != null) ...[
                     const SizedBox(height: 2),

@@ -538,14 +538,22 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
       int dragIndex,
       VoidCallback onEdit,
       VoidCallback onDelete) {
+    // 休眠中（inactive）は背景を薄いグレー、文字を薄める。
+    final isInactive = a.inactive;
     return Container(
       key: key,
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isInactive ? const Color(0xFFF3F4F6) : Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
+      foregroundDecoration: isInactive
+          ? BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              color: Colors.white.withValues(alpha: 0.35),
+            )
+          : null,
       // ListTile では title/subtitle 間に固定パディングが入って間延びするため、
       // 独自レイアウト（Padding + Row + Column）で余白を詰める。
       child: Padding(
@@ -573,11 +581,36 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(a.name,
-                      style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF111827))),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(a.name,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF111827))),
+                      ),
+                      if (isInactive) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE5E7EB),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: const Text(
+                            '休眠中',
+                            style: TextStyle(
+                                fontSize: 9,
+                                color: Color(0xFF6B7280),
+                                fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                   if (a.last4 != null) ...[
                     const SizedBox(height: 2),
                     Text(
