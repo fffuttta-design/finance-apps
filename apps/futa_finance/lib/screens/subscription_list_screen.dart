@@ -14,6 +14,10 @@ import '../widgets/centered_body.dart';
 /// - amountAsc: 月額換算の安い順
 enum _SortMode { manual, amountDesc, amountAsc }
 
+/// セクションのグループ化軸。none=フラット表示、byCategory=ユーザーカテゴリ別、
+/// byAmountType=定額/変動別。
+enum _GroupMode { none, byCategory, byAmountType }
+
 /// 固定費一覧のCRUD画面。月払い/年払い・定額/変動を統一管理。
 class SubscriptionListScreen extends StatefulWidget {
   const SubscriptionListScreen({super.key});
@@ -31,8 +35,8 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
   /// 並び順モード。デフォルトは手動（永続化された順序）。
   _SortMode _sortMode = _SortMode.manual;
 
-  /// カテゴリ別グルーピング表示。デフォルトは ON（セクション分け）。
-  bool _groupByCategory = true;
+  /// グループ表示モード。デフォルトはカテゴリ別。
+  _GroupMode _groupMode = _GroupMode.byCategory;
 
   @override
   void initState() {
@@ -542,17 +546,45 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF111827))),
         actions: [
-          // カテゴリ表示ON/OFF
-          IconButton(
-            tooltip: _groupByCategory ? 'カテゴリ表示OFF' : 'カテゴリ表示ON',
+          // グループ表示モード切替（フラット / カテゴリ別 / 定額・変動別）
+          PopupMenuButton<_GroupMode>(
+            tooltip: 'グループ表示',
             icon: Icon(
-              _groupByCategory
-                  ? Icons.folder
-                  : Icons.folder_off_outlined,
+              _groupMode == _GroupMode.none
+                  ? Icons.folder_off_outlined
+                  : _groupMode == _GroupMode.byAmountType
+                      ? Icons.swap_vert
+                      : Icons.folder,
               color: const Color(0xFF1A237E),
             ),
-            onPressed: () =>
-                setState(() => _groupByCategory = !_groupByCategory),
+            initialValue: _groupMode,
+            onSelected: (v) => setState(() => _groupMode = v),
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: _GroupMode.byCategory,
+                child: Row(children: [
+                  Icon(Icons.folder, size: 18),
+                  SizedBox(width: 8),
+                  Text('カテゴリ別'),
+                ]),
+              ),
+              PopupMenuItem(
+                value: _GroupMode.byAmountType,
+                child: Row(children: [
+                  Icon(Icons.swap_vert, size: 18),
+                  SizedBox(width: 8),
+                  Text('定額/変動別'),
+                ]),
+              ),
+              PopupMenuItem(
+                value: _GroupMode.none,
+                child: Row(children: [
+                  Icon(Icons.folder_off_outlined, size: 18),
+                  SizedBox(width: 8),
+                  Text('フラット（分類なし）'),
+                ]),
+              ),
+            ],
           ),
           // 並び順
           PopupMenuButton<_SortMode>(
@@ -604,9 +636,13 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                     Expanded(
                       child: config.subscriptions.isEmpty
                           ? _empty()
-                          : (_groupByCategory
-                              ? _categorizedList(config)
-                              : _flatList(config)),
+                          : switch (_groupMode) {
+                              _GroupMode.byCategory =>
+                                _categorizedList(config),
+                              _GroupMode.byAmountType =>
+                                _byAmountTypeList(config),
+                              _GroupMode.none => _flatList(config),
+                            },
                     ),
                   ],
                 ),
@@ -687,6 +723,165 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
         );
       },
     );
+  }
+
+  /// 定額/変動でセクション分けする表示。
+  /// 変動費は毎月入力が必要なので、まず先に並べて目立たせる。
+  /// 並び替えは「同じ amountType の中だけ」で許可（種別をまたぐ移動は無効）。
+  Widget _byAmountTypeList(SubscriptionConfig config) {
+    final isManual = _sortMode == _SortMode.manual;
+    final variableItems = _applySort(config.subscriptions
+        .where((s) => s.amountType == SubscriptionAmountType.variable)
+        .toList());
+    final fixedItems = _applySort(config.subscriptions
+        .where((s) => s.amountType == SubscriptionAmountType.fixed)
+        .toList());
+
+    Widget section(String label, List<Subscription> items, IconData icon,
+        Color tint) {
+      if (items.isEmpty) return const SizedBox.shrink();
+      final monthlyTotal =
+          items.fold<int>(0, (s, sub) => s + sub.monthlyEquivalent);
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // セクションヘッダー: 種別ラベル + 件数 + 月額合算
+            Container(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+              decoration: BoxDecoration(
+                color: tint.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border(
+                  left: BorderSide(color: tint, width: 4),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(icon, size: 16, color: tint),
+                  const SizedBox(width: 6),
+                  Text(label,
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: tint)),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: tint.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    child: Text('${items.length}',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: tint,
+                            fontWeight: FontWeight.w700)),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '月額換算 ${formatYen(monthlyTotal)}',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111827),
+                        fontFamily: 'monospace'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            // 中身（並び替えはこのセクション内だけ）
+            if (isManual)
+              ReorderableListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                buildDefaultDragHandles: false,
+                itemCount: items.length,
+                onReorder: (oldIndex, newIndex) =>
+                    _reorderInAmountTypeGroup(items, oldIndex, newIndex),
+                itemBuilder: (context, i) {
+                  final s = items[i];
+                  return _tile(
+                    key: ValueKey('sub-${s.id}'),
+                    s: s,
+                    dragIndex: i,
+                    draggable: true,
+                    onEdit: () => _editById(s.id),
+                    onDelete: () => _deleteById(s.id),
+                  );
+                },
+              )
+            else
+              Column(
+                children: items
+                    .map((s) => _tile(
+                          key: ValueKey('sub-${s.id}'),
+                          s: s,
+                          dragIndex: 0,
+                          draggable: false,
+                          onEdit: () => _editById(s.id),
+                          onDelete: () => _deleteById(s.id),
+                        ))
+                    .toList(),
+              ),
+          ],
+        ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // 変動費を上に置く（毎月入力が必要なので注意喚起の意味でも先頭）
+        section('変動費（毎月入力が必要）', variableItems,
+            Icons.swap_vert, const Color(0xFFEA580C)),
+        section('定額費', fixedItems,
+            Icons.lock_clock, const Color(0xFF1A237E)),
+      ],
+    );
+  }
+
+  /// 定額/変動グループ内での並び替え。
+  /// グループをまたぐ移動はしない（同じ amountType 内のみ）。
+  Future<void> _reorderInAmountTypeGroup(
+      List<Subscription> groupItems, int oldIndex, int newIndex) async {
+    if (newIndex > oldIndex) newIndex--;
+    if (oldIndex < 0 ||
+        oldIndex >= groupItems.length ||
+        newIndex < 0 ||
+        newIndex >= groupItems.length) {
+      return;
+    }
+    final movedId = groupItems[oldIndex].id;
+    final beforeId =
+        newIndex == 0 ? null : groupItems[newIndex - 1].id;
+
+    // 全 subscriptions の中で movedId を探し、beforeId の直後に挿入する。
+    final all = List<Subscription>.from(_config!.subscriptions);
+    final movedIdx = all.indexWhere((s) => s.id == movedId);
+    if (movedIdx < 0) return;
+    final moved = all.removeAt(movedIdx);
+    if (beforeId == null) {
+      // グループ内の先頭 = 全リストの中での「同 amountType の最初の位置」
+      final firstSameTypeIdx =
+          all.indexWhere((s) => s.amountType == moved.amountType);
+      if (firstSameTypeIdx < 0) {
+        all.add(moved);
+      } else {
+        all.insert(firstSameTypeIdx, moved);
+      }
+    } else {
+      final beforeIdx = all.indexWhere((s) => s.id == beforeId);
+      if (beforeIdx < 0) {
+        all.add(moved);
+      } else {
+        all.insert(beforeIdx + 1, moved);
+      }
+    }
+    _update(all);
   }
 
   /// カテゴリ無視のフラット表示。
