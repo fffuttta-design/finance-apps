@@ -383,7 +383,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          initiallyExpanded: true,
+          // デフォルトはクローズ状態。タップで展開する運用に。
+          initiallyExpanded: false,
           tilePadding:
               const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
           childrenPadding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
@@ -503,21 +504,29 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
       ),
       child: Column(
         children: [
-          // 円グラフ本体（中央に合計表示）
+          // 円グラフ本体（中央に合計表示 + 外周にラベル線で各カテゴリ表示）。
+          // ラベル線（leader line）方式: セグメント中央から外側に短い線を引き、
+          // 水平に折れた先にカテゴリ名と金額を描く。色だけだと識別しにくい問題を解消。
           SizedBox(
-            width: 240,
-            height: 240,
+            width: 380,
+            height: 300,
             child: Stack(
               alignment: Alignment.center,
               children: [
                 CustomPaint(
-                  size: const Size(240, 240),
+                  size: const Size(380, 300),
                   painter: _DonutChartPainter(
                     values: totals.map((e) => e.value.toDouble()).toList(),
                     colors: List.generate(
                         totals.length,
                         (i) =>
                             _chartColors[i % _chartColors.length]),
+                    labels: totals.map((e) {
+                      final name = e.key.contains('.')
+                          ? e.key.substring(e.key.indexOf('.') + 1)
+                          : e.key;
+                      return '$name ${formatYen(e.value)}';
+                    }).toList(),
                   ),
                 ),
                 Column(
@@ -953,14 +962,30 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
   }
 }
 
-/// ドーナツ型の円グラフを描画する CustomPainter。
-/// [values] の合計を 360° に正規化し、各セグメントを [colors] で塗り分ける。
+/// ドーナツ型の円グラフ + leader line ラベル付き。
+/// [values] の合計を 360° に正規化し、各セグメントを [colors] で塗り分けて、
+/// セグメント中央から外側に短い線を引き、その先に [labels] のテキストを描く。
+/// 色だけだと識別しにくい問題を緩和する。
 class _DonutChartPainter extends CustomPainter {
-  _DonutChartPainter({required this.values, required this.colors})
-      : assert(values.length == colors.length);
+  _DonutChartPainter({
+    required this.values,
+    required this.colors,
+    this.labels = const [],
+  }) : assert(values.length == colors.length);
 
   final List<double> values;
   final List<Color> colors;
+  final List<String> labels;
+
+  /// ドーナツ自体の半径（中心からリング外周まで）。
+  /// SizedBox はラベル領域分の余白を含むため、リング自体は控えめにする。
+  static const double _ringOuterRadius = 100;
+
+  /// リング外側から最初の折れ点までの距離。
+  static const double _elbowOffset = 14;
+
+  /// 折れ点からラベル開始 X までの水平距離。
+  static const double _labelLeadLength = 32;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -968,13 +993,16 @@ class _DonutChartPainter extends CustomPainter {
     if (total <= 0) return;
 
     final center = Offset(size.width / 2, size.height / 2);
-    final outerRadius = math.min(size.width, size.height) / 2;
-    final strokeWidth = outerRadius * 0.32; // ドーナツの太さ
-    final ringRadius = outerRadius - strokeWidth / 2;
+    const outerRadius = _ringOuterRadius;
+    const strokeWidth = outerRadius * 0.32;
+    const ringRadius = outerRadius - strokeWidth / 2;
 
-    double startAngle = -math.pi / 2; // 12時位置から開始
+    // 1) ドーナツのセグメント描画
+    double startAngle = -math.pi / 2;
+    final segmentMidAngles = <double>[];
     for (int i = 0; i < values.length; i++) {
       final sweep = (values[i] / total) * 2 * math.pi;
+      segmentMidAngles.add(startAngle + sweep / 2);
       final paint = Paint()
         ..color = colors[i]
         ..style = PaintingStyle.stroke
@@ -983,15 +1011,113 @@ class _DonutChartPainter extends CustomPainter {
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: ringRadius),
         startAngle,
-        sweep - 0.005, // セグメント間の隙間
+        sweep - 0.005,
         false,
         paint,
       );
       startAngle += sweep;
     }
+
+    // 2) leader line + ラベル
+    if (labels.isEmpty) return;
+    // 左右に振り分けて Y を昇順に並べ、重なり対策の最小間隔を確保する。
+    const minLabelSpacing = 18.0;
+    final rightItems = <_LabelLayoutItem>[];
+    final leftItems = <_LabelLayoutItem>[];
+    for (int i = 0; i < segmentMidAngles.length && i < labels.length; i++) {
+      final a = segmentMidAngles[i];
+      final ringPoint = Offset(
+        center.dx + math.cos(a) * outerRadius,
+        center.dy + math.sin(a) * outerRadius,
+      );
+      final elbow = Offset(
+        center.dx + math.cos(a) * (outerRadius + _elbowOffset),
+        center.dy + math.sin(a) * (outerRadius + _elbowOffset),
+      );
+      final isRight = math.cos(a) >= 0;
+      final item = _LabelLayoutItem(
+        index: i,
+        ringPoint: ringPoint,
+        elbow: elbow,
+        anchorY: elbow.dy,
+        isRight: isRight,
+      );
+      (isRight ? rightItems : leftItems).add(item);
+    }
+    rightItems.sort((a, b) => a.anchorY.compareTo(b.anchorY));
+    leftItems.sort((a, b) => a.anchorY.compareTo(b.anchorY));
+    _resolveOverlaps(rightItems, minLabelSpacing);
+    _resolveOverlaps(leftItems, minLabelSpacing);
+
+    final allItems = [...rightItems, ...leftItems];
+    for (final item in allItems) {
+      final i = item.index;
+      final labelStartX = item.isRight
+          ? item.elbow.dx + _labelLeadLength
+          : item.elbow.dx - _labelLeadLength;
+      final labelY = item.anchorY;
+      final linePaint = Paint()
+        ..color = colors[i]
+        ..strokeWidth = 1.2
+        ..style = PaintingStyle.stroke;
+      // 折れ点位置はY調整後に水平に合わせる
+      final adjustedElbow = Offset(item.elbow.dx, labelY);
+      canvas.drawLine(item.ringPoint, adjustedElbow, linePaint);
+      canvas.drawLine(adjustedElbow, Offset(labelStartX, labelY), linePaint);
+
+      // テキスト
+      final tp = TextPainter(
+        text: TextSpan(
+          text: labels[i],
+          style: const TextStyle(
+            fontSize: 10,
+            color: Color(0xFF111827),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+        ellipsis: '…',
+      );
+      tp.layout(maxWidth: 90);
+      final textOffset = item.isRight
+          ? Offset(labelStartX + 3, labelY - tp.height / 2)
+          : Offset(labelStartX - tp.width - 3, labelY - tp.height / 2);
+      tp.paint(canvas, textOffset);
+    }
+  }
+
+  /// 縦方向にラベルが重なる場合、後続を [minSpacing] ずつ下にずらす。
+  void _resolveOverlaps(List<_LabelLayoutItem> items, double minSpacing) {
+    for (int k = 1; k < items.length; k++) {
+      final prev = items[k - 1];
+      final cur = items[k];
+      if (cur.anchorY - prev.anchorY < minSpacing) {
+        cur.anchorY = prev.anchorY + minSpacing;
+      }
+    }
   }
 
   @override
   bool shouldRepaint(covariant _DonutChartPainter oldDelegate) =>
-      oldDelegate.values != values || oldDelegate.colors != colors;
+      oldDelegate.values != values ||
+      oldDelegate.colors != colors ||
+      oldDelegate.labels != labels;
+}
+
+/// ラベル配置の中間データ。重なり解消用に Y を可変で保持。
+class _LabelLayoutItem {
+  _LabelLayoutItem({
+    required this.index,
+    required this.ringPoint,
+    required this.elbow,
+    required this.anchorY,
+    required this.isRight,
+  });
+
+  final int index;
+  final Offset ringPoint;
+  final Offset elbow;
+  double anchorY;
+  final bool isRight;
 }

@@ -1,8 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:finance_core/finance_core.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,7 +10,6 @@ import '../data/monthly_snapshot_repository.dart';
 import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
-import '../utils/emoji_palette.dart';
 import '../utils/formatters.dart';
 import '../widgets/brand_logo.dart';
 import 'account_detail_screen.dart';
@@ -38,7 +35,6 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
 
   List<Transaction> _transactions = [];
   PaymentMethodsConfig _payments = PaymentMethodsConfig.empty();
-  CategoryConfig _categories = CategoryConfig.businessDefaults();
   MonthlySnapshotConfig _snapshots = MonthlySnapshotConfig.empty();
   bool _loading = true;
 
@@ -69,13 +65,11 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
   Future<void> _load() async {
     final txns = await _txRepo.loadAll();
     final payments = await _settings.loadPayments();
-    final categories = await _settings.loadCategories();
     final snapshots = await _snapshotRepo.load();
     if (!mounted) return;
     setState(() {
       _transactions = txns;
       _payments = payments;
-      _categories = categories;
       _snapshots = snapshots;
       _loading = false;
     });
@@ -303,8 +297,6 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
                   _monthlyFlow(today),
                   const SizedBox(height: 12),
                   _balanceSummary(),
-                  const SizedBox(height: 12),
-                  _expenseBreakdown(today),
                   const SizedBox(height: 24),
                   _footer(),
                 ],
@@ -966,118 +958,6 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
     );
   }
 
-  // ===================== Section: 支出内訳 =====================
-
-  Widget _expenseBreakdown(DateTime today) {
-    final expenses = _monthTxns(today)
-        .where((t) => t.type == TransactionType.expense);
-
-    // 大カテゴリ別合計
-    final totals = <String, int>{};
-    for (final t in expenses) {
-      totals[t.category.major] = (totals[t.category.major] ?? 0) + t.amount;
-    }
-    final total = totals.values.fold<int>(0, (s, v) => s + v);
-    final sorted = totals.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    String iconForMajor(String major) {
-      for (int i = 0; i < _categories.majors.length; i++) {
-        if (_categories.majors[i].displayName(i) == major) {
-          return _categories.majors[i].iconKey ?? '📦';
-        }
-      }
-      return '📦';
-    }
-
-    return _card(
-      icon: Icons.pie_chart,
-      iconColor: const Color(0xFF1A237E),
-      title: '今月の支出内訳',
-      child: total == 0
-          ? const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text('支出記録なし',
-                  style:
-                      TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
-            )
-          : Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('当月支出合計',
-                          style: TextStyle(
-                              fontSize: 12, color: Color(0xFF6B7280))),
-                      Text(
-                        formatYen(-total, withSign: true),
-                        style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFDC2626),
-                            fontFamily: 'monospace'),
-                      ),
-                    ],
-                  ),
-                ),
-                ...sorted.map((e) => _categoryBar(
-                    iconForMajor(e.key), e.key, e.value, total)),
-              ],
-            ),
-    );
-  }
-
-  Widget _categoryBar(String iconKey, String major, int amount, int total) {
-    final ratio = total == 0 ? 0.0 : amount / total;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              categoryIconWidget(iconKey, size: 16),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(major,
-                    style: const TextStyle(
-                        fontSize: 12, color: Color(0xFF111827)),
-                    overflow: TextOverflow.ellipsis),
-              ),
-              Text(formatYen(amount),
-                  style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF111827),
-                      fontFamily: 'monospace',
-                      fontWeight: FontWeight.w600)),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 32,
-                child: Text('${(ratio * 100).toStringAsFixed(0)}%',
-                    textAlign: TextAlign.right,
-                    style: const TextStyle(
-                        fontSize: 10, color: Color(0xFF9CA3AF))),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(2),
-            child: LinearProgressIndicator(
-              value: ratio,
-              minHeight: 4,
-              backgroundColor: const Color(0xFFF3F4F6),
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                  Color(0xFF1A237E)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ===================== 共通 =====================
 
   Widget _card({
@@ -1122,8 +1002,6 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
   }
 
   Widget _footer() {
-    final projectId =
-        kIsWeb ? 'web-dev (Firebase未接続)' : Firebase.app().options.projectId;
     return Column(
       children: [
         // PackageInfo から動的にバージョン取得（ハードコード防止）
@@ -1149,22 +1027,6 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
               ),
             );
           },
-        ),
-        const SizedBox(height: 6),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.cloud_done,
-                size: 12, color: Color(0xFF16A34A)),
-            const SizedBox(width: 4),
-            Text(
-              'Firebase: $projectId',
-              style: const TextStyle(
-                  fontSize: 10,
-                  color: Color(0xFF16A34A),
-                  fontFamily: 'monospace'),
-            ),
-          ],
         ),
       ],
     );

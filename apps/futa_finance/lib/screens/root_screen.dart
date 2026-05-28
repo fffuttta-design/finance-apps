@@ -703,13 +703,8 @@ class _SideNavState extends State<_SideNav> {
                     '収入を記録',
                     const Color(0xFF16A34A),
                   ),
-                  const SizedBox(height: 6),
-                  _recordButton(
-                    _RecordPanelKind.transfer,
-                    Icons.swap_horiz,
-                    '振替を記録',
-                    const Color(0xFFEA580C),
-                  ),
+                  // 振替はサイドバーから外す（明示的に押す頻度が低いため）。
+                  // 振替自体は通帳画面（口座詳細）から引き続き入力可能。
                 ],
               ),
             ),
