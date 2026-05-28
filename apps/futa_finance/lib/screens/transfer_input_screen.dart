@@ -6,14 +6,36 @@ import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 
+/// 振替入力モーダルを表示する。保存成功時は true を返す。
+Future<bool?> showTransferInputModal(BuildContext context) {
+  return showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (sheetCtx) {
+      return Padding(
+        padding: EdgeInsets.only(
+            bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
+        child: Container(
+          height: MediaQuery.of(sheetCtx).size.height * 0.95,
+          decoration: const BoxDecoration(
+            color: Color(0xFFFAFAFA),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: const TransferInputScreen(),
+        ),
+      );
+    },
+  );
+}
+
 /// 振替入力画面（口座間のお金の移動）。
 /// 収支には影響せず、口座残高だけが付け替わる。
 /// 例:
 ///   - GMOあおぞら → 三井住友（事業資金移動）
 ///   - 銀行 → 現金（ATM 引出し）
 ///   - 銀行 → クレジットカード（カード引落）
-///
-/// モバイル: モーダル表示。Web: 右側ドロワーで埋め込み表示。
 class TransferInputScreen extends StatefulWidget {
   const TransferInputScreen({super.key, this.initialFromAccount});
 

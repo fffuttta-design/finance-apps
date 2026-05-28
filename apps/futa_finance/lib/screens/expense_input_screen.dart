@@ -752,27 +752,36 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               ),
               const SizedBox(height: 16),
 
-              _label('通貨'),
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(
-                    value: 'JPY',
-                    label: Text('円'),
-                    icon: Icon(Icons.currency_yen),
-                  ),
-                  ButtonSegment(
-                    value: 'USD',
-                    label: Text('USD'),
-                    icon: Icon(Icons.attach_money),
+              // 通貨は 99% 円なので、デフォルトは「金額（円）」のみ表示。
+              // USD で記録したい時だけ右上の小さなリンクで切り替える。
+              Row(
+                children: [
+                  _label(_currency == 'USD'
+                      ? '概算金額（円）— 集計に使われる値'
+                      : '金額（円）'),
+                  const Spacer(),
+                  InkWell(
+                    onTap: () => setState(() {
+                      _currency = _currency == 'USD' ? 'JPY' : 'USD';
+                    }),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      child: Text(
+                        _currency == 'USD' ? '← 円に戻す' : '\$ USD で記録',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF6B7280),
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
-                selected: {_currency},
-                onSelectionChanged: (s) =>
-                    setState(() => _currency = s.first),
               ),
-              const SizedBox(height: 16),
-
               if (_currency == 'USD') ...[
+                const SizedBox(height: 6),
                 _label('USD金額（\$）'),
                 TextFormField(
                   controller: _usdAmountCtrl,
@@ -790,8 +799,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 ),
                 const SizedBox(height: 16),
                 _label('概算金額（円）— 集計に使われる値'),
-              ] else ...[
-                _label('金額（円）'),
               ],
               TextFormField(
                 controller: _amountCtrl,

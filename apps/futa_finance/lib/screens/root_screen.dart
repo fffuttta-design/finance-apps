@@ -28,14 +28,11 @@ class RootScreen extends StatefulWidget {
   State<RootScreen> createState() => _RootScreenState();
 }
 
-/// 広い画面で開く記録パネルの種類。
+/// サイドバーから起動する記録ダイアログの種類。
 enum _RecordPanelKind { expense, income, transfer }
 
 class _RootScreenState extends State<RootScreen> {
   int _index = 0;
-
-  /// 広い画面で開いている記録パネル。null=閉じている。
-  _RecordPanelKind? _recordPanel;
 
   // インデックス対応:
   //   0=Home, 1=Expenses, 2=Income, 3=Report, 4=Settings,
@@ -379,6 +376,51 @@ class _RootScreenState extends State<RootScreen> {
   /// 画面が広くてもコンテンツが横にダラっと伸びないようにする。
   static const double _wideContentMaxWidth = 1080;
 
+  /// 記録ダイアログ（中央モーダル）を表示する。
+  /// 旧: 右サイドの埋め込みパネル方式。
+  /// 新: 画面中央に固定幅のダイアログ。サイドバーがグレーアウトする
+  ///     現象も中央モーダル化で解消（panel 用 Navigator が無くなったため）。
+  Future<void> _showRecordDialog(_RecordPanelKind kind) async {
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        final screen = MediaQuery.of(ctx).size;
+        final dialogWidth =
+            screen.width < 560 ? screen.width - 24 : 540.0;
+        final dialogHeight = screen.height * 0.9;
+        Widget body;
+        switch (kind) {
+          case _RecordPanelKind.expense:
+            body = const ExpenseInputScreen();
+            break;
+          case _RecordPanelKind.income:
+            body = const IncomeInputScreen();
+            break;
+          case _RecordPanelKind.transfer:
+            body = const TransferInputScreen();
+            break;
+        }
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+          backgroundColor: const Color(0xFFFAFAFA),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: SizedBox(
+            width: dialogWidth,
+            height: dialogHeight,
+            child: body,
+          ),
+        );
+      },
+    );
+    // モーダル閉じた後は各画面が Stream/Notifier で勝手に更新されるはずだが、
+    // 念のため再ビルドして表示を最新化する。
+    if (mounted) setState(() {});
+  }
+
   Widget _buildWideLayout() {
     return Scaffold(
       body: Row(
@@ -386,13 +428,8 @@ class _RootScreenState extends State<RootScreen> {
           _SideNav(
             selectedIndex: _index,
             onDestinationSelected: (i) => setState(() => _index = i),
-            onRecord: (kind) {
-              setState(() {
-                // 同じパネルを押したら閉じる、違う種類なら切替
-                _recordPanel = _recordPanel == kind ? null : kind;
-              });
-            },
-            recordPanelKind: _recordPanel,
+            onRecord: (kind) => _showRecordDialog(kind),
+            recordPanelKind: null, // 中央モーダル化後はサイドバーで選択状態を持たない
           ),
           const VerticalDivider(width: 1, thickness: 1),
           Expanded(
@@ -419,57 +456,7 @@ class _RootScreenState extends State<RootScreen> {
               },
             ),
           ),
-          if (_recordPanel != null) ...[
-            const VerticalDivider(width: 1, thickness: 1),
-            _RecordPanel(
-              kind: _recordPanel!,
-              onClose: () => setState(() => _recordPanel = null),
-            ),
-          ],
         ],
-      ),
-    );
-  }
-}
-
-/// 広い画面用、右側にスライドする記録パネル。
-/// 中身は ExpenseInputScreen / IncomeInputScreen をそのまま埋め込み、
-/// 内部 Navigator の pop（保存完了 or キャンセル）でパネルを閉じる。
-class _RecordPanel extends StatelessWidget {
-  const _RecordPanel({required this.kind, required this.onClose});
-
-  final _RecordPanelKind kind;
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 380,
-      child: Container(
-        color: const Color(0xFFFAFAFA),
-        child: Navigator(
-          onGenerateRoute: (settings) => MaterialPageRoute(
-            settings: const RouteSettings(name: '/record'),
-            builder: (_) {
-              switch (kind) {
-                case _RecordPanelKind.expense:
-                  return const ExpenseInputScreen();
-                case _RecordPanelKind.income:
-                  return const IncomeInputScreen();
-                case _RecordPanelKind.transfer:
-                  return const TransferInputScreen();
-              }
-            },
-          ),
-          // onGenerateRoute と組み合わせる場合は onPopPage を使う必要がある。
-          // ignore: deprecated_member_use
-          onPopPage: (route, result) {
-            // 内側 Navigator が pop した（保存 or AppBar の戻る）
-            // パネルごと閉じる。リストは Stream で自動同期されるので明示更新不要。
-            WidgetsBinding.instance.addPostFrameCallback((_) => onClose());
-            return route.didPop(result);
-          },
-        ),
       ),
     );
   }

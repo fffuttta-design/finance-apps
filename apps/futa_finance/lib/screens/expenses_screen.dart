@@ -20,7 +20,9 @@ class ExpensesScreen extends StatefulWidget {
 }
 
 /// 支出タブの表示モード。
-enum _ExpensesViewMode { list, grouped, row, chart }
+/// 表示モード。並びは UI の並びと合わせて 行→リスト→カテゴリ→グラフ。
+/// 行をデフォルトに（最も情報密度が高く、日々の確認はこのモードが中心）。
+enum _ExpensesViewMode { row, list, grouped, chart }
 
 /// リスト表示時の並び順。
 enum _ExpensesSortMode { dateDesc, amountDesc }
@@ -35,7 +37,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
   List<core.Transaction> _transactions = [];
   core.CategoryConfig? _categoryConfig;
   DateTime _focused = DateTime(DateTime.now().year, DateTime.now().month);
-  _ExpensesViewMode _viewMode = _ExpensesViewMode.list;
+  _ExpensesViewMode _viewMode = _ExpensesViewMode.row;
   _ExpensesSortMode _sortMode = _ExpensesSortMode.dateDesc;
 
   @override
@@ -265,14 +267,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
               child: Row(
                 children: [
                   Expanded(
+                      child: _toggleSeg(_ExpensesViewMode.row, '行',
+                          Icons.table_rows_outlined)),
+                  Expanded(
                       child: _toggleSeg(
                           _ExpensesViewMode.list, 'リスト', Icons.list)),
                   Expanded(
                       child: _toggleSeg(_ExpensesViewMode.grouped, 'カテゴリ',
                           Icons.folder_outlined)),
-                  Expanded(
-                      child: _toggleSeg(_ExpensesViewMode.row, '行',
-                          Icons.table_rows_outlined)),
                   Expanded(
                       child: _toggleSeg(_ExpensesViewMode.chart, 'グラフ',
                           Icons.pie_chart_outline)),
