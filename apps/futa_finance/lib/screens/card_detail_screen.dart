@@ -50,13 +50,32 @@ class _CardDetailScreenState extends State<CardDetailScreen>
       if (!mounted) return;
       setState(() => _all = list);
     });
+    // 他画面で payments が更新された時、このカードの最新値を反映する
+    // （引落日を保存 → 戻る → 再表示で消える問題を防ぐ）
+    PaymentsChangeNotifier.instance.addListener(_refreshCardFromPayments);
   }
 
   @override
   void dispose() {
     _sub?.cancel();
     _tabController.dispose();
+    PaymentsChangeNotifier.instance.removeListener(_refreshCardFromPayments);
     super.dispose();
+  }
+
+  Future<void> _refreshCardFromPayments() async {
+    try {
+      final cfg = await SettingsRepository.instance.loadPayments();
+      core.RegisteredCreditCard? found;
+      for (final c in cfg.creditCards) {
+        if (c.id == widget.card.id) {
+          found = c;
+          break;
+        }
+      }
+      if (found == null || !mounted) return;
+      setState(() => _updatedCard = found);
+    } catch (_) {}
   }
 
   Future<void> _load() async {
@@ -120,6 +139,14 @@ class _CardDetailScreenState extends State<CardDetailScreen>
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_circle,
+                color: Color(0xFFDC2626)),
+            tooltip: '月別請求を追加',
+            onPressed: _showAddBillingDialog,
+          ),
+        ],
       ),
       body: LayoutBuilder(
         builder: (ctx, constraints) {
@@ -617,6 +644,159 @@ class _CardDetailScreenState extends State<CardDetailScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('保存に失敗しました: $e')),
+      );
+    }
+  }
+
+  // ─── 月別請求の追加ダイアログ（過去請求を一括入力するため） ──
+  Future<void> _showAddBillingDialog() async {
+    final now = DateTime.now();
+    int year = now.year;
+    int month = now.month;
+    final amountCtrl = TextEditingController();
+    final memoCtrl =
+        TextEditingController(text: '$month月のオリコ請求まとめ');
+    bool confirmed = false;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setLocal) {
+        return AlertDialog(
+          title: const Text('月別請求を追加',
+              style: TextStyle(fontWeight: FontWeight.w700)),
+          content: SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 年月
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        initialValue: year,
+                        decoration: const InputDecoration(
+                          labelText: '年',
+                          floatingLabelBehavior:
+                              FloatingLabelBehavior.always,
+                        ),
+                        items: [
+                          for (var y = now.year - 5;
+                              y <= now.year + 1;
+                              y++)
+                            DropdownMenuItem(value: y, child: Text('$y')),
+                        ],
+                        onChanged: (v) {
+                          if (v != null) setLocal(() => year = v);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        initialValue: month,
+                        decoration: const InputDecoration(
+                          labelText: '月',
+                          floatingLabelBehavior:
+                              FloatingLabelBehavior.always,
+                        ),
+                        items: [
+                          for (var m = 1; m <= 12; m++)
+                            DropdownMenuItem(value: m, child: Text('$m月')),
+                        ],
+                        onChanged: (v) {
+                          if (v != null) {
+                            setLocal(() {
+                              month = v;
+                              // メモも月変更で自動更新（ユーザーが変えてなければ）
+                              memoCtrl.text =
+                                  '$month月の${_card.name}請求まとめ';
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: amountCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '請求金額（円）',
+                    prefixText: '¥ ',
+                    floatingLabelBehavior: FloatingLabelBehavior.always,
+                  ),
+                  autofocus: true,
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: memoCtrl,
+                  decoration: const InputDecoration(
+                    labelText: '摘要',
+                    floatingLabelBehavior: FloatingLabelBehavior.always,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '※ 1取引として登録します。月末日付・カテゴリは「特別出費/高額投資」固定',
+                  style:
+                      TextStyle(fontSize: 10, color: Color(0xFF9CA3AF)),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('キャンセル')),
+            FilledButton(
+              onPressed: () {
+                confirmed = true;
+                Navigator.pop(ctx);
+              },
+              child: const Text('追加'),
+            ),
+          ],
+        );
+      }),
+    );
+    if (!confirmed) return;
+    final amount = int.tryParse(amountCtrl.text.replaceAll(',', ''));
+    if (amount == null || amount <= 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('金額を正しく入力してください')),
+      );
+      return;
+    }
+    // その月の月末日を計算
+    final lastDay = DateTime(year, month + 1, 0).day;
+    final txn = core.Transaction(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      date: DateTime(year, month, lastDay),
+      type: core.TransactionType.expense,
+      category: const core.Category(
+          major: '9.特別出費', sub: '高額投資'),
+      paymentMethod: _card.name,
+      description: memoCtrl.text.trim().isEmpty
+          ? '$month月の${_card.name}請求'
+          : memoCtrl.text.trim(),
+      amount: amount,
+      memo: '月別請求として一括登録（カード詳細画面から追加）',
+    );
+    try {
+      await TransactionRepository.instance.add(txn);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$year年$month月の請求 ${formatYen(amount)} を追加しました'),
+          backgroundColor: const Color(0xFF16A34A),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('追加に失敗しました: $e')),
       );
     }
   }
