@@ -3,6 +3,7 @@ import 'package:finance_core/finance_core.dart';
 
 import '../data/settings_repository.dart';
 import '../utils/emoji_palette.dart';
+import '../utils/subcategory_icon_suggester.dart';
 import '../widgets/centered_body.dart';
 import '../widgets/emoji_picker_dialog.dart';
 import 'category_sub_editor_screen.dart';
@@ -41,6 +42,29 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
   void _update(List<MajorCategory> newMajors) {
     setState(() => _config = _config!.copyWith(majors: newMajors));
     _save();
+  }
+
+  /// アイコン未設定の小カテゴリに、名前から推測した絵文字を一括付与する。
+  /// 既存のアイコン設定は絶対に上書きしない（ユーザーの選択を尊重）。
+  Future<void> _autoAssignSubIcons() async {
+    final config = _config;
+    if (config == null) return;
+    final (newConfig, applied) =
+        SubcategoryIconSuggester.applyToConfig(config);
+    if (applied == 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('未設定の小カテゴリはありませんでした')),
+      );
+      return;
+    }
+    setState(() => _config = newConfig);
+    await _repo.saveCategories(newConfig);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$applied 件の小カテゴリにアイコンを自動付与しました')),
+    );
   }
 
   Future<String?> _promptText(
@@ -146,6 +170,11 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
               color: Color(0xFF111827)),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.auto_fix_high, color: Color(0xFFEA580C)),
+            tooltip: 'アイコン未設定の小カテゴリに自動推測アイコンを付与',
+            onPressed: config == null ? null : _autoAssignSubIcons,
+          ),
           IconButton(
             icon: const Icon(Icons.add, color: Color(0xFF1A237E)),
             tooltip: '大カテゴリを追加',

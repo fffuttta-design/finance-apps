@@ -543,7 +543,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
                       final name = e.key.contains('.')
                           ? e.key.substring(e.key.indexOf('.') + 1)
                           : e.key;
-                      return '$name ${formatYen(e.value)}';
+                      final pct = total == 0
+                          ? 0.0
+                          : e.value / total * 100;
+                      // ラベルにパーセントも併記（一目で構成比が分かる）。
+                      return '$name ${pct.toStringAsFixed(1)}%';
                     }).toList(),
                   ),
                 ),

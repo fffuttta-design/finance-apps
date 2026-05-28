@@ -546,18 +546,30 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
                   : '- 当月支出',
               formatYen(-expense, withSign: true),
               const Color(0xFFDC2626)),
-          const SizedBox(height: 6),
-          // 差引（黒字/赤字バッジ付き）
+          const SizedBox(height: 10),
+          // ── 差引（主役）────────────────────────────────
+          // この月の収支が黒字 / 赤字かを一番大きく見せる。
+          // ホームを開いた瞬間に「今月の調子」が読み取れるようにする。
           Builder(builder: (_) {
             final net = income - expense;
             final isBlack = net >= 0;
             final color = isBlack
                 ? const Color(0xFF16A34A)
                 : const Color(0xFFDC2626);
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
+            final bgColor = isBlack
+                ? const Color(0xFFDCFCE7)
+                : const Color(0xFFFEE2E2);
+            return Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: bgColor.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: color.withValues(alpha: 0.3)),
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Row(
                     children: [
@@ -565,40 +577,34 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
                           isBlack
                               ? Icons.trending_up
                               : Icons.trending_down,
-                          size: 14,
+                          size: 22,
                           color: color),
-                      const SizedBox(width: 4),
-                      Text(
-                        '差引',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: color,
-                            fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: isBlack
-                              ? const Color(0xFFDCFCE7)
-                              : const Color(0xFFFEE2E2),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: Text(
-                          isBlack ? '黒字' : '赤字',
-                          style: TextStyle(
-                              fontSize: 10,
-                              color: color,
-                              fontWeight: FontWeight.w700),
-                        ),
+                      const SizedBox(width: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isBlack ? '黒字' : '赤字',
+                            style: TextStyle(
+                                fontSize: 14,
+                                color: color,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1),
+                          ),
+                          const Text(
+                            '差引（収入 − 支出）',
+                            style: TextStyle(
+                                fontSize: 10,
+                                color: Color(0xFF6B7280)),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                   Text(
                     formatYen(net, withSign: true),
                     style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 28,
                         color: color,
                         fontFamily: 'monospace',
                         fontWeight: FontWeight.bold),
@@ -607,7 +613,7 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
               ),
             );
           }),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Container(height: 1, color: const Color(0xFFE5E7EB)),
           const SizedBox(height: 10),
           Row(
