@@ -43,6 +43,16 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
   MonthlySnapshotConfig _snapshots = MonthlySnapshotConfig.empty();
   bool _loading = true;
 
+  /// ホームで表示する月。デフォルトは今月。月切替バーで前後に動かす。
+  late DateTime _selectedMonth =
+      DateTime(DateTime.now().year, DateTime.now().month);
+
+  /// 月初残高の内訳展開フラグ。
+  bool _initialBreakdownExpanded = false;
+
+  /// 経費内訳の展開フラグ。
+  bool _expenseBreakdownExpanded = false;
+
   @override
   void initState() {
     super.initState();
@@ -395,7 +405,9 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
                 children: [
                   _todayHeader(today),
                   const SizedBox(height: 12),
-                  _monthlyFlow(today),
+                  _monthSwitcher(),
+                  const SizedBox(height: 8),
+                  _monthlyFlow(_selectedMonth),
                   const SizedBox(height: 12),
                   _balanceSummary(),
                   const SizedBox(height: 24),
@@ -403,6 +415,69 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
                 ],
               ),
             ),
+    );
+  }
+
+  // ===================== Section: 月切替 =====================
+
+  /// 月送りバー。「< 2026年5月 >」+ 今月に戻るボタン。
+  Widget _monthSwitcher() {
+    final now = DateTime.now();
+    final isCurrentMonth = _selectedMonth.year == now.year &&
+        _selectedMonth.month == now.month;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left,
+                color: Color(0xFF1A237E)),
+            onPressed: () => setState(() {
+              _selectedMonth = DateTime(
+                  _selectedMonth.year, _selectedMonth.month - 1);
+            }),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() {
+                _selectedMonth = DateTime(now.year, now.month);
+              }),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${_selectedMonth.year}年${_selectedMonth.month}月',
+                      style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF111827)),
+                    ),
+                    if (!isCurrentMonth)
+                      const Text('タップで今月に戻る',
+                          style: TextStyle(
+                              fontSize: 9,
+                              color: Color(0xFF9CA3AF))),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right,
+                color: Color(0xFF1A237E)),
+            onPressed: () => setState(() {
+              _selectedMonth = DateTime(
+                  _selectedMonth.year, _selectedMonth.month + 1);
+            }),
+          ),
+        ],
+      ),
     );
   }
 
@@ -453,9 +528,9 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
 
   // ===================== Section: 月次フロー =====================
 
-  Widget _monthlyFlow(DateTime today) {
-    final snap = _snapshots.forMonth(today.year, today.month);
-    final monthTxns = _monthTxns(today);
+  Widget _monthlyFlow(DateTime month) {
+    final snap = _snapshots.forMonth(month.year, month.month);
+    final monthTxns = _monthTxns(month);
     final income = monthTxns
         .where((t) => t.type == TransactionType.income)
         .fold<int>(0, (s, t) => s + t.amount);
@@ -464,14 +539,37 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
         .fold<int>(0, (s, t) => s + t.amount);
     final initial = snap?.initialBalance ?? 0;
     final projected = initial + income - expense;
-    final actual = _payments.bankAccounts
-        .fold<int>(0, (s, b) => s + (b.displayBalance ?? 0));
+    // 実測残高は「現時点の合計」なので、今月の時だけ意味がある。
+    // 過去月を見ている時は projected の方を「終値」として扱う。
+    final now = DateTime.now();
+    final isCurrentMonth =
+        month.year == now.year && month.month == now.month;
+    final actual = isCurrentMonth
+        ? _payments.bankAccounts
+            .fold<int>(0, (s, b) => s + (b.displayBalance ?? 0))
+        : projected;
     final diff = actual - projected;
+
+    // 経費内訳（ウォレット別）。当月の支出取引を支払方法でグループ化。
+    final expenseByMethod = <String, int>{};
+    for (final t in monthTxns) {
+      if (t.type != TransactionType.expense) continue;
+      expenseByMethod[t.paymentMethod] =
+          (expenseByMethod[t.paymentMethod] ?? 0) + t.amount;
+    }
+    final expenseBreakdown = expenseByMethod.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    // 月初残高の内訳（口座別）= 各口座の現在残高 - 今月分の取引差分。
+    // 過去月を見ている時は計算が複雑になるので、今月のみ内訳表示。
+    final initialBreakdown = isCurrentMonth
+        ? _calculateMonthStartBreakdown(monthTxns)
+        : <String, int>{};
 
     return _card(
       icon: Icons.timeline,
       iconColor: const Color(0xFF1A237E),
-      title: '今月のフロー（${today.month}月）',
+      title: '${month.month}月のフロー',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -494,58 +592,176 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
                           fontSize: 12, color: Color(0xFF92400E)),
                     ),
                   ),
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 8),
+                  if (isCurrentMonth)
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8),
+                      ),
+                      onPressed: _showSnapshotDialog,
+                      child: const Text('記録する'),
                     ),
-                    onPressed: _showSnapshotDialog,
-                    child: const Text('記録する'),
-                  ),
                 ],
               ),
             )
-          else
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '月初残高 (${today.month}/1)',
-                    style: const TextStyle(
-                        fontSize: 12, color: Color(0xFF6B7280)),
-                  ),
+          else ...[
+            // ── 月初残高（主役）────────────────────────────
+            // 大きな数字で表示 + タップで口座別内訳を展開。
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: initialBreakdown.isEmpty
+                  ? null
+                  : () => setState(() => _initialBreakdownExpanded =
+                      !_initialBreakdownExpanded),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 4, vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                '月初残高 (${month.month}/1)',
+                                style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF6B7280)),
+                              ),
+                              if (initialBreakdown.isNotEmpty) ...[
+                                const SizedBox(width: 4),
+                                Icon(
+                                  _initialBreakdownExpanded
+                                      ? Icons.expand_less
+                                      : Icons.expand_more,
+                                  size: 14,
+                                  color: const Color(0xFF9CA3AF),
+                                ),
+                              ],
+                            ],
+                          ),
+                          Text(
+                            formatYen(snap.initialBalance),
+                            style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF111827),
+                                fontFamily: 'monospace'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (isCurrentMonth)
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        iconSize: 16,
+                        icon: const Icon(Icons.edit,
+                            color: Color(0xFF9CA3AF)),
+                        onPressed: _showSnapshotDialog,
+                        tooltip: '月初残高を編集',
+                      ),
+                  ],
                 ),
-                Text(
-                  formatYen(snap.initialBalance),
-                  style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF111827),
-                      fontFamily: 'monospace'),
-                ),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  iconSize: 16,
-                  icon: const Icon(Icons.edit, color: Color(0xFF9CA3AF)),
-                  onPressed: _showSnapshotDialog,
-                  tooltip: '月初残高を編集',
-                ),
-              ],
+              ),
             ),
-          const SizedBox(height: 8),
+            if (_initialBreakdownExpanded &&
+                initialBreakdown.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              ..._breakdownTiles(initialBreakdown),
+              const SizedBox(height: 6),
+            ],
+          ],
+          const SizedBox(height: 6),
           _flowRow(
               AppModeManager.instance.current == AppMode.business
                   ? '+ 当月売上'
                   : '+ 当月収入',
               formatYen(income, withSign: true),
               const Color(0xFF16A34A)),
-          _flowRow(
-              AppModeManager.instance.current == AppMode.business
-                  ? '- 当月経費'
-                  : '- 当月支出',
-              formatYen(-expense, withSign: true),
-              const Color(0xFFDC2626)),
+          // 経費行: タップで内訳展開
+          InkWell(
+            borderRadius: BorderRadius.circular(4),
+            onTap: expenseBreakdown.isEmpty
+                ? null
+                : () => setState(() => _expenseBreakdownExpanded =
+                    !_expenseBreakdownExpanded),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Text(
+                    AppModeManager.instance.current == AppMode.business
+                        ? '- 当月経費'
+                        : '- 当月支出',
+                    style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFFDC2626),
+                        fontWeight: FontWeight.w600),
+                  ),
+                  if (expenseBreakdown.isNotEmpty) ...[
+                    const SizedBox(width: 4),
+                    Icon(
+                      _expenseBreakdownExpanded
+                          ? Icons.expand_less
+                          : Icons.expand_more,
+                      size: 16,
+                      color: const Color(0xFF9CA3AF),
+                    ),
+                  ],
+                  const Spacer(),
+                  Text(
+                    formatYen(-expense, withSign: true),
+                    style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFFDC2626),
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'monospace'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_expenseBreakdownExpanded &&
+              expenseBreakdown.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            ...expenseBreakdown.map((e) => Padding(
+                  padding: const EdgeInsets.only(
+                      left: 12, right: 4, top: 2, bottom: 2),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 4,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDC2626)
+                              .withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(e.key,
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF6B7280)),
+                            overflow: TextOverflow.ellipsis),
+                      ),
+                      Text(
+                        formatYen(-e.value),
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFFDC2626),
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                )),
+            const SizedBox(height: 4),
+          ],
           const SizedBox(height: 10),
           // ── 差引（主役）────────────────────────────────
           // この月の収支が黒字 / 赤字かを一番大きく見せる。
@@ -667,6 +883,85 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
         ],
       ),
     );
+  }
+
+  /// 月初時点の各口座残高を逆算する。
+  /// 現在の displayBalance から「今月の取引差分」を引いた値が月初残高。
+  /// 振替は from を増（戻す）、to を減（戻す）として扱う。
+  Map<String, int> _calculateMonthStartBreakdown(
+      List<Transaction> monthTxns) {
+    final banks = _payments.bankAccounts;
+    final bankNameSet = banks.map((b) => b.name).toSet();
+
+    // 今月の取引差分を口座別に計算
+    final delta = <String, int>{};
+    for (final t in monthTxns) {
+      if (t.type == TransactionType.transfer) {
+        final from = t.transferFromAccount;
+        final to = t.transferToAccount;
+        if (from != null && bankNameSet.contains(from)) {
+          delta[from] = (delta[from] ?? 0) - t.amount;
+        }
+        if (to != null && bankNameSet.contains(to)) {
+          delta[to] = (delta[to] ?? 0) + t.amount;
+        }
+        continue;
+      }
+      if (!bankNameSet.contains(t.paymentMethod)) continue;
+      if (t.type == TransactionType.income) {
+        delta[t.paymentMethod] =
+            (delta[t.paymentMethod] ?? 0) + t.amount;
+      } else {
+        delta[t.paymentMethod] =
+            (delta[t.paymentMethod] ?? 0) - t.amount;
+      }
+    }
+
+    // 月初残高 = 現在残高 - 今月の差分
+    final out = <String, int>{};
+    for (final b in banks) {
+      final current = b.displayBalance ?? 0;
+      out[b.name] = current - (delta[b.name] ?? 0);
+    }
+    return out;
+  }
+
+  /// 内訳一覧を口座別タイルで返す（月初残高内訳の表示用）。
+  List<Widget> _breakdownTiles(Map<String, int> breakdown) {
+    final entries = breakdown.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return entries.map((e) => Padding(
+      padding:
+          const EdgeInsets.only(left: 12, right: 4, top: 2, bottom: 2),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 12,
+            decoration: BoxDecoration(
+              color:
+                  const Color(0xFF1A237E).withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(e.key,
+                style: const TextStyle(
+                    fontSize: 11, color: Color(0xFF6B7280)),
+                overflow: TextOverflow.ellipsis),
+          ),
+          Text(
+            formatYen(e.value),
+            style: const TextStyle(
+                fontSize: 11,
+                color: Color(0xFF111827),
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    )).toList();
   }
 
   Widget _flowRow(String label, String value, Color color) {
