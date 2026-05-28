@@ -112,6 +112,11 @@ class _CardsScreenState extends State<CardsScreen> with ModeAwareMixin {
           children: [
             _totalCard(monthTotal, cards.length),
             const SizedBox(height: 12),
+            // ── 月別請求一覧（全カード合算） ──
+            if (cards.isNotEmpty) ...[
+              _monthlyBillingSection(cards),
+              const SizedBox(height: 12),
+            ],
             if (cards.isEmpty)
               _emptyState()
             else
@@ -276,6 +281,146 @@ class _CardsScreenState extends State<CardsScreen> with ModeAwareMixin {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// 月別請求一覧（全カード合算）。
+  /// 各月のカード合計請求額と、カード毎の内訳サマリーを表示。
+  Widget _monthlyBillingSection(
+      List<core.RegisteredCreditCard> cards) {
+    final cardNameSet = cards.map((c) => c.name).toSet();
+    // yearMonth (e.g. '2026-05') → カード名 → 合計
+    final byMonthCard = <String, Map<String, int>>{};
+    for (final t in _transactions) {
+      if (t.type != core.TransactionType.expense) continue;
+      if (!cardNameSet.contains(t.paymentMethod)) continue;
+      final ym =
+          '${t.date.year}-${t.date.month.toString().padLeft(2, '0')}';
+      final m = byMonthCard.putIfAbsent(ym, () => <String, int>{});
+      m[t.paymentMethod] = (m[t.paymentMethod] ?? 0) + t.amount;
+    }
+    if (byMonthCard.isEmpty) return const SizedBox.shrink();
+    final entries = byMonthCard.entries.toList()
+      ..sort((a, b) => b.key.compareTo(a.key));
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 10),
+            child: Row(
+              children: [
+                Icon(Icons.calendar_month,
+                    color: Color(0xFF1A237E), size: 18),
+                SizedBox(width: 6),
+                Text('月別請求一覧',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111827))),
+                SizedBox(width: 4),
+                Text('（全カード合算）',
+                    style: TextStyle(
+                        fontSize: 10, color: Color(0xFF9CA3AF))),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          for (var i = 0; i < entries.length; i++)
+            _monthRow(entries[i].key, entries[i].value, cards,
+                isLast: i == entries.length - 1),
+        ],
+      ),
+    );
+  }
+
+  Widget _monthRow(String yearMonth, Map<String, int> byCard,
+      List<core.RegisteredCreditCard> cards,
+      {required bool isLast}) {
+    final parts = yearMonth.split('-');
+    final year = int.parse(parts[0]);
+    final month = int.parse(parts[1]);
+    final total = byCard.values.fold<int>(0, (s, v) => s + v);
+    return Container(
+      decoration: BoxDecoration(
+        border: isLast
+            ? null
+            : const Border(
+                bottom: BorderSide(color: Color(0xFFF3F4F6))),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text('$year年$month月',
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111827))),
+              ),
+              Text(formatYen(total),
+                  style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'monospace',
+                      color: Color(0xFFDC2626))),
+            ],
+          ),
+          const SizedBox(height: 4),
+          // カード毎の内訳（金額の大きい順）
+          ...() {
+            final usedCards = cards
+                .where((c) => (byCard[c.name] ?? 0) > 0)
+                .toList()
+              ..sort((a, b) =>
+                  (byCard[b.name] ?? 0).compareTo(byCard[a.name] ?? 0));
+            return usedCards.map((c) {
+              final amount = byCard[c.name] ?? 0;
+              final paymentDay = c.paymentDay;
+              String? billingLabel;
+              if (paymentDay != null) {
+                final billY = month == 12 ? year + 1 : year;
+                final billM = month == 12 ? 1 : month + 1;
+                billingLabel =
+                    '$billY/${billM.toString().padLeft(2, '0')}/${paymentDay.toString().padLeft(2, '0')} 引落';
+              }
+              return Padding(
+                padding: const EdgeInsets.only(top: 3, left: 4),
+                child: Row(
+                  children: [
+                    const Text('• ',
+                        style: TextStyle(
+                            fontSize: 11, color: Color(0xFF9CA3AF))),
+                    Expanded(
+                      child: Text(
+                        billingLabel != null
+                            ? '${c.name}  ·  $billingLabel'
+                            : c.name,
+                        style: const TextStyle(
+                            fontSize: 11, color: Color(0xFF6B7280)),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Text(formatYen(amount),
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF6B7280),
+                            fontFamily: 'monospace')),
+                  ],
+                ),
+              );
+            }).toList();
+          }(),
+        ],
       ),
     );
   }
