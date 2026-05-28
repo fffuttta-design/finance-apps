@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/app_mode.dart';
+import '../data/backup_repository.dart';
 import '../data/monthly_snapshot_repository.dart';
 import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
@@ -44,8 +48,11 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
     super.initState();
     _load().then((_) {
       if (!mounted) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _maybeShowSnapshotReminder();
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await _maybeShowSnapshotReminder();
+        // 月初リマインダーが出てない時のみ、14日バックアップリマインダーを判定。
+        // 同タイミングで2連発ダイアログは出さない。
+        if (mounted) await _maybeShowBackupReminder();
       });
     });
     _sub = _txRepo.stream.listen((list) {
@@ -103,6 +110,92 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
     if (!mounted) return;
     await _showSnapshotDialog(forceCurrentMonth: true);
     await prefs.setBool(shownKey, true);
+  }
+
+  /// 「最後の手動バックアップから14日経過」で起動時に1回リマインドする。
+  /// 一度もバックアップしてない人には出さない（押し付けがましくないように）。
+  Future<void> _maybeShowBackupReminder() async {
+    final state = await BackupRepository.instance.shouldRemindBackup();
+    if (state != BackupReminderState.shouldRemind) return;
+    if (!mounted) return;
+
+    final last = await BackupRepository.instance.lastManualBackupAt();
+    final days =
+        last == null ? 0 : DateTime.now().difference(last).inDays;
+    if (!mounted) return;
+
+    final action = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Row(
+          children: const [
+            Icon(Icons.cloud_upload, color: Color(0xFFEA580C)),
+            SizedBox(width: 8),
+            Text('バックアップしませんか？'),
+          ],
+        ),
+        content: Text(
+          '最後のバックアップから $days 日経ちました。\n'
+          'Drive に書き出して安全に保管しておきましょう。',
+          style: const TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'snooze'),
+            child: const Text('あとで (3日)'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context, 'export'),
+            icon: const Icon(Icons.cloud_upload, size: 18),
+            label: const Text('書き出す'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF16A34A),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (action == 'snooze') {
+      await BackupRepository.instance.snoozeReminder(days: 3);
+    } else if (action == 'export') {
+      if (!mounted) return;
+      // 設定画面のバックアップ書き出しと同じフロー（共有シート）
+      await _runBackupExportFromReminder();
+    }
+  }
+
+  /// リマインダー経由でバックアップ書き出しを実行。
+  /// 設定画面の _exportBackup と同じ処理を最小限で再現。
+  Future<void> _runBackupExportFromReminder() async {
+    try {
+      final json = await BackupRepository.instance.exportAll();
+      final tempDir = await getTemporaryDirectory();
+      final now = DateTime.now();
+      final stamp =
+          '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}'
+          '-${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}';
+      final fileName = 'futa-finance-backup-$stamp.json';
+      final file = File('${tempDir.path}/$fileName');
+      await file.writeAsString(json);
+
+      if (!mounted) return;
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'application/json')],
+          subject: 'FutaFinance バックアップ ($stamp)',
+          text:
+              'FutaFinance のデータバックアップ ($stamp)。\n'
+              '保存先推奨: マイドライブ/ツール開発/FutaFinance/backups/',
+        ),
+      );
+      await BackupRepository.instance.markManualBackupDone();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('書き出しに失敗しました: $e')),
+      );
+    }
   }
 
   /// 月初残高入力ダイアログ。

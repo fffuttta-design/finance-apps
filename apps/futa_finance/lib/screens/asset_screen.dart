@@ -36,6 +36,12 @@ class _AssetScreenState extends State<AssetScreen> with ModeAwareMixin {
   List<core.Transaction> _transactions = [];
   core.PaymentMethodsConfig? _payments;
 
+  /// 「口座別残高」セクションの開閉状態。デフォルトは開いた状態。
+  bool _accountsExpanded = true;
+
+  /// 「入出金履歴」セクションの開閉状態。デフォルトは開いた状態。
+  bool _historyExpanded = true;
+
   @override
   void initState() {
     super.initState();
@@ -306,46 +312,62 @@ class _AssetScreenState extends State<AssetScreen> with ModeAwareMixin {
       ),
       child: Column(
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Row(
-              children: [
-                Icon(Icons.account_balance_wallet,
-                    color: Color(0xFF1A237E), size: 16),
-                SizedBox(width: 6),
-                Text('口座別残高',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF111827))),
-                Spacer(),
-                Icon(Icons.drag_indicator,
-                    color: Color(0xFFD1D5DB), size: 14),
-                SizedBox(width: 4),
-                Text('ドラッグで並び替え',
-                    style: TextStyle(
-                        fontSize: 10, color: Color(0xFF9CA3AF))),
-              ],
+          // ヘッダー（タップで開閉）
+          InkWell(
+            onTap: () =>
+                setState(() => _accountsExpanded = !_accountsExpanded),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.account_balance_wallet,
+                      color: Color(0xFF1A237E), size: 16),
+                  const SizedBox(width: 6),
+                  const Text('口座別残高',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF111827))),
+                  const Spacer(),
+                  if (_accountsExpanded) ...[
+                    const Icon(Icons.drag_indicator,
+                        color: Color(0xFFD1D5DB), size: 14),
+                    const SizedBox(width: 4),
+                    const Text('ドラッグで並び替え',
+                        style: TextStyle(
+                            fontSize: 10, color: Color(0xFF9CA3AF))),
+                    const SizedBox(width: 8),
+                  ],
+                  Icon(
+                      _accountsExpanded
+                          ? Icons.expand_less
+                          : Icons.expand_more,
+                      color: const Color(0xFF6B7280),
+                      size: 20),
+                ],
+              ),
             ),
           ),
-          const Divider(height: 1),
-          ReorderableListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            buildDefaultDragHandles: false,
-            itemCount: accounts.length,
-            itemBuilder: (ctx, i) {
-              final a = accounts[i];
-              return _accountRow(
-                key: ValueKey(a.id),
-                index: i,
-                a: a,
-                balance: balances[a.name] ?? 0,
-                total: total,
-              );
-            },
-            onReorder: _onReorderAccounts,
-          ),
+          if (_accountsExpanded) ...[
+            const Divider(height: 1),
+            ReorderableListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              buildDefaultDragHandles: false,
+              itemCount: accounts.length,
+              itemBuilder: (ctx, i) {
+                final a = accounts[i];
+                return _accountRow(
+                  key: ValueKey(a.id),
+                  index: i,
+                  a: a,
+                  balance: balances[a.name] ?? 0,
+                  total: total,
+                );
+              },
+              onReorder: _onReorderAccounts,
+            ),
+          ],
         ],
       ),
     );
@@ -477,34 +499,55 @@ class _AssetScreenState extends State<AssetScreen> with ModeAwareMixin {
       ),
       child: Column(
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Row(
-              children: [
-                Icon(Icons.history,
-                    color: Color(0xFF1A237E), size: 16),
-                SizedBox(width: 6),
-                Text('入出金履歴',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF111827))),
-              ],
+          // ヘッダー（タップで開閉）
+          InkWell(
+            onTap: () =>
+                setState(() => _historyExpanded = !_historyExpanded),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.history,
+                      color: Color(0xFF1A237E), size: 16),
+                  const SizedBox(width: 6),
+                  const Text('入出金履歴',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF111827))),
+                  const Spacer(),
+                  if (!_historyExpanded && txns.isNotEmpty)
+                    Text(
+                      '${txns.length > 100 ? "100+" : txns.length}件',
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF9CA3AF)),
+                    ),
+                  const SizedBox(width: 8),
+                  Icon(
+                      _historyExpanded
+                          ? Icons.expand_less
+                          : Icons.expand_more,
+                      color: const Color(0xFF6B7280),
+                      size: 20),
+                ],
+              ),
             ),
           ),
-          const Divider(height: 1),
-          if (txns.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(
-                child: Text('まだ取引がありません',
-                    style:
-                        TextStyle(color: Color(0xFF9CA3AF), fontSize: 13)),
-              ),
-            )
-          else
-            // 最新100件まで（パフォーマンスとの兼ね合い）
-            for (final t in txns.take(100)) _historyRow(t),
+          if (_historyExpanded) ...[
+            const Divider(height: 1),
+            if (txns.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(
+                  child: Text('まだ取引がありません',
+                      style:
+                          TextStyle(color: Color(0xFF9CA3AF), fontSize: 13)),
+                ),
+              )
+            else
+              // 最新100件まで（パフォーマンスとの兼ね合い）
+              for (final t in txns.take(100)) _historyRow(t),
+          ],
         ],
       ),
     );

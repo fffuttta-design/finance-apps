@@ -84,10 +84,17 @@ class BackupRepository {
   /// auto_snapshots/ にタイムスタンプ付きで保存。
   /// 失敗しても取り込み本体は止めない（best-effort）。
   ///
+  /// [reason] は「何の前のスナップショットか」を示す英字タグ。
+  /// ファイル名に埋め込み、後でスナップショット一覧で識別できる。
+  /// - "pre-import"  : JSON 取り込みの直前
+  /// - "pre-wipe"    : 全削除の直前
+  /// - "pre-sample"  : サンプル投入の直前
+  /// - "manual"      : ユーザー任意の手動取得
+  ///
   /// Web では path_provider が File API を提供しないためスキップ。
   /// （Firestore 同期環境では取り込みデータの上書きも別端末から復旧可能なので、
   ///  Web 側のローカルスナップショットが無くても運用上は問題なし）
-  Future<File?> savePreImportSnapshot() async {
+  Future<File?> savePreImportSnapshot({String reason = 'pre-import'}) async {
     if (kIsWeb) return null;
     try {
       final json = await exportAll();
@@ -100,7 +107,9 @@ class BackupRepository {
           '${now.hour.toString().padLeft(2, '0')}'
           '${now.minute.toString().padLeft(2, '0')}'
           '${now.second.toString().padLeft(2, '0')}';
-      final file = File('${dir.path}/pre-import-$stamp.json');
+      // reason は英数とハイフン以外を除去（ファイル名に安全な形に）
+      final safeReason = reason.replaceAll(RegExp(r'[^a-zA-Z0-9\-]'), '-');
+      final file = File('${dir.path}/$safeReason-$stamp.json');
       await file.writeAsString(json);
       await _pruneOldSnapshots();
       return file;
@@ -155,6 +164,68 @@ class BackupRepository {
   Future<BackupImportResult> restoreFromSnapshot(File snapshot) async {
     final json = await snapshot.readAsString();
     return importAll(json);
+  }
+
+  // ───────────────────────────────────────────────────────────────
+  // 手動バックアップの最終実施日（リマインダー用）
+  // ───────────────────────────────────────────────────────────────
+
+  /// 「最後に手動バックアップを取った日時」を SharedPreferences に保持するキー。
+  static const _kLastManualBackupAt = 'futa.backup.last_manual_at';
+
+  /// 「14日リマインダーを次にいつまで黙らせるか」を保持するキー（後で でスヌーズ）。
+  static const _kRemindSnoozeUntil = 'futa.backup.remind_snooze_until';
+
+  /// リマインドのしきい値（日数）。
+  static const int reminderThresholdDays = 14;
+
+  /// 手動バックアップ完了を記録する（exportAll() を実行した UI 側から呼ぶ）。
+  Future<void> markManualBackupDone() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+        _kLastManualBackupAt, DateTime.now().toIso8601String());
+    // バックアップしたらスヌーズも解除（次の14日後にまたリマインド）
+    await prefs.remove(_kRemindSnoozeUntil);
+  }
+
+  /// 最後の手動バックアップ日時。未実施なら null。
+  Future<DateTime?> lastManualBackupAt() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kLastManualBackupAt);
+    if (raw == null) return null;
+    return DateTime.tryParse(raw);
+  }
+
+  /// 「リマインドを次に出してよい時刻」。null なら制限なし。
+  Future<DateTime?> _remindSnoozeUntil() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kRemindSnoozeUntil);
+    if (raw == null) return null;
+    return DateTime.tryParse(raw);
+  }
+
+  /// 「あとで」で 3日間 リマインドをスヌーズ。
+  Future<void> snoozeReminder({int days = 3}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final until = DateTime.now().add(Duration(days: days));
+    await prefs.setString(_kRemindSnoozeUntil, until.toIso8601String());
+  }
+
+  /// 今リマインダーを出すべきか判定する。
+  /// 条件:
+  ///   1) 過去に1度でも手動バックアップしている（してないと意味不明）
+  ///   2) 最終バックアップから [reminderThresholdDays] 日経過
+  ///   3) スヌーズ期限が切れている（または未設定）
+  Future<BackupReminderState> shouldRemindBackup() async {
+    final last = await lastManualBackupAt();
+    if (last == null) return BackupReminderState.noPriorBackup;
+    final days = DateTime.now().difference(last).inDays;
+    if (days < reminderThresholdDays) return BackupReminderState.fresh;
+    final snooze = await _remindSnoozeUntil();
+    if (snooze != null && DateTime.now().isBefore(snooze)) {
+      return BackupReminderState.snoozed;
+    }
+    return BackupReminderState.shouldRemind;
   }
 
   // ───────────────────────────────────────────────────────────────
@@ -222,7 +293,7 @@ class BackupRepository {
 
     // ── 取り込み実行 *前* に現在の状態を自動スナップショット
     // 失敗しても取り込み本体は止めない（best-effort）
-    await savePreImportSnapshot();
+    await savePreImportSnapshot(reason: 'pre-import');
 
     final prefs = await SharedPreferences.getInstance();
 
@@ -441,6 +512,21 @@ class BackupImportResult {
   });
 }
 
+/// バックアップリマインダーの判定結果。
+enum BackupReminderState {
+  /// まだ一度も手動バックアップしたことがない（リマインドしない）
+  noPriorBackup,
+
+  /// 最終バックアップから 14日 未満（フレッシュ）
+  fresh,
+
+  /// 14日経過しているがユーザーが「あとで」でスヌーズ中
+  snoozed,
+
+  /// リマインドを出すべき
+  shouldRemind,
+}
+
 /// バックアップ処理の失敗（ユーザーに見せる例外）。
 class BackupException implements Exception {
   final String message;
@@ -474,5 +560,31 @@ class AutoSnapshotInfo {
     final kb = sizeBytes / 1024;
     if (kb < 1024) return '${kb.toStringAsFixed(1)} KB';
     return '${(kb / 1024).toStringAsFixed(1)} MB';
+  }
+
+  /// ファイル名から「取得理由」タグを抽出する。
+  /// 例: pre-import-20260527-153045.json → "pre-import"
+  /// 該当しなければ null。
+  String? get reasonTag {
+    final base = file.uri.pathSegments.last; // "pre-import-20260527-153045.json"
+    // タイムスタンプ "-YYYYMMDD-" の前までが reason
+    final m = RegExp(r'^(.+?)-\d{8}-\d{6}\.json$').firstMatch(base);
+    return m?.group(1);
+  }
+
+  /// reason の日本語ラベル。UI 一覧での識別用。
+  String? get reasonLabel {
+    switch (reasonTag) {
+      case 'pre-import':
+        return 'JSON取り込み前';
+      case 'pre-wipe':
+        return '全削除前';
+      case 'pre-sample':
+        return 'サンプル投入前';
+      case 'manual':
+        return '手動';
+      default:
+        return null;
+    }
   }
 }

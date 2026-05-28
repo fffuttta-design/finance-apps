@@ -328,6 +328,9 @@ class _MonthClosingViewState extends State<MonthClosingView>
               '保存先推奨: マイドライブ/ツール開発/FutaFinance/backups/',
         ),
       );
+      // 月末締めエクスポートも「手動バックアップ実施」扱いにして
+      // 14日リマインダーをリセットする。
+      await BackupRepository.instance.markManualBackupDone();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

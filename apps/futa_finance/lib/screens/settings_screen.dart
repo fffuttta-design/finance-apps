@@ -522,7 +522,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (ok != true) return;
 
     // 破壊的操作前に自動スナップショット（誤実行からの一発復旧用）
-    await BackupRepository.instance.savePreImportSnapshot();
+    await BackupRepository.instance
+        .savePreImportSnapshot(reason: 'pre-sample');
 
     await TransactionRepository.instance
         .replaceAll(MockData.sampleTransactions());
@@ -569,7 +570,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (ok != true) return;
 
     // 破壊的操作前に自動スナップショット
-    await BackupRepository.instance.savePreImportSnapshot();
+    await BackupRepository.instance
+        .savePreImportSnapshot(reason: 'pre-wipe');
 
     await TransactionRepository.instance.clear();
     if (!context.mounted) return;
@@ -602,6 +604,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               '保存先推奨: マイドライブ/ツール開発/FutaFinance/backups/',
         ),
       );
+      // 「最後の手動バックアップ日時」を記録 → 14日リマインダーの基準になる。
+      await BackupRepository.instance.markManualBackupDone();
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -899,10 +903,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ],
                         ],
                       ),
-                      subtitle: Text(s.displaySize,
-                          style: const TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF9CA3AF))),
+                      subtitle: Row(
+                        children: [
+                          if (s.reasonLabel != null) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF3C7),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: Text(
+                                s.reasonLabel!,
+                                style: const TextStyle(
+                                    fontSize: 10,
+                                    color: Color(0xFF92400E),
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          Text(s.displaySize,
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF9CA3AF))),
+                        ],
+                      ),
                       trailing: const Icon(Icons.chevron_right,
                           color: Color(0xFF9CA3AF)),
                       onTap: () => Navigator.pop(sheet, s),
