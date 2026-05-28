@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/app_mode.dart';
+import '../data/budget_item.dart';
+import '../data/budget_item_repository.dart';
 import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
@@ -656,76 +658,751 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
   }
 
   // ═══════════════════════════════════════════════
-  // 予算管理 - プレースホルダ
+  // 予算管理 - Phase 1〜4 実装
   // ═══════════════════════════════════════════════
   Widget _budgetView() {
+    return AnimatedBuilder(
+      animation: BudgetItemRepository.instance,
+      builder: (context, _) => FutureBuilder<BudgetItemsConfig>(
+        future: BudgetItemRepository.instance.load(),
+        builder: (context, snap) {
+          if (!snap.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final cfg = snap.data!;
+          return _budgetBody(cfg);
+        },
+      ),
+    );
+  }
+
+  Widget _budgetBody(BudgetItemsConfig cfg) {
+    final now = DateTime.now();
+    final year = now.year;
+
+    // Phase 2: 来月の予定支払い（今日から30日以内）
+    final upcoming = <_UpcomingItem>[];
+    for (final item in cfg.items) {
+      for (final s in item.schedule) {
+        final next = s.nextDateFrom(now);
+        final diffDays = next.difference(now).inDays;
+        if (diffDays <= 30) {
+          upcoming.add(
+              _UpcomingItem(item: item, scheduled: s, date: next));
+        }
+      }
+    }
+    upcoming.sort((a, b) => a.date.compareTo(b.date));
+
+    // Phase 4: 予実突合（年度ベース）
+    final annualBudget =
+        cfg.items.fold<int>(0, (s, i) => s + i.annualAmount);
+    final annualActual = cfg.items
+        .fold<int>(0, (s, i) => s + i.actualTotal(year: year));
+    final remaining = annualBudget - annualActual;
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        _devNote('予算管理（税金・保険料） - 構想段階',
-            '次フェーズ実装予定。BudgetItem モデル新設 + 不定期支払いスケジュール対応。'),
-        const SizedBox(height: 16),
+        _devNote('予算管理（税金・保険料） - Phase 1〜4 試作',
+            '開発中ラボ内で完結する実装。Transaction との本紐付けは未対応で、'
+            '「実績マーク」ボタンで予実を手動付与する仕様。'),
+        const SizedBox(height: 12),
+
+        // ── Phase 4: 年間予実サマリー ──
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.account_balance_wallet,
+                      size: 16, color: Color(0xFF1A237E)),
+                  const SizedBox(width: 6),
+                  Text('$year 年の予実',
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF111827))),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.add,
+                        color: Color(0xFFEA580C)),
+                    tooltip: '予算項目を追加',
+                    onPressed: () => _editBudgetDialog(null),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              _budgetSummaryRow('年間予算', annualBudget,
+                  const Color(0xFF1A237E)),
+              _budgetSummaryRow('実績合計', annualActual,
+                  const Color(0xFF16A34A)),
+              const Divider(),
+              _budgetSummaryRow('残予算', remaining,
+                  remaining < 0
+                      ? const Color(0xFFDC2626)
+                      : const Color(0xFF6B7280),
+                  big: true),
+              if (annualBudget > 0) ...[
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: (annualActual / annualBudget).clamp(0, 1),
+                    minHeight: 6,
+                    backgroundColor: const Color(0xFFF3F4F6),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      annualActual >= annualBudget
+                          ? const Color(0xFFDC2626)
+                          : const Color(0xFF16A34A),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '達成率 ${(annualActual / annualBudget * 100).toStringAsFixed(1)}%',
+                  style: const TextStyle(
+                      fontSize: 11, color: Color(0xFF9CA3AF)),
+                ),
+              ],
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 14),
+
+        // ── Phase 2: 直近30日の予定支払い ──
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: Row(children: [
+            Icon(Icons.event, size: 14, color: Color(0xFFEA580C)),
+            SizedBox(width: 4),
+            Text('直近30日の予定支払',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF6B7280))),
+          ]),
+        ),
+        Container(
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: const Color(0xFFE5E7EB)),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text('Phase 構成',
-                  style: TextStyle(
+          child: upcoming.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: Text('30日以内の予定はなし',
+                      style: TextStyle(
+                          fontSize: 11, color: Color(0xFF9CA3AF))),
+                )
+              : Column(
+                  children: upcoming
+                      .map((u) => _upcomingTile(u))
+                      .toList(),
+                ),
+        ),
+
+        const SizedBox(height: 14),
+
+        // ── Phase 1: 予算項目一覧 ──
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: Row(children: [
+            Icon(Icons.list_alt, size: 14, color: Color(0xFF1A237E)),
+            SizedBox(width: 4),
+            Text('予算項目',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF6B7280))),
+          ]),
+        ),
+        if (cfg.items.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: Column(
+              children: [
+                const Text('まだ予算項目がありません',
+                    style: TextStyle(
+                        fontSize: 12, color: Color(0xFF9CA3AF))),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('予算項目を追加'),
+                  onPressed: () => _editBudgetDialog(null),
+                ),
+                const SizedBox(height: 12),
+                _budgetHints(),
+              ],
+            ),
+          )
+        else
+          ...cfg.items.map((i) => _budgetItemTile(i, year)),
+      ],
+    );
+  }
+
+  Widget _budgetSummaryRow(String label, int amount, Color color,
+      {bool big = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  fontSize: big ? 14 : 12,
+                  fontWeight: big ? FontWeight.w700 : FontWeight.w500,
+                  color: const Color(0xFF111827))),
+          Text(formatYen(amount, withSign: big),
+              style: TextStyle(
+                  fontSize: big ? 22 : 14,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                  fontFamily: 'monospace')),
+        ],
+      ),
+    );
+  }
+
+  Widget _upcomingTile(_UpcomingItem u) {
+    final daysLeft = u.date.difference(DateTime.now()).inDays;
+    final urgent = daysLeft <= 7;
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Color(0xFFF3F4F6))),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        children: [
+          Text(u.item.kind.emoji,
+              style: const TextStyle(fontSize: 18)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(u.item.name,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF111827))),
+                Row(
+                  children: [
+                    Text('${u.scheduled.month}/${u.scheduled.day}',
+                        style: const TextStyle(
+                            fontSize: 11, color: Color(0xFF6B7280))),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: urgent
+                            ? const Color(0xFFFEE2E2)
+                            : const Color(0xFFE0E7FF),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: Text(
+                        daysLeft <= 0
+                            ? '今日'
+                            : daysLeft == 1
+                                ? '明日'
+                                : 'あと $daysLeft 日',
+                        style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: urgent
+                                ? const Color(0xFFDC2626)
+                                : const Color(0xFF1A237E)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(formatYen(u.scheduled.amount),
+                  style: const TextStyle(
                       fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF111827))),
-              SizedBox(height: 12),
-              _PhaseTile(
-                  num: 1,
-                  title: 'BudgetItem モデル + 一覧画面',
-                  body:
-                      '年額 + 支払スケジュール（月/日/金額）。 設定からアクセス可能に。',
-                  done: false),
-              _PhaseTile(
-                  num: 2,
-                  title: 'ホームに「来月の予定支払」セクション',
-                  body: '予算項目のスケジュールから直近30日を抽出して表示。',
-                  done: false),
-              _PhaseTile(
-                  num: 3,
-                  title: '取引保存時に予算項目を紐付け',
-                  body: 'Transaction に budgetItemId を追加。',
-                  done: false),
-              _PhaseTile(
-                  num: 4,
-                  title: '予実突合（予算 vs 実績）ビュー',
-                  body: '集計タブ or この開発中タブに表示。',
-                  done: false),
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF111827),
+                      fontFamily: 'monospace')),
+              const SizedBox(height: 2),
+              SizedBox(
+                height: 24,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6),
+                    minimumSize: const Size(0, 24),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: () => _markActual(u),
+                  child: const Text('払った',
+                      style: TextStyle(fontSize: 10)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _budgetItemTile(BudgetItem item, int year) {
+    final actual = item.actualTotal(year: year);
+    final progress = item.progress(year: year).clamp(0.0, 1.0);
+    final remaining = item.annualAmount - actual;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => _editBudgetDialog(item),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Text(item.kind.emoji,
+                      style: const TextStyle(fontSize: 18)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item.name,
+                            style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF111827))),
+                        Text(
+                          '${item.kind.label} / 年${item.schedule.length}回 / 年額 ${formatYen(item.annualAmount)}',
+                          style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF6B7280)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline,
+                        size: 18, color: Color(0xFFDC2626)),
+                    onPressed: () => _deleteBudget(item),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // 進捗バー
+              Row(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 5,
+                        backgroundColor: const Color(0xFFF3F4F6),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          progress >= 1.0
+                              ? const Color(0xFFDC2626)
+                              : const Color(0xFF16A34A),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text('${(progress * 100).toStringAsFixed(0)}%',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF6B7280))),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Text('実績 ${formatYen(actual)}',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF16A34A),
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.w600)),
+                  const Spacer(),
+                  Text('残 ${formatYen(remaining)}',
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: remaining < 0
+                              ? const Color(0xFFDC2626)
+                              : const Color(0xFF6B7280),
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.w600)),
+                ],
+              ),
             ],
           ),
         ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFEEF2FF),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Text(
-            '💡 想定する税金・保険料の例:\n'
-            '・住民税（年4回払い: 6/8/10/1月）\n'
-            '・所得税（年1回 or 予定納税3回）\n'
-            '・国民健康保険（年10回など自治体次第）\n'
-            '・国民年金（毎月）\n'
-            '・生命保険（年払い/月払い）\n'
-            '・自動車税（5月）\n'
-            '・固定資産税（年4回）',
-            style: TextStyle(fontSize: 12, color: Color(0xFF1E3A8A)),
-          ),
-        ),
-      ],
+      ),
     );
+  }
+
+  Widget _budgetHints() {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEF2FF),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: const Text(
+        '💡 想定例: 住民税(6/8/10/1月) / 国民健康保険 / 国民年金 / 生命保険 / 自動車税 / 固定資産税',
+        style: TextStyle(fontSize: 11, color: Color(0xFF1E3A8A)),
+      ),
+    );
+  }
+
+  // ── 追加・編集ダイアログ ──
+  Future<void> _editBudgetDialog(BudgetItem? initial) async {
+    final nameCtrl = TextEditingController(text: initial?.name ?? '');
+    final noteCtrl = TextEditingController(text: initial?.note ?? '');
+    var kind = initial?.kind ?? BudgetKind.tax;
+    final scheduleItems = [...(initial?.schedule ?? <ScheduledPayment>[])];
+
+    final saved = await showModalBottomSheet<BudgetItem?>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setLocal) {
+        final annual =
+            scheduleItems.fold<int>(0, (s, p) => s + p.amount);
+        return Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: FractionallySizedBox(
+            heightFactor: 0.85,
+            child: Column(
+              children: [
+                // ヘッダー
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+                  child: Row(
+                    children: [
+                      Text(initial == null ? '予算項目を追加' : '予算項目を編集',
+                          style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700)),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding:
+                        const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextField(
+                          controller: nameCtrl,
+                          decoration: const InputDecoration(
+                            labelText: '項目名（必須）',
+                            floatingLabelBehavior:
+                                FloatingLabelBehavior.always,
+                          ),
+                          onChanged: (_) => setLocal(() {}),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<BudgetKind>(
+                          initialValue: kind,
+                          decoration: const InputDecoration(
+                            labelText: '種別',
+                            floatingLabelBehavior:
+                                FloatingLabelBehavior.always,
+                          ),
+                          items: BudgetKind.values
+                              .map((k) => DropdownMenuItem(
+                                    value: k,
+                                    child: Text('${k.emoji} ${k.label}'),
+                                  ))
+                              .toList(),
+                          onChanged: (v) =>
+                              setLocal(() => kind = v ?? kind),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: noteCtrl,
+                          decoration: const InputDecoration(
+                            labelText: '備考（任意）',
+                            floatingLabelBehavior:
+                                FloatingLabelBehavior.always,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            const Text('支払スケジュール',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF6B7280))),
+                            const Spacer(),
+                            Text('年額 ${formatYen(annual)}',
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    fontFamily: 'monospace',
+                                    color: Color(0xFF111827))),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ...List.generate(scheduleItems.length, (i) {
+                          final s = scheduleItems[i];
+                          return Padding(
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '${s.month}月 ${s.day}日',
+                                    style: const TextStyle(
+                                        fontSize: 13),
+                                  ),
+                                ),
+                                Text(formatYen(s.amount),
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        fontFamily: 'monospace',
+                                        fontWeight: FontWeight.w600)),
+                                IconButton(
+                                  icon: const Icon(
+                                      Icons.delete_outline,
+                                      size: 18,
+                                      color: Color(0xFFDC2626)),
+                                  onPressed: () => setLocal(() =>
+                                      scheduleItems.removeAt(i)),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.add, size: 16),
+                          label: const Text('支払予定を追加'),
+                          onPressed: () async {
+                            final added = await _editSchedulePayment(null);
+                            if (added != null) {
+                              setLocal(() => scheduleItems.add(added));
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // フッター: 保存
+                Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    border: Border(
+                        top: BorderSide(color: Color(0xFFE5E7EB))),
+                  ),
+                  padding:
+                      const EdgeInsets.fromLTRB(20, 10, 20, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('キャンセル'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: nameCtrl.text.trim().isEmpty
+                              ? null
+                              : () {
+                                  final item = BudgetItem(
+                                    id: initial?.id ??
+                                        DateTime.now()
+                                            .microsecondsSinceEpoch
+                                            .toString(),
+                                    name: nameCtrl.text.trim(),
+                                    kind: kind,
+                                    schedule: scheduleItems,
+                                    actuals: initial?.actuals ?? const [],
+                                    note: noteCtrl.text.trim().isEmpty
+                                        ? null
+                                        : noteCtrl.text.trim(),
+                                  );
+                                  Navigator.pop(ctx, item);
+                                },
+                          child: const Text('保存'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }),
+    );
+
+    if (saved != null) {
+      await BudgetItemRepository.instance.upsert(saved);
+    }
+  }
+
+  // ── 支払予定 1件を編集 ──
+  Future<ScheduledPayment?> _editSchedulePayment(
+      ScheduledPayment? initial) async {
+    int month = initial?.month ?? DateTime.now().month;
+    int day = initial?.day ?? 1;
+    final amountCtrl =
+        TextEditingController(text: initial?.amount.toString() ?? '');
+
+    return showDialog<ScheduledPayment?>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setLocal) {
+        return AlertDialog(
+          title: const Text('支払予定'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      initialValue: month,
+                      decoration: const InputDecoration(labelText: '月'),
+                      items: List.generate(12, (i) => i + 1)
+                          .map((m) => DropdownMenuItem(
+                              value: m, child: Text('$m月')))
+                          .toList(),
+                      onChanged: (v) => setLocal(() => month = v ?? 1),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      initialValue: day,
+                      decoration: const InputDecoration(labelText: '日'),
+                      items: List.generate(31, (i) => i + 1)
+                          .map((d) => DropdownMenuItem(
+                              value: d, child: Text('$d日')))
+                          .toList(),
+                      onChanged: (v) => setLocal(() => day = v ?? 1),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: amountCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: '金額（円）',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('キャンセル')),
+            FilledButton(
+              onPressed: () {
+                final a = int.tryParse(amountCtrl.text.trim());
+                if (a == null) return;
+                Navigator.pop(
+                    ctx,
+                    ScheduledPayment(
+                        month: month, day: day, amount: a));
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      }),
+    );
+  }
+
+  Future<void> _markActual(_UpcomingItem u) async {
+    // 「払った」確定: その日付・金額で actuals に追加
+    final newActuals = [
+      ...u.item.actuals,
+      ActualPayment(
+        date: DateTime.now(),
+        amount: u.scheduled.amount,
+        note: '${u.scheduled.month}/${u.scheduled.day} 予定分',
+      ),
+    ];
+    final updated = u.item.copyWith(actuals: newActuals);
+    await BudgetItemRepository.instance.upsert(updated);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(
+              '${u.item.name}: ${formatYen(u.scheduled.amount)} の実績を記録しました'),
+          duration: const Duration(seconds: 2)),
+    );
+  }
+
+  Future<void> _deleteBudget(BudgetItem item) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('${item.name} を削除？'),
+        content: const Text('予算項目と実績記録ごと削除されます。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626)),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('削除'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await BudgetItemRepository.instance.remove(item.id);
+    }
   }
 
   // ═══════════════════════════════════════════════
@@ -770,62 +1447,11 @@ class _BsItem {
   _BsItem(this.label, this.amount);
 }
 
-class _PhaseTile extends StatelessWidget {
-  const _PhaseTile(
-      {required this.num,
-      required this.title,
-      required this.body,
-      required this.done});
-
-  final int num;
-  final String title;
-  final String body;
-  final bool done;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: done
-                  ? const Color(0xFF16A34A)
-                  : const Color(0xFFE5E7EB),
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Text('$num',
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: done
-                        ? Colors.white
-                        : const Color(0xFF6B7280))),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF111827))),
-                const SizedBox(height: 2),
-                Text(body,
-                    style: const TextStyle(
-                        fontSize: 11, color: Color(0xFF6B7280))),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+/// 来月以内の予定支払いの内部表現。
+class _UpcomingItem {
+  final BudgetItem item;
+  final ScheduledPayment scheduled;
+  final DateTime date;
+  _UpcomingItem(
+      {required this.item, required this.scheduled, required this.date});
 }
