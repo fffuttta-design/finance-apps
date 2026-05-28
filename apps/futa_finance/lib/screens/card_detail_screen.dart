@@ -27,10 +27,13 @@ class CardDetailScreen extends StatefulWidget {
 
 const double _kContentMaxWidth = 1000;
 
-class _CardDetailScreenState extends State<CardDetailScreen> {
+class _CardDetailScreenState extends State<CardDetailScreen>
+    with SingleTickerProviderStateMixin {
   StreamSubscription<List<core.Transaction>>? _sub;
   List<core.Transaction> _all = [];
   DateTime? _selectedMonth;
+  late final TabController _tabController =
+      TabController(length: 2, vsync: this);
 
   /// 編集後のカードスナップショット（paymentDay変更時に画面に即反映するため）。
   /// null なら widget.card を使う。
@@ -52,6 +55,7 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
   @override
   void dispose() {
     _sub?.cancel();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -121,12 +125,48 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
         builder: (ctx, constraints) {
           final content = Column(
             children: [
-              _monthSelector(),
+              // 共通: サマリー（利用合計/件数/引落予定日）
               _summaryCard(monthTotal, monthTxns.length),
+              // タブバー
+              Container(
+                color: Colors.white,
+                child: TabBar(
+                  controller: _tabController,
+                  labelColor: const Color(0xFFDC2626),
+                  unselectedLabelColor: const Color(0xFF6B7280),
+                  indicatorColor: const Color(0xFFDC2626),
+                  tabs: const [
+                    Tab(
+                      icon: Icon(Icons.receipt_long_outlined, size: 18),
+                      text: '明細',
+                      height: 48,
+                    ),
+                    Tab(
+                      icon: Icon(Icons.show_chart, size: 18),
+                      text: '請求推移',
+                      height: 48,
+                    ),
+                  ],
+                ),
+              ),
               const Divider(height: 1),
-              _monthlyBillingSection(),
-              const Divider(height: 1),
-              Expanded(child: _historyList(monthTxns)),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    // ── タブ1: その月の明細 ──
+                    Column(
+                      children: [
+                        _monthSelector(),
+                        const Divider(height: 1),
+                        Expanded(child: _historyList(monthTxns)),
+                      ],
+                    ),
+                    // ── タブ2: 月別請求推移 ──
+                    _monthlyBillingPage(),
+                  ],
+                ),
+              ),
             ],
           );
           if (constraints.maxWidth >= 900) {
@@ -373,10 +413,9 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     );
   }
 
-  // ─── 月別請求履歴セクション（ExpansionTile、折りたたみ式） ──
-  Widget _monthlyBillingSection() {
+  // ─── 月別請求推移ページ（タブ2の本体） ──
+  Widget _monthlyBillingPage() {
     final name = _card.name;
-    // 取引から月別合計を集計
     final billing = <String, int>{};
     for (final t in _all) {
       if (t.type != core.TransactionType.expense) continue;
@@ -385,84 +424,106 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
           '${t.date.year}-${t.date.month.toString().padLeft(2, '0')}';
       billing[ym] = (billing[ym] ?? 0) + t.amount;
     }
-    if (billing.isEmpty) return const SizedBox.shrink();
+    if (billing.isEmpty) {
+      return const Center(
+        child: Text('まだ利用履歴がありません',
+            style: TextStyle(color: Color(0xFF9CA3AF))),
+      );
+    }
     final entries = billing.entries.toList()
       ..sort((a, b) => b.key.compareTo(a.key));
+    // 全体の最大値を取得（バー幅の正規化用）
+    final maxAmount =
+        entries.map((e) => e.value).reduce((a, b) => a > b ? a : b);
 
-    return Theme(
-      // ExpansionTile のデフォルト分割線を消す
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        leading: const Icon(Icons.calendar_month,
-            color: Color(0xFF1A237E), size: 18),
-        title: const Text('月別請求履歴',
-            style: TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w700)),
-        subtitle: Text('${entries.length} ヶ月分',
-            style: const TextStyle(
-                fontSize: 11, color: Color(0xFF9CA3AF))),
-        childrenPadding: EdgeInsets.zero,
-        children: entries.map((e) => _billingRow(e.key, e.value)).toList(),
-      ),
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      itemCount: entries.length,
+      itemBuilder: (ctx, i) {
+        final e = entries[i];
+        return _billingRow(e.key, e.value, maxAmount: maxAmount);
+      },
     );
   }
 
-  Widget _billingRow(String yearMonth, int amount) {
+  Widget _billingRow(String yearMonth, int amount,
+      {required int maxAmount}) {
     final parts = yearMonth.split('-');
     final year = int.parse(parts[0]);
     final month = int.parse(parts[1]);
     final paymentDay = _card.paymentDay;
     String? billingLabel;
     if (paymentDay != null) {
-      // 引落予定日 = 翌月の paymentDay 日
       final billYear = month == 12 ? year + 1 : year;
       final billMonth = month == 12 ? 1 : month + 1;
-      billingLabel = '$billYear/${billMonth.toString().padLeft(2, '0')}/${paymentDay.toString().padLeft(2, '0')} 引落';
+      billingLabel =
+          '$billYear/${billMonth.toString().padLeft(2, '0')}/${paymentDay.toString().padLeft(2, '0')} 引落';
     }
-    final isSelected = _selectedMonth != null &&
-        _selectedMonth!.year == year &&
-        _selectedMonth!.month == month;
+    final ratio = maxAmount > 0 ? (amount / maxAmount).clamp(0.0, 1.0) : 0.0;
     return InkWell(
-      onTap: () => setState(() => _selectedMonth = DateTime(year, month)),
+      onTap: () {
+        setState(() => _selectedMonth = DateTime(year, month));
+        // 明細タブに切替（その月の利用を見られるよう）
+        _tabController.animateTo(0);
+      },
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFFFEF3C7)
-              : Colors.transparent,
-          border: const Border(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        decoration: const BoxDecoration(
+          border: Border(
             bottom: BorderSide(color: Color(0xFFF3F4F6), width: 1),
           ),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('$year年$month月',
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: isSelected
-                              ? FontWeight.w800
-                              : FontWeight.w600)),
-                  if (billingLabel != null) ...[
-                    const SizedBox(height: 2),
-                    Text(billingLabel,
-                        style: const TextStyle(
-                            fontSize: 10,
-                            color: Color(0xFF1A237E),
-                            fontFamily: 'monospace')),
-                  ],
-                ],
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text('$year年$month月',
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF111827))),
+                ),
+                Text(formatYen(amount),
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        fontFamily: 'monospace',
+                        color: Color(0xFFDC2626))),
+              ],
             ),
-            Text(formatYen(amount),
-                style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: 'monospace',
-                    color: Color(0xFFDC2626))),
+            const SizedBox(height: 6),
+            // 棒グラフ（金額比較で視覚化）
+            Stack(
+              children: [
+                Container(
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+                FractionallySizedBox(
+                  widthFactor: ratio,
+                  child: Container(
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDC2626),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (billingLabel != null) ...[
+              const SizedBox(height: 4),
+              Text(billingLabel,
+                  style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF1A237E),
+                      fontFamily: 'monospace')),
+            ],
           ],
         ),
       ),
