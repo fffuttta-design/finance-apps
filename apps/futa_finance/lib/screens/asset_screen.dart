@@ -179,11 +179,16 @@ class _AssetScreenState extends State<AssetScreen> with ModeAwareMixin {
       );
     }
     // 計算は全口座でやってから、表示直前に hideInactive フィルタを掛ける。
+    // ただし「残高が1円以上あれば休眠と見なさない」ので、隠れるのは
+    // inactive && 残高<=0 の口座のみ。
     final allAccounts = p.bankAccounts;
     final allBalances = _currentBalances(allAccounts);
     final hideInactive = UiPreferences.instance.hideInactive;
     final accounts = hideInactive
-        ? allAccounts.where((a) => !a.inactive).toList()
+        ? allAccounts
+            .where((a) =>
+                !(a.inactive && (allBalances[a.name] ?? 0) <= 0))
+            .toList()
         : allAccounts;
     final balances = Map<String, int>.fromEntries(
         accounts.map((a) => MapEntry(a.name, allBalances[a.name] ?? 0)));

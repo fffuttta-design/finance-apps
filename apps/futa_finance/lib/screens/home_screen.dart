@@ -743,19 +743,25 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
     }
 
     // 当月利用が 0 のカードはホーム画面には表示しない（残高表示の混雑回避）。
-    // さらに hideInactive=ON なら「未使用」フラグが立ったカードも除外。
+    // さらに hideInactive=ON でも、累積額（当月利用+過去入力）が 1円以上なら
+    // 休眠と見なさず表示する。
     final cards = _payments.creditCards
         .where((c) {
-          if (hideInactive && c.inactive) return false;
           final usage = cardUsage[c.name] ?? 0;
           if (usage <= 0) return false;
+          final accum = usage + c.displayBalance;
+          if (hideInactive && c.inactive && accum <= 0) return false;
           return true;
         })
         .toList();
 
-    // 表示対象の銀行: hideInactive=ON なら inactive フラグの立った口座を除外。
+    // 表示対象の銀行: hideInactive=ON でも、残高が1円以上あれば
+    // 「休眠と見なさない」ので表示する（フラグ自動無視）。
+    // 隠れるのは inactive && 残高<=0 の口座のみ。
     final banks = hideInactive
-        ? allBanks.where((b) => !b.inactive).toList()
+        ? allBanks
+            .where((b) => !(b.inactive && currentBalanceOf(b) <= 0))
+            .toList()
         : allBanks;
 
     final assetTotal =

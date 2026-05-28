@@ -238,7 +238,7 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
                                     fontWeight: FontWeight.w600,
                                     color: Color(0xFF111827))),
                             subtitle: const Text(
-                                '残高 0 のアクティブ口座と区別するためのフラグ',
+                                '残高が1円以上ある間は自動で表示されます',
                                 style: TextStyle(
                                     fontSize: 11,
                                     color: Color(0xFF6B7280))),

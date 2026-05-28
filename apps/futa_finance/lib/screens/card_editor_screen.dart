@@ -220,7 +220,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                                     fontWeight: FontWeight.w600,
                                     color: Color(0xFF111827))),
                             subtitle: const Text(
-                                '当月利用が偶々 0 のカードと区別するためのフラグ',
+                                '累積額が1円以上ある間は自動で表示されます',
                                 style: TextStyle(
                                     fontSize: 11,
                                     color: Color(0xFF6B7280))),
