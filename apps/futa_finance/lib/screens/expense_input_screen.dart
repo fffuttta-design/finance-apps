@@ -6,6 +6,37 @@ import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 
+/// 支払元のカテゴリ。UI 上はまずこれを選択 → 該当の項目プルダウンが切り替わる。
+enum _PayCategory { card, bank, cash, emoney }
+
+extension _PayCategoryX on _PayCategory {
+  String get label {
+    switch (this) {
+      case _PayCategory.card:
+        return 'クレカ';
+      case _PayCategory.bank:
+        return '銀行';
+      case _PayCategory.cash:
+        return '現金';
+      case _PayCategory.emoney:
+        return '電子';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case _PayCategory.card:
+        return Icons.credit_card;
+      case _PayCategory.bank:
+        return Icons.account_balance;
+      case _PayCategory.cash:
+        return Icons.payments;
+      case _PayCategory.emoney:
+        return Icons.phone_iphone;
+    }
+  }
+}
+
 /// 支出入力モーダルを表示する。保存成功時は true を返す。
 Future<bool?> showExpenseInputModal(BuildContext context) {
   return showModalBottomSheet<bool>(
@@ -58,6 +89,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   String? _majorCategory;
   String? _subCategory;
   String? _paymentMethod;
+
+  /// 現在選択中の支払元カテゴリ。デフォルト: クレカ（最も使用頻度が高いため）。
+  _PayCategory _payCategory = _PayCategory.card;
   final _descCtrl = TextEditingController();
   final _amountCtrl = TextEditingController(); // 円金額（USD時はここに概算円）
   final _usdAmountCtrl = TextEditingController(); // USD金額
@@ -124,12 +158,74 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     setState(() {
       _categories = c;
       _payments = p;
-      // 呼び出し元から支払方法プリセットがあれば適用
+      // 呼び出し元から支払方法プリセットがあれば、それに合わせてカテゴリも判定。
       if (_paymentMethod == null && widget.initialPaymentMethod != null) {
         _paymentMethod = widget.initialPaymentMethod;
+        _payCategory = _categoryOf(_paymentMethod!) ?? _PayCategory.card;
         _onPaymentMethodChanged(_paymentMethod);
+      } else {
+        // プリセットなし → 現カテゴリ（デフォルト: クレカ）の最上位項目を選択。
+        _applyCategoryDefault();
       }
     });
+  }
+
+  /// 指定カテゴリの登録項目リスト（並び順そのまま、先頭が最上位）。
+  List<String> _methodsFor(_PayCategory cat) {
+    final p = _payments;
+    if (p == null) return const [];
+    switch (cat) {
+      case _PayCategory.card:
+        return p.creditCards.map((c) => c.name).toList();
+      case _PayCategory.bank:
+        return p.bankAccounts
+            .where((b) => b.accountType == core.AccountType.bank)
+            .map((b) => b.name)
+            .toList();
+      case _PayCategory.cash:
+        return p.bankAccounts
+            .where((b) => b.accountType == core.AccountType.cash)
+            .map((b) => b.name)
+            .toList();
+      case _PayCategory.emoney:
+        return p.bankAccounts
+            .where((b) => b.accountType == core.AccountType.emoney)
+            .map((b) => b.name)
+            .toList();
+    }
+  }
+
+  /// 支払方法名から、それが属するカテゴリを逆引きする。
+  _PayCategory? _categoryOf(String name) {
+    final p = _payments;
+    if (p == null) return null;
+    if (p.creditCards.any((c) => c.name == name)) return _PayCategory.card;
+    for (final b in p.bankAccounts) {
+      if (b.name == name) {
+        switch (b.accountType) {
+          case core.AccountType.bank:
+            return _PayCategory.bank;
+          case core.AccountType.cash:
+            return _PayCategory.cash;
+          case core.AccountType.emoney:
+            return _PayCategory.emoney;
+        }
+      }
+    }
+    return null;
+  }
+
+  /// 現カテゴリの先頭項目を _paymentMethod にセットして、残高情報も更新する。
+  /// 該当カテゴリが空ならクリア。
+  void _applyCategoryDefault() {
+    final list = _methodsFor(_payCategory);
+    if (list.isEmpty) {
+      _paymentMethod = null;
+      _onPaymentMethodChanged(null);
+    } else {
+      _paymentMethod = list.first;
+      _onPaymentMethodChanged(list.first);
+    }
   }
 
   List<String> get _availableSubs {
@@ -140,16 +236,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         (m) => m.displayName(cfg.majors.indexOf(m)) == major);
     if (idx < 0) return const [];
     return cfg.majors[idx].subs;
-  }
-
-  /// 銀行口座 + クレジットカードを統合した支払方法リスト。
-  List<String> get _availablePaymentMethods {
-    final p = _payments;
-    if (p == null) return const [];
-    return [
-      ...p.bankAccounts.map((b) => b.name),
-      ...p.creditCards.map((c) => c.name),
-    ];
   }
 
   /// 選択中の支払い方法が銀行口座ならその口座を返す。カードなら null。
@@ -472,7 +558,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     final majorNames = List.generate(categories.majors.length,
         (i) => categories.majors[i].displayName(i));
 
-    final paymentMethods = _availablePaymentMethods;
+    final paymentMethods = _methodsFor(_payCategory);
     final hasBalanceTracking = _currentBalance != null;
     final isCard = _selectedIsCard;
 
@@ -587,6 +673,33 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               const SizedBox(height: 16),
 
               _label('支払方法'),
+              // 1段目: カテゴリ選択（クレカ/銀行/現金/電子）。
+              // 切替時はそのカテゴリの先頭項目を自動選択（よく使うやつをデフォに）。
+              SegmentedButton<_PayCategory>(
+                segments: _PayCategory.values
+                    .map((c) => ButtonSegment<_PayCategory>(
+                          value: c,
+                          icon: Icon(c.icon, size: 16),
+                          label: Text(c.label,
+                              style: const TextStyle(fontSize: 12)),
+                        ))
+                    .toList(),
+                selected: {_payCategory},
+                showSelectedIcon: false,
+                onSelectionChanged: (set) {
+                  setState(() {
+                    _payCategory = set.first;
+                  });
+                  _applyCategoryDefault();
+                },
+                style: ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  padding: WidgetStateProperty.all(
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              // 2段目: 選択カテゴリの項目プルダウン。
               if (paymentMethods.isEmpty)
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -594,14 +707,20 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                     color: const Color(0xFFFEF3C7),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text(
-                    '支払方法が未登録です。設定 → 銀行口座 / クレジットカード で登録してください。',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF92400E)),
+                  child: Text(
+                    '${_payCategory.label}が未登録です。設定 → 銀行口座 / クレジットカード で登録してください。',
+                    style: const TextStyle(
+                        fontSize: 12, color: Color(0xFF92400E)),
                   ),
                 )
               else
                 DropdownButtonFormField<String>(
-                  initialValue: _paymentMethod,
+                  // カテゴリ切替で項目リストが変わると、前の選択値が無効に
+                  // なるケースがあるためカテゴリを Key に含めて再生成。
+                  key: ValueKey('pay-${_payCategory.name}'),
+                  initialValue: paymentMethods.contains(_paymentMethod)
+                      ? _paymentMethod
+                      : null,
                   items: paymentMethods
                       .map((p) =>
                           DropdownMenuItem(value: p, child: Text(p)))

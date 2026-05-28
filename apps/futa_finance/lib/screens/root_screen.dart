@@ -396,18 +396,27 @@ class _RootScreenState extends State<RootScreen> {
           ),
           const VerticalDivider(width: 1, thickness: 1),
           Expanded(
+            // 利用可能幅に応じてコンテンツ幅を動的決定。
+            // 1080 まではセンタリング、足りなければ画面いっぱい使う。
             // Align+ConstrainedBox(maxWidth)では子のScaffold/ListViewに
             // 高さ制約が伝わらずグレーアウトすることがあるため、
             // Row+Spacer+SizedBox(width only) パターンで中央寄せ
-            child: Row(
-              children: [
-                const Spacer(),
-                SizedBox(
-                  width: _wideContentMaxWidth,
-                  child: IndexedStack(index: _index, children: _tabs),
-                ),
-                const Spacer(),
-              ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final contentWidth = constraints.maxWidth < _wideContentMaxWidth
+                    ? constraints.maxWidth
+                    : _wideContentMaxWidth;
+                return Row(
+                  children: [
+                    const Spacer(),
+                    SizedBox(
+                      width: contentWidth,
+                      child: IndexedStack(index: _index, children: _tabs),
+                    ),
+                    const Spacer(),
+                  ],
+                );
+              },
             ),
           ),
           if (_recordPanel != null) ...[
@@ -435,7 +444,7 @@ class _RecordPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 420,
+      width: 380,
       child: Container(
         color: const Color(0xFFFAFAFA),
         child: Navigator(
@@ -536,7 +545,7 @@ class _SideNavState extends State<_SideNav> {
   Widget build(BuildContext context) {
     final current = AppModeManager.instance.current;
     return Container(
-      width: 240,
+      width: 200,
       color: Colors.white,
       child: SafeArea(
         child: Column(
