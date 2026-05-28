@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/app_mode.dart';
+import '../data/monthly_snapshot_repository.dart';
 import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
@@ -32,9 +34,15 @@ class _AssetScreenState extends State<AssetScreen> with ModeAwareMixin {
   void onModeChanged() => _load();
 
   final _settings = SettingsRepository();
+  final _snapshotRepo = MonthlySnapshotRepository.instance;
   StreamSubscription<List<core.Transaction>>? _sub;
   List<core.Transaction> _transactions = [];
   core.PaymentMethodsConfig? _payments;
+  core.MonthlySnapshotConfig _snapshots =
+      core.MonthlySnapshotConfig.empty();
+
+  /// 「資産推移」セクションの開閉状態。デフォルトは開いた状態。
+  bool _trendExpanded = true;
 
   /// 「口座別残高」セクションの開閉状態。デフォルトは開いた状態。
   bool _accountsExpanded = true;
@@ -71,10 +79,12 @@ class _AssetScreenState extends State<AssetScreen> with ModeAwareMixin {
   Future<void> _load() async {
     final list = await TransactionRepository.instance.loadAll();
     final p = await _settings.loadPayments();
+    final snaps = await _snapshotRepo.load();
     if (!mounted) return;
     setState(() {
       _transactions = list;
       _payments = p;
+      _snapshots = snaps;
     });
   }
 
@@ -204,6 +214,8 @@ class _AssetScreenState extends State<AssetScreen> with ModeAwareMixin {
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
           children: [
             _totalCard(total, delta),
+            const SizedBox(height: 12),
+            _savingsTrendCard(),
             const SizedBox(height: 12),
             _accountListCard(accounts, balances, total),
             const SizedBox(height: 12),
@@ -632,4 +644,342 @@ class _AssetScreenState extends State<AssetScreen> with ModeAwareMixin {
       ),
     );
   }
+
+  // ───────────────────────────────────────────────
+  // 資産推移カード（月初残高スナップショットの月次推移）
+  // ───────────────────────────────────────────────
+
+  /// 月初残高スナップショットから直近12ヶ月の推移を描画する。
+  /// データが2点未満の場合はメッセージのみ。
+  Widget _savingsTrendCard() {
+    // 直近12ヶ月のスナップショットを年月昇順で抽出
+    final all = List<core.MonthlySnapshot>.from(_snapshots.snapshots)
+      ..sort((a, b) => a.yearMonth.compareTo(b.yearMonth));
+    final last12 = all.length <= 12
+        ? all
+        : all.sublist(all.length - 12);
+
+    // 純増減（最新月初残 − 最古月初残）。データ不足なら null。
+    int? netDelta;
+    if (last12.length >= 2) {
+      netDelta = last12.last.initialBalance - last12.first.initialBalance;
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        children: [
+          // ヘッダー（タップで開閉）
+          InkWell(
+            onTap: () =>
+                setState(() => _trendExpanded = !_trendExpanded),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.show_chart,
+                      color: Color(0xFF16A34A), size: 16),
+                  const SizedBox(width: 6),
+                  const Text('資産推移',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF111827))),
+                  const SizedBox(width: 6),
+                  Text(
+                    '(${last12.length}ヶ月)',
+                    style: const TextStyle(
+                        fontSize: 10, color: Color(0xFF9CA3AF)),
+                  ),
+                  const Spacer(),
+                  Icon(
+                      _trendExpanded
+                          ? Icons.expand_less
+                          : Icons.expand_more,
+                      color: const Color(0xFF6B7280),
+                      size: 20),
+                ],
+              ),
+            ),
+          ),
+          if (_trendExpanded) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+              child: last12.length < 2
+                  ? const _TrendEmpty()
+                  : _TrendChart(
+                      snapshots: last12,
+                      netDelta: netDelta!,
+                    ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 資産推移のデータ不足時メッセージ。
+class _TrendEmpty extends StatelessWidget {
+  const _TrendEmpty();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 14),
+      child: Center(
+        child: Text(
+          '月初残高のスナップショットが 2ヶ月分以上ないと推移は描けません。\nホームの月初リマインドで毎月記録してください。',
+          style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+}
+
+/// 資産推移の本体（直近1年の純増減 + 折れ線）。
+class _TrendChart extends StatelessWidget {
+  const _TrendChart({required this.snapshots, required this.netDelta});
+
+  final List<core.MonthlySnapshot> snapshots;
+  final int netDelta;
+
+  @override
+  Widget build(BuildContext context) {
+    final isUp = netDelta >= 0;
+    final color = isUp
+        ? const Color(0xFF16A34A)
+        : const Color(0xFFDC2626);
+    final firstLabel = _shortMonth(snapshots.first.yearMonth);
+    final lastLabel = _shortMonth(snapshots.last.yearMonth);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ── 純増減（主役） ──
+        Container(
+          padding: const EdgeInsets.symmetric(
+              horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: (isUp
+                    ? const Color(0xFFDCFCE7)
+                    : const Color(0xFFFEE2E2))
+                .withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                      isUp
+                          ? Icons.trending_up
+                          : Icons.trending_down,
+                      size: 20,
+                      color: color),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isUp ? '貯金増加' : '貯金減少',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: color,
+                            fontWeight: FontWeight.w700),
+                      ),
+                      Text(
+                        '$firstLabel → $lastLabel',
+                        style: const TextStyle(
+                            fontSize: 10,
+                            color: Color(0xFF6B7280)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Text(
+                formatYen(netDelta, withSign: true),
+                style: TextStyle(
+                    fontSize: 22,
+                    color: color,
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        // ── 折れ線グラフ本体 ──
+        SizedBox(
+          height: 160,
+          child: CustomPaint(
+            painter: _TrendLinePainter(snapshots: snapshots),
+            child: Container(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 'YYYY-MM' → 'YY/M' (例: '2026-05' → '26/5')
+  static String _shortMonth(String yearMonth) {
+    final parts = yearMonth.split('-');
+    if (parts.length != 2) return yearMonth;
+    final year = parts[0].length >= 4
+        ? parts[0].substring(2)
+        : parts[0];
+    final month = int.tryParse(parts[1]) ?? 0;
+    return '$year/$month';
+  }
+}
+
+/// 折れ線グラフ + 各点の金額ラベル描画。
+class _TrendLinePainter extends CustomPainter {
+  _TrendLinePainter({required this.snapshots});
+
+  final List<core.MonthlySnapshot> snapshots;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (snapshots.length < 2) return;
+
+    // 余白（軸ラベル分）
+    const leftPad = 4.0;
+    const rightPad = 4.0;
+    const topPad = 20.0; // 各点の金額ラベル分
+    const bottomPad = 18.0; // X軸ラベル分
+
+    final chartW = size.width - leftPad - rightPad;
+    final chartH = size.height - topPad - bottomPad;
+
+    final values = snapshots.map((s) => s.initialBalance).toList();
+    final minV = values.reduce(math.min);
+    final maxV = values.reduce(math.max);
+    final range = maxV - minV;
+    // 平坦な時に y が NaN にならないよう
+    final yRange = range == 0 ? 1 : range;
+
+    final n = snapshots.length;
+    Offset pointAt(int i) {
+      final x = leftPad +
+          (n == 1 ? chartW / 2 : chartW * i / (n - 1));
+      final y = topPad +
+          chartH * (1 - (values[i] - minV) / yRange);
+      return Offset(x, y);
+    }
+
+    // 塗りエリア（グラデーション風の単色うすめ）
+    final fillPath = Path()
+      ..moveTo(leftPad, topPad + chartH);
+    for (int i = 0; i < n; i++) {
+      final p = pointAt(i);
+      if (i == 0) {
+        fillPath.lineTo(p.dx, p.dy);
+      } else {
+        fillPath.lineTo(p.dx, p.dy);
+      }
+    }
+    fillPath.lineTo(size.width - rightPad, topPad + chartH);
+    fillPath.close();
+
+    final fillPaint = Paint()
+      ..color = const Color(0xFF16A34A).withValues(alpha: 0.12)
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(fillPath, fillPaint);
+
+    // 折れ線本体
+    final linePaint = Paint()
+      ..color = const Color(0xFF16A34A)
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke
+      ..strokeJoin = StrokeJoin.round;
+    final linePath = Path()..moveTo(pointAt(0).dx, pointAt(0).dy);
+    for (int i = 1; i < n; i++) {
+      final p = pointAt(i);
+      linePath.lineTo(p.dx, p.dy);
+    }
+    canvas.drawPath(linePath, linePaint);
+
+    // 各点 + 金額/月ラベル
+    final pointPaint = Paint()
+      ..color = const Color(0xFF16A34A)
+      ..style = PaintingStyle.fill;
+    final pointBorder = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+    for (int i = 0; i < n; i++) {
+      final p = pointAt(i);
+      canvas.drawCircle(p, 3.5, pointPaint);
+      canvas.drawCircle(p, 3.5, pointBorder);
+
+      // 金額ラベル（上）：データ点が多すぎる時は隔月ぐらいに間引く
+      final showAmount = n <= 6 || i % 2 == 0 || i == n - 1;
+      if (showAmount) {
+        final tp = TextPainter(
+          text: TextSpan(
+            text: _shortYen(values[i]),
+            style: const TextStyle(
+              fontSize: 9,
+              color: Color(0xFF111827),
+              fontWeight: FontWeight.w600,
+              fontFamily: 'monospace',
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        tp.paint(
+          canvas,
+          Offset(p.dx - tp.width / 2, p.dy - tp.height - 4),
+        );
+      }
+
+      // 月ラベル（下）：全部書くと潰れるので、最初/最後/中間で十分
+      final showMonth =
+          i == 0 || i == n - 1 || (n > 4 && i % (n ~/ 4) == 0);
+      if (showMonth) {
+        final ym = snapshots[i].yearMonth.split('-');
+        final label = ym.length == 2
+            ? '${int.tryParse(ym[1]) ?? ''}月'
+            : snapshots[i].yearMonth;
+        final tp = TextPainter(
+          text: TextSpan(
+            text: label,
+            style: const TextStyle(
+              fontSize: 9,
+              color: Color(0xFF9CA3AF),
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        tp.paint(
+          canvas,
+          Offset(p.dx - tp.width / 2,
+              topPad + chartH + 4),
+        );
+      }
+    }
+  }
+
+  /// 'XX 万' のような短縮表示。10000円以上で「万」、それ未満は素のまま。
+  static String _shortYen(int v) {
+    if (v.abs() >= 10000) {
+      final man = (v / 10000).toStringAsFixed(v.abs() < 100000 ? 1 : 0);
+      return '$man 万';
+    }
+    return v.toString();
+  }
+
+  @override
+  bool shouldRepaint(covariant _TrendLinePainter oldDelegate) =>
+      oldDelegate.snapshots != snapshots;
 }
