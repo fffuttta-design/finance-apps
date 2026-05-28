@@ -10,6 +10,7 @@ import '../utils/emoji_palette.dart';
 import '../utils/formatters.dart';
 import '../widgets/calendar_view.dart';
 import '../widgets/month_closing_view.dart';
+import 'table_view_screen.dart';
 
 /// 期間フィルタの選択肢。
 enum _PeriodFilter {
@@ -62,7 +63,7 @@ extension _PeriodFilterX on _PeriodFilter {
 enum _TypeFilter { expense, income, both }
 
 /// 集計タブ内のビューモード。
-enum _AggregationViewMode { statistics, calendar, closing }
+enum _AggregationViewMode { statistics, table, calendar, closing }
 
 extension _TypeFilterX on _TypeFilter {
   String get label {
@@ -234,6 +235,8 @@ class _ReportScreenState extends State<ReportScreen> with ModeAwareMixin {
                       _transactionsCard(filtered),
                     ],
                   ),
+                _AggregationViewMode.table =>
+                  const TableViewScreen(embedded: true),
                 _AggregationViewMode.calendar => const CalendarView(),
                 _AggregationViewMode.closing => const MonthClosingView(),
               },
@@ -259,6 +262,9 @@ class _ReportScreenState extends State<ReportScreen> with ModeAwareMixin {
             Expanded(
                 child: _toggleSeg(_AggregationViewMode.statistics, '統計',
                     Icons.analytics_outlined)),
+            Expanded(
+                child: _toggleSeg(_AggregationViewMode.table, 'テーブル',
+                    Icons.table_chart_outlined)),
             Expanded(
                 child: _toggleSeg(_AggregationViewMode.calendar,
                     'カレンダー', Icons.calendar_month_outlined)),

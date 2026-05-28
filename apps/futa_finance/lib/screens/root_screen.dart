@@ -654,8 +654,8 @@ class _SideNavState extends State<_SideNav> {
                       selectedColor: const Color(0xFFDC2626)),
                   _navItem(3, Icons.bar_chart_outlined, Icons.bar_chart,
                       '集計'),
-                  _navItem(5, Icons.table_chart_outlined,
-                      Icons.table_chart, 'テーブル'),
+                  // 旧「テーブル」ナビは v1.0.69 で削除。
+                  // テーブルビューは「集計」→「テーブル」モード内に統合。
                   _navItem(4, Icons.settings_outlined, Icons.settings,
                       '設定'),
                 ],

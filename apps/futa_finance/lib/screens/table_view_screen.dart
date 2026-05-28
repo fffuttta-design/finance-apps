@@ -11,7 +11,11 @@ import '../utils/formatters.dart';
 /// 全取引を1つのフラットなテーブルで表示し、列ソート＋テキストフィルタ＋
 /// 期間/フロー絞り込みができる。Excel/スプシ風の体験を想定。
 class TableViewScreen extends StatefulWidget {
-  const TableViewScreen({super.key});
+  const TableViewScreen({super.key, this.embedded = false});
+
+  /// 他画面に埋め込んで使う場合は true。AppBar / Scaffold を省略する。
+  /// 集計タブのサブビューから呼ばれる時に使用。
+  final bool embedded;
 
   @override
   State<TableViewScreen> createState() => _TableViewScreenState();
@@ -208,19 +212,25 @@ class _TableViewScreenState extends State<TableViewScreen>
         .where((t) => t.type == core.TransactionType.income)
         .fold<int>(0, (s, t) => s + t.amount);
 
+    final body = Column(
+      children: [
+        _filterBar(),
+        _summaryBar(list.length, expenseSum, incomeSum),
+        const Divider(height: 1),
+        Expanded(child: _buildTable(list)),
+      ],
+    );
+    if (widget.embedded) {
+      // 集計タブからサブビューとして埋め込む場合、外側の Scaffold/AppBar
+      // を流用するのでここでは body だけ返す。
+      return body;
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('テーブル',
             style: TextStyle(fontWeight: FontWeight.w700)),
       ),
-      body: Column(
-        children: [
-          _filterBar(),
-          _summaryBar(list.length, expenseSum, incomeSum),
-          const Divider(height: 1),
-          Expanded(child: _buildTable(list)),
-        ],
-      ),
+      body: body,
     );
   }
 
