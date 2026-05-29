@@ -403,10 +403,12 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 children: [
-                  _todayHeader(today),
-                  const SizedBox(height: 12),
+                  // 表示順は「月切替 → 今日 → フロー」。
+                  // 月切替が画面のメイン軸なので一番上、その下に補助情報の今日。
                   _monthSwitcher(),
                   const SizedBox(height: 8),
+                  _todayHeader(today),
+                  const SizedBox(height: 12),
                   _monthlyFlow(_selectedMonth),
                   const SizedBox(height: 12),
                   _balanceSummary(),
@@ -727,39 +729,47 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
           if (_expenseBreakdownExpanded &&
               expenseBreakdown.isNotEmpty) ...[
             const SizedBox(height: 2),
-            ...expenseBreakdown.map((e) => Padding(
-                  padding: const EdgeInsets.only(
-                      left: 12, right: 4, top: 2, bottom: 2),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 4,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDC2626)
-                              .withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
+            ...expenseBreakdown.map((e) {
+              final logo = _logoFor(e.key);
+              return Padding(
+                padding: const EdgeInsets.only(
+                    left: 12, right: 4, top: 3, bottom: 3),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 3,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDC2626)
+                            .withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(e.key,
-                            style: const TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF6B7280)),
-                            overflow: TextOverflow.ellipsis),
-                      ),
-                      Text(
-                        formatYen(-e.value),
-                        style: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFFDC2626),
-                            fontFamily: 'monospace',
-                            fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                )),
+                    ),
+                    const SizedBox(width: 6),
+                    BrandLogo(
+                        iconUrl: logo.iconUrl,
+                        fallbackEmoji: logo.emoji,
+                        size: 18),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(e.key,
+                          style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF6B7280)),
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                    Text(
+                      formatYen(-e.value),
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFFDC2626),
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              );
+            }),
             const SizedBox(height: 4),
           ],
           const SizedBox(height: 10),
@@ -926,42 +936,66 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
     return out;
   }
 
+  /// 支払方法名（銀行/カード名）からロゴ用 iconUrl と fallback 絵文字を引く。
+  /// 該当しなければ null/デフォルトを返す。
+  ({String? iconUrl, String emoji}) _logoFor(String name) {
+    for (final b in _payments.bankAccounts) {
+      if (b.name == name) {
+        return (iconUrl: b.iconUrl, emoji: b.accountType.emoji);
+      }
+    }
+    for (final c in _payments.creditCards) {
+      if (c.name == name) {
+        return (iconUrl: c.iconUrl, emoji: '💳');
+      }
+    }
+    return (iconUrl: null, emoji: '📦');
+  }
+
   /// 内訳一覧を口座別タイルで返す（月初残高内訳の表示用）。
   List<Widget> _breakdownTiles(Map<String, int> breakdown) {
     final entries = breakdown.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-    return entries.map((e) => Padding(
-      padding:
-          const EdgeInsets.only(left: 12, right: 4, top: 2, bottom: 2),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 12,
-            decoration: BoxDecoration(
-              color:
-                  const Color(0xFF1A237E).withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(2),
+    return entries.map((e) {
+      final logo = _logoFor(e.key);
+      return Padding(
+        padding:
+            const EdgeInsets.only(left: 12, right: 4, top: 3, bottom: 3),
+        child: Row(
+          children: [
+            Container(
+              width: 3,
+              height: 16,
+              decoration: BoxDecoration(
+                color:
+                    const Color(0xFF1A237E).withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(e.key,
-                style: const TextStyle(
-                    fontSize: 11, color: Color(0xFF6B7280)),
-                overflow: TextOverflow.ellipsis),
-          ),
-          Text(
-            formatYen(e.value),
-            style: const TextStyle(
-                fontSize: 11,
-                color: Color(0xFF111827),
-                fontFamily: 'monospace',
-                fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
-    )).toList();
+            const SizedBox(width: 6),
+            BrandLogo(
+                iconUrl: logo.iconUrl,
+                fallbackEmoji: logo.emoji,
+                size: 18),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(e.key,
+                  style: const TextStyle(
+                      fontSize: 11, color: Color(0xFF6B7280)),
+                  overflow: TextOverflow.ellipsis),
+            ),
+            Text(
+              formatYen(e.value),
+              style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF111827),
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      );
+    }).toList();
   }
 
   Widget _flowRow(String label, String value, Color color) {
