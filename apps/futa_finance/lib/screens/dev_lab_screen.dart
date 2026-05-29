@@ -167,6 +167,15 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
   // ═══════════════════════════════════════════════
   // PL（損益計算書）プロトタイプ
   // ═══════════════════════════════════════════════
+  /// カテゴリ名が「原価」か判定する。
+  /// 「原価」「外注」「仕入」「材料」のいずれかを含むカテゴリは原価扱い。
+  /// それ以外の経費は販管費扱い。
+  /// 後でカテゴリ編集に「会計科目マッピング」を入れたら、これを置き換える。
+  bool _isCostOfSales(String majorCategory) {
+    const costKeywords = ['原価', '外注', '仕入', '材料'];
+    return costKeywords.any((k) => majorCategory.contains(k));
+  }
+
   Widget _plView() {
     final now = DateTime.now();
     // 直近12ヶ月の月次集計
@@ -189,11 +198,35 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
             t.date.month == m.month)
         .fold<int>(0, (s, t) => s + t.amount);
 
+    // 月別の原価/販管費を分けて集計
+    int costInMonth(DateTime m) => _transactions
+        .where((t) =>
+            t.type == core.TransactionType.expense &&
+            t.date.year == m.year &&
+            t.date.month == m.month &&
+            _isCostOfSales(t.category.major))
+        .fold<int>(0, (s, t) => s + t.amount);
+
+    int sgaInMonth(DateTime m) => _transactions
+        .where((t) =>
+            t.type == core.TransactionType.expense &&
+            t.date.year == m.year &&
+            t.date.month == m.month &&
+            !_isCostOfSales(t.category.major))
+        .fold<int>(0, (s, t) => s + t.amount);
+
     final yearIncome =
         months.fold<int>(0, (s, m) => s + incomeIn(m));
     final yearExpense =
         months.fold<int>(0, (s, m) => s + expenseIn(m));
     final yearProfit = yearIncome - yearExpense;
+    final yearCost = months.fold<int>(0, (s, m) => s + costInMonth(m));
+    final yearSga = months.fold<int>(0, (s, m) => s + sgaInMonth(m));
+    final yearGrossProfit = yearIncome - yearCost; // 粗利
+
+    // 比率（売上が0なら0扱い）
+    double pct(int part) =>
+        yearIncome == 0 ? 0 : part / yearIncome * 100;
 
     // カテゴリ別経費（直近12ヶ月）
     final categoryTotals = <String, int>{};
@@ -211,7 +244,9 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         _devNote('PL（損益計算書） - プロトタイプ',
-            '直近12ヶ月の売上・経費・利益。\n会計科目グルーピングは未実装で、カテゴリそのまま。'),
+            '直近12ヶ月の売上・原価・販管費・利益。\n'
+            '原価判定はカテゴリ名に「原価」「外注」「仕入」「材料」を含むものを自動判別。\n'
+            '後で「会計科目マッピング」UIで個別調整できるようにする予定。'),
         const SizedBox(height: 12),
         // 年間サマリー（主役）
         Container(
@@ -231,32 +266,40 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
                       letterSpacing: 1)),
               const SizedBox(height: 6),
               _plRow('売上', yearIncome, const Color(0xFF16A34A)),
-              _plRow('経費', -yearExpense, const Color(0xFFDC2626)),
+              _plRow('原価', -yearCost, const Color(0xFFDC2626)),
               const Divider(),
-              _plRow('利益（売上 − 経費）', yearProfit,
+              _plRow('粗利（売上 − 原価）', yearGrossProfit,
+                  yearGrossProfit >= 0
+                      ? const Color(0xFF16A34A)
+                      : const Color(0xFFDC2626)),
+              _plRow('販管費', -yearSga, const Color(0xFFDC2626)),
+              const Divider(),
+              _plRow('営業利益（粗利 − 販管費）', yearProfit,
                   yearProfit >= 0
                       ? const Color(0xFF16A34A)
                       : const Color(0xFFDC2626),
                   big: true),
               if (yearIncome > 0) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
+                // 3つの率を横並びで主役表示
                 Row(
                   children: [
-                    const Text('利益率',
-                        style: TextStyle(
-                            fontSize: 11, color: Color(0xFF6B7280))),
-                    const Spacer(),
-                    Text(
-                      '${(yearProfit / yearIncome * 100).toStringAsFixed(1)}%',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: yearProfit >= 0
-                            ? const Color(0xFF16A34A)
-                            : const Color(0xFFDC2626),
-                        fontFamily: 'monospace',
-                      ),
-                    ),
+                    Expanded(
+                        child: _ratioBadge(
+                            '原価率', pct(yearCost),
+                            const Color(0xFFDC2626))),
+                    const SizedBox(width: 6),
+                    Expanded(
+                        child: _ratioBadge(
+                            '粗利率', pct(yearGrossProfit),
+                            const Color(0xFF16A34A))),
+                    const SizedBox(width: 6),
+                    Expanded(
+                        child: _ratioBadge(
+                            '営業利益率', pct(yearProfit),
+                            yearProfit >= 0
+                                ? const Color(0xFF1A237E)
+                                : const Color(0xFFDC2626))),
                   ],
                 ),
               ],
@@ -289,6 +332,33 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
                 return _plMonthRow(m, i, e);
               }),
             ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // 会計風 PL 表（横スクロール）
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          child: Row(children: [
+            Icon(Icons.table_chart_outlined,
+                size: 14, color: Color(0xFF6B7280)),
+            SizedBox(width: 4),
+            Text('会計風 月次表（横スクロール）',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF6B7280))),
+          ]),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: _accountingTable(months, incomeIn, costInMonth,
+                sgaInMonth, yearIncome, yearCost, yearSga),
           ),
         ),
         const SizedBox(height: 16),
@@ -353,6 +423,240 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
                   }).toList(),
           ),
         ),
+      ],
+    );
+  }
+
+  /// 比率バッジ（原価率 / 粗利率 / 営業利益率の3つを横並びで使う）。
+  Widget _ratioBadge(String label, double pct, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        children: [
+          Text(label,
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: color)),
+          const SizedBox(height: 2),
+          Text(
+            '${pct.toStringAsFixed(1)}%',
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: color,
+                fontFamily: 'monospace'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 会計風 月次表（横スクロール）。
+  /// 縦に項目（売上/原価/粗利/販管費/営業利益）、横に月（12ヶ月 + 累計 + 売上比%）。
+  /// 添付画像の「収益計算表」っぽい構造に寄せる。
+  Widget _accountingTable(
+      List<DateTime> months,
+      int Function(DateTime) incomeIn,
+      int Function(DateTime) costInMonth,
+      int Function(DateTime) sgaInMonth,
+      int yearIncome,
+      int yearCost,
+      int yearSga) {
+    final yearGross = yearIncome - yearCost;
+    final yearOp = yearGross - yearSga;
+
+    // 月別の値を縦項目ごとに事前計算
+    final salesPerMonth =
+        months.map((m) => incomeIn(m)).toList();
+    final costPerMonth =
+        months.map((m) => costInMonth(m)).toList();
+    final grossPerMonth = [
+      for (int i = 0; i < months.length; i++)
+        salesPerMonth[i] - costPerMonth[i]
+    ];
+    final sgaPerMonth =
+        months.map((m) => sgaInMonth(m)).toList();
+    final opPerMonth = [
+      for (int i = 0; i < months.length; i++)
+        grossPerMonth[i] - sgaPerMonth[i]
+    ];
+
+    String yenLabel(int v) {
+      if (v == 0) return '0';
+      return formatYen(v);
+    }
+
+    Color amountColor(int v, {bool isProfit = false}) {
+      if (isProfit) {
+        return v >= 0 ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
+      }
+      return const Color(0xFF111827);
+    }
+
+    Widget headerCell(String text,
+        {double width = 70, Color? bg, Color? fg}) {
+      return Container(
+        width: width,
+        padding: const EdgeInsets.symmetric(
+            horizontal: 6, vertical: 8),
+        decoration: BoxDecoration(
+          color: bg ?? const Color(0xFFF9FAFB),
+          border: const Border(
+              bottom: BorderSide(color: Color(0xFFE5E7EB))),
+        ),
+        alignment: Alignment.center,
+        child: Text(text,
+            style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: fg ?? const Color(0xFF6B7280))),
+      );
+    }
+
+    Widget labelCell(String text,
+        {double width = 110,
+        bool bold = false,
+        Color? bg,
+        Color? fg}) {
+      return Container(
+        width: width,
+        padding: const EdgeInsets.symmetric(
+            horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: bg ?? Colors.white,
+          border: const Border(
+              right: BorderSide(color: Color(0xFFE5E7EB)),
+              bottom: BorderSide(color: Color(0xFFF3F4F6))),
+        ),
+        alignment: Alignment.centerLeft,
+        child: Text(text,
+            style: TextStyle(
+                fontSize: 11,
+                fontWeight:
+                    bold ? FontWeight.w700 : FontWeight.w500,
+                color: fg ?? const Color(0xFF111827))),
+      );
+    }
+
+    Widget dataCell(int amount,
+        {double width = 70,
+        bool isProfit = false,
+        bool bold = false,
+        Color? bg}) {
+      return Container(
+        width: width,
+        padding: const EdgeInsets.symmetric(
+            horizontal: 6, vertical: 6),
+        decoration: BoxDecoration(
+          color: bg ?? Colors.white,
+          border: const Border(
+              bottom: BorderSide(color: Color(0xFFF3F4F6))),
+        ),
+        alignment: Alignment.centerRight,
+        child: Text(yenLabel(amount),
+            style: TextStyle(
+                fontSize: 10,
+                fontFamily: 'monospace',
+                fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+                color: amountColor(amount, isProfit: isProfit))),
+      );
+    }
+
+    Widget pctCell(double pct,
+        {double width = 60, Color? bg, Color? fg}) {
+      return Container(
+        width: width,
+        padding: const EdgeInsets.symmetric(
+            horizontal: 6, vertical: 6),
+        decoration: BoxDecoration(
+          color: bg ?? const Color(0xFFFDF4FF),
+          border: const Border(
+              bottom: BorderSide(color: Color(0xFFF3F4F6))),
+        ),
+        alignment: Alignment.centerRight,
+        child: Text('${pct.toStringAsFixed(1)}%',
+            style: TextStyle(
+                fontSize: 10,
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.w600,
+                color: fg ?? const Color(0xFF7C2D12))),
+      );
+    }
+
+    Widget row({
+      required String label,
+      required List<int> values,
+      required int total,
+      bool isProfit = false,
+      bool emphasize = false,
+    }) {
+      final ratio = yearIncome == 0 ? 0.0 : total / yearIncome * 100;
+      final bg = emphasize ? const Color(0xFFFEF9C3) : null;
+      return Row(
+        children: [
+          labelCell(label, bold: emphasize, bg: bg),
+          for (int i = 0; i < values.length; i++)
+            dataCell(values[i],
+                isProfit: isProfit, bold: emphasize, bg: bg),
+          dataCell(total,
+              isProfit: isProfit, bold: true, bg: bg),
+          pctCell(ratio),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ヘッダー
+        Row(
+          children: [
+            headerCell('項目', width: 110),
+            for (final m in months)
+              headerCell('${m.month}月'),
+            headerCell('1年累計', width: 80, bg: const Color(0xFFF3F4F6)),
+            headerCell('売上比',
+                width: 60, bg: const Color(0xFFFDF4FF)),
+          ],
+        ),
+        // 売上
+        row(
+            label: '売上',
+            values: salesPerMonth,
+            total: yearIncome,
+            emphasize: false),
+        // 原価
+        row(
+            label: '原価',
+            values: costPerMonth,
+            total: yearCost,
+            emphasize: false),
+        // 粗利（強調）
+        row(
+            label: '粗利',
+            values: grossPerMonth,
+            total: yearGross,
+            isProfit: true,
+            emphasize: true),
+        // 販管費
+        row(
+            label: '販管費',
+            values: sgaPerMonth,
+            total: yearSga,
+            emphasize: false),
+        // 営業利益（強調）
+        row(
+            label: '営業利益',
+            values: opPerMonth,
+            total: yearOp,
+            isProfit: true,
+            emphasize: true),
       ],
     );
   }
