@@ -33,11 +33,52 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
+/// 設定画面のセクション。サイドバー型ナビでの選択軸。
+enum _SettingsSection { money, display, data, account, app }
+
+extension _SettingsSectionX on _SettingsSection {
+  String get label {
+    switch (this) {
+      case _SettingsSection.money:
+        return 'お金の項目';
+      case _SettingsSection.display:
+        return '表示';
+      case _SettingsSection.data:
+        return 'データ管理';
+      case _SettingsSection.account:
+        return 'アカウント';
+      case _SettingsSection.app:
+        return 'アプリ情報';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case _SettingsSection.money:
+        return Icons.attach_money;
+      case _SettingsSection.display:
+        return Icons.visibility;
+      case _SettingsSection.data:
+        return Icons.storage;
+      case _SettingsSection.account:
+        return Icons.person;
+      case _SettingsSection.app:
+        return Icons.info_outline;
+    }
+  }
+}
+
 class _SettingsScreenState extends State<SettingsScreen> {
   UpdateCheckResult? _versionResult;
   bool _checking = false;
   bool _downloading = false;
   double _downloadProgress = 0;
+
+  /// 広い画面でサイドバーから選ばれているセクション。
+  _SettingsSection _selected = _SettingsSection.money;
+
+  /// サイドバーレイアウトに切り替えるしきい値。
+  static const double _wideBreakpoint = 720;
 
   @override
   void initState() {
@@ -152,126 +193,227 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            _section('お金の項目'),
-            _tile(
-              icon: Icons.category,
-              title: 'カテゴリ編集',
-              subtitle: '大カテゴリ・小カテゴリ・アイコンの追加と編集',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const CategoryEditorScreen()),
-              ),
-            ),
-            _tile(
-              icon: Icons.account_balance,
-              title: 'ウォレット',
-              subtitle: '銀行口座・現金（財布）・電子マネー(PayPay等)の登録',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const AccountEditorScreen()),
-              ),
-            ),
-            _tile(
-              icon: Icons.credit_card,
-              title: 'クレジットカード',
-              subtitle: '取引で選択するカードの登録',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const CardEditorScreen()),
-              ),
-            ),
-            _tile(
-              icon: Icons.attach_money,
-              title: '収入マスタ',
-              subtitle: '継続収入・単発収入のテンプレート登録',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const IncomeMasterScreen()),
-              ),
-            ),
-            _tile(
-              icon: Icons.subscriptions,
-              title: '固定費一覧',
-              subtitle: '月払い/年払い・定額/変動の継続支払いを一覧管理',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const SubscriptionListScreen()),
-              ),
-            ),
-            _tile(
-              icon: Icons.checklist,
-              title: '月末締めチェックリスト',
-              subtitle: '締め前に確認するサイト・項目を登録',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const ChecklistEditorScreen()),
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            _section('表示'),
-            _hideInactiveTile(),
-
-            const SizedBox(height: 8),
-
-            _section('アプリ情報'),
-            _versionCard(),
-
-            const SizedBox(height: 8),
-            _section('データ管理'),
-            _tile(
-              icon: Icons.cloud_upload,
-              title: 'バックアップを書き出す',
-              subtitle: '全データを1つのJSONファイルとして共有（Drive等へ保存）',
-              onTap: () => _exportBackup(context),
-            ),
-            _tile(
-              icon: Icons.cloud_download,
-              title: 'バックアップから復元',
-              subtitle: 'JSONファイルを取り込んで既存データを上書き',
-              onTap: () => _importBackup(context),
-            ),
-            // Web 専用: D&D で取り込めるゾーン。
-            // ブラウザの仕様上、ファイルピッカーに絶対パスを指定できないため
-            // 「H:\マイドライブ\ツール開発\FutaFinance\」 をエクスプローラで
-            // 開いておき、JSONファイルをここにドロップしてもらう運用。
-            if (kIsWeb) _importDropZone(context),
-            _tile(
-              icon: Icons.restore,
-              title: '直前の状態に戻す（自動スナップショット）',
-              subtitle: '取り込み実行の直前に自動保存された状態を一覧から復元',
-              onTap: () => _showAutoSnapshots(context),
-            ),
-            _tile(
-              icon: Icons.upload_file,
-              title: 'サンプルデータを投入（全置換）',
-              subtitle: '既存の取引を全削除し、5月実データ30件 + 住信SBI口座をセット',
-              onTap: () => _seedSampleData(context),
-            ),
-            _tile(
-              icon: Icons.delete_sweep,
-              title: '全取引を削除',
-              subtitle: '入力済みの取引を全て消去（自動スナップショットから復元可）',
-              onTap: () => _clearAll(context),
-              danger: true,
-            ),
-
-            const SizedBox(height: 8),
-            _section('アカウント'),
-            _accountTile(),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth >= _wideBreakpoint) {
+              return _buildWideLayout();
+            }
+            return _buildNarrowLayout();
+          },
         ),
       ),
     );
+  }
+
+  /// 広い画面: 左サイドバー + 右コンテンツの2カラム
+  Widget _buildWideLayout() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          width: 200,
+          color: const Color(0xFFFAFAFA),
+          child: ListView(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            children: _SettingsSection.values
+                .map((s) => _sideNavTile(s))
+                .toList(),
+          ),
+        ),
+        const VerticalDivider(width: 1, thickness: 1),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: _buildSection(_selected),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 狭い画面（モバイル）: 全セクションを縦に並べる（従来通り）
+  Widget _buildNarrowLayout() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        for (final s in _SettingsSection.values) ...[
+          ..._buildSection(s),
+          const SizedBox(height: 8),
+        ],
+      ],
+    );
+  }
+
+  /// サイドバーのタイル
+  Widget _sideNavTile(_SettingsSection section) {
+    final selected = _selected == section;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => setState(() => _selected = section),
+        child: Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: selected
+                ? const Color(0xFFE0E7FF).withValues(alpha: 0.6)
+                : Colors.transparent,
+            border: Border(
+              left: BorderSide(
+                color: selected
+                    ? const Color(0xFF1A237E)
+                    : Colors.transparent,
+                width: 3,
+              ),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(section.icon,
+                  size: 18,
+                  color: selected
+                      ? const Color(0xFF1A237E)
+                      : const Color(0xFF6B7280)),
+              const SizedBox(width: 10),
+              Text(section.label,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight:
+                          selected ? FontWeight.w700 : FontWeight.w500,
+                      color: selected
+                          ? const Color(0xFF1A237E)
+                          : const Color(0xFF111827))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// セクションの中身（タイル群）を返す。
+  List<Widget> _buildSection(_SettingsSection section) {
+    switch (section) {
+      case _SettingsSection.money:
+        return [
+          _section('お金の項目'),
+          _tile(
+            icon: Icons.category,
+            title: 'カテゴリ編集',
+            subtitle: '大カテゴリ・小カテゴリ・アイコンの追加と編集',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const CategoryEditorScreen()),
+            ),
+          ),
+          _tile(
+            icon: Icons.account_balance,
+            title: 'ウォレット',
+            subtitle: '銀行口座・現金（財布）・電子マネー(PayPay等)の登録',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const AccountEditorScreen()),
+            ),
+          ),
+          _tile(
+            icon: Icons.credit_card,
+            title: 'クレジットカード',
+            subtitle: '取引で選択するカードの登録',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const CardEditorScreen()),
+            ),
+          ),
+          _tile(
+            icon: Icons.attach_money,
+            title: '収入マスタ',
+            subtitle: '継続収入・単発収入のテンプレート登録',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const IncomeMasterScreen()),
+            ),
+          ),
+          _tile(
+            icon: Icons.subscriptions,
+            title: '固定費一覧',
+            subtitle: '月払い/年払い・定額/変動の継続支払いを一覧管理',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const SubscriptionListScreen()),
+            ),
+          ),
+          _tile(
+            icon: Icons.checklist,
+            title: '月末締めチェックリスト',
+            subtitle: '締め前に確認するサイト・項目を登録',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const ChecklistEditorScreen()),
+            ),
+          ),
+        ];
+
+      case _SettingsSection.display:
+        return [
+          _section('表示'),
+          _hideInactiveTile(),
+        ];
+
+      case _SettingsSection.data:
+        return [
+          _section('データ管理'),
+          _tile(
+            icon: Icons.cloud_upload,
+            title: 'バックアップを書き出す',
+            subtitle: '全データを1つのJSONファイルとして共有（Drive等へ保存）',
+            onTap: () => _exportBackup(context),
+          ),
+          _tile(
+            icon: Icons.cloud_download,
+            title: 'バックアップから復元',
+            subtitle: 'JSONファイルを取り込んで既存データを上書き',
+            onTap: () => _importBackup(context),
+          ),
+          // Web 専用: D&D 取り込みゾーン
+          if (kIsWeb) _importDropZone(context),
+          _tile(
+            icon: Icons.restore,
+            title: '直前の状態に戻す（自動スナップショット）',
+            subtitle: '取り込み実行の直前に自動保存された状態を一覧から復元',
+            onTap: () => _showAutoSnapshots(context),
+          ),
+          _tile(
+            icon: Icons.upload_file,
+            title: 'サンプルデータを投入（全置換）',
+            subtitle: '既存の取引を全削除し、5月実データ30件 + 住信SBI口座をセット',
+            onTap: () => _seedSampleData(context),
+          ),
+          _tile(
+            icon: Icons.delete_sweep,
+            title: '全取引を削除',
+            subtitle: '入力済みの取引を全て消去（自動スナップショットから復元可）',
+            onTap: () => _clearAll(context),
+            danger: true,
+          ),
+        ];
+
+      case _SettingsSection.account:
+        return [
+          _section('アカウント'),
+          _accountTile(),
+        ];
+
+      case _SettingsSection.app:
+        return [
+          _section('アプリ情報'),
+          _versionCard(),
+        ];
+    }
   }
 
   /// アカウント情報＋サインアウトボタン。

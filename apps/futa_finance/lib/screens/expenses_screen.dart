@@ -6,6 +6,7 @@ import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/app_mode.dart';
 import '../data/settings_repository.dart';
+import '../data/subscription_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/emoji_palette.dart';
 import '../utils/formatters.dart';
@@ -36,9 +37,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
   StreamSubscription<List<core.Transaction>>? _sub;
   List<core.Transaction> _transactions = [];
   core.CategoryConfig? _categoryConfig;
+  core.SubscriptionConfig _subscriptions =
+      core.SubscriptionConfig.empty();
   DateTime _focused = DateTime(DateTime.now().year, DateTime.now().month);
   _ExpensesViewMode _viewMode = _ExpensesViewMode.row;
   _ExpensesSortMode _sortMode = _ExpensesSortMode.dateDesc;
+
+  /// 「毎月引落予定」セクションの開閉。デフォルトは開いた状態。
+  bool _monthlyChargesExpanded = true;
 
   @override
   void initState() {
@@ -59,10 +65,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
   Future<void> _load() async {
     final list = await _repo.loadAll();
     final cfg = await _settings.loadCategories();
+    final subs = await SubscriptionRepository.instance.load();
     if (!mounted) return;
     setState(() {
       _transactions = list;
       _categoryConfig = cfg;
+      _subscriptions = subs;
     });
   }
 
@@ -183,6 +191,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 children: [
+                  // 毎月引落予定（月払いsubscription）。全view モードの上に表示。
+                  _monthlyChargesSection(),
+                  if (_monthlyCharges.isNotEmpty)
+                    const SizedBox(height: 10),
                   if (monthExpenses.isEmpty)
                     _empty()
                   else if (_viewMode == _ExpensesViewMode.list)
@@ -683,6 +695,184 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
                   fontWeight: FontWeight.w700,
                   fontFamily: 'monospace'),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ═════════════════════════════════════════════════
+  // 毎月引落予定セクション（月払い subscription）
+  // ═════════════════════════════════════════════════
+
+  /// 表示月の「毎月引落」予定の subscription リスト（請求日昇順）。
+  List<core.Subscription> get _monthlyCharges {
+    final list = _subscriptions.subscriptions
+        .where((s) => s.cycle == core.SubscriptionCycle.monthly)
+        .toList();
+    list.sort((a, b) {
+      final ad = a.billingDay ?? 32;
+      final bd = b.billingDay ?? 32;
+      return ad.compareTo(bd);
+    });
+    return list;
+  }
+
+  Widget _monthlyChargesSection() {
+    final charges = _monthlyCharges;
+    if (charges.isEmpty) return const SizedBox.shrink();
+    final total =
+        charges.fold<int>(0, (s, c) => s + c.amount);
+    final today = DateTime.now();
+    final isCurrentMonth = _focused.year == today.year &&
+        _focused.month == today.month;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        children: [
+          // ヘッダー（タップで開閉）
+          InkWell(
+            onTap: () => setState(
+                () => _monthlyChargesExpanded = !_monthlyChargesExpanded),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: Row(
+                children: [
+                  const Icon(Icons.event_repeat,
+                      size: 16, color: Color(0xFFEA580C)),
+                  const SizedBox(width: 6),
+                  const Text('毎月引落予定',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF111827))),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFEDD5),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    child: Text('${charges.length}',
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFFEA580C),
+                            fontWeight: FontWeight.w700)),
+                  ),
+                  const Spacer(),
+                  Text(
+                    formatYen(total),
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111827),
+                        fontFamily: 'monospace'),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(
+                      _monthlyChargesExpanded
+                          ? Icons.expand_less
+                          : Icons.expand_more,
+                      color: const Color(0xFF6B7280),
+                      size: 18),
+                ],
+              ),
+            ),
+          ),
+          if (_monthlyChargesExpanded) ...[
+            const Divider(height: 1),
+            ...charges.map((c) =>
+                _monthlyChargeRow(c, isCurrentMonth, today)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _monthlyChargeRow(
+      core.Subscription s, bool isCurrentMonth, DateTime today) {
+    final day = s.billingDay;
+    // 今月の場合: 引落日に対する状態（過ぎた/今日/予定）バッジ
+    String? statusLabel;
+    Color? statusColor;
+    if (isCurrentMonth && day != null) {
+      if (day < today.day) {
+        statusLabel = '引落済';
+        statusColor = const Color(0xFF16A34A);
+      } else if (day == today.day) {
+        statusLabel = '今日';
+        statusColor = const Color(0xFFDC2626);
+      } else {
+        final left = day - today.day;
+        statusLabel = 'あと$left日';
+        statusColor = left <= 3
+            ? const Color(0xFFEA580C)
+            : const Color(0xFF1A237E);
+      }
+    }
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Color(0xFFF3F4F6))),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 40,
+            child: Text(
+              day == null ? '—' : '$day 日',
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFFEA580C)),
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(s.name,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF111827))),
+                if (s.paymentMethod != null &&
+                    s.paymentMethod!.isNotEmpty)
+                  Text(s.paymentMethod!,
+                      style: const TextStyle(
+                          fontSize: 10, color: Color(0xFF9CA3AF))),
+              ],
+            ),
+          ),
+          if (statusLabel != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: statusColor!.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: Text(statusLabel,
+                  style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: statusColor)),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Text(
+            formatYen(s.amount),
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF111827),
+                fontFamily: 'monospace'),
           ),
         ],
       ),
