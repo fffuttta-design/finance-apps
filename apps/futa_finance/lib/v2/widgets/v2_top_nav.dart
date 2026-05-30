@@ -32,7 +32,7 @@ class V2TopNav extends StatelessWidget {
     required this.currentId,
     required this.onSelect,
     required this.accent,
-    this.maxWidth = 1200,
+    this.maxWidth = 1040,
   });
 
   @override

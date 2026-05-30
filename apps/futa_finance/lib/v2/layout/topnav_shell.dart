@@ -23,7 +23,7 @@ class V2TopNavShell extends StatelessWidget {
   final V2TopNav topNav;
   final Widget content;
 
-  /// 中央コンテンツの最大幅。マネフォ ME はだいたい 1100px 前後
+  /// 中央コンテンツの最大幅。マネフォ ME はだいたい 1040px 前後
   final double maxContentWidth;
 
   const V2TopNavShell({
@@ -31,7 +31,7 @@ class V2TopNavShell extends StatelessWidget {
     required this.header,
     required this.topNav,
     required this.content,
-    this.maxContentWidth = 1200,
+    this.maxContentWidth = 1040,
   });
 
   @override

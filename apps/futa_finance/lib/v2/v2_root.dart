@@ -270,8 +270,8 @@ class _V2RootState extends State<V2Root> {
         currentId: _currentId,
         onSelect: (id) => setState(() => _currentId = id),
         accent: accent,
-        // Shell の maxContentWidth と揃える
-        maxWidth: 1200,
+        // Shell の maxContentWidth と揃える（マネフォ ME 寄りに 1040px）
+        maxWidth: 1040,
       ),
       content: _bodyFor(_currentId, accent: accent),
     );
