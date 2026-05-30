@@ -374,6 +374,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           _v2UiTile(),
+          _v2VariantTile(),
         ];
 
       case _SettingsSection.data:
@@ -1392,6 +1393,78 @@ class _SettingsScreenState extends State<SettingsScreen> {
               letterSpacing: 1),
         ),
       );
+
+  /// v2 のレイアウトバリアント（サイドバー版 vs 上タブ版）切替トグル。
+  Widget _v2VariantTile() {
+    return AnimatedBuilder(
+      animation: UiPreferences.instance,
+      builder: (context, _) {
+        final variant = UiPreferences.instance.v2Variant;
+        final isTopNav =
+            variant == UiPreferences.v2VariantTopNav;
+        final label = isTopNav ? '上タブ (v2.1)' : 'サイドバー (v2)';
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: ListTile(
+            leading: const Icon(Icons.view_compact_outlined,
+                color: Color(0xFF1976D2)),
+            title: const Text('v2 レイアウト',
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF111827))),
+            subtitle: const Text(
+                'v2 が ON のときのレイアウト形式（サイドバー or 上タブ）',
+                style: TextStyle(
+                    fontSize: 11, color: Color(0xFF6B7280))),
+            trailing: PopupMenuButton<String>(
+              tooltip: '切替',
+              onSelected: (val) =>
+                  UiPreferences.instance.setV2Variant(val),
+              itemBuilder: (_) => [
+                CheckedPopupMenuItem(
+                  value: UiPreferences.v2VariantSidebar,
+                  checked: !isTopNav,
+                  child: const Text('サイドバー (v2)\nマネフォクラウド風'),
+                ),
+                CheckedPopupMenuItem(
+                  value: UiPreferences.v2VariantTopNav,
+                  checked: isTopNav,
+                  child: const Text('上タブ (v2.1)\nマネフォ ME 風'),
+                ),
+              ],
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3F2FD),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(label,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1976D2))),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.arrow_drop_down,
+                        size: 18, color: Color(0xFF1976D2)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   /// v2 UI（デスクトップ向け抜本リデザイン、β）切替トグル。
   /// 3 状態: 自動 / v2 強制 / v1 強制。

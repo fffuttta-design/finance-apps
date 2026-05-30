@@ -40,9 +40,19 @@ class UiPreferences extends ChangeNotifier {
   /// - false → v1 強制
   static const _kUseV2Ui = 'futa.ui.use_v2';
 
+  /// v2 のレイアウトバリアント。
+  /// - 'sidebar' → マネフォクラウド風の左サイドバー（既定）
+  /// - 'topnav' → マネフォ ME 風の上タブ + 中央カラム（v2.1）
+  static const _kV2Variant = 'futa.ui.v2_variant';
+
+  /// v2 バリアント識別子。
+  static const v2VariantSidebar = 'sidebar';
+  static const v2VariantTopNav = 'topnav';
+
   bool _hideInactive = false;
   List<String> _sidebarOrder = List.of(defaultSidebarOrder);
   bool? _useV2Ui;
+  String _v2Variant = v2VariantSidebar;
   bool _loaded = false;
 
   /// 「未使用」フラグの立っているウォレット・口座・クレカを表示系画面で隠すか。
@@ -61,6 +71,9 @@ class UiPreferences extends ChangeNotifier {
 
   /// v2 UI 強制設定。null=自動判定。
   bool? get useV2Ui => _useV2Ui;
+
+  /// 現在の v2 レイアウトバリアント（'sidebar' or 'topnav'）。
+  String get v2Variant => _v2Variant;
 
   /// 渡された画面幅から、最終的に v2 を使うかを返す。
   /// - 強制設定（true/false）があればそれに従う
@@ -99,7 +112,23 @@ class UiPreferences extends ChangeNotifier {
     } else {
       _useV2Ui = null;
     }
+    // v2 バリアント
+    final variant = prefs.getString(_kV2Variant);
+    _v2Variant = (variant == v2VariantTopNav)
+        ? v2VariantTopNav
+        : v2VariantSidebar;
     _loaded = true;
+    notifyListeners();
+  }
+
+  /// v2 バリアントを更新。
+  Future<void> setV2Variant(String variant) async {
+    if (variant != v2VariantSidebar && variant != v2VariantTopNav) {
+      return;
+    }
+    _v2Variant = variant;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kV2Variant, variant);
     notifyListeners();
   }
 

@@ -4,13 +4,18 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../data/app_mode.dart';
 import '../data/ui_preferences.dart';
 import 'layout/shell.dart';
+import 'layout/topnav_shell.dart';
 import 'screens/v2_home.dart';
+import 'screens/v2_home_topnav.dart';
 import 'screens/v2_placeholder.dart';
 import 'theme/colors.dart';
+import 'theme/mode_accent.dart';
 import 'theme/spacing.dart';
 import 'theme/typography.dart';
 import 'widgets/v2_mode_switcher.dart';
 import 'widgets/v2_sidebar.dart';
+import 'widgets/v2_top_header.dart';
+import 'widgets/v2_top_nav.dart';
 import 'widgets/v2_topbar.dart';
 
 /// v2 のルート。サイドバーのナビ選択を保持し、メイン領域を切り替える。
@@ -91,9 +96,14 @@ class _V2RootState extends State<V2Root> {
     ];
   }
 
-  Widget _bodyFor(String id) {
+  Widget _bodyFor(String id, {required Color accent}) {
     switch (id) {
       case 'home':
+        // sidebar バリアントは従来のホーム、topnav は ME 風ホーム
+        final variant = UiPreferences.instance.v2Variant;
+        if (variant == UiPreferences.v2VariantTopNav) {
+          return V2HomeTopNavScreen(accent: accent);
+        }
         return const V2HomeScreen();
       case 'expenses':
         return const V2PlaceholderScreen(
@@ -152,6 +162,18 @@ class _V2RootState extends State<V2Root> {
   @override
   Widget build(BuildContext context) {
     final mode = AppModeManager.instance.current;
+    final variant = UiPreferences.instance.v2Variant;
+    final accent = V2ModeAccent.of(mode);
+
+    if (variant == UiPreferences.v2VariantTopNav) {
+      return _buildTopNav(context, accent);
+    }
+    return _buildSidebar(context, accent);
+  }
+
+  /// マネフォクラウド風（既定）: 左サイドバー + メイン
+  Widget _buildSidebar(BuildContext context, Color accent) {
+    final mode = AppModeManager.instance.current;
     return V2Shell(
       sidebar: V2Sidebar(
         items: _navItems,
@@ -167,20 +189,20 @@ class _V2RootState extends State<V2Root> {
         ],
         actions: [
           OutlinedButton.icon(
-            onPressed: () {
-              // Phase 0 ではダミー。Phase 1+ で記録モーダル実装。
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('記録ボタン: Phase 1 以降で実装'),
-                ),
-              );
-            },
+            onPressed: () => _showRecordSnack(context),
             icon: const Icon(Icons.add, size: 14),
             label: const Text('記録'),
           ),
           OutlinedButton.icon(
             onPressed: () async {
-              // v1 に戻す（手動切替の出口）
+              await UiPreferences.instance.setV2Variant(
+                  UiPreferences.v2VariantTopNav);
+            },
+            icon: const Icon(Icons.view_compact, size: 14),
+            label: const Text('上タブ版 (v2.1)'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () async {
               await UiPreferences.instance.setUseV2Ui(false);
             },
             icon: const Icon(Icons.swap_horiz, size: 14),
@@ -188,7 +210,58 @@ class _V2RootState extends State<V2Root> {
           ),
         ],
       ),
-      content: _bodyFor(_currentId),
+      content: _bodyFor(_currentId, accent: accent),
+    );
+  }
+
+  /// マネフォ ME 風（v2.1）: 上タブ + 中央カラム
+  Widget _buildTopNav(BuildContext context, Color accent) {
+    return V2TopNavShell(
+      header: V2TopHeader(
+        accent: accent,
+        modeSwitcher: const V2ModeSwitcher(),
+        actions: [
+          FilledButton.icon(
+            onPressed: () => _showRecordSnack(context),
+            icon: const Icon(Icons.add, size: 14),
+            label: const Text('記録'),
+            style: FilledButton.styleFrom(
+              backgroundColor: accent,
+              foregroundColor: Colors.white,
+            ),
+          ),
+          OutlinedButton.icon(
+            onPressed: () async {
+              await UiPreferences.instance.setV2Variant(
+                  UiPreferences.v2VariantSidebar);
+            },
+            icon: const Icon(Icons.view_sidebar, size: 14),
+            label: const Text('サイドバー版 (v2)'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () async {
+              await UiPreferences.instance.setUseV2Ui(false);
+            },
+            icon: const Icon(Icons.swap_horiz, size: 14),
+            label: const Text('v1 に戻す'),
+          ),
+        ],
+      ),
+      topNav: V2TopNav(
+        items: _navItems,
+        currentId: _currentId,
+        onSelect: (id) => setState(() => _currentId = id),
+        accent: accent,
+      ),
+      content: _bodyFor(_currentId, accent: accent),
+    );
+  }
+
+  void _showRecordSnack(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('記録ボタン: Phase 1 以降で実装'),
+      ),
     );
   }
 }
