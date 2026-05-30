@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -11,6 +12,8 @@ import 'data/ui_preferences.dart';
 import 'firebase_options.dart';
 import 'screens/auth_screen.dart';
 import 'screens/root_screen.dart';
+import 'v2/theme/app_theme.dart';
+import 'v2/v2_root.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,8 +37,10 @@ class FutaFinanceApp extends StatelessWidget {
   Widget build(BuildContext context) {
     // モード変更時にテーマ（特に scaffoldBackgroundColor）を再構築するため、
     // AppModeManager を listenable にして MaterialApp ごと rebuild する。
+    // また UiPreferences の v1/v2 切替にも追従する。
     return ListenableBuilder(
-      listenable: AppModeManager.instance,
+      listenable: Listenable.merge(
+          [AppModeManager.instance, UiPreferences.instance]),
       builder: (context, _) {
         final mode = AppModeManager.instance.current;
         return MaterialApp(
@@ -51,13 +56,15 @@ class FutaFinanceApp extends StatelessWidget {
             Locale('en', 'US'),
           ],
           locale: const Locale('ja', 'JP'),
+          // v1 のテーマは MaterialApp に直接渡す（ダイアログ・スナックバー等の
+          // デフォルトを担保）。v2 のときは _AuthGate の中で Theme widget で
+          // 上書きするので、ここではテーマ判定をしない。
           theme: ThemeData(
             useMaterial3: true,
             colorScheme: ColorScheme.fromSeed(
               seedColor: mode.accentColor,
               brightness: Brightness.light,
             ),
-            // モード別の薄背景（事業=薄紺、個人=薄オレンジ）
             scaffoldBackgroundColor: mode.backgroundTint,
             appBarTheme: const AppBarTheme(
               backgroundColor: Colors.white,
@@ -161,6 +168,17 @@ class _AuthGateState extends State<_AuthGate> {
           );
         }
 
+        // v1/v2 切替（自動 or 設定の手動値）。
+        // v2 のときは V2Theme でラップして v2 配下の widget 全体に適用する。
+        final width = MediaQuery.sizeOf(context).width;
+        final useV2 = UiPreferences.instance.resolveUseV2(
+            isWeb: kIsWeb, width: width);
+        if (useV2) {
+          return Theme(
+            data: V2Theme.light(),
+            child: const V2Root(),
+          );
+        }
         return const RootScreen();
       },
     );

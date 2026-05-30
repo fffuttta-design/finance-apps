@@ -373,6 +373,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   builder: (_) => const SidebarOrderScreen()),
             ),
           ),
+          _v2UiTile(),
         ];
 
       case _SettingsSection.data:
@@ -1391,6 +1392,84 @@ class _SettingsScreenState extends State<SettingsScreen> {
               letterSpacing: 1),
         ),
       );
+
+  /// v2 UI（デスクトップ向け抜本リデザイン、β）切替トグル。
+  /// 3 状態: 自動 / v2 強制 / v1 強制。
+  Widget _v2UiTile() {
+    return AnimatedBuilder(
+      animation: UiPreferences.instance,
+      builder: (context, _) {
+        final v = UiPreferences.instance.useV2Ui;
+        final label = v == null
+            ? '自動'
+            : (v ? 'v2 を強制' : 'v1 を強制');
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: ListTile(
+            leading: const Icon(Icons.dashboard_customize_outlined,
+                color: Color(0xFF4F46E5)),
+            title: const Text('UI バージョン (β)',
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF111827))),
+            subtitle: const Text(
+                '自動: Web×幅 1024px 以上で v2。手動切替も可。',
+                style: TextStyle(
+                    fontSize: 11, color: Color(0xFF6B7280))),
+            trailing: PopupMenuButton<bool?>(
+              tooltip: '切替',
+              onSelected: (val) =>
+                  UiPreferences.instance.setUseV2Ui(val),
+              itemBuilder: (_) => [
+                CheckedPopupMenuItem(
+                  value: null,
+                  checked: v == null,
+                  child: const Text('自動'),
+                ),
+                CheckedPopupMenuItem(
+                  value: true,
+                  checked: v == true,
+                  child: const Text('v2 を強制（デスクトップ向け）'),
+                ),
+                CheckedPopupMenuItem(
+                  value: false,
+                  checked: v == false,
+                  child: const Text('v1 を強制（モバイル向け）'),
+                ),
+              ],
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF2FF),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(label,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF4F46E5))),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.arrow_drop_down,
+                        size: 18, color: Color(0xFF4F46E5)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   /// 「未使用のウォレット/口座/クレカを隠す」スイッチ。
   /// 各ウォレット/カード編集で「未使用」フラグを立てた項目だけが対象。

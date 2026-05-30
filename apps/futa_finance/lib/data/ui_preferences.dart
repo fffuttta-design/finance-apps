@@ -34,8 +34,15 @@ class UiPreferences extends ChangeNotifier {
     'devLab',
   ];
 
+  /// v2 UI（デスクトップ向け抜本リデザイン）を強制 ON/OFF するキー。
+  /// - 値なし（null） → 自動判定
+  /// - true → v2 強制
+  /// - false → v1 強制
+  static const _kUseV2Ui = 'futa.ui.use_v2';
+
   bool _hideInactive = false;
   List<String> _sidebarOrder = List.of(defaultSidebarOrder);
+  bool? _useV2Ui;
   bool _loaded = false;
 
   /// 「未使用」フラグの立っているウォレット・口座・クレカを表示系画面で隠すか。
@@ -50,6 +57,18 @@ class UiPreferences extends ChangeNotifier {
         .where((id) => !_sidebarOrder.contains(id))
         .toList();
     return [..._sidebarOrder, ...missing];
+  }
+
+  /// v2 UI 強制設定。null=自動判定。
+  bool? get useV2Ui => _useV2Ui;
+
+  /// 渡された画面幅から、最終的に v2 を使うかを返す。
+  /// - 強制設定（true/false）があればそれに従う
+  /// - 未設定なら自動判定: Web×幅 >= 1024px で v2
+  bool resolveUseV2({required bool isWeb, required double width}) {
+    final forced = _useV2Ui;
+    if (forced != null) return forced;
+    return isWeb && width >= 1024;
   }
 
   /// 起動時に一度呼ぶ。多重呼び出しは無害（最初の値を保持）。
@@ -74,7 +93,25 @@ class UiPreferences extends ChangeNotifier {
     } else {
       _sidebarOrder = List.of(defaultSidebarOrder);
     }
+    // v2 UI 強制設定（未設定なら null）
+    if (prefs.containsKey(_kUseV2Ui)) {
+      _useV2Ui = prefs.getBool(_kUseV2Ui);
+    } else {
+      _useV2Ui = null;
+    }
     _loaded = true;
+    notifyListeners();
+  }
+
+  /// v2 UI 強制設定を更新。null を渡すと自動判定に戻す。
+  Future<void> setUseV2Ui(bool? v) async {
+    _useV2Ui = v;
+    final prefs = await SharedPreferences.getInstance();
+    if (v == null) {
+      await prefs.remove(_kUseV2Ui);
+    } else {
+      await prefs.setBool(_kUseV2Ui, v);
+    }
     notifyListeners();
   }
 
