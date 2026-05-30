@@ -22,7 +22,11 @@ enum _GroupMode { none, byCategory, byAmountType }
 
 /// 固定費一覧のCRUD画面。月払い/年払い・定額/変動を統一管理。
 class SubscriptionListScreen extends StatefulWidget {
-  const SubscriptionListScreen({super.key});
+  /// 起動時に自動で編集モーダルを開く対象 subscription の ID。
+  /// 支出タブの「毎月引落予定」行からのディープリンク用。
+  final String? initialEditId;
+
+  const SubscriptionListScreen({super.key, this.initialEditId});
 
   @override
   State<SubscriptionListScreen> createState() => _SubscriptionListScreenState();
@@ -54,6 +58,13 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
       _config = c;
       _payments = p;
     });
+    // ディープリンク: 起動時に編集モーダルを自動で開く（一度だけ）。
+    final editId = widget.initialEditId;
+    if (editId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _editById(editId);
+      });
+    }
   }
 
   Future<void> _save() async {

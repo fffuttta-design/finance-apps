@@ -12,6 +12,7 @@ import '../utils/emoji_palette.dart';
 import '../utils/formatters.dart';
 import '../widgets/brand_logo.dart';
 import 'expense_input_screen.dart';
+import 'subscription_list_screen.dart';
 
 /// 支出タブ。月送り、年間払い契約、カテゴリ別の支出一覧（折りたたみ式）。
 class ExpensesScreen extends StatefulWidget {
@@ -927,7 +928,19 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
             : const Color(0xFF1A237E);
       }
     }
-    return Container(
+    return InkWell(
+      onTap: () async {
+        // 固定費編集画面（一覧）へ遷移し、対象 subscription の編集モーダルを
+        // 自動で開く。戻ってきたら自前の固定費キャッシュも再読込。
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) =>
+                SubscriptionListScreen(initialEditId: s.id),
+          ),
+        );
+        if (mounted) await _load();
+      },
+      child: Container(
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: Color(0xFFF3F4F6))),
       ),
@@ -994,6 +1007,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
                 fontFamily: 'monospace'),
           ),
         ],
+      ),
       ),
     );
   }
