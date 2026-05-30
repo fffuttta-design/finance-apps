@@ -55,6 +55,10 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
   /// 経費内訳の展開フラグ。
   bool _expenseBreakdownExpanded = false;
 
+  /// 残高セクションで銀行口座を「全件展開」しているか。
+  /// false の時は上位3件のみ表示。
+  bool _allBanksExpanded = false;
+
   @override
   void initState() {
     super.initState();
@@ -622,314 +626,329 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
               ),
             )
           else ...[
-            // ── 月初残高（主役）────────────────────────────
-            // 大きな数字で表示 + タップで口座別内訳を展開。
-            InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: initialBreakdown.isEmpty
-                  ? null
-                  : () => setState(() => _initialBreakdownExpanded =
-                      !_initialBreakdownExpanded),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 4, vertical: 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                '月初残高 (${month.month}/1)',
-                                style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF6B7280)),
-                              ),
-                              if (initialBreakdown.isNotEmpty) ...[
-                                const SizedBox(width: 4),
-                                Icon(
-                                  _initialBreakdownExpanded
-                                      ? Icons.expand_less
-                                      : Icons.expand_more,
-                                  size: 14,
-                                  color: const Color(0xFF9CA3AF),
-                                ),
-                              ],
-                            ],
-                          ),
-                          Text(
-                            formatYen(snap.initialBalance),
-                            style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF111827),
-                                fontFamily: 'monospace'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (isCurrentMonth)
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        iconSize: 16,
-                        icon: const Icon(Icons.edit,
-                            color: Color(0xFF9CA3AF)),
-                        onPressed: _showSnapshotDialog,
-                        tooltip: '月初残高を編集',
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            if (_initialBreakdownExpanded &&
-                initialBreakdown.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              ..._breakdownTiles(initialBreakdown),
-              const SizedBox(height: 6),
-            ],
-          ],
-          const SizedBox(height: 6),
-          _flowRow(
-              AppModeManager.instance.current == AppMode.business
-                  ? '+ 当月売上（確定）'
-                  : '+ 当月収入',
-              formatYen(incomeConfirmed, withSign: true),
-              const Color(0xFF16A34A)),
-          if (incomePending > 0)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(
-                children: [
-                  const Icon(Icons.hourglass_top,
-                      size: 14, color: Color(0xFFD97706)),
-                  const SizedBox(width: 4),
-                  const Text('+ 当月売上（見込み）',
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFFD97706),
-                          fontWeight: FontWeight.w600)),
-                  const Spacer(),
-                  Text(
-                    formatYen(incomePending, withSign: true),
-                    style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFFD97706),
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.w700),
-                  ),
-                ],
-              ),
-            ),
-          // 経費行: タップで内訳展開
-          InkWell(
-            borderRadius: BorderRadius.circular(4),
-            onTap: expenseBreakdown.isEmpty
-                ? null
-                : () => setState(() => _expenseBreakdownExpanded =
-                    !_expenseBreakdownExpanded),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  Text(
-                    AppModeManager.instance.current == AppMode.business
-                        ? '- 当月経費'
-                        : '- 当月支出',
-                    style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFFDC2626),
-                        fontWeight: FontWeight.w600),
-                  ),
-                  if (expenseBreakdown.isNotEmpty) ...[
-                    const SizedBox(width: 4),
-                    Icon(
-                      _expenseBreakdownExpanded
-                          ? Icons.expand_less
-                          : Icons.expand_more,
-                      size: 16,
-                      color: const Color(0xFF9CA3AF),
-                    ),
-                  ],
-                  const Spacer(),
-                  Text(
-                    formatYen(-expense, withSign: true),
-                    style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFFDC2626),
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'monospace'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (_expenseBreakdownExpanded &&
-              expenseBreakdown.isNotEmpty) ...[
-            const SizedBox(height: 2),
-            ...expenseBreakdown.map((e) {
-              final logo = _logoFor(e.key);
-              return Padding(
-                padding: const EdgeInsets.only(
-                    left: 12, right: 4, top: 3, bottom: 3),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 3,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDC2626)
-                            .withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    BrandLogo(
-                        iconUrl: logo.iconUrl,
-                        fallbackEmoji: logo.emoji,
-                        size: 18),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(e.key,
-                          style: const TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF6B7280)),
-                          overflow: TextOverflow.ellipsis),
-                    ),
-                    Text(
-                      formatYen(-e.value),
-                      style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFFDC2626),
-                          fontFamily: 'monospace',
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-              );
-            }),
-            const SizedBox(height: 4),
-          ],
-          const SizedBox(height: 10),
-          // ── 差引（主役）────────────────────────────────
-          // この月の収支が黒字 / 赤字かを一番大きく見せる。
-          // ホームを開いた瞬間に「今月の調子」が読み取れるようにする。
-          Builder(builder: (_) {
-            final net = income - expense;
-            final isBlack = net >= 0;
-            final color = isBlack
-                ? const Color(0xFF16A34A)
-                : const Color(0xFFDC2626);
-            final bgColor = isBlack
-                ? const Color(0xFFDCFCE7)
-                : const Color(0xFFFEE2E2);
-            return Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: bgColor.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: color.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
+            // ── 2x2 サマリーグリッド ────────────────────
+            // 月初残高 / 黒字赤字（上段）、収入 / 支出（下段）。
+            // 月初・支出セルはタップ可。それぞれの内訳をグリッド下に展開。
+            Builder(builder: (_) {
+              final net = income - expense;
+              final isBlack = net >= 0;
+              final netColor = isBlack
+                  ? const Color(0xFF16A34A)
+                  : const Color(0xFFDC2626);
+              final netBg = isBlack
+                  ? const Color(0xFFDCFCE7)
+                  : const Color(0xFFFEE2E2);
+              return Column(
                 children: [
                   Row(
                     children: [
-                      Icon(
-                          isBlack
-                              ? Icons.trending_up
-                              : Icons.trending_down,
-                          size: 22,
-                          color: color),
-                      const SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            isBlack ? '黒字' : '赤字',
-                            style: TextStyle(
-                                fontSize: 14,
-                                color: color,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1),
-                          ),
-                          const Text(
-                            '差引（収入 − 支出）',
-                            style: TextStyle(
-                                fontSize: 10,
-                                color: Color(0xFF6B7280)),
-                          ),
-                        ],
+                      Expanded(
+                        child: _summaryCell(
+                          label: '月初残高 (${month.month}/1)',
+                          value: formatYen(snap.initialBalance),
+                          valueColor: const Color(0xFF111827),
+                          icon: isCurrentMonth ? Icons.edit : null,
+                          onIconTap:
+                              isCurrentMonth ? _showSnapshotDialog : null,
+                          onTap: initialBreakdown.isEmpty
+                              ? null
+                              : () => setState(() =>
+                                  _initialBreakdownExpanded =
+                                      !_initialBreakdownExpanded),
+                          expanded: _initialBreakdownExpanded,
+                          expandable: initialBreakdown.isNotEmpty,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: _summaryCell(
+                          label: isBlack ? '黒字（差引）' : '赤字（差引）',
+                          value: formatYen(net, withSign: true),
+                          valueColor: netColor,
+                          bg: netBg.withValues(alpha: 0.35),
+                          border: netColor.withValues(alpha: 0.3),
+                        ),
                       ),
                     ],
                   ),
-                  Text(
-                    formatYen(net, withSign: true),
-                    style: TextStyle(
-                        fontSize: 28,
-                        color: color,
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.bold),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _summaryCell(
+                          label: AppModeManager.instance.current ==
+                                  AppMode.business
+                              ? '+ 当月売上'
+                              : '+ 当月収入',
+                          value: formatYen(income, withSign: true),
+                          valueColor: const Color(0xFF16A34A),
+                          subText: incomePending > 0
+                              ? '見込み +${formatYen(incomePending).replaceAll('¥', '¥')}'
+                              : null,
+                          subColor: const Color(0xFFD97706),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: _summaryCell(
+                          label: AppModeManager.instance.current ==
+                                  AppMode.business
+                              ? '- 当月経費'
+                              : '- 当月支出',
+                          value: formatYen(-expense, withSign: true),
+                          valueColor: const Color(0xFFDC2626),
+                          onTap: expenseBreakdown.isEmpty
+                              ? null
+                              : () => setState(() =>
+                                  _expenseBreakdownExpanded =
+                                      !_expenseBreakdownExpanded),
+                          expanded: _expenseBreakdownExpanded,
+                          expandable: expenseBreakdown.isNotEmpty,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-              ),
-            );
-          }),
-          const SizedBox(height: 10),
-          Container(height: 1, color: const Color(0xFFE5E7EB)),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('推定残高',
-                  style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF111827),
-                      fontWeight: FontWeight.w600)),
-              Text(
-                formatYen(projected),
-                style: TextStyle(
-                    fontSize: 20,
-                    color: projected >= 0
-                        ? const Color(0xFF16A34A)
-                        : const Color(0xFFDC2626),
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'monospace'),
-              ),
+              );
+            }),
+            // 月初残高の内訳（タップで展開）
+            if (_initialBreakdownExpanded &&
+                initialBreakdown.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              ..._breakdownTiles(initialBreakdown),
             ],
-          ),
-          if (snap != null) ...[
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text(
-                  '実測 ${formatYen(actual)}',
-                  style: const TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF9CA3AF),
-                      fontFamily: 'monospace'),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  diff == 0
-                      ? '一致 ✓'
-                      : '差 ${formatYen(diff, withSign: true)}',
-                  style: TextStyle(
-                      fontSize: 11,
+            // 支出内訳（タップで展開）
+            if (_expenseBreakdownExpanded &&
+                expenseBreakdown.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              ...expenseBreakdown.map((e) {
+                final logo = _logoFor(e.key);
+                return Padding(
+                  padding: const EdgeInsets.only(
+                      left: 12, right: 4, top: 3, bottom: 3),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 3,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDC2626)
+                              .withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      BrandLogo(
+                          iconUrl: logo.iconUrl,
+                          fallbackEmoji: logo.emoji,
+                          size: 18),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(e.key,
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF6B7280)),
+                            overflow: TextOverflow.ellipsis),
+                      ),
+                      Text(
+                        formatYen(-e.value),
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFFDC2626),
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+            const SizedBox(height: 10),
+            Container(height: 1, color: const Color(0xFFE5E7EB)),
+            const SizedBox(height: 8),
+            // ── 推定残高 vs 実測残高（1行統合）────────────
+            // 過去月: 推定のみ表示。今月: 推定／実測／差 を並べる。
+            Builder(builder: (_) {
+              final projColor = projected >= 0
+                  ? const Color(0xFF16A34A)
+                  : const Color(0xFFDC2626);
+              if (!isCurrentMonth) {
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('推定残高',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF6B7280),
+                            fontWeight: FontWeight.w600)),
+                    Text(
+                      formatYen(projected),
+                      style: TextStyle(
+                          fontSize: 16,
+                          color: projColor,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'monospace'),
+                    ),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('推定 / 実測',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF6B7280),
+                                fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 2),
+                        Row(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              formatYen(projected),
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  color: projColor,
+                                  fontWeight: FontWeight.w700,
+                                  fontFamily: 'monospace'),
+                            ),
+                            const SizedBox(width: 6),
+                            const Text('／',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFFD1D5DB))),
+                            const SizedBox(width: 6),
+                            Text(
+                              formatYen(actual),
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF6B7280),
+                                  fontFamily: 'monospace'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
                       color: diff == 0
-                          ? const Color(0xFF16A34A)
-                          : const Color(0xFFEA580C),
+                          ? const Color(0xFFDCFCE7)
+                          : const Color(0xFFFFEDD5),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      diff == 0
+                          ? '一致 ✓'
+                          : '差 ${formatYen(diff, withSign: true)}',
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: diff == 0
+                              ? const Color(0xFF16A34A)
+                              : const Color(0xFFEA580C),
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// 2x2 サマリーグリッドのセル。値、ラベル、タップで展開する場合は矢印を表示。
+  Widget _summaryCell({
+    required String label,
+    required String value,
+    required Color valueColor,
+    String? subText,
+    Color subColor = const Color(0xFF9CA3AF),
+    Color bg = const Color(0xFFF9FAFB),
+    Color? border,
+    IconData? icon,
+    VoidCallback? onIconTap,
+    VoidCallback? onTap,
+    bool expandable = false,
+    bool expanded = false,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: onTap,
+      child: Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+              color: border ?? const Color(0xFFE5E7EB), width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                        fontSize: 10,
+                        color: Color(0xFF6B7280),
+                        fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (expandable)
+                  Icon(
+                      expanded
+                          ? Icons.expand_less
+                          : Icons.expand_more,
+                      size: 14,
+                      color: const Color(0xFF9CA3AF)),
+                if (icon != null)
+                  GestureDetector(
+                    onTap: onIconTap,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: Icon(icon,
+                          size: 13, color: const Color(0xFF9CA3AF)),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 3),
+            Text(
+              value,
+              style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: valueColor,
+                  fontFamily: 'monospace'),
+            ),
+            if (subText != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  subText,
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: subColor,
                       fontFamily: 'monospace',
                       fontWeight: FontWeight.w600),
                 ),
-              ],
-            ),
+              ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -1035,28 +1054,6 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
         ),
       );
     }).toList();
-  }
-
-  Widget _flowRow(String label, String value, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label,
-              style: TextStyle(
-                  fontSize: 12, color: color, fontWeight: FontWeight.w500)),
-          Text(
-            value,
-            style: TextStyle(
-                fontSize: 13,
-                color: color,
-                fontFamily: 'monospace',
-                fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
-    );
   }
 
   // ===================== Section: 残高 =====================
@@ -1168,7 +1165,58 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
               const SizedBox(height: 8),
             ],
             // 内訳: 銀行 / 現金 / 電子マネー（残高は自動計算）
-            ...banks.map((b) => _balanceRow(b, currentBalanceOf(b))),
+            // 残高が大きい順にソート → 上位3件は常時表示、残りは折りたたみ。
+            // 縦に長くなりがちな口座リストを圧縮し、ホーム画面のスクロール量を削減。
+            ...(() {
+              final sorted = [...banks]
+                ..sort((a, b) => currentBalanceOf(b)
+                    .compareTo(currentBalanceOf(a)));
+              const topN = 3;
+              final showAll =
+                  _allBanksExpanded || sorted.length <= topN;
+              final visible = showAll
+                  ? sorted
+                  : sorted.take(topN).toList();
+              final hiddenCount = sorted.length - visible.length;
+              final tiles = <Widget>[
+                ...visible
+                    .map((b) => _balanceRow(b, currentBalanceOf(b))),
+              ];
+              if (sorted.length > topN) {
+                tiles.add(
+                  InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () => setState(() =>
+                        _allBanksExpanded = !_allBanksExpanded),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 6),
+                      child: Row(
+                        children: [
+                          Icon(
+                              _allBanksExpanded
+                                  ? Icons.expand_less
+                                  : Icons.expand_more,
+                              size: 16,
+                              color: const Color(0xFF6B7280)),
+                          const SizedBox(width: 4),
+                          Text(
+                            _allBanksExpanded
+                                ? '閉じる'
+                                : 'すべて表示（残り$hiddenCount件）',
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF6B7280),
+                                fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }
+              return tiles;
+            })(),
             // クレカ累積（当月利用合計を自動集計）
             // これは来月の引き落とし予定なので、想定残高では資産から引かれる扱い
             if (cards.isNotEmpty) ...[
