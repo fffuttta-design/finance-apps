@@ -1475,7 +1475,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final v = UiPreferences.instance.useV2Ui;
         final label = v == null
             ? '自動'
-            : (v ? 'v2 を強制' : 'v1 を強制');
+            : (v ? 'v2.1 を強制' : 'v1 (旧)');
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
           decoration: BoxDecoration(
@@ -1485,14 +1485,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           child: ListTile(
             leading: const Icon(Icons.dashboard_customize_outlined,
-                color: Color(0xFF4F46E5)),
-            title: const Text('UI バージョン (β)',
+                color: Color(0xFF1976D2)),
+            title: const Text('UI バージョン',
                 style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF111827))),
             subtitle: const Text(
-                '自動: Web×幅 1024px 以上で v2。手動切替も可。',
+                '自動: Web は v2.1（推奨）、Android は v1。',
                 style: TextStyle(
                     fontSize: 11, color: Color(0xFF6B7280))),
             trailing: PopupMenuButton<bool?>(
@@ -1503,17 +1503,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 CheckedPopupMenuItem(
                   value: null,
                   checked: v == null,
-                  child: const Text('自動'),
+                  child: const Text('自動（推奨）'),
                 ),
                 CheckedPopupMenuItem(
                   value: true,
                   checked: v == true,
-                  child: const Text('v2 を強制（デスクトップ向け）'),
+                  child: const Text('v2.1 を強制'),
                 ),
                 CheckedPopupMenuItem(
                   value: false,
                   checked: v == false,
-                  child: const Text('v1 を強制（モバイル向け）'),
+                  child: const Text('v1 を強制（旧 UI / 非推奨）'),
                 ),
               ],
               child: Container(

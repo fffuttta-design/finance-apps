@@ -7,7 +7,6 @@ import '../screens/asset_screen.dart';
 import '../screens/cards_screen.dart';
 import '../screens/dev_lab_screen.dart';
 import '../screens/expense_input_screen.dart';
-import '../screens/expenses_screen.dart';
 import '../screens/income_input_screen.dart';
 import '../screens/income_screen.dart';
 import '../screens/report_screen.dart';
@@ -15,6 +14,7 @@ import '../screens/settings_screen.dart';
 import '../screens/transfer_input_screen.dart';
 import 'layout/shell.dart';
 import 'layout/topnav_shell.dart';
+import 'screens/v2_expenses.dart';
 import 'screens/v2_home.dart';
 import 'screens/v2_home_topnav.dart';
 import 'theme/colors.dart';
@@ -114,11 +114,11 @@ class _V2RootState extends State<V2Root> {
           return V2HomeTopNavScreen(accent: accent);
         }
         return const V2HomeScreen();
-      // Phase 2〜6: v1 画面を v2.1 シェル内に表示。
-      // 各画面の AppBar は Theme で高さ 0 にして潰し、v2.1 ヘッダー一本に統一。
-      // 各画面の AppBar actions（+ 記録）は v2.1 ヘッダーの「記録」ボタンで代替。
+      // 支出: v2.1 ネイティブ実装（マネフォクラウド寄りのテーブル中心）
       case 'expenses':
-        return _wrapV1(const ExpensesScreen());
+        return V2ExpensesScreen(accent: accent);
+      // Phase 2〜6: v1 画面を v2.1 シェル内に表示（順次 v2.1 ネイティブに置換中）。
+      // 各画面の AppBar は Theme で高さ 0 にして潰し、v2.1 ヘッダー一本に統一。
       case 'income':
         return _wrapV1(const IncomeScreen());
       case 'asset':
@@ -207,8 +207,8 @@ class _V2RootState extends State<V2Root> {
             onPressed: () async {
               await UiPreferences.instance.setUseV2Ui(false);
             },
-            icon: const Icon(Icons.swap_horiz, size: 14),
-            label: const Text('v1 に戻す'),
+            icon: const Icon(Icons.history, size: 14),
+            label: const Text('v1 (旧)'),
           ),
         ],
       ),
@@ -255,8 +255,8 @@ class _V2RootState extends State<V2Root> {
             onPressed: () async {
               await UiPreferences.instance.setUseV2Ui(false);
             },
-            icon: const Icon(Icons.swap_horiz, size: 14),
-            label: const Text('v1 に戻す'),
+            icon: const Icon(Icons.history, size: 14),
+            label: const Text('v1 (旧)'),
             style: OutlinedButton.styleFrom(
               foregroundColor: outlinedFg,
               side: BorderSide(color: outlinedBorder),

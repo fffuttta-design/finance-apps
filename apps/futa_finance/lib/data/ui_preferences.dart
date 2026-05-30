@@ -77,11 +77,12 @@ class UiPreferences extends ChangeNotifier {
 
   /// 渡された画面幅から、最終的に v2 を使うかを返す。
   /// - 強制設定（true/false）があればそれに従う
-  /// - 未設定なら自動判定: Web×幅 >= 1024px で v2
+  /// - 未設定なら自動判定: Web は常に v2.1（v1 は非推奨）
+  ///   Android アプリは v1（モバイル UI を保持）
   bool resolveUseV2({required bool isWeb, required double width}) {
     final forced = _useV2Ui;
     if (forced != null) return forced;
-    return isWeb && width >= 1024;
+    return isWeb;
   }
 
   /// 起動時に一度呼ぶ。多重呼び出しは無害（最初の値を保持）。
