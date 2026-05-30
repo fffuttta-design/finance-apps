@@ -1,9 +1,16 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/app_mode.dart';
+import '../../data/backup_repository.dart';
 import '../../data/monthly_snapshot_repository.dart';
 import '../../data/payments_change_notifier.dart';
 import '../../data/settings_repository.dart';
@@ -11,6 +18,7 @@ import '../../data/transaction_repository.dart';
 import '../../screens/expense_input_screen.dart';
 import '../../screens/income_input_screen.dart';
 import '../../utils/formatters.dart';
+import '../../utils/thousands_separator_input_formatter.dart';
 import '../../widgets/brand_logo.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
@@ -48,13 +56,26 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
   late DateTime _selectedMonth =
       DateTime(DateTime.now().year, DateTime.now().month);
 
+  /// 月初残高の口座別内訳展開
+  bool _initialBreakdownExpanded = false;
+
+  /// 当月支出の口座別内訳展開
+  bool _expenseBreakdownExpanded = false;
+
   @override
   void onModeChanged() => _load();
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _load().then((_) {
+      if (!mounted) return;
+      // 起動時に v1 と同じリマインダーを順に判定（同タイミングで2連発しない）
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await _maybeShowSnapshotReminder();
+        if (mounted) await _maybeShowBackupReminder();
+      });
+    });
     _sub = _txRepo.stream.listen((list) {
       if (!mounted) return;
       setState(() => _transactions = list);
@@ -75,6 +96,241 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
       _selectedMonth =
           DateTime(_selectedMonth.year, _selectedMonth.month + delta);
     });
+  }
+
+  /// 内訳の開閉トグル（外側 widget から呼べる公開メソッド）
+  void toggleInitialBreakdown() {
+    setState(() => _initialBreakdownExpanded = !_initialBreakdownExpanded);
+  }
+
+  void toggleExpenseBreakdown() {
+    setState(() => _expenseBreakdownExpanded = !_expenseBreakdownExpanded);
+  }
+
+  /// 起動時に「当月の月初残高が未記録」ならダイアログで促す。
+  /// - 1日は強制表示、それ以外は月内 1 回だけ
+  Future<void> _maybeShowSnapshotReminder() async {
+    final now = DateTime.now();
+    final existing = _snapshots.forMonth(now.year, now.month);
+    if (existing != null) return;
+
+    final modePrefix = AppModeManager.instance.current.keyPrefix;
+    final monthKey = MonthlySnapshot.monthKey(now.year, now.month);
+    final shownKey = 'futa.snapshot_reminder.$modePrefix.$monthKey';
+    final prefs = await SharedPreferences.getInstance();
+    final alreadyShown = prefs.getBool(shownKey) ?? false;
+
+    if (now.day != 1 && alreadyShown) return;
+    if (!mounted) return;
+    await openSnapshotDialog(forceCurrentMonth: true);
+    await prefs.setBool(shownKey, true);
+  }
+
+  /// 「最後の手動バックアップから14日経過」で1回リマインド
+  Future<void> _maybeShowBackupReminder() async {
+    final state =
+        await BackupRepository.instance.shouldRemindBackup();
+    if (state != BackupReminderState.shouldRemind) return;
+    if (!mounted) return;
+    final last = await BackupRepository.instance.lastManualBackupAt();
+    final days = last == null
+        ? 0
+        : DateTime.now().difference(last).inDays;
+    if (!mounted) return;
+
+    final action = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.cloud_upload, color: Color(0xFFEA580C)),
+            SizedBox(width: 8),
+            Text('バックアップしませんか？'),
+          ],
+        ),
+        content: Text(
+          '最後のバックアップから $days 日経ちました。\n'
+          'Drive に書き出して安全に保管しておきましょう。',
+          style: const TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'snooze'),
+            child: const Text('あとで (3日)'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context, 'export'),
+            icon: const Icon(Icons.cloud_upload, size: 18),
+            label: const Text('書き出す'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF16A34A),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (action == 'snooze') {
+      await BackupRepository.instance.snoozeReminder(days: 3);
+    } else if (action == 'export') {
+      if (!mounted) return;
+      await _runBackupExport();
+    }
+  }
+
+  Future<void> _runBackupExport() async {
+    try {
+      final json = await BackupRepository.instance.exportAll();
+      // Web は Share Plus が動かないので（kIsWeb 経由で別フロー）今回は
+      // ファイル経由の Share に統一。Web は path_provider が動かないため
+      // 例外を握って通知のみ。
+      if (kIsWeb) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Web ではバックアップは設定画面から書き出してください')),
+        );
+        return;
+      }
+      final tempDir = await getTemporaryDirectory();
+      final now = DateTime.now();
+      final stamp =
+          '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}'
+          '-${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}';
+      final fileName = 'futa-finance-backup-$stamp.json';
+      final file = File('${tempDir.path}/$fileName');
+      await file.writeAsString(json);
+      if (!mounted) return;
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'application/json')],
+          subject: 'FutaFinance バックアップ ($stamp)',
+          text: 'FutaFinance のデータバックアップ ($stamp)。',
+        ),
+      );
+      await BackupRepository.instance.markManualBackupDone();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('書き出しに失敗しました: $e')),
+      );
+    }
+  }
+
+  /// 月初残高入力ダイアログ（v1 と同じロジック）。
+  Future<void> openSnapshotDialog({
+    bool forceCurrentMonth = false,
+  }) async {
+    final now = DateTime.now();
+    final suggestedBalance = _payments.bankAccounts
+        .fold<int>(0, (s, b) => s + (b.displayBalance ?? 0));
+    final controller =
+        TextEditingController(text: formatAmount(suggestedBalance));
+
+    final result = await showDialog<int?>(
+      context: context,
+      barrierDismissible: !forceCurrentMonth,
+      builder: (_) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.event_note, color: Color(0xFF1A237E)),
+            const SizedBox(width: 8),
+            Text('${now.month}月の月初残高'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${now.year}年${now.month}月1日時点の銀行・現金・電子マネー合算残高を記録します。',
+              style: const TextStyle(
+                  fontSize: 12, color: Color(0xFF6B7280)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                ThousandsSeparatorInputFormatter(),
+              ],
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: '残高（円）',
+                hintText: '例: 1,000,000',
+                helperText:
+                    '提案: 現口座合算 ${formatYen(suggestedBalance)}',
+                prefixText: '¥ ',
+              ),
+              style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, null),
+              child: const Text('後で')),
+          FilledButton(
+            onPressed: () {
+              final value = parseAmount(controller.text);
+              Navigator.pop(context, value);
+            },
+            child: const Text('記録'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null || result < 0) return;
+
+    final snap = MonthlySnapshot(
+      yearMonth: MonthlySnapshot.monthKey(now.year, now.month),
+      initialBalance: result,
+      recordedAt: now,
+    );
+    await _snapshotRepo.upsert(snap);
+    final cfg = await _snapshotRepo.load();
+    if (!mounted) return;
+    setState(() => _snapshots = cfg);
+  }
+
+  /// 月初時点の各口座残高を逆算（現在残高 − 当月取引差分）
+  Map<String, int> _calculateMonthStartBreakdown(
+      List<Transaction> monthTxns) {
+    final banks = _payments.bankAccounts;
+    final bankNameSet = banks.map((b) => b.name).toSet();
+    final delta = <String, int>{};
+    for (final t in monthTxns) {
+      if (t.type == TransactionType.transfer) {
+        final from = t.transferFromAccount;
+        final to = t.transferToAccount;
+        if (from != null && bankNameSet.contains(from)) {
+          delta[from] = (delta[from] ?? 0) - t.amount;
+        }
+        if (to != null && bankNameSet.contains(to)) {
+          delta[to] = (delta[to] ?? 0) + t.amount;
+        }
+        continue;
+      }
+      if (!bankNameSet.contains(t.paymentMethod)) continue;
+      if (t.type == TransactionType.income) {
+        delta[t.paymentMethod] =
+            (delta[t.paymentMethod] ?? 0) + t.amount;
+      } else {
+        delta[t.paymentMethod] =
+            (delta[t.paymentMethod] ?? 0) - t.amount;
+      }
+    }
+    final out = <String, int>{};
+    for (final b in banks) {
+      final current = b.displayBalance ?? 0;
+      out[b.name] = current - (delta[b.name] ?? 0);
+    }
+    return out;
   }
 
   Future<void> _load() async {
@@ -367,6 +623,30 @@ class _CenterColumn extends StatelessWidget {
     final net = income - expense;
     final isBlack = net >= 0;
 
+    // 支出内訳（支払方法別）
+    final expenseByMethod = <String, int>{};
+    for (final t in monthTxns) {
+      if (t.type != TransactionType.expense) continue;
+      expenseByMethod[t.paymentMethod] =
+          (expenseByMethod[t.paymentMethod] ?? 0) + t.amount;
+    }
+    final expenseBreakdown = expenseByMethod.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    // 推定残高 / 実測残高（今月のみ意味がある）
+    final now = DateTime.now();
+    final isCurrentMonth = state._selectedMonth.year == now.year &&
+        state._selectedMonth.month == now.month;
+    final snap = state._snapshots.forMonth(
+        state._selectedMonth.year, state._selectedMonth.month);
+    final initialBalance = snap?.initialBalance ?? 0;
+    final projected = initialBalance + income - expense;
+    final actual = isCurrentMonth
+        ? state._payments.bankAccounts.fold<int>(
+            0, (s, b) => s + (b.displayBalance ?? 0))
+        : projected;
+    final diff = actual - projected;
+
     // 最新の入出金: 日付降順で最新 5 件
     final recent = [...state._transactions]
       ..sort((a, b) => b.date.compareTo(a.date));
@@ -501,16 +781,193 @@ class _CenterColumn extends StatelessWidget {
                   ),
                 ),
               const Divider(height: 1),
-              _SummaryRow(
-                  label: isBusiness ? '当月経費' : '当月支出',
-                  value: formatYen(-expense, withSign: true),
-                  color: V2Colors.negative),
+              // 支出行: タップで支払方法別の内訳展開
+              InkWell(
+                onTap: expenseBreakdown.isEmpty
+                    ? null
+                    : state.toggleExpenseBreakdown,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 10),
+                  child: Row(
+                    children: [
+                      Text(isBusiness ? '当月経費' : '当月支出',
+                          style: V2Typography.body),
+                      if (expenseBreakdown.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                            state._expenseBreakdownExpanded
+                                ? Icons.expand_less
+                                : Icons.expand_more,
+                            size: 16,
+                            color: V2Colors.textSecondary),
+                      ],
+                      const Spacer(),
+                      Text(formatYen(-expense, withSign: true),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: V2Colors.negative,
+                            fontFeatures: V2Typography.tabularNums,
+                          )),
+                    ],
+                  ),
+                ),
+              ),
+              if (state._expenseBreakdownExpanded &&
+                  expenseBreakdown.isNotEmpty) ...[
+                for (final e in expenseBreakdown)
+                  Padding(
+                    padding: const EdgeInsets.only(
+                        left: 16,
+                        right: 0,
+                        top: 4,
+                        bottom: 4),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 3,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: V2Colors.negative
+                                .withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(e.key,
+                              style: V2Typography.caption,
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        Text(formatYen(-e.value),
+                            style: V2Typography.caption.copyWith(
+                                color: V2Colors.negative,
+                                fontWeight: FontWeight.w700,
+                                fontFeatures:
+                                    V2Typography.tabularNums)),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 4),
+              ],
               const Divider(height: 1),
-              _SummaryRow(
-                  label: '当月収支',
-                  value: formatYen(net, withSign: true),
-                  color: isBlack ? V2Colors.positive : V2Colors.negative,
-                  emphasize: true),
+              // 黒字/赤字バッジ（v1 のホームと同じ「主役」扱い）
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: (isBlack
+                          ? V2Colors.positiveSoft
+                          : V2Colors.negativeSoft)
+                      .withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(
+                      V2Spacing.radiusMd),
+                  border: Border.all(
+                      color: (isBlack
+                              ? V2Colors.positive
+                              : V2Colors.negative)
+                          .withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  mainAxisAlignment:
+                      MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                            isBlack
+                                ? Icons.trending_up
+                                : Icons.trending_down,
+                            size: 22,
+                            color: isBlack
+                                ? V2Colors.positive
+                                : V2Colors.negative),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: [
+                            Text(isBlack ? '黒字' : '赤字',
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                    color: isBlack
+                                        ? V2Colors.positive
+                                        : V2Colors.negative,
+                                    letterSpacing: 1)),
+                            Text('差引（収入 − 支出）',
+                                style: V2Typography.micro),
+                          ],
+                        ),
+                      ],
+                    ),
+                    Text(formatYen(net, withSign: true),
+                        style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                            color: isBlack
+                                ? V2Colors.positive
+                                : V2Colors.negative,
+                            fontFeatures:
+                                V2Typography.tabularNums)),
+                  ],
+                ),
+              ),
+              // 推定残高 / 実測残高（v1 のホームと同じ並び）
+              if (snap != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  height: 1,
+                  color: V2Colors.divider,
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment:
+                      MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('推定残高', style: V2Typography.bodyStrong),
+                    Text(formatYen(projected),
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: projected >= 0
+                              ? V2Colors.positive
+                              : V2Colors.negative,
+                          fontFeatures:
+                              V2Typography.tabularNums,
+                        )),
+                  ],
+                ),
+                if (isCurrentMonth) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Text('実測 ${formatYen(actual)}',
+                          style: V2Typography.micro.copyWith(
+                              color: V2Colors.textMuted,
+                              fontFeatures:
+                                  V2Typography.tabularNums)),
+                      const SizedBox(width: 8),
+                      Text(
+                        diff == 0
+                            ? '一致 ✓'
+                            : '差 ${formatYen(diff, withSign: true)}',
+                        style: V2Typography.micro.copyWith(
+                          color: diff == 0
+                              ? V2Colors.positive
+                              : V2Colors.warning,
+                          fontWeight: FontWeight.w700,
+                          fontFeatures:
+                              V2Typography.tabularNums,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
             ],
           ),
         ),
@@ -642,12 +1099,10 @@ class _SummaryRow extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  final bool emphasize;
   const _SummaryRow({
     required this.label,
     required this.value,
     required this.color,
-    this.emphasize = false,
   });
 
   @override
@@ -656,17 +1111,12 @@ class _SummaryRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
-          Text(label,
-              style: emphasize
-                  ? V2Typography.bodyStrong.copyWith(
-                      color: V2Colors.textPrimary, fontSize: 14)
-                  : V2Typography.body),
+          Text(label, style: V2Typography.body),
           const Spacer(),
           Text(value,
               style: TextStyle(
-                fontSize: emphasize ? 20 : 16,
-                fontWeight:
-                    emphasize ? FontWeight.w800 : FontWeight.w700,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
                 color: color,
                 fontFeatures: V2Typography.tabularNums,
               )),
@@ -688,49 +1138,136 @@ class _RightSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final snap = state._snapshots
         .forMonth(state._selectedMonth.year, state._selectedMonth.month);
+    final today = DateTime.now();
+    final isCurrentMonth = state._selectedMonth.year == today.year &&
+        state._selectedMonth.month == today.month;
+    final monthTxns = state._monthTxns(state._selectedMonth);
+    // 月初残高内訳は今月のみ計算可能（過去月は履歴がないため）
+    final breakdown = isCurrentMonth
+        ? state._calculateMonthStartBreakdown(monthTxns)
+        : <String, int>{};
+
     return Column(
       children: [
         V2Card(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('${state._selectedMonth.month}月の月初残高',
-                  style: V2Typography.bodyStrong.copyWith(
-                      color: V2Colors.textPrimary, fontSize: 13)),
+              Row(
+                children: [
+                  Text('${state._selectedMonth.month}月の月初残高',
+                      style: V2Typography.bodyStrong.copyWith(
+                          color: V2Colors.textPrimary, fontSize: 13)),
+                  const Spacer(),
+                  if (isCurrentMonth)
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      iconSize: 14,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      icon: const Icon(Icons.edit,
+                          color: V2Colors.textMuted),
+                      onPressed: () => state.openSnapshotDialog(),
+                      tooltip: '月初残高を編集',
+                    ),
+                ],
+              ),
               const SizedBox(height: V2Spacing.sm),
               if (snap != null)
-                Text(formatYen(snap.initialBalance),
-                    style: V2Typography.h1.copyWith(
-                        color: V2Colors.textPrimary,
-                        fontFeatures: V2Typography.tabularNums))
-              else
-                Text('未記録',
-                    style: V2Typography.caption
-                        .copyWith(color: V2Colors.warning)),
+                InkWell(
+                  onTap: breakdown.isEmpty
+                      ? null
+                      : state.toggleInitialBreakdown,
+                  child: Row(
+                    children: [
+                      Text(formatYen(snap.initialBalance),
+                          style: V2Typography.h1.copyWith(
+                              color: V2Colors.textPrimary,
+                              fontFeatures:
+                                  V2Typography.tabularNums)),
+                      if (breakdown.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                            state._initialBreakdownExpanded
+                                ? Icons.expand_less
+                                : Icons.expand_more,
+                            size: 14,
+                            color: V2Colors.textMuted),
+                      ],
+                    ],
+                  ),
+                )
+              else ...[
+                Row(
+                  children: [
+                    const Icon(Icons.warning_amber,
+                        size: 14, color: V2Colors.warning),
+                    const SizedBox(width: 4),
+                    Text('未記録',
+                        style: V2Typography.caption.copyWith(
+                            color: V2Colors.warning,
+                            fontWeight: FontWeight.w700)),
+                  ],
+                ),
+                const SizedBox(height: V2Spacing.xs),
+                if (isCurrentMonth)
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      alignment: Alignment.centerLeft,
+                    ),
+                    onPressed: () => state.openSnapshotDialog(),
+                    icon: const Icon(Icons.add, size: 14),
+                    label: const Text('記録する'),
+                  ),
+              ],
               const SizedBox(height: V2Spacing.xs),
               Text(
                 snap != null
-                    ? 'スナップショット記録済'
-                    : '集計 → 月初残高を記録するから設定できます',
+                    ? 'タップで口座別内訳を展開'
+                    : '残高の起点として記録できます',
                 style: V2Typography.micro
                     .copyWith(color: V2Colors.textSecondary),
               ),
-            ],
-          ),
-        ),
-        const SizedBox(height: V2Spacing.lg),
-        V2Card(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('お知らせ',
-                  style: V2Typography.bodyStrong.copyWith(
-                      color: V2Colors.textPrimary, fontSize: 13)),
-              const SizedBox(height: V2Spacing.sm),
-              Text(
-                  'v2.1 ホームに実データを反映中。\n'
-                  '他タブも順次 v2.1 ネイティブに移植予定。',
-                  style: V2Typography.caption),
+              // 月初残高の口座別内訳展開
+              if (state._initialBreakdownExpanded &&
+                  breakdown.isNotEmpty) ...[
+                const SizedBox(height: V2Spacing.sm),
+                const Divider(height: 1),
+                const SizedBox(height: V2Spacing.sm),
+                for (final e in (breakdown.entries.toList()
+                  ..sort((a, b) => b.value.compareTo(a.value))))
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 3,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: V2Colors.accent
+                                .withValues(alpha: 0.5),
+                            borderRadius:
+                                BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(e.key,
+                              style: V2Typography.micro,
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        Text(formatYen(e.value),
+                            style: V2Typography.micro.copyWith(
+                                color: V2Colors.textPrimary,
+                                fontWeight: FontWeight.w700,
+                                fontFeatures:
+                                    V2Typography.tabularNums)),
+                      ],
+                    ),
+                  ),
+              ],
             ],
           ),
         ),
