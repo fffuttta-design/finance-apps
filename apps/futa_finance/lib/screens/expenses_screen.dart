@@ -10,6 +10,7 @@ import '../data/subscription_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/emoji_palette.dart';
 import '../utils/formatters.dart';
+import '../widgets/brand_logo.dart';
 import 'expense_input_screen.dart';
 
 /// 支出タブ。月送り、年間払い契約、カテゴリ別の支出一覧（折りたたみ式）。
@@ -45,6 +46,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
 
   /// 「毎月引落予定」セクションの開閉。デフォルトは開いた状態。
   bool _monthlyChargesExpanded = true;
+
+  /// 固定費（定額）サブセクションの開閉。
+  bool _fixedChargesExpanded = true;
+
+  /// 変動費サブセクションの開閉。
+  bool _variableChargesExpanded = true;
 
   @override
   void initState() {
@@ -727,6 +734,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
     final isCurrentMonth = _focused.year == today.year &&
         _focused.month == today.month;
 
+    // 固定（定額）と変動でグルーピング。並び順は元のリスト準拠（請求日昇順）。
+    final fixed = charges
+        .where((s) => s.amountType == core.SubscriptionAmountType.fixed)
+        .toList();
+    final variable = charges
+        .where((s) => s.amountType == core.SubscriptionAmountType.variable)
+        .toList();
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -735,7 +750,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
       ),
       child: Column(
         children: [
-          // ヘッダー（タップで開閉）
+          // 全体ヘッダー（タップで開閉）
           InkWell(
             onTap: () => setState(
                 () => _monthlyChargesExpanded = !_monthlyChargesExpanded),
@@ -787,11 +802,107 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
           ),
           if (_monthlyChargesExpanded) ...[
             const Divider(height: 1),
-            ...charges.map((c) =>
-                _monthlyChargeRow(c, isCurrentMonth, today)),
+            if (fixed.isNotEmpty)
+              _monthlyChargeSubSection(
+                title: '固定費（定額）',
+                icon: Icons.lock_outline,
+                accent: const Color(0xFF1A237E),
+                bg: const Color(0xFFE0E7FF),
+                charges: fixed,
+                expanded: _fixedChargesExpanded,
+                onToggle: () => setState(
+                    () => _fixedChargesExpanded = !_fixedChargesExpanded),
+                isCurrentMonth: isCurrentMonth,
+                today: today,
+              ),
+            if (fixed.isNotEmpty && variable.isNotEmpty)
+              const Divider(height: 1),
+            if (variable.isNotEmpty)
+              _monthlyChargeSubSection(
+                title: '変動費',
+                icon: Icons.bolt_outlined,
+                accent: const Color(0xFFEA580C),
+                bg: const Color(0xFFFFEDD5),
+                charges: variable,
+                expanded: _variableChargesExpanded,
+                onToggle: () => setState(() =>
+                    _variableChargesExpanded = !_variableChargesExpanded),
+                isCurrentMonth: isCurrentMonth,
+                today: today,
+              ),
           ],
         ],
       ),
+    );
+  }
+
+  /// 固定/変動サブセクション（ヘッダー + 行リスト）。
+  Widget _monthlyChargeSubSection({
+    required String title,
+    required IconData icon,
+    required Color accent,
+    required Color bg,
+    required List<core.Subscription> charges,
+    required bool expanded,
+    required VoidCallback onToggle,
+    required bool isCurrentMonth,
+    required DateTime today,
+  }) {
+    final subtotal = charges.fold<int>(0, (s, c) => s + c.amount);
+    return Column(
+      children: [
+        InkWell(
+          onTap: onToggle,
+          child: Container(
+            color: const Color(0xFFFAFAFA),
+            padding: const EdgeInsets.fromLTRB(12, 7, 12, 7),
+            child: Row(
+              children: [
+                Icon(icon, size: 13, color: accent),
+                const SizedBox(width: 6),
+                Text(title,
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: accent)),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: bg,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Text('${charges.length}',
+                      style: TextStyle(
+                          fontSize: 10,
+                          color: accent,
+                          fontWeight: FontWeight.w700)),
+                ),
+                const Spacer(),
+                Text(
+                  formatYen(subtotal),
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF374151),
+                      fontFamily: 'monospace'),
+                ),
+                const SizedBox(width: 6),
+                Icon(
+                    expanded
+                        ? Icons.expand_less
+                        : Icons.expand_more,
+                    color: const Color(0xFF9CA3AF),
+                    size: 16),
+              ],
+            ),
+          ),
+        ),
+        if (expanded)
+          ...charges.map(
+              (c) => _monthlyChargeRow(c, isCurrentMonth, today)),
+      ],
     );
   }
 
@@ -824,7 +935,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
       child: Row(
         children: [
           SizedBox(
-            width: 40,
+            width: 36,
             child: Text(
               day == null ? '—' : '$day 日',
               style: const TextStyle(
@@ -833,6 +944,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> with ModeAwareMixin {
                   color: Color(0xFFEA580C)),
             ),
           ),
+          // ブランドロゴ（iconUrl があれば画像、無ければサブスクアイコン）
+          BrandLogo(
+            iconUrl: s.iconUrl,
+            fallbackIcon: Icons.subscriptions_outlined,
+            size: 24,
+            borderRadius: 5,
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
