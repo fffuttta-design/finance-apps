@@ -3,11 +3,17 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../data/app_mode.dart';
 import '../data/ui_preferences.dart';
+import '../screens/asset_screen.dart';
+import '../screens/cards_screen.dart';
+import '../screens/dev_lab_screen.dart';
+import '../screens/expenses_screen.dart';
+import '../screens/income_screen.dart';
+import '../screens/report_screen.dart';
+import '../screens/settings_screen.dart';
 import 'layout/shell.dart';
 import 'layout/topnav_shell.dart';
 import 'screens/v2_home.dart';
 import 'screens/v2_home_topnav.dart';
-import 'screens/v2_placeholder.dart';
 import 'theme/colors.dart';
 import 'theme/mode_accent.dart';
 import 'theme/spacing.dart';
@@ -99,56 +105,32 @@ class _V2RootState extends State<V2Root> {
   Widget _bodyFor(String id, {required Color accent}) {
     switch (id) {
       case 'home':
-        // sidebar バリアントは従来のホーム、topnav は ME 風ホーム
+        // sidebar バリアント = 旧 v2 ホーム、topnav = v2.1 ホーム（実データ）
         final variant = UiPreferences.instance.v2Variant;
         if (variant == UiPreferences.v2VariantTopNav) {
           return V2HomeTopNavScreen(accent: accent);
         }
         return const V2HomeScreen();
+      // Phase 2〜6: v1 画面をそのまま v2.1 シェル内に表示。
+      // 全機能（取引一覧/編集、固定費、月末締め、バックアップ等）が即時利用可能。
+      // 各画面の AppBar は v2.1 ヘッダーと二重表示になるが、機能保持優先で許容。
+      // 将来的に各画面を v2.1 ネイティブ widget でリファクタする。
       case 'expenses':
-        return const V2PlaceholderScreen(
-            title: '支出',
-            subtitle: '取引一覧 / 毎月引落予定 / カテゴリ別 / グラフ',
-            icon: Icons.receipt_long_outlined,
-            phaseLabel: 'Phase 4 で実装');
+        return const ExpensesScreen();
       case 'income':
-        return const V2PlaceholderScreen(
-            title: '収入',
-            subtitle: '収入記録 / 見込み売上の管理',
-            icon: Icons.savings_outlined,
-            phaseLabel: 'Phase 4 で実装');
+        return const IncomeScreen();
       case 'asset':
-        return const V2PlaceholderScreen(
-            title: '資産',
-            subtitle: 'ウォレット一覧 / 通帳 / 入出金',
-            icon: Icons.account_balance_wallet_outlined,
-            phaseLabel: 'Phase 2 で実装');
+        return const AssetScreen();
       case 'cards':
-        return const V2PlaceholderScreen(
-            title: 'クレカ',
-            subtitle: 'クレジットカード一覧 / 月別請求 / 引落予定',
-            icon: Icons.credit_card_outlined,
-            phaseLabel: 'Phase 5 で実装');
+        return const CardsScreen();
       case 'report':
-        return const V2PlaceholderScreen(
-            title: '集計',
-            subtitle: 'PL / カテゴリ別 / テーブル / 月末締め',
-            icon: Icons.bar_chart_outlined,
-            phaseLabel: 'Phase 3 で実装');
+        return const ReportScreen();
       case 'settings':
-        return const V2PlaceholderScreen(
-            title: '設定',
-            subtitle: 'カテゴリ / 支払方法 / バックアップ / 表示',
-            icon: Icons.settings_outlined,
-            phaseLabel: 'Phase 6 で実装');
+        return const SettingsScreen();
       case 'devLab':
-        return const V2PlaceholderScreen(
-            title: '開発中',
-            subtitle: 'PL / BS / 予算管理のプロトタイプ',
-            icon: Icons.science_outlined,
-            phaseLabel: 'v1 から移植予定');
+        return const DevLabScreen();
       default:
-        return const V2HomeScreen();
+        return V2HomeTopNavScreen(accent: accent);
     }
   }
 
