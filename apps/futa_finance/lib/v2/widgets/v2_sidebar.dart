@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../../data/app_mode.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
 
-/// v2 サイドバー。Linear / Notion 風の左ナビ。
+/// v2 サイドバー（マネフォクラウド寄り）。
 /// 仕様:
-/// - 上部: ワークスペース識別子（アプリ名 + モードスイッチ）
-/// - 中央: ナビ項目（アイコン + ラベル）
-/// - 下部: 設定・バージョンなどのフッターセクション
+/// - 背景はダークネイビー、テキスト白系
+/// - 上部: ロゴ + アプリ名
+/// - 中央: ナビ項目（hover/selected で背景ハイライト）
+/// - 下部: フッター（モードスイッチ + バージョン）
 class V2Sidebar extends StatelessWidget {
   /// ナビ項目リスト
   final List<V2NavItem> items;
@@ -39,25 +39,18 @@ class V2Sidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: V2Spacing.sidebarWidth,
-      decoration: const BoxDecoration(
-        color: V2Colors.sidebar,
-        border: Border(
-          right: BorderSide(color: V2Colors.border, width: 1),
-        ),
-      ),
+      color: V2Colors.sidebar,
       child: Column(
         children: [
           _header(),
           if (modeSwitcher != null) ...[
-            const SizedBox(height: V2Spacing.sm),
             Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: V2Spacing.md),
+              padding: const EdgeInsets.fromLTRB(
+                  V2Spacing.md, 0, V2Spacing.md, V2Spacing.sm),
               child: modeSwitcher!,
             ),
-            const SizedBox(height: V2Spacing.md),
           ],
-          const Divider(),
+          Container(height: 1, color: V2Colors.sidebarDivider),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(
@@ -74,7 +67,7 @@ class V2Sidebar extends StatelessWidget {
             ),
           ),
           if (footer != null) ...[
-            const Divider(),
+            Container(height: 1, color: V2Colors.sidebarDivider),
             footer!,
           ],
         ],
@@ -83,26 +76,23 @@ class V2Sidebar extends StatelessWidget {
   }
 
   Widget _header() {
-    final mode = AppModeManager.instance.current;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-          V2Spacing.lg, V2Spacing.lg, V2Spacing.lg, V2Spacing.sm),
+          V2Spacing.lg, V2Spacing.lg, V2Spacing.lg, V2Spacing.md),
       child: Row(
         children: [
           Container(
-            width: 28,
-            height: 28,
+            width: 30,
+            height: 30,
             decoration: BoxDecoration(
-              color: mode == AppMode.business
-                  ? V2Colors.accent
-                  : V2Colors.accentPersonal,
+              color: Colors.white,
               borderRadius: BorderRadius.circular(V2Spacing.radiusSm),
             ),
             alignment: Alignment.center,
             child: const Text('財',
                 style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
+                    color: V2Colors.accent,
+                    fontWeight: FontWeight.w800,
                     fontSize: 14)),
           ),
           const SizedBox(width: V2Spacing.sm),
@@ -110,7 +100,8 @@ class V2Sidebar extends StatelessWidget {
               style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: V2Colors.textPrimary)),
+                  color: V2Colors.sidebarText,
+                  letterSpacing: 0.2)),
         ],
       ),
     );
@@ -152,13 +143,13 @@ class _NavTileState extends State<_NavTile> {
   @override
   Widget build(BuildContext context) {
     final bg = widget.selected
-        ? V2Colors.selected
+        ? V2Colors.sidebarSelected
         : _hover
-            ? V2Colors.hover
+            ? V2Colors.sidebarHover
             : Colors.transparent;
     final fg = widget.selected
-        ? V2Colors.accent
-        : V2Colors.textBody;
+        ? Colors.white
+        : V2Colors.sidebarText;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
@@ -169,46 +160,69 @@ class _NavTileState extends State<_NavTile> {
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: widget.onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: V2Spacing.sm, vertical: 7),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius:
-                  BorderRadius.circular(V2Spacing.radiusSm),
-            ),
-            child: Row(
-              children: [
-                Icon(widget.item.icon, size: 16, color: fg),
-                const SizedBox(width: V2Spacing.sm),
-                Expanded(
-                  child: Text(
-                    widget.item.label,
-                    style: V2Typography.body.copyWith(
-                      color: fg,
-                      fontWeight: widget.selected
-                          ? FontWeight.w600
-                          : FontWeight.w500,
+          child: Stack(
+            children: [
+              // 選択中は左に明るい青のアクセントバー（マネフォクラウド風）
+              if (widget.selected)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 3,
+                    decoration: BoxDecoration(
+                      color: V2Colors.accent,
+                      borderRadius:
+                          BorderRadius.circular(V2Spacing.radiusXs),
                     ),
                   ),
                 ),
-                if (widget.item.badge != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: V2Spacing.sm, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: V2Colors.surfaceMuted,
-                      borderRadius: BorderRadius.circular(
-                          V2Spacing.radiusXs),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: V2Spacing.md, vertical: 8),
+                margin: const EdgeInsets.only(left: 4),
+                decoration: BoxDecoration(
+                  color: bg,
+                  borderRadius:
+                      BorderRadius.circular(V2Spacing.radiusSm),
+                ),
+                child: Row(
+                  children: [
+                    Icon(widget.item.icon, size: 16, color: fg),
+                    const SizedBox(width: V2Spacing.sm),
+                    Expanded(
+                      child: Text(
+                        widget.item.label,
+                        style: V2Typography.body.copyWith(
+                          color: fg,
+                          fontWeight: widget.selected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                        ),
+                      ),
                     ),
-                    child: Text(widget.item.badge!,
-                        style: V2Typography.micro),
-                  ),
-              ],
-            ),
+                    if (widget.item.badge != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: V2Spacing.sm,
+                            vertical: 1),
+                        decoration: BoxDecoration(
+                          color: V2Colors.sidebarHover,
+                          borderRadius: BorderRadius.circular(
+                              V2Spacing.radiusXs),
+                        ),
+                        child: Text(widget.item.badge!,
+                            style: V2Typography.micro.copyWith(
+                                color: V2Colors.sidebarText)),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 }
+

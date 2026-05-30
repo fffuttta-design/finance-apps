@@ -83,13 +83,13 @@ class V2Typography {
     letterSpacing: 0.1,
   );
 
-  /// 大きな数値（KPI カードの値）。等幅数字を効かせる
+  /// 大きな数値（KPI カードの値）。マネフォ寄りに少し大きく、強い対比
   static const TextStyle kpiValue = TextStyle(
-    fontSize: 22,
-    fontWeight: FontWeight.w700,
+    fontSize: 26,
+    fontWeight: FontWeight.w800,
     color: V2Colors.textPrimary,
-    height: 1.2,
-    letterSpacing: -0.3,
+    height: 1.15,
+    letterSpacing: -0.5,
     fontFeatures: tabularNums,
   );
 

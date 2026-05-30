@@ -12,17 +12,17 @@ class V2Spacing {
   static const xxl = 32.0;
   static const xxxl = 48.0;
 
-  // ── 角丸 ──
+  // ── 角丸（マネフォクラウド寄り：シャープめ）──
   /// 小要素（バッジ・タグ・ピル）
-  static const radiusXs = 4.0;
+  static const radiusXs = 3.0;
   /// ボタン・チップ
-  static const radiusSm = 6.0;
+  static const radiusSm = 4.0;
   /// 入力欄・小カード
-  static const radiusMd = 8.0;
+  static const radiusMd = 6.0;
   /// セクションカード
-  static const radiusLg = 10.0;
+  static const radiusLg = 8.0;
   /// モーダル・大型ダイアログ
-  static const radiusXl = 14.0;
+  static const radiusXl = 12.0;
 
   // ── レイアウト寸法 ──
   /// サイドバー幅

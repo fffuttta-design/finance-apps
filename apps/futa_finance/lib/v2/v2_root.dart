@@ -208,13 +208,14 @@ class _SidebarFooter extends StatelessWidget {
             padding: const EdgeInsets.symmetric(
                 horizontal: V2Spacing.sm, vertical: 2),
             decoration: BoxDecoration(
-              color: V2Colors.accentSoft,
+              color: V2Colors.accent,
               borderRadius: BorderRadius.circular(V2Spacing.radiusXs),
             ),
-            child: Text(
+            child: const Text(
               'v2 (β)',
-              style: V2Typography.micro.copyWith(
-                  color: V2Colors.accent,
+              style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.white,
                   fontWeight: FontWeight.w700),
             ),
           ),
@@ -222,7 +223,7 @@ class _SidebarFooter extends StatelessWidget {
           if (versionLabel != null)
             Text(versionLabel!,
                 style: V2Typography.micro.copyWith(
-                    color: V2Colors.textMuted,
+                    color: V2Colors.sidebarTextMuted,
                     fontFeatures: V2Typography.tabularNums)),
         ],
       ),

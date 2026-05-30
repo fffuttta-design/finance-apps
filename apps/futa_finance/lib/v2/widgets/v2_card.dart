@@ -17,6 +17,10 @@ class V2Card extends StatefulWidget {
   final Color? borderColor;
   final double radius;
 
+  /// 影の濃さ。マネフォ寄り（薄い立体感）がデフォルト。
+  /// `V2CardElevation.none` で完全フラット、`raised` で強めの影。
+  final V2CardElevation elevation;
+
   const V2Card({
     super.key,
     required this.child,
@@ -26,6 +30,7 @@ class V2Card extends StatefulWidget {
     this.background,
     this.borderColor,
     this.radius = V2Spacing.radiusLg,
+    this.elevation = V2CardElevation.soft,
   });
 
   @override
@@ -35,20 +40,44 @@ class V2Card extends StatefulWidget {
 class _V2CardState extends State<V2Card> {
   bool _hovering = false;
 
+  List<BoxShadow> _shadows(V2CardElevation e, bool hover) {
+    switch (e) {
+      case V2CardElevation.none:
+        return const [];
+      case V2CardElevation.soft:
+        return [
+          BoxShadow(
+            color: V2Colors.shadow,
+            blurRadius: hover ? 12 : 6,
+            offset: Offset(0, hover ? 4 : 1),
+          ),
+        ];
+      case V2CardElevation.raised:
+        return [
+          BoxShadow(
+            color: V2Colors.shadow,
+            blurRadius: hover ? 18 : 12,
+            offset: Offset(0, hover ? 8 : 4),
+          ),
+        ];
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bg = widget.background ?? V2Colors.surface;
-    final hoverBg = V2Colors.surfaceMuted;
+    final hoverBg = widget.background ?? V2Colors.surface;
     final showHover =
         (widget.hoverable || widget.onTap != null) && _hovering;
     final card = AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
+      duration: const Duration(milliseconds: 140),
       padding: widget.padding,
       decoration: BoxDecoration(
         color: showHover ? hoverBg : bg,
         borderRadius: BorderRadius.circular(widget.radius),
         border: Border.all(
             color: widget.borderColor ?? V2Colors.border, width: 1),
+        boxShadow: _shadows(widget.elevation, showHover),
       ),
       child: widget.child,
     );
@@ -68,4 +97,16 @@ class _V2CardState extends State<V2Card> {
       ),
     );
   }
+}
+
+/// カードの立体感レベル。
+enum V2CardElevation {
+  /// 完全フラット（罫線のみ）
+  none,
+
+  /// マネフォ風の薄いソフトシャドウ（デフォルト）
+  soft,
+
+  /// 浮き上がり強め（重要なカードのみ）
+  raised,
 }

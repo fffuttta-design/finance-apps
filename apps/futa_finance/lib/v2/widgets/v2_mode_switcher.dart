@@ -15,11 +15,11 @@ class V2ModeSwitcher extends StatelessWidget {
       listenable: AppModeManager.instance,
       builder: (_, _) {
         final current = AppModeManager.instance.current;
+        // ダークなサイドバー上で見えるよう、背景は半透明白に
         return Container(
           decoration: BoxDecoration(
-            color: V2Colors.surfaceMuted,
+            color: V2Colors.sidebarHover,
             borderRadius: BorderRadius.circular(V2Spacing.radiusSm),
-            border: Border.all(color: V2Colors.border),
           ),
           padding: const EdgeInsets.all(2),
           child: Row(
@@ -60,14 +60,11 @@ class V2ModeSwitcher extends StatelessWidget {
           decoration: BoxDecoration(
             color: isSelected ? V2Colors.surface : Colors.transparent,
             borderRadius: BorderRadius.circular(V2Spacing.radiusXs),
-            border: isSelected
-                ? Border.all(color: V2Colors.border)
-                : null,
           ),
           child: Text(
             label,
             style: V2Typography.caption.copyWith(
-              color: isSelected ? accent : V2Colors.textSecondary,
+              color: isSelected ? accent : V2Colors.sidebarText,
               fontWeight: isSelected
                   ? FontWeight.w700
                   : FontWeight.w500,
