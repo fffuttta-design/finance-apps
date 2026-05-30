@@ -421,7 +421,7 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
                   const SizedBox(height: 12),
                   _monthlyFlow(_selectedMonth),
                   const SizedBox(height: 12),
-                  _balanceSummary(),
+                  _balanceSummary(_selectedMonth),
                   const SizedBox(height: 24),
                   _footer(),
                 ],
@@ -541,7 +541,6 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
   // ===================== Section: 月次フロー =====================
 
   Widget _monthlyFlow(DateTime month) {
-    final snap = _snapshots.forMonth(month.year, month.month);
     final monthTxns = _monthTxns(month);
     // 売上は「確定」と「見込み」に分けて集計。
     // 見込みは銀行残高に反映されていないので別行で見せる。
@@ -557,18 +556,6 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
     final expense = monthTxns
         .where((t) => t.type == TransactionType.expense)
         .fold<int>(0, (s, t) => s + t.amount);
-    final initial = snap?.initialBalance ?? 0;
-    final projected = initial + income - expense;
-    // 実測残高は「現時点の合計」なので、今月の時だけ意味がある。
-    // 過去月を見ている時は projected の方を「終値」として扱う。
-    final now = DateTime.now();
-    final isCurrentMonth =
-        month.year == now.year && month.month == now.month;
-    final actual = isCurrentMonth
-        ? _payments.bankAccounts
-            .fold<int>(0, (s, b) => s + (b.displayBalance ?? 0))
-        : projected;
-    final diff = actual - projected;
 
     // 経費内訳（ウォレット別）。当月の支出取引を支払方法でグループ化。
     final expenseByMethod = <String, int>{};
@@ -580,121 +567,23 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
     final expenseBreakdown = expenseByMethod.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    // 月初残高の内訳（口座別）= 各口座の現在残高 - 今月分の取引差分。
-    // 過去月を見ている時は計算が複雑になるので、今月のみ内訳表示。
-    final initialBreakdown = isCurrentMonth
-        ? _calculateMonthStartBreakdown(monthTxns)
-        : <String, int>{};
-
     return _card(
       icon: Icons.timeline,
       iconColor: const Color(0xFF1A237E),
       title: '${month.month}月のフロー',
+      iconSize: 22,
+      titleGap: 8,
+      titleStyle: const TextStyle(
+        fontSize: 20,
+        color: Color(0xFF111827),
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.3,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (snap == null)
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEF3C7),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.warning_amber,
-                      size: 16, color: Color(0xFFD97706)),
-                  const SizedBox(width: 6),
-                  const Expanded(
-                    child: Text(
-                      '月初残高が未記録',
-                      style: TextStyle(
-                          fontSize: 12, color: Color(0xFF92400E)),
-                    ),
-                  ),
-                  if (isCurrentMonth)
-                    TextButton(
-                      style: TextButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8),
-                      ),
-                      onPressed: _showSnapshotDialog,
-                      child: const Text('記録する'),
-                    ),
-                ],
-              ),
-            )
-          else ...[
-            // ── 月初残高（主役）────────────────────────────
-            // 大きな数字で表示 + タップで口座別内訳を展開。
-            InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: initialBreakdown.isEmpty
-                  ? null
-                  : () => setState(() => _initialBreakdownExpanded =
-                      !_initialBreakdownExpanded),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 4, vertical: 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                '月初残高 (${month.month}/1)',
-                                style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF6B7280)),
-                              ),
-                              if (initialBreakdown.isNotEmpty) ...[
-                                const SizedBox(width: 4),
-                                Icon(
-                                  _initialBreakdownExpanded
-                                      ? Icons.expand_less
-                                      : Icons.expand_more,
-                                  size: 14,
-                                  color: const Color(0xFF9CA3AF),
-                                ),
-                              ],
-                            ],
-                          ),
-                          Text(
-                            formatYen(snap.initialBalance),
-                            style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF111827),
-                                fontFamily: 'monospace'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (isCurrentMonth)
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        iconSize: 16,
-                        icon: const Icon(Icons.edit,
-                            color: Color(0xFF9CA3AF)),
-                        onPressed: _showSnapshotDialog,
-                        tooltip: '月初残高を編集',
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            if (_initialBreakdownExpanded &&
-                initialBreakdown.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              ..._breakdownTiles(initialBreakdown),
-              const SizedBox(height: 6),
-            ],
-          ],
-          const SizedBox(height: 6),
+          // ── 当月の収支のみシンプルに ──
+          // 月初残高/推定残高/実測残高は「残高」セクションへ移動済。
           _flowRow(
               AppModeManager.instance.current == AppMode.business
                   ? '+ 当月売上（確定）'
@@ -818,7 +707,6 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
           const SizedBox(height: 10),
           // ── 差引（主役）────────────────────────────────
           // この月の収支が黒字 / 赤字かを一番大きく見せる。
-          // ホームを開いた瞬間に「今月の調子」が読み取れるようにする。
           Builder(builder: (_) {
             final net = income - expense;
             final isBlack = net >= 0;
@@ -882,57 +770,6 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
               ),
             );
           }),
-          const SizedBox(height: 10),
-          Container(height: 1, color: const Color(0xFFE5E7EB)),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('推定残高',
-                  style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF111827),
-                      fontWeight: FontWeight.w600)),
-              Text(
-                formatYen(projected),
-                style: TextStyle(
-                    fontSize: 20,
-                    color: projected >= 0
-                        ? const Color(0xFF16A34A)
-                        : const Color(0xFFDC2626),
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'monospace'),
-              ),
-            ],
-          ),
-          if (snap != null) ...[
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text(
-                  '実測 ${formatYen(actual)}',
-                  style: const TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF9CA3AF),
-                      fontFamily: 'monospace'),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  diff == 0
-                      ? '一致 ✓'
-                      : '差 ${formatYen(diff, withSign: true)}',
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: diff == 0
-                          ? const Color(0xFF16A34A)
-                          : const Color(0xFFEA580C),
-                      fontFamily: 'monospace',
-                      fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );
@@ -1065,10 +902,19 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
 
   // ===================== Section: 残高 =====================
 
-  Widget _balanceSummary() {
+  Widget _balanceSummary(DateTime month) {
     final allBanks = _payments.bankAccounts;
     final today = DateTime.now();
     final hideInactive = UiPreferences.instance.hideInactive;
+
+    // 月初残高（残高の起点）。
+    final snap = _snapshots.forMonth(month.year, month.month);
+    final isCurrentMonth =
+        month.year == today.year && month.month == today.month;
+    final monthTxns = _monthTxns(month);
+    final initialBreakdown = isCurrentMonth
+        ? _calculateMonthStartBreakdown(monthTxns)
+        : <String, int>{};
 
     // 銀行/現金/電子マネーの現在残高 = startingBalance + 全期間の取引集計（入金 - 出金）
     // ユーザーは startingBalance だけ手動入力し、以降は取引から自動増減。
@@ -1155,6 +1001,107 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── 月初残高（残高の起点。フローから移動）──────────
+          // snap == null の時は警告バナー、ある時は数値表示（編集 + 内訳タップ）。
+          if (snap == null)
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber,
+                      size: 16, color: Color(0xFFD97706)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '${month.month}月の月初残高が未記録',
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF92400E)),
+                    ),
+                  ),
+                  if (isCurrentMonth)
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      onPressed: _showSnapshotDialog,
+                      child: const Text('記録する'),
+                    ),
+                ],
+              ),
+            )
+          else ...[
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: initialBreakdown.isEmpty
+                  ? null
+                  : () => setState(() => _initialBreakdownExpanded =
+                      !_initialBreakdownExpanded),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Text(
+                            '${month.month}月初残高 (${month.month}/1)',
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF6B7280),
+                                fontWeight: FontWeight.w600),
+                          ),
+                          if (initialBreakdown.isNotEmpty) ...[
+                            const SizedBox(width: 4),
+                            Icon(
+                              _initialBreakdownExpanded
+                                  ? Icons.expand_less
+                                  : Icons.expand_more,
+                              size: 14,
+                              color: const Color(0xFF9CA3AF),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    Text(
+                      formatYen(snap.initialBalance),
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF374151),
+                          fontFamily: 'monospace'),
+                    ),
+                    if (isCurrentMonth)
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        iconSize: 14,
+                        padding: const EdgeInsets.only(left: 4),
+                        constraints: const BoxConstraints(),
+                        icon: const Icon(Icons.edit,
+                            color: Color(0xFF9CA3AF)),
+                        onPressed: _showSnapshotDialog,
+                        tooltip: '月初残高を編集',
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            if (_initialBreakdownExpanded &&
+                initialBreakdown.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              ..._breakdownTiles(initialBreakdown),
+            ],
+            const SizedBox(height: 8),
+            const Divider(height: 1, color: Color(0xFFE5E7EB)),
+            const SizedBox(height: 8),
+          ],
           if (banks.isEmpty && cards.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
@@ -1515,6 +1462,10 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
     required Color iconColor,
     required String title,
     required Widget child,
+    TextStyle? titleStyle,
+    double iconSize = 16,
+    double titleGap = 6,
+    double contentGap = 12,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1534,17 +1485,18 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: iconColor),
-              const SizedBox(width: 6),
+              Icon(icon, size: iconSize, color: iconColor),
+              SizedBox(width: titleGap),
               Text(title,
-                  style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF6B7280),
-                      letterSpacing: 0.5,
-                      fontWeight: FontWeight.w600)),
+                  style: titleStyle ??
+                      const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF6B7280),
+                          letterSpacing: 0.5,
+                          fontWeight: FontWeight.w600)),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: contentGap),
           child,
         ],
       ),
