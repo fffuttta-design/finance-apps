@@ -52,7 +52,7 @@ class UiPreferences extends ChangeNotifier {
   bool _hideInactive = false;
   List<String> _sidebarOrder = List.of(defaultSidebarOrder);
   bool? _useV2Ui;
-  String _v2Variant = v2VariantSidebar;
+  String _v2Variant = v2VariantTopNav;
   bool _loaded = false;
 
   /// 「未使用」フラグの立っているウォレット・口座・クレカを表示系画面で隠すか。
@@ -112,11 +112,11 @@ class UiPreferences extends ChangeNotifier {
     } else {
       _useV2Ui = null;
     }
-    // v2 バリアント
+    // v2 バリアント。未設定は topnav（v2.1）を既定とする。
     final variant = prefs.getString(_kV2Variant);
-    _v2Variant = (variant == v2VariantTopNav)
-        ? v2VariantTopNav
-        : v2VariantSidebar;
+    _v2Variant = (variant == v2VariantSidebar)
+        ? v2VariantSidebar
+        : v2VariantTopNav;
     _loaded = true;
     notifyListeners();
   }

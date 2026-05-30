@@ -215,11 +215,21 @@ class _V2RootState extends State<V2Root> {
   }
 
   /// マネフォ ME 風（v2.1）: 上タブ + 中央カラム
+  /// 事業モード時はヘッダーがダークネイビー、個人モード時は白
   Widget _buildTopNav(BuildContext context, Color accent) {
+    final mode = AppModeManager.instance.current;
+    final isBusiness = mode == AppMode.business;
+    // ダーク背景上のアクションボタンは透過＋白枠で読めるように
+    final outlinedFg =
+        isBusiness ? Colors.white : V2Colors.textBody;
+    final outlinedBorder = isBusiness
+        ? Colors.white.withValues(alpha: 0.35)
+        : V2Colors.border;
     return V2TopNavShell(
       header: V2TopHeader(
+        mode: mode,
         accent: accent,
-        modeSwitcher: const V2ModeSwitcher(),
+        modeSwitcher: V2ModeSwitcher(onDark: isBusiness),
         actions: [
           FilledButton.icon(
             onPressed: () => _showRecordSnack(context),
@@ -237,6 +247,10 @@ class _V2RootState extends State<V2Root> {
             },
             icon: const Icon(Icons.view_sidebar, size: 14),
             label: const Text('サイドバー版 (v2)'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: outlinedFg,
+              side: BorderSide(color: outlinedBorder),
+            ),
           ),
           OutlinedButton.icon(
             onPressed: () async {
@@ -244,6 +258,10 @@ class _V2RootState extends State<V2Root> {
             },
             icon: const Icon(Icons.swap_horiz, size: 14),
             label: const Text('v1 に戻す'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: outlinedFg,
+              side: BorderSide(color: outlinedBorder),
+            ),
           ),
         ],
       ),
