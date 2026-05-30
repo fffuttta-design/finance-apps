@@ -6,10 +6,13 @@ import '../data/ui_preferences.dart';
 import '../screens/asset_screen.dart';
 import '../screens/cards_screen.dart';
 import '../screens/dev_lab_screen.dart';
+import '../screens/expense_input_screen.dart';
 import '../screens/expenses_screen.dart';
+import '../screens/income_input_screen.dart';
 import '../screens/income_screen.dart';
 import '../screens/report_screen.dart';
 import '../screens/settings_screen.dart';
+import '../screens/transfer_input_screen.dart';
 import 'layout/shell.dart';
 import 'layout/topnav_shell.dart';
 import 'screens/v2_home.dart';
@@ -111,27 +114,43 @@ class _V2RootState extends State<V2Root> {
           return V2HomeTopNavScreen(accent: accent);
         }
         return const V2HomeScreen();
-      // Phase 2〜6: v1 画面をそのまま v2.1 シェル内に表示。
-      // 全機能（取引一覧/編集、固定費、月末締め、バックアップ等）が即時利用可能。
-      // 各画面の AppBar は v2.1 ヘッダーと二重表示になるが、機能保持優先で許容。
-      // 将来的に各画面を v2.1 ネイティブ widget でリファクタする。
+      // Phase 2〜6: v1 画面を v2.1 シェル内に表示。
+      // 各画面の AppBar は Theme で高さ 0 にして潰し、v2.1 ヘッダー一本に統一。
+      // 各画面の AppBar actions（+ 記録）は v2.1 ヘッダーの「記録」ボタンで代替。
       case 'expenses':
-        return const ExpensesScreen();
+        return _wrapV1(const ExpensesScreen());
       case 'income':
-        return const IncomeScreen();
+        return _wrapV1(const IncomeScreen());
       case 'asset':
-        return const AssetScreen();
+        return _wrapV1(const AssetScreen());
       case 'cards':
-        return const CardsScreen();
+        return _wrapV1(const CardsScreen());
       case 'report':
-        return const ReportScreen();
+        return _wrapV1(const ReportScreen());
       case 'settings':
-        return const SettingsScreen();
+        return _wrapV1(const SettingsScreen());
       case 'devLab':
-        return const DevLabScreen();
+        return _wrapV1(const DevLabScreen());
       default:
         return V2HomeTopNavScreen(accent: accent);
     }
+  }
+
+  /// v1 画面の AppBar を Theme で完全に潰すラッパー。
+  /// AppBar に含まれる title/actions は v2.1 ヘッダーで代替するため見た目から消す。
+  Widget _wrapV1(Widget v1Screen) {
+    return Theme(
+      data: Theme.of(context).copyWith(
+        appBarTheme: const AppBarTheme(
+          toolbarHeight: 0,
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+        ),
+      ),
+      child: v1Screen,
+    );
   }
 
   String _titleFor(String id) {
@@ -170,10 +189,11 @@ class _V2RootState extends State<V2Root> {
           mode == AppMode.business ? '事業' : '個人',
         ],
         actions: [
-          OutlinedButton.icon(
-            onPressed: () => _showRecordSnack(context),
-            icon: const Icon(Icons.add, size: 14),
-            label: const Text('記録'),
+          _RecordMenuButton(
+            accent: accent,
+            mode: mode,
+            onDark: false,
+            onSelected: _openRecord,
           ),
           OutlinedButton.icon(
             onPressed: () async {
@@ -213,14 +233,11 @@ class _V2RootState extends State<V2Root> {
         accent: accent,
         modeSwitcher: V2ModeSwitcher(onDark: isBusiness),
         actions: [
-          FilledButton.icon(
-            onPressed: () => _showRecordSnack(context),
-            icon: const Icon(Icons.add, size: 14),
-            label: const Text('記録'),
-            style: FilledButton.styleFrom(
-              backgroundColor: accent,
-              foregroundColor: Colors.white,
-            ),
+          _RecordMenuButton(
+            accent: accent,
+            mode: mode,
+            onDark: isBusiness,
+            onSelected: _openRecord,
           ),
           OutlinedButton.icon(
             onPressed: () async {
@@ -259,10 +276,105 @@ class _V2RootState extends State<V2Root> {
     );
   }
 
-  void _showRecordSnack(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('記録ボタン: Phase 1 以降で実装'),
+  /// 記録メニュー: 支出 / 収入 / 振替を選んで対応する入力モーダルを開く。
+  void _openRecord(String kind) {
+    Widget? page;
+    switch (kind) {
+      case 'expense':
+        page = const ExpenseInputScreen();
+        break;
+      case 'income':
+        page = const IncomeInputScreen();
+        break;
+      case 'transfer':
+        page = const TransferInputScreen();
+        break;
+    }
+    if (page == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => page!),
+    );
+  }
+}
+
+/// 「+ 記録」ボタン（PopupMenu）。支出/収入/振替を選んで入力できる。
+/// 事業モードでは「支出/経費」は「経費」、「収入」は「売上」とラベルが切り替わる。
+class _RecordMenuButton extends StatelessWidget {
+  final Color accent;
+  final AppMode mode;
+  final bool onDark;
+  final void Function(String kind) onSelected;
+  const _RecordMenuButton({
+    required this.accent,
+    required this.mode,
+    required this.onDark,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isBusiness = mode == AppMode.business;
+    return PopupMenuButton<String>(
+      tooltip: '記録する',
+      onSelected: onSelected,
+      itemBuilder: (_) => [
+        PopupMenuItem(
+          value: 'expense',
+          child: Row(
+            children: [
+              const Icon(Icons.remove_circle_outline,
+                  size: 16, color: Color(0xFFEF4444)),
+              const SizedBox(width: 8),
+              Text(isBusiness ? '経費を記録' : '支出を記録'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'income',
+          child: Row(
+            children: [
+              const Icon(Icons.add_circle_outline,
+                  size: 16, color: Color(0xFF10B981)),
+              const SizedBox(width: 8),
+              Text(isBusiness ? '売上を記録' : '収入を記録'),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'transfer',
+          child: Row(
+            children: [
+              Icon(Icons.swap_horiz,
+                  size: 16, color: Color(0xFF64748B)),
+              SizedBox(width: 8),
+              Text('振替を記録'),
+            ],
+          ),
+        ),
+      ],
+      child: Container(
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: accent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        alignment: Alignment.center,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.add, size: 14, color: Colors.white),
+            SizedBox(width: 4),
+            Text('記録',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700)),
+            SizedBox(width: 2),
+            Icon(Icons.arrow_drop_down, size: 16, color: Colors.white),
+          ],
+        ),
       ),
     );
   }
