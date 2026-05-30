@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/colors.dart';
+import '../theme/spacing.dart';
 import '../widgets/v2_top_header.dart';
 import '../widgets/v2_top_nav.dart';
 
@@ -44,15 +45,18 @@ class V2TopNavShell extends StatelessWidget {
             // タブ列は V2TopNav 内部で maxWidth に対して中央寄せ + 端まで均等配置
             // （ホームタブの左端 = 左カラムの左端、最終タブの右端 = 右カラムの右端）
             topNav,
-            // v1 画面（Scaffold + ListView）も v2.1 ネイティブ画面も入る
-            // 受け皿。スクロールは各画面側に任せる（v1 画面は ListView を持ち、
-            // v2.1 画面は内部で SingleChildScrollView を持つ前提）。
             Expanded(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints:
-                      BoxConstraints(maxWidth: maxContentWidth),
-                  child: content,
+              child: SingleChildScrollView(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints:
+                        BoxConstraints(maxWidth: maxContentWidth),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: V2Spacing.xl),
+                      child: content,
+                    ),
+                  ),
                 ),
               ),
             ),
