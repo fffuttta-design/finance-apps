@@ -23,6 +23,7 @@ import 'card_editor_screen.dart';
 import 'category_editor_screen.dart';
 import 'checklist_editor_screen.dart';
 import 'income_master_screen.dart';
+import 'sidebar_order_screen.dart';
 import 'subscription_list_screen.dart';
 
 /// 設定のトップ画面。各サブ設定への入り口を並べる。
@@ -362,6 +363,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return [
           _section('表示'),
           _hideInactiveTile(),
+          _tile(
+            icon: Icons.view_sidebar_outlined,
+            title: 'サイドバーの並び順',
+            subtitle: '広い画面（PC/タブレット）のナビ項目をドラッグで並び替え',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const SidebarOrderScreen()),
+            ),
+          ),
         ];
 
       case _SettingsSection.data:

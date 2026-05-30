@@ -6,6 +6,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/app_mode.dart';
+import '../data/ui_preferences.dart';
 import '../data/update_checker.dart';
 import '../data/update_installer.dart';
 import 'asset_screen.dart';
@@ -498,12 +499,14 @@ class _SideNavState extends State<_SideNav> {
   void initState() {
     super.initState();
     AppModeManager.instance.addListener(_rebuild);
+    UiPreferences.instance.addListener(_rebuild);
     _loadVersion();
   }
 
   @override
   void dispose() {
     AppModeManager.instance.removeListener(_rebuild);
+    UiPreferences.instance.removeListener(_rebuild);
     super.dispose();
   }
 
@@ -640,33 +643,16 @@ class _SideNavState extends State<_SideNav> {
               child: Divider(height: 1),
             ),
 
-            // ── ナビアイテム ──
+            // ── ナビアイテム（UiPreferences.sidebarOrder の順で構築）──
+            // 旧「テーブル」ナビは v1.0.69 で削除（集計→テーブルモード内に統合）。
+            // 🧪 開発中ラボ（devLab）は事業モードのみ表示。
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 children: [
-                  _navItem(0, Icons.home_outlined, Icons.home, 'ホーム'),
-                  _navItem(1, Icons.receipt_long_outlined,
-                      Icons.receipt_long, '支出'),
-                  _navItem(2, Icons.savings_outlined, Icons.savings, '収入',
-                      selectedColor: const Color(0xFF16A34A)),
-                  _navItem(6, Icons.account_balance_wallet_outlined,
-                      Icons.account_balance_wallet, '資産'),
-                  _navItem(7, Icons.credit_card_outlined,
-                      Icons.credit_card, 'クレカ',
-                      selectedColor: const Color(0xFFDC2626)),
-                  _navItem(3, Icons.bar_chart_outlined, Icons.bar_chart,
-                      '集計'),
-                  // 旧「テーブル」ナビは v1.0.69 で削除。
-                  // テーブルビューは「集計」→「テーブル」モード内に統合。
-                  _navItem(4, Icons.settings_outlined, Icons.settings,
-                      '設定'),
-                  // 🧪 開発中ラボ（事業モードのみ表示）。
-                  // PL/BS のプロトタイプ・予算管理の Phase 構成を並べる場所。
-                  if (AppModeManager.instance.current == AppMode.business)
-                    _navItem(8, Icons.science_outlined, Icons.science,
-                        '🧪 開発中',
-                        selectedColor: const Color(0xFFEA580C)),
+                  for (final id in UiPreferences.instance.sidebarOrder)
+                    if (_buildNavById(id, current) != null)
+                      _buildNavById(id, current)!,
                 ],
               ),
             ),
@@ -798,6 +784,43 @@ class _SideNavState extends State<_SideNav> {
         ),
       ),
     );
+  }
+
+  /// サイドバー並び順の識別子（'home', 'expenses', ...）から
+  /// 対応するナビアイテム widget を生成する。
+  /// - 該当しない id（未知 / 廃止）は null を返してスキップ
+  /// - devLab は事業モード時のみ表示
+  Widget? _buildNavById(String id, AppMode current) {
+    switch (id) {
+      case 'home':
+        return _navItem(0, Icons.home_outlined, Icons.home, 'ホーム');
+      case 'expenses':
+        return _navItem(
+            1, Icons.receipt_long_outlined, Icons.receipt_long, '支出');
+      case 'income':
+        return _navItem(2, Icons.savings_outlined, Icons.savings, '収入',
+            selectedColor: const Color(0xFF16A34A));
+      case 'asset':
+        return _navItem(6, Icons.account_balance_wallet_outlined,
+            Icons.account_balance_wallet, '資産');
+      case 'cards':
+        return _navItem(
+            7, Icons.credit_card_outlined, Icons.credit_card, 'クレカ',
+            selectedColor: const Color(0xFFDC2626));
+      case 'report':
+        return _navItem(
+            3, Icons.bar_chart_outlined, Icons.bar_chart, '集計');
+      case 'settings':
+        return _navItem(
+            4, Icons.settings_outlined, Icons.settings, '設定');
+      case 'devLab':
+        if (current != AppMode.business) return null;
+        return _navItem(
+            8, Icons.science_outlined, Icons.science, '🧪 開発中',
+            selectedColor: const Color(0xFFEA580C));
+      default:
+        return null;
+    }
   }
 
   Widget _navItem(
