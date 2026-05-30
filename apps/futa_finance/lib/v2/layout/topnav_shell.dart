@@ -42,6 +42,8 @@ class V2TopNavShell extends StatelessWidget {
         child: Column(
           children: [
             header,
+            // タブ列は V2TopNav 内部で maxWidth に対して中央寄せ + 端まで均等配置
+            // （ホームタブの左端 = 左カラムの左端、最終タブの右端 = 右カラムの右端）
             topNav,
             Expanded(
               child: SingleChildScrollView(
@@ -51,7 +53,6 @@ class V2TopNavShell extends StatelessWidget {
                         BoxConstraints(maxWidth: maxContentWidth),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: V2Spacing.xl,
                           vertical: V2Spacing.xl),
                       child: content,
                     ),

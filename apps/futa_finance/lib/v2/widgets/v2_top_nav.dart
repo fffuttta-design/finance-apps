@@ -7,6 +7,9 @@ import 'v2_sidebar.dart' show V2NavItem;
 
 /// マネフォ ME 風の上タブナビ。
 /// 白背景 + 横並びタブ + 選択中タブの下にアクセント色のアンダーラインバー。
+///
+/// シェルから maxWidth を渡されたら、その幅でセンタリングし、左右両端まで
+/// タブを均等配置する（背景・下罫線は画面全幅のまま）。
 class V2TopNav extends StatelessWidget {
   /// タブ項目
   final List<V2NavItem> items;
@@ -20,12 +23,16 @@ class V2TopNav extends StatelessWidget {
   /// アクセント色（事業=青、個人=オレンジ）
   final Color accent;
 
+  /// タブ列の最大幅。中央コンテンツと揃える用。
+  final double maxWidth;
+
   const V2TopNav({
     super.key,
     required this.items,
     required this.currentId,
     required this.onSelect,
     required this.accent,
+    this.maxWidth = 1200,
   });
 
   @override
@@ -37,21 +44,21 @@ class V2TopNav extends StatelessWidget {
           bottom: BorderSide(color: V2Colors.border, width: 1),
         ),
       ),
-      padding:
-          const EdgeInsets.symmetric(horizontal: V2Spacing.xl),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final item in items)
-              _Tab(
-                item: item,
-                selected: item.id == currentId,
-                accent: accent,
-                onTap: () => onSelect(item.id),
-              ),
-          ],
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              for (final item in items)
+                _Tab(
+                  item: item,
+                  selected: item.id == currentId,
+                  accent: accent,
+                  onTap: () => onSelect(item.id),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -95,7 +102,7 @@ class _TabState extends State<_Tab> {
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: V2Spacing.lg),
+                    horizontal: V2Spacing.md),
                 child: Center(
                   child: Row(
                     children: [
@@ -117,8 +124,8 @@ class _TabState extends State<_Tab> {
               // 選択中タブの下のアクセントバー
               if (widget.selected)
                 Positioned(
-                  left: V2Spacing.md,
-                  right: V2Spacing.md,
+                  left: V2Spacing.sm,
+                  right: V2Spacing.sm,
                   bottom: 0,
                   child: Container(
                     height: 3,
