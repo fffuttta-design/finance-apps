@@ -59,6 +59,12 @@ class Transaction {
   /// 振替先（type=transfer のみ使用）。
   final String? transferToAccount;
 
+  /// 見込みフラグ（発生主義・案A の運用拡張）。
+  /// true: 発生月の売上を見込み額で計上（実際の入金は来月以降）。
+  /// 月末締めの「入金締め処理」で実額に確定したら false に切り替える。
+  /// デフォルトは false（=確定）。既存データは false で読まれる。
+  final bool isPending;
+
   const Transaction({
     required this.id,
     required this.date,
@@ -74,6 +80,7 @@ class Transaction {
     this.originalAmount,
     this.transferFromAccount,
     this.transferToAccount,
+    this.isPending = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -92,6 +99,7 @@ class Transaction {
         'originalAmount': originalAmount,
         'transferFromAccount': transferFromAccount,
         'transferToAccount': transferToAccount,
+        'isPending': isPending,
       };
 
   factory Transaction.fromJson(Map<String, dynamic> j) => Transaction(
@@ -115,6 +123,7 @@ class Transaction {
         originalAmount: (j['originalAmount'] as num?)?.toDouble(),
         transferFromAccount: j['transferFromAccount'] as String?,
         transferToAccount: j['transferToAccount'] as String?,
+        isPending: j['isPending'] as bool? ?? false,
       );
 
   Transaction copyWith({
@@ -131,6 +140,7 @@ class Transaction {
     double? originalAmount,
     String? transferFromAccount,
     String? transferToAccount,
+    bool? isPending,
   }) =>
       Transaction(
         id: id,
@@ -147,5 +157,6 @@ class Transaction {
         originalAmount: originalAmount ?? this.originalAmount,
         transferFromAccount: transferFromAccount ?? this.transferFromAccount,
         transferToAccount: transferToAccount ?? this.transferToAccount,
+        isPending: isPending ?? this.isPending,
       );
 }

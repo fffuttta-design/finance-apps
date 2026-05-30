@@ -62,6 +62,10 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
   final _amountCtrl = TextEditingController();
   final _balanceAfterCtrl = TextEditingController();
   final _memoCtrl = TextEditingController();
+
+  /// 見込み売上として記録するか。デフォルト false（=確定）。
+  /// 発生主義の運用で「発生月に計上、実額は来月確定」の時に使う。
+  bool _isPending = false;
   final _amountFocus = FocusNode();
   final _balanceFocus = FocusNode();
   bool _saving = false;
@@ -249,11 +253,13 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       amount: amount,
       memo: _memoCtrl.text.trim().isEmpty ? null : _memoCtrl.text.trim(),
       incomeSourceId: _selectedSource!.id,
+      isPending: _isPending,
     );
     await TransactionRepository.instance.add(tx);
 
     // 銀行口座の currentBalance を更新
-    if (balanceAfter != null && _payments != null) {
+    // 見込み売上は実際にはまだ入金されていないので、残高は更新しない。
+    if (!_isPending && balanceAfter != null && _payments != null) {
       final updated = _payments!.bankAccounts.map((b) {
         if (b.name == _receiveAccount) {
           return b.copyWith(currentBalance: balanceAfter);
@@ -387,7 +393,48 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    _label('入金額（円）'),
+                    // 見込みトグル（発生主義・案A 拡張）。
+                    // ON: 発生月に見込み額で計上、入金は来月以降。
+                    //     残高は更新しない（実際に入金されてないため）。
+                    // OFF: 通常の入金記録（残高も更新）。
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        color: _isPending
+                            ? const Color(0xFFFEF3C7)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: _isPending
+                                ? const Color(0xFFD97706)
+                                : const Color(0xFFE5E7EB)),
+                      ),
+                      child: SwitchListTile(
+                        value: _isPending,
+                        onChanged: (v) => setState(() => _isPending = v),
+                        title: const Text('見込み売上として記録',
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF111827))),
+                        subtitle: Text(
+                            _isPending
+                                ? '発生月に計上。残高は更新しない。\n月末締めの「入金締め処理」で確定に切り替え。'
+                                : 'OFF: 通常の確定入金として記録（残高も更新）',
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF6B7280))),
+                        secondary: Icon(
+                            _isPending
+                                ? Icons.hourglass_top
+                                : Icons.check_circle_outline,
+                            color: _isPending
+                                ? const Color(0xFFD97706)
+                                : const Color(0xFF6B7280)),
+                      ),
+                    ),
+
+                    _label(_isPending ? '見込み売上額（円）' : '入金額（円）'),
                     TextFormField(
                       controller: _amountCtrl,
                       focusNode: _amountFocus,
@@ -403,22 +450,24 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    _label('入金後の残高（円）— 自動計算・編集可'),
-                    TextFormField(
-                      controller: _balanceAfterCtrl,
-                      focusNode: _balanceFocus,
-                      keyboardType: TextInputType.number,
-                      decoration: _inputDecoration().copyWith(
-                        prefixIcon: const Icon(Icons.account_balance,
-                            size: 18, color: Color(0xFF16A34A)),
+                    if (!_isPending) ...[
+                      _label('入金後の残高（円）— 自動計算・編集可'),
+                      TextFormField(
+                        controller: _balanceAfterCtrl,
+                        focusNode: _balanceFocus,
+                        keyboardType: TextInputType.number,
+                        decoration: _inputDecoration().copyWith(
+                          prefixIcon: const Icon(Icons.account_balance,
+                              size: 18, color: Color(0xFF16A34A)),
+                        ),
+                        style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 16,
+                            color: Color(0xFF16A34A),
+                            fontWeight: FontWeight.bold),
                       ),
-                      style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 16,
-                          color: Color(0xFF16A34A),
-                          fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 16),
+                    ],
 
                     _label('備考（任意）'),
                     TextFormField(

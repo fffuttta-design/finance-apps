@@ -14,6 +14,7 @@ import '../data/checklist_repository.dart';
 import '../data/month_closing_repository.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
+import '../screens/pending_settlement_screen.dart';
 import '../utils/formatters.dart';
 
 /// 集計タブの「月末締め」ビュー。
@@ -427,6 +428,8 @@ class _MonthClosingViewState extends State<MonthClosingView>
         if (isClosed) const SizedBox(height: 12),
         _summaryCard(income, expense),
         const SizedBox(height: 12),
+        _pendingSettlementCard(),
+        const SizedBox(height: 12),
         _progressCard(checkedCount, total, progress, isClosed),
         const SizedBox(height: 12),
         if (items.isEmpty)
@@ -527,6 +530,78 @@ class _MonthClosingViewState extends State<MonthClosingView>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 入金締め処理カード。
+  /// 「見込み売上」フラグの立った収入が残っている時に表示し、
+  /// タップで PendingSettlementScreen に遷移する。
+  Widget _pendingSettlementCard() {
+    final pending = _transactions
+        .where((t) =>
+            t.type == TransactionType.income && t.isPending)
+        .toList();
+    final pendingTotal =
+        pending.fold<int>(0, (s, t) => s + t.amount);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => const PendingSettlementScreen()),
+        );
+        // 戻ってきたら再読み込み
+        _load();
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: pending.isEmpty
+              ? Colors.white
+              : const Color(0xFFFEF3C7),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+              color: pending.isEmpty
+                  ? const Color(0xFFE5E7EB)
+                  : const Color(0xFFFCD34D)),
+        ),
+        child: Row(
+          children: [
+            Icon(
+                pending.isEmpty
+                    ? Icons.check_circle_outline
+                    : Icons.hourglass_top,
+                size: 18,
+                color: pending.isEmpty
+                    ? const Color(0xFF16A34A)
+                    : const Color(0xFFD97706)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('入金締め処理',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF111827))),
+                  Text(
+                      pending.isEmpty
+                          ? '見込み売上はありません'
+                          : '${pending.length} 件 / ${formatYen(pendingTotal)} を確定に切り替え',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF6B7280))),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right,
+                color: Color(0xFF9CA3AF)),
+          ],
+        ),
       ),
     );
   }

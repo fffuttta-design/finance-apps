@@ -533,9 +533,17 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
   Widget _monthlyFlow(DateTime month) {
     final snap = _snapshots.forMonth(month.year, month.month);
     final monthTxns = _monthTxns(month);
-    final income = monthTxns
-        .where((t) => t.type == TransactionType.income)
+    // 売上は「確定」と「見込み」に分けて集計。
+    // 見込みは銀行残高に反映されていないので別行で見せる。
+    final incomeConfirmed = monthTxns
+        .where((t) =>
+            t.type == TransactionType.income && !t.isPending)
         .fold<int>(0, (s, t) => s + t.amount);
+    final incomePending = monthTxns
+        .where((t) =>
+            t.type == TransactionType.income && t.isPending)
+        .fold<int>(0, (s, t) => s + t.amount);
+    final income = incomeConfirmed + incomePending;
     final expense = monthTxns
         .where((t) => t.type == TransactionType.expense)
         .fold<int>(0, (s, t) => s + t.amount);
@@ -679,10 +687,35 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
           const SizedBox(height: 6),
           _flowRow(
               AppModeManager.instance.current == AppMode.business
-                  ? '+ 当月売上'
+                  ? '+ 当月売上（確定）'
                   : '+ 当月収入',
-              formatYen(income, withSign: true),
+              formatYen(incomeConfirmed, withSign: true),
               const Color(0xFF16A34A)),
+          if (incomePending > 0)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                children: [
+                  const Icon(Icons.hourglass_top,
+                      size: 14, color: Color(0xFFD97706)),
+                  const SizedBox(width: 4),
+                  const Text('+ 当月売上（見込み）',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFFD97706),
+                          fontWeight: FontWeight.w600)),
+                  const Spacer(),
+                  Text(
+                    formatYen(incomePending, withSign: true),
+                    style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFFD97706),
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+            ),
           // 経費行: タップで内訳展開
           InkWell(
             borderRadius: BorderRadius.circular(4),
