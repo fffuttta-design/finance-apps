@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
@@ -16,6 +17,7 @@ import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../data/ui_preferences.dart';
 import '../utils/formatters.dart';
+import '../utils/thousands_separator_input_formatter.dart';
 import '../widgets/brand_logo.dart';
 import 'account_detail_screen.dart';
 import 'card_detail_screen.dart';
@@ -214,7 +216,7 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
     final suggestedBalance = _payments.bankAccounts
         .fold<int>(0, (s, b) => s + (b.displayBalance ?? 0));
     final controller =
-        TextEditingController(text: suggestedBalance.toString());
+        TextEditingController(text: formatAmount(suggestedBalance));
 
     final result = await showDialog<int?>(
       context: context,
@@ -240,10 +242,14 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
             TextField(
               controller: controller,
               keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                ThousandsSeparatorInputFormatter(),
+              ],
               autofocus: true,
               decoration: InputDecoration(
                 labelText: '残高（円）',
-                hintText: '例: 1000000',
+                hintText: '例: 1,000,000',
                 helperText: '提案: 現口座合算 ${formatYen(suggestedBalance)}',
                 prefixText: '¥ ',
               ),
@@ -260,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
               child: const Text('後で')),
           FilledButton(
             onPressed: () {
-              final value = int.tryParse(controller.text.trim());
+              final value = parseAmount(controller.text);
               Navigator.pop(context, value);
             },
             child: const Text('記録'),

@@ -1,10 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
+import '../utils/thousands_separator_input_formatter.dart';
 
 /// 支払元のカテゴリ。UI 上はまずこれを選択 → 該当の項目プルダウンが切り替わる。
 enum _PayCategory { card, bank, cash, emoney }
@@ -271,9 +273,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       _syncing = false;
       return;
     }
-    final amount = int.tryParse(_amountCtrl.text) ?? 0;
+    final amount = parseAmount(_amountCtrl.text) ?? 0;
     _syncing = true;
-    _balanceAfterCtrl.text = _computeAfter(amount).toString();
+    _balanceAfterCtrl.text = formatAmount(_computeAfter(amount));
     _syncing = false;
   }
 
@@ -298,8 +300,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     if (_syncing) return;
     if (_currentBalance == null) return;
     if (!_amountFocus.hasFocus) return;
-    final amount = int.tryParse(_amountCtrl.text) ?? 0;
-    final newBalance = _computeAfter(amount).toString();
+    final amount = parseAmount(_amountCtrl.text) ?? 0;
+    final newBalance = formatAmount(_computeAfter(amount));
     if (_balanceAfterCtrl.text != newBalance) {
       _syncing = true;
       _balanceAfterCtrl.text = newBalance;
@@ -311,8 +313,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     if (_syncing) return;
     if (_currentBalance == null) return;
     if (!_balanceFocus.hasFocus) return;
-    final balance = int.tryParse(_balanceAfterCtrl.text) ?? 0;
-    final newAmount = _computeAmount(balance).toString();
+    final balance = parseAmount(_balanceAfterCtrl.text) ?? 0;
+    final newAmount = formatAmount(_computeAmount(balance));
     if (_amountCtrl.text != newAmount) {
       _syncing = true;
       _amountCtrl.text = newAmount;
@@ -480,7 +482,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       );
       return;
     }
-    final amount = int.tryParse(_amountCtrl.text.trim());
+    final amount = parseAmount(_amountCtrl.text);
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('金額は1以上の整数を入力してください')),
@@ -499,7 +501,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       }
     }
 
-    final balanceAfter = int.tryParse(_balanceAfterCtrl.text.trim());
+    final balanceAfter = parseAmount(_balanceAfterCtrl.text);
 
     setState(() => _saving = true);
     final tx = core.Transaction(
@@ -804,12 +806,16 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 controller: _amountCtrl,
                 focusNode: _amountFocus,
                 keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  ThousandsSeparatorInputFormatter(),
+                ],
                 decoration: _inputDecoration(),
                 style: const TextStyle(
                     fontFamily: 'monospace', fontSize: 16),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return '入力してください';
-                  if (int.tryParse(v.trim()) == null) return '数字のみで入力';
+                  if (parseAmount(v) == null) return '数字のみで入力';
                   return null;
                 },
               ),
@@ -823,6 +829,10 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                   controller: _balanceAfterCtrl,
                   focusNode: _balanceFocus,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    ThousandsSeparatorInputFormatter(),
+                  ],
                   decoration: _inputDecoration().copyWith(
                     prefixIcon: Icon(
                       isCard ? Icons.credit_card : Icons.account_balance,

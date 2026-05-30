@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
+import '../utils/thousands_separator_input_formatter.dart';
 
 /// 入金締め処理画面。
 ///
@@ -189,7 +191,7 @@ class _PendingSettlementScreenState extends State<PendingSettlementScreen> {
 
   Widget _pendingTile(core.Transaction t) {
     final amountCtrl =
-        TextEditingController(text: t.amount.toString());
+        TextEditingController(text: formatAmount(t.amount));
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
@@ -255,6 +257,10 @@ class _PendingSettlementScreenState extends State<PendingSettlementScreen> {
                 child: TextField(
                   controller: amountCtrl,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    ThousandsSeparatorInputFormatter(),
+                  ],
                   textAlign: TextAlign.right,
                   decoration: const InputDecoration(
                     isDense: true,
@@ -274,7 +280,7 @@ class _PendingSettlementScreenState extends State<PendingSettlementScreen> {
                 icon: const Icon(Icons.check, size: 16),
                 label: const Text('確定'),
                 onPressed: () =>
-                    _settleOne(t, int.tryParse(amountCtrl.text.trim())),
+                    _settleOne(t, parseAmount(amountCtrl.text)),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF16A34A),
                   padding: const EdgeInsets.symmetric(

@@ -1,10 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart';
 
 import '../data/settings_repository.dart';
 import '../data/subscription_repository.dart';
 import '../utils/formatters.dart';
+import '../utils/thousands_separator_input_formatter.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/centered_body.dart';
 
@@ -78,8 +80,8 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
   Future<Subscription?> _editDialog(
       BuildContext context, Subscription? initial) async {
     final nameCtrl = TextEditingController(text: initial?.name ?? '');
-    final amountCtrl =
-        TextEditingController(text: initial?.amount.toString() ?? '');
+    final amountCtrl = TextEditingController(
+        text: initial != null ? formatAmount(initial.amount) : '');
     final billingDayCtrl =
         TextEditingController(text: initial?.billingDay?.toString() ?? '');
     final memoCtrl = TextEditingController(text: initial?.memo ?? '');
@@ -157,11 +159,11 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
         builder: (ctx, setLocal) {
           // フォーム入力可否（バリデーション）
           final isValid = nameCtrl.text.trim().isNotEmpty &&
-              (int.tryParse(amountCtrl.text.trim()) ?? 0) > 0;
+              (parseAmount(amountCtrl.text) ?? 0) > 0;
 
           void onSave() {
             final name = nameCtrl.text.trim();
-            final amount = int.tryParse(amountCtrl.text.trim());
+            final amount = parseAmount(amountCtrl.text);
             if (name.isEmpty || amount == null || amount <= 0) {
               Navigator.pop(ctx, null);
               return;
@@ -257,6 +259,10 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                           TextField(
                             controller: amountCtrl,
                             keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              ThousandsSeparatorInputFormatter(),
+                            ],
                             decoration: InputDecoration(
                               labelText:
                                   amountType == SubscriptionAmountType.fixed

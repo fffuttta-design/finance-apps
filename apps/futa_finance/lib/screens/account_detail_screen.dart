@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
+import '../utils/thousands_separator_input_formatter.dart';
 import '../widgets/brand_logo.dart';
 import 'expense_input_screen.dart';
 import 'income_input_screen.dart';
@@ -643,7 +645,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
 
   Future<void> _editVirtualBalance(bool isMonthStart, int currentValue) async {
     final ctrl =
-        TextEditingController(text: currentValue.toString());
+        TextEditingController(text: formatAmount(currentValue));
     final newValue = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -653,6 +655,10 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
           child: TextField(
             controller: ctrl,
             keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              ThousandsSeparatorInputFormatter(),
+            ],
             decoration: const InputDecoration(
               labelText: '残高（円）',
               prefixText: '¥ ',
@@ -667,7 +673,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
               child: const Text('キャンセル')),
           FilledButton(
             onPressed: () {
-              final v = int.tryParse(ctrl.text.replaceAll(',', ''));
+              final v = parseAmount(ctrl.text);
               if (v != null) Navigator.pop(ctx, v);
             },
             child: const Text('OK'),
@@ -881,7 +887,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
 
     DateTime editingDate = t.date;
     final descCtrl = TextEditingController(text: t.description);
-    final amountCtrl = TextEditingController(text: t.amount.toString());
+    final amountCtrl = TextEditingController(text: formatAmount(t.amount));
     final memoCtrl = TextEditingController(text: t.memo ?? '');
 
     final saved = await showDialog<bool>(
@@ -964,6 +970,10 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                   TextField(
                     controller: amountCtrl,
                     keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      ThousandsSeparatorInputFormatter(),
+                    ],
                     decoration: InputDecoration(
                       labelText: isOut ? '出金額（円）' : '入金額（円）',
                       floatingLabelBehavior: FloatingLabelBehavior.always,
@@ -1033,8 +1043,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
               ),
               FilledButton(
                 onPressed: () async {
-                  final newAmount =
-                      int.tryParse(amountCtrl.text.replaceAll(',', ''));
+                  final newAmount = parseAmount(amountCtrl.text);
                   if (newAmount == null || newAmount <= 0) return;
                   final updated = t.copyWith(
                     date: editingDate,

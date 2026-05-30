@@ -1,10 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
+import '../utils/thousands_separator_input_formatter.dart';
 
 /// 振替入力モーダルを表示する。保存成功時は true を返す。
 Future<bool?> showTransferInputModal(BuildContext context) {
@@ -102,7 +104,7 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
       );
       return;
     }
-    final amount = int.tryParse(_amountCtrl.text.replaceAll(',', ''));
+    final amount = parseAmount(_amountCtrl.text);
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('正しい金額を入力してください')),
@@ -263,6 +265,10 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
             TextField(
               controller: _amountCtrl,
               keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                ThousandsSeparatorInputFormatter(),
+              ],
               decoration: const InputDecoration(
                 labelText: '金額（円）',
                 prefixText: '¥ ',
@@ -274,8 +280,7 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Builder(builder: (_) {
-                  final v = int.tryParse(
-                      _amountCtrl.text.replaceAll(',', ''));
+                  final v = parseAmount(_amountCtrl.text);
                   if (v == null) return const SizedBox.shrink();
                   return Text(
                     formatYen(v),

@@ -1,5 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../utils/thousands_separator_input_formatter.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/income_source_repository.dart';
@@ -117,7 +120,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       if (s != null) {
         _descCtrl.text = s.name;
         if (s.expectedAmount != null) {
-          _amountCtrl.text = s.expectedAmount.toString();
+          _amountCtrl.text = formatAmount(s.expectedAmount!);
         }
       }
     });
@@ -138,17 +141,17 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       _currentBalance = bank?.displayBalance ?? 0;
     });
     // 既に入金額が入ってればそれを反映、空なら現残高そのまま
-    final amount = int.tryParse(_amountCtrl.text) ?? 0;
+    final amount = parseAmount(_amountCtrl.text) ?? 0;
     _syncing = true;
-    _balanceAfterCtrl.text = (_currentBalance + amount).toString();
+    _balanceAfterCtrl.text = formatAmount(_currentBalance + amount);
     _syncing = false;
   }
 
   void _syncBalanceFromAmount() {
     if (_syncing) return;
     if (!_amountFocus.hasFocus) return;
-    final amount = int.tryParse(_amountCtrl.text) ?? 0;
-    final newBalance = (_currentBalance + amount).toString();
+    final amount = parseAmount(_amountCtrl.text) ?? 0;
+    final newBalance = formatAmount(_currentBalance + amount);
     if (_balanceAfterCtrl.text != newBalance) {
       _syncing = true;
       _balanceAfterCtrl.text = newBalance;
@@ -159,8 +162,8 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
   void _syncAmountFromBalance() {
     if (_syncing) return;
     if (!_balanceFocus.hasFocus) return;
-    final balance = int.tryParse(_balanceAfterCtrl.text) ?? 0;
-    final newAmount = (balance - _currentBalance).toString();
+    final balance = parseAmount(_balanceAfterCtrl.text) ?? 0;
+    final newAmount = formatAmount(balance - _currentBalance);
     if (_amountCtrl.text != newAmount) {
       _syncing = true;
       _amountCtrl.text = newAmount;
@@ -230,14 +233,14 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       );
       return;
     }
-    final amount = int.tryParse(_amountCtrl.text.trim());
+    final amount = parseAmount(_amountCtrl.text);
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('金額は1以上の整数を入力してください')),
       );
       return;
     }
-    final balanceAfter = int.tryParse(_balanceAfterCtrl.text.trim());
+    final balanceAfter = parseAmount(_balanceAfterCtrl.text);
 
     setState(() => _saving = true);
     final tx = core.Transaction(
@@ -439,12 +442,16 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                       controller: _amountCtrl,
                       focusNode: _amountFocus,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        ThousandsSeparatorInputFormatter(),
+                      ],
                       decoration: _inputDecoration(),
                       style: const TextStyle(
                           fontFamily: 'monospace', fontSize: 16),
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return '入力してください';
-                        if (int.tryParse(v.trim()) == null) return '数字のみで入力';
+                        if (parseAmount(v) == null) return '数字のみで入力';
                         return null;
                       },
                     ),
@@ -456,6 +463,10 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                         controller: _balanceAfterCtrl,
                         focusNode: _balanceFocus,
                         keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          ThousandsSeparatorInputFormatter(),
+                        ],
                         decoration: _inputDecoration().copyWith(
                           prefixIcon: const Icon(Icons.account_balance,
                               size: 18, color: Color(0xFF16A34A)),

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/app_mode.dart';
@@ -10,6 +11,7 @@ import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
+import '../utils/thousands_separator_input_formatter.dart';
 
 /// 🧪 開発中ラボ（事業モード専用）
 ///
@@ -1595,8 +1597,8 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
       ScheduledPayment? initial) async {
     int month = initial?.month ?? DateTime.now().month;
     int day = initial?.day ?? 1;
-    final amountCtrl =
-        TextEditingController(text: initial?.amount.toString() ?? '');
+    final amountCtrl = TextEditingController(
+        text: initial != null ? formatAmount(initial.amount) : '');
 
     return showDialog<ScheduledPayment?>(
       context: context,
@@ -1637,6 +1639,10 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
               TextField(
                 controller: amountCtrl,
                 keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  ThousandsSeparatorInputFormatter(),
+                ],
                 decoration: const InputDecoration(
                   labelText: '金額（円）',
                 ),
@@ -1649,7 +1655,7 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
                 child: const Text('キャンセル')),
             FilledButton(
               onPressed: () {
-                final a = int.tryParse(amountCtrl.text.trim());
+                final a = parseAmount(amountCtrl.text);
                 if (a == null) return;
                 Navigator.pop(
                     ctx,

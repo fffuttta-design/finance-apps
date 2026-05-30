@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
+import '../utils/thousands_separator_input_formatter.dart';
 import '../widgets/brand_logo.dart';
 
 /// クレジットカード詳細（利用明細）画面。
@@ -721,6 +723,10 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                 TextField(
                   controller: amountCtrl,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    ThousandsSeparatorInputFormatter(),
+                  ],
                   decoration: const InputDecoration(
                     labelText: '請求金額（円）',
                     prefixText: '¥ ',
@@ -761,7 +767,7 @@ class _CardDetailScreenState extends State<CardDetailScreen>
       }),
     );
     if (!confirmed) return;
-    final amount = int.tryParse(amountCtrl.text.replaceAll(',', ''));
+    final amount = parseAmount(amountCtrl.text);
     if (amount == null || amount <= 0) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

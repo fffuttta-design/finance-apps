@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart';
 
 import '../data/settings_repository.dart';
+import '../utils/thousands_separator_input_formatter.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/centered_body.dart';
 
@@ -49,7 +51,9 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
     final memoCtrl = TextEditingController(text: initial?.memo ?? '');
     // 開始残高(任意): 通帳画面の月初/月末残高をユーザーが直したい時用に復活。
     final startingCtrl = TextEditingController(
-        text: initial?.startingBalance?.toString() ?? '');
+        text: initial?.startingBalance != null
+            ? formatAmount(initial!.startingBalance!)
+            : '');
     AccountType selectedType = initial?.accountType ?? AccountType.bank;
     bool selectedInactive = initial?.inactive ?? false;
     // last4 は UI 入力廃止。既存値があれば保持して破壊しない。
@@ -82,9 +86,8 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
                 memoCtrl.text.trim().isEmpty ? null : memoCtrl.text.trim();
             // 開始残高: 空欄は null（未設定）扱い。
             final startingRaw = startingCtrl.text.trim();
-            final starting = startingRaw.isEmpty
-                ? null
-                : int.tryParse(startingRaw.replaceAll(',', ''));
+            final starting =
+                startingRaw.isEmpty ? null : parseAmount(startingRaw);
             if (initial == null) {
               Navigator.pop(
                   ctx,
@@ -201,6 +204,10 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
                           TextField(
                             controller: startingCtrl,
                             keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              ThousandsSeparatorInputFormatter(),
+                            ],
                             decoration: const InputDecoration(
                               labelText: '開始残高（任意・円）',
                               prefixText: '¥ ',
