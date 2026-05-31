@@ -12,7 +12,7 @@ import '../theme/spacing.dart';
 import '../theme/typography.dart';
 import '../widgets/v2_card.dart';
 
-/// 損益計算書（PL）の項目分類。
+/// 損益計算書（PL）の大カテゴリ分類。
 enum _PLCategory {
   sales,
   cogs,
@@ -25,19 +25,64 @@ enum _PLCategory {
   other,
 }
 
+/// PL テーブルの行種別。
+enum _RowKind {
+  /// 通常データ行（売上高・売上原価など、大区分の合計）
+  data,
+
+  /// 内訳行（販管費の中の「役員報酬」など、インデント表示）
+  detail,
+
+  /// 小計行（粗利・営業利益など、黄色背景でハイライト）
+  subtotal,
+
+  /// 最終利益（当期純利益、強ハイライト）
+  emphasize,
+}
+
+/// 販売管理費の標準的な勘定科目（順序固定）。
+/// Transaction.category.major でこれに完全一致するものを各内訳として集計。
+/// リストにない販管費カテゴリは「その他販管費」に集約する。
+const List<String> _sgaItems = [
+  '役員報酬',
+  '給与',
+  '雑給与',
+  '賞与・退職金',
+  '法定福利費',
+  '福利厚生費',
+  '広告宣伝費',
+  '交際費',
+  '会議費',
+  '旅費交通費',
+  '通信費',
+  '消耗品費',
+  '修繕費',
+  '水道光熱費',
+  '新聞図書費',
+  '諸会費',
+  '支払手数料',
+  '賃借料',
+  '保険料',
+  '租税公課',
+  '支払報酬',
+  '減価償却費',
+  '雑費',
+];
+
+/// 営業外収益の標準科目。
+const List<String> _nonOpIncomeItems = [
+  '受取利息',
+  '受取配当金',
+  '雑収入',
+];
+
+/// 営業外費用の標準科目。
+const List<String> _nonOpExpenseItems = [
+  '支払利息',
+  '雑損失',
+];
+
 /// v2.1 集計タブ：会計風月次表（PL）。
-///
-/// 横軸: 事業年度の各月（6月始まり既定）＋ 年度累計
-/// 縦軸: 売上 / 原価 / 粗利 / 販管費 / 営業利益 / 営業外収益 / 営業外費用 /
-///       経常利益 / 特別利益 / 特別損失 / 税引前利益 / 法人税等 / 当期純利益
-///
-/// データは Transaction から自動集計。Category.major のキーワードで分類する：
-/// - "原価" / "仕入"   → 売上原価
-/// - "営業外"          → 営業外収益 or 費用
-/// - "特別"            → 特別利益 or 損失
-/// - "法人税" / "租税" / "税金" → 法人税等
-/// - それ以外の expense → 販管費
-/// - 通常 income       → 売上高
 class V2ReportScreen extends StatefulWidget {
   final Color accent;
   const V2ReportScreen({super.key, required this.accent});
@@ -54,10 +99,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
   List<core.Transaction> _transactions = [];
   bool _loading = true;
 
-  /// 事業年度開始月（既定: 6 月）
   final int _fyStartMonth = 6;
-
-  /// 表示する事業年度（その年度の開始年）
   late int _fyYear = _calcFyYear();
 
   int _calcFyYear() {
@@ -93,25 +135,32 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     });
   }
 
-  // ── PL カテゴリ分類 ──
+  /// 大カテゴリ分類。
+  /// 法人税等の判定は major の完全一致のみ（租税公課は販管費）。
   _PLCategory _classify(core.Transaction t) {
-    final major = t.category.major;
+    final major = t.category.major.trim();
     if (t.type == core.TransactionType.income) {
       if (major.contains('特別')) return _PLCategory.extraIncome;
-      if (major.contains('営業外')) return _PLCategory.nonOpIncome;
+      if (_nonOpIncomeItems.contains(major) ||
+          major.contains('営業外')) {
+        return _PLCategory.nonOpIncome;
+      }
       return _PLCategory.sales;
     }
     if (t.type == core.TransactionType.expense) {
-      if (major.contains('法人税') ||
-          major.contains('租税') ||
-          major.contains('税金') ||
-          major.contains('住民税') ||
-          major.contains('事業税') ||
-          major.contains('所得税')) {
+      // 法人税等は完全一致のみ（"租税公課" は販管費に残す）
+      if (major == '法人税等' ||
+          major == '法人税' ||
+          major == '住民税' ||
+          major == '事業税' ||
+          major == '所得税') {
         return _PLCategory.tax;
       }
       if (major.contains('特別')) return _PLCategory.extraExpense;
-      if (major.contains('営業外')) return _PLCategory.nonOpExpense;
+      if (_nonOpExpenseItems.contains(major) ||
+          major.contains('営業外')) {
+        return _PLCategory.nonOpExpense;
+      }
       if (major.contains('原価') || major.contains('仕入')) {
         return _PLCategory.cogs;
       }
@@ -120,7 +169,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     return _PLCategory.other;
   }
 
-  /// 事業年度の各月 (12 件、開始月から順)
+  /// 事業年度の各月（12 件）
   List<DateTime> get _fyMonths => List.generate(12, (i) {
         final m = _fyStartMonth + i;
         final y = _fyYear + (m > 12 ? 1 : 0);
@@ -128,20 +177,48 @@ class _V2ReportScreenState extends State<V2ReportScreen>
         return DateTime(y, mm);
       });
 
-  /// カテゴリ別の月次集計 [Category → List<int> (12 ヶ月)]
-  Map<_PLCategory, List<int>> _aggregate() {
+  /// 指定大カテゴリの月次集計
+  List<int> _monthlyForCategory(_PLCategory c) {
     final months = _fyMonths;
-    final result = {
-      for (final c in _PLCategory.values) c: List<int>.filled(12, 0),
-    };
+    final result = List<int>.filled(12, 0);
     for (final t in _transactions) {
+      if (_classify(t) != c) continue;
       final idx = months.indexWhere(
           (m) => m.year == t.date.year && m.month == t.date.month);
       if (idx < 0) continue;
-      final c = _classify(t);
-      result[c]![idx] += t.amount;
+      result[idx] += t.amount;
     }
     return result;
+  }
+
+  /// 指定大カテゴリ × 指定 major の月次集計
+  List<int> _monthlyForItem(_PLCategory c, String major) {
+    final months = _fyMonths;
+    final result = List<int>.filled(12, 0);
+    for (final t in _transactions) {
+      if (_classify(t) != c) continue;
+      if (t.category.major.trim() != major) continue;
+      final idx = months.indexWhere(
+          (m) => m.year == t.date.year && m.month == t.date.month);
+      if (idx < 0) continue;
+      result[idx] += t.amount;
+    }
+    return result;
+  }
+
+  /// 指定大カテゴリの「リストに無い」内訳の major リスト（出現順）
+  List<String> _unlistedMajors(
+      _PLCategory c, List<String> knownItems) {
+    final seen = <String>{};
+    final list = <String>[];
+    for (final t in _transactions) {
+      if (_classify(t) != c) continue;
+      final major = t.category.major.trim();
+      if (major.isEmpty) continue;
+      if (knownItems.contains(major)) continue;
+      if (seen.add(major)) list.add(major);
+    }
+    return list;
   }
 
   void _shiftYear(int delta) {
@@ -156,7 +233,9 @@ class _V2ReportScreenState extends State<V2ReportScreen>
         child: Center(child: CircularProgressIndicator()),
       );
     }
-    final agg = _aggregate();
+
+    final months = _fyMonths;
+    final rows = _buildRows();
     final fyEndYear = _fyYear + 1;
 
     return SingleChildScrollView(
@@ -164,7 +243,6 @@ class _V2ReportScreenState extends State<V2ReportScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── 月次表 PL ────────────────────────
           V2Card(
             padding: EdgeInsets.zero,
             child: Column(
@@ -185,7 +263,6 @@ class _V2ReportScreenState extends State<V2ReportScreen>
                           style: V2Typography.micro.copyWith(
                               color: V2Colors.textMuted)),
                       const Spacer(),
-                      // 年度切替
                       IconButton(
                         visualDensity: VisualDensity.compact,
                         icon: const Icon(Icons.chevron_left, size: 18),
@@ -205,15 +282,11 @@ class _V2ReportScreenState extends State<V2ReportScreen>
                     ],
                   ),
                 ),
-                _PLTable(
-                  months: _fyMonths,
-                  monthly: agg,
-                ),
+                _PLTable(months: months, rows: rows),
               ],
             ),
           ),
           const SizedBox(height: V2Spacing.lg),
-          // ── 注記 + v1 集計画面リンク ──
           V2Card(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -223,13 +296,13 @@ class _V2ReportScreenState extends State<V2ReportScreen>
                         color: V2Colors.textPrimary)),
                 const SizedBox(height: V2Spacing.sm),
                 Text(
-                  'Transaction のカテゴリ名（大カテゴリ）で自動分類します。\n'
-                  '・「原価」「仕入」を含む → 売上原価\n'
-                  '・「営業外」を含む → 営業外収益 / 費用\n'
+                  '・通常 income → 売上高\n'
+                  '・「原価」「仕入」を含む expense → 売上原価\n'
+                  '・「営業外」or 受取利息/受取配当金/雑収入 → 営業外収益\n'
+                  '・「営業外」or 支払利息/雑損失 → 営業外費用\n'
                   '・「特別」を含む → 特別利益 / 損失\n'
-                  '・「法人税」「租税」「税金」「住民税」「事業税」「所得税」を含む → 法人税等\n'
-                  '・上記以外の収入 → 売上高\n'
-                  '・上記以外の支出 → 販売管理費',
+                  '・法人税 / 住民税 / 事業税 / 所得税（完全一致） → 法人税等\n'
+                  '・上記以外の expense → 販売管理費（内訳は標準勘定科目で表示）',
                   style: V2Typography.caption,
                 ),
                 const SizedBox(height: V2Spacing.md),
@@ -250,71 +323,170 @@ class _V2ReportScreenState extends State<V2ReportScreen>
       ),
     );
   }
+
+  /// PL テーブルの行リストを構築
+  List<_PLRow> _buildRows() {
+    final salesMonthly = _monthlyForCategory(_PLCategory.sales);
+    final cogsMonthly = _monthlyForCategory(_PLCategory.cogs);
+    final sgaMonthly = _monthlyForCategory(_PLCategory.sga);
+    final nonOpIncomeMonthly =
+        _monthlyForCategory(_PLCategory.nonOpIncome);
+    final nonOpExpenseMonthly =
+        _monthlyForCategory(_PLCategory.nonOpExpense);
+    final extraIncomeMonthly =
+        _monthlyForCategory(_PLCategory.extraIncome);
+    final extraExpenseMonthly =
+        _monthlyForCategory(_PLCategory.extraExpense);
+    final taxMonthly = _monthlyForCategory(_PLCategory.tax);
+
+    final gross = _diff(salesMonthly, cogsMonthly);
+    final oper = _diff(gross, sgaMonthly);
+    final ord = _addSub(oper, nonOpIncomeMonthly, nonOpExpenseMonthly);
+    final preTax =
+        _addSub(ord, extraIncomeMonthly, extraExpenseMonthly);
+    final net = _diff(preTax, taxMonthly);
+
+    final unlistedSga = _unlistedMajors(_PLCategory.sga, _sgaItems);
+    final unlistedNonOpIn =
+        _unlistedMajors(_PLCategory.nonOpIncome, _nonOpIncomeItems);
+    final unlistedNonOpEx =
+        _unlistedMajors(_PLCategory.nonOpExpense, _nonOpExpenseItems);
+
+    final rows = <_PLRow>[];
+
+    // ── 売上 ──
+    rows.add(_PLRow(
+        label: '売上高', monthly: salesMonthly, kind: _RowKind.data));
+    rows.add(_PLRow(
+        label: '売上原価', monthly: cogsMonthly, kind: _RowKind.data));
+    rows.add(_PLRow(
+        label: '売上総利益', monthly: gross, kind: _RowKind.subtotal));
+
+    // ── 販管費（内訳付き） ──
+    for (final item in _sgaItems) {
+      rows.add(_PLRow(
+        label: item,
+        monthly: _monthlyForItem(_PLCategory.sga, item),
+        kind: _RowKind.detail,
+      ));
+    }
+    for (final item in unlistedSga) {
+      rows.add(_PLRow(
+        label: '$item（その他）',
+        monthly: _monthlyForItem(_PLCategory.sga, item),
+        kind: _RowKind.detail,
+      ));
+    }
+    rows.add(_PLRow(
+        label: '販管費 合計', monthly: sgaMonthly, kind: _RowKind.data));
+    rows.add(_PLRow(
+        label: '営業利益', monthly: oper, kind: _RowKind.subtotal));
+
+    // ── 営業外収益 ──
+    for (final item in _nonOpIncomeItems) {
+      rows.add(_PLRow(
+        label: item,
+        monthly: _monthlyForItem(_PLCategory.nonOpIncome, item),
+        kind: _RowKind.detail,
+      ));
+    }
+    for (final item in unlistedNonOpIn) {
+      rows.add(_PLRow(
+        label: '$item（その他）',
+        monthly: _monthlyForItem(_PLCategory.nonOpIncome, item),
+        kind: _RowKind.detail,
+      ));
+    }
+    rows.add(_PLRow(
+        label: '営業外収益 合計',
+        monthly: nonOpIncomeMonthly,
+        kind: _RowKind.data));
+
+    // ── 営業外費用 ──
+    for (final item in _nonOpExpenseItems) {
+      rows.add(_PLRow(
+        label: item,
+        monthly: _monthlyForItem(_PLCategory.nonOpExpense, item),
+        kind: _RowKind.detail,
+      ));
+    }
+    for (final item in unlistedNonOpEx) {
+      rows.add(_PLRow(
+        label: '$item（その他）',
+        monthly: _monthlyForItem(_PLCategory.nonOpExpense, item),
+        kind: _RowKind.detail,
+      ));
+    }
+    rows.add(_PLRow(
+        label: '営業外費用 合計',
+        monthly: nonOpExpenseMonthly,
+        kind: _RowKind.data));
+
+    rows.add(_PLRow(
+        label: '経常利益', monthly: ord, kind: _RowKind.subtotal));
+
+    // ── 特別利益 / 損失 ──
+    rows.add(_PLRow(
+        label: '特別利益',
+        monthly: extraIncomeMonthly,
+        kind: _RowKind.data));
+    rows.add(_PLRow(
+        label: '特別損失',
+        monthly: extraExpenseMonthly,
+        kind: _RowKind.data));
+
+    rows.add(_PLRow(
+        label: '税引前当期純利益',
+        monthly: preTax,
+        kind: _RowKind.subtotal));
+
+    // ── 法人税等 ──
+    rows.add(_PLRow(
+        label: '法人税等', monthly: taxMonthly, kind: _RowKind.data));
+
+    rows.add(_PLRow(
+        label: '当期純利益', monthly: net, kind: _RowKind.emphasize));
+
+    return rows;
+  }
+
+  /// 配列同士の差分（同じ index 同士）
+  List<int> _diff(List<int> a, List<int> b) =>
+      List.generate(12, (i) => a[i] - b[i]);
+
+  /// a + b - c
+  List<int> _addSub(List<int> a, List<int> b, List<int> c) =>
+      List.generate(12, (i) => a[i] + b[i] - c[i]);
+}
+
+class _PLRow {
+  final String label;
+  final List<int> monthly;
+  final _RowKind kind;
+  const _PLRow({
+    required this.label,
+    required this.monthly,
+    required this.kind,
+  });
+
+  int get total => monthly.fold<int>(0, (s, v) => s + v);
 }
 
 // ═════════════════════════════════════════════════
-// PL テーブル本体
+// テーブル本体（横スクロール）
 // ═════════════════════════════════════════════════
 
 class _PLTable extends StatelessWidget {
   final List<DateTime> months;
-  final Map<_PLCategory, List<int>> monthly;
-  const _PLTable({required this.months, required this.monthly});
+  final List<_PLRow> rows;
+  const _PLTable({required this.months, required this.rows});
 
-  // 各カテゴリの累計
-  int _total(_PLCategory c) =>
-      monthly[c]!.fold<int>(0, (s, v) => s + v);
-
-  // 計算行：粗利、営業利益、経常利益、税引前、当期純利益
-  List<int> _grossMonthly() => List.generate(12, (i) =>
-      monthly[_PLCategory.sales]![i] - monthly[_PLCategory.cogs]![i]);
-
-  List<int> _operMonthly() {
-    final gross = _grossMonthly();
-    return List.generate(
-        12, (i) => gross[i] - monthly[_PLCategory.sga]![i]);
-  }
-
-  List<int> _ordMonthly() {
-    final oper = _operMonthly();
-    return List.generate(
-        12,
-        (i) =>
-            oper[i] +
-            monthly[_PLCategory.nonOpIncome]![i] -
-            monthly[_PLCategory.nonOpExpense]![i]);
-  }
-
-  List<int> _preTaxMonthly() {
-    final ord = _ordMonthly();
-    return List.generate(
-        12,
-        (i) =>
-            ord[i] +
-            monthly[_PLCategory.extraIncome]![i] -
-            monthly[_PLCategory.extraExpense]![i]);
-  }
-
-  List<int> _netMonthly() {
-    final preTax = _preTaxMonthly();
-    return List.generate(
-        12, (i) => preTax[i] - monthly[_PLCategory.tax]![i]);
-  }
-
-  int _sumOf(List<int> arr) => arr.fold<int>(0, (s, v) => s + v);
+  static const labelColWidth = 160.0;
+  static const monthColWidth = 90.0;
+  static const totalColWidth = 120.0;
 
   @override
   Widget build(BuildContext context) {
-    final gross = _grossMonthly();
-    final oper = _operMonthly();
-    final ord = _ordMonthly();
-    final preTax = _preTaxMonthly();
-    final net = _netMonthly();
-
-    const labelColWidth = 130.0;
-    const monthColWidth = 90.0;
-    const totalColWidth = 110.0;
-
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Container(
@@ -324,119 +496,8 @@ class _PLTable extends StatelessWidget {
         ),
         child: Column(
           children: [
-            // ヘッダー
-            _HeaderRow(
-              months: months,
-              labelWidth: labelColWidth,
-              monthWidth: monthColWidth,
-              totalWidth: totalColWidth,
-            ),
-            // データ
-            _DataRow(
-              label: '売上高',
-              monthly: monthly[_PLCategory.sales]!,
-              total: _total(_PLCategory.sales),
-              labelWidth: labelColWidth,
-              monthWidth: monthColWidth,
-              totalWidth: totalColWidth,
-            ),
-            _DataRow(
-              label: '売上原価',
-              monthly: monthly[_PLCategory.cogs]!,
-              total: _total(_PLCategory.cogs),
-              labelWidth: labelColWidth,
-              monthWidth: monthColWidth,
-              totalWidth: totalColWidth,
-            ),
-            _SubtotalRow(
-              label: '売上総利益',
-              monthly: gross,
-              total: _sumOf(gross),
-              labelWidth: labelColWidth,
-              monthWidth: monthColWidth,
-              totalWidth: totalColWidth,
-            ),
-            _DataRow(
-              label: '販売管理費',
-              monthly: monthly[_PLCategory.sga]!,
-              total: _total(_PLCategory.sga),
-              labelWidth: labelColWidth,
-              monthWidth: monthColWidth,
-              totalWidth: totalColWidth,
-            ),
-            _SubtotalRow(
-              label: '営業利益',
-              monthly: oper,
-              total: _sumOf(oper),
-              labelWidth: labelColWidth,
-              monthWidth: monthColWidth,
-              totalWidth: totalColWidth,
-            ),
-            _DataRow(
-              label: '営業外収益',
-              monthly: monthly[_PLCategory.nonOpIncome]!,
-              total: _total(_PLCategory.nonOpIncome),
-              labelWidth: labelColWidth,
-              monthWidth: monthColWidth,
-              totalWidth: totalColWidth,
-            ),
-            _DataRow(
-              label: '営業外費用',
-              monthly: monthly[_PLCategory.nonOpExpense]!,
-              total: _total(_PLCategory.nonOpExpense),
-              labelWidth: labelColWidth,
-              monthWidth: monthColWidth,
-              totalWidth: totalColWidth,
-            ),
-            _SubtotalRow(
-              label: '経常利益',
-              monthly: ord,
-              total: _sumOf(ord),
-              labelWidth: labelColWidth,
-              monthWidth: monthColWidth,
-              totalWidth: totalColWidth,
-            ),
-            _DataRow(
-              label: '特別利益',
-              monthly: monthly[_PLCategory.extraIncome]!,
-              total: _total(_PLCategory.extraIncome),
-              labelWidth: labelColWidth,
-              monthWidth: monthColWidth,
-              totalWidth: totalColWidth,
-            ),
-            _DataRow(
-              label: '特別損失',
-              monthly: monthly[_PLCategory.extraExpense]!,
-              total: _total(_PLCategory.extraExpense),
-              labelWidth: labelColWidth,
-              monthWidth: monthColWidth,
-              totalWidth: totalColWidth,
-            ),
-            _SubtotalRow(
-              label: '税引前当期純利益',
-              monthly: preTax,
-              total: _sumOf(preTax),
-              labelWidth: labelColWidth,
-              monthWidth: monthColWidth,
-              totalWidth: totalColWidth,
-            ),
-            _DataRow(
-              label: '法人税等',
-              monthly: monthly[_PLCategory.tax]!,
-              total: _total(_PLCategory.tax),
-              labelWidth: labelColWidth,
-              monthWidth: monthColWidth,
-              totalWidth: totalColWidth,
-            ),
-            _SubtotalRow(
-              label: '当期純利益',
-              monthly: net,
-              total: _sumOf(net),
-              labelWidth: labelColWidth,
-              monthWidth: monthColWidth,
-              totalWidth: totalColWidth,
-              emphasize: true,
-            ),
+            _HeaderRow(months: months),
+            for (final r in rows) _BodyRow(row: r),
           ],
         ),
       ),
@@ -446,15 +507,7 @@ class _PLTable extends StatelessWidget {
 
 class _HeaderRow extends StatelessWidget {
   final List<DateTime> months;
-  final double labelWidth;
-  final double monthWidth;
-  final double totalWidth;
-  const _HeaderRow({
-    required this.months,
-    required this.labelWidth,
-    required this.monthWidth,
-    required this.totalWidth,
-  });
+  const _HeaderRow({required this.months});
 
   @override
   Widget build(BuildContext context) {
@@ -463,17 +516,17 @@ class _HeaderRow extends StatelessWidget {
       child: Row(
         children: [
           SizedBox(
-            width: labelWidth,
+            width: _PLTable.labelColWidth,
             child: Padding(
               padding: const EdgeInsets.symmetric(
                   horizontal: V2Spacing.md, vertical: 8),
-              child: Text('項目',
-                  style: V2Typography.tableHeader),
+              child:
+                  Text('項目', style: V2Typography.tableHeader),
             ),
           ),
           for (final m in months)
             SizedBox(
-              width: monthWidth,
+              width: _PLTable.monthColWidth,
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                     horizontal: V2Spacing.sm, vertical: 8),
@@ -485,7 +538,7 @@ class _HeaderRow extends StatelessWidget {
               ),
             ),
           SizedBox(
-            width: totalWidth,
+            width: _PLTable.totalColWidth,
             child: Padding(
               padding: const EdgeInsets.symmetric(
                   horizontal: V2Spacing.sm, vertical: 8),
@@ -504,94 +557,9 @@ class _HeaderRow extends StatelessWidget {
   }
 }
 
-class _DataRow extends StatelessWidget {
-  final String label;
-  final List<int> monthly;
-  final int total;
-  final double labelWidth;
-  final double monthWidth;
-  final double totalWidth;
-  const _DataRow({
-    required this.label,
-    required this.monthly,
-    required this.total,
-    required this.labelWidth,
-    required this.monthWidth,
-    required this.totalWidth,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        border: Border(
-            top: BorderSide(color: V2Colors.divider, width: 1)),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: labelWidth,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: V2Spacing.md, vertical: 8),
-              child: Text(label, style: V2Typography.body),
-            ),
-          ),
-          for (final v in monthly)
-            SizedBox(
-              width: monthWidth,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: V2Spacing.sm, vertical: 8),
-                child: Text(
-                  v == 0 ? '0' : formatYen(v),
-                  textAlign: TextAlign.right,
-                  style: V2Typography.numericCell.copyWith(
-                      color: v == 0
-                          ? V2Colors.textMuted
-                          : V2Colors.textBody),
-                ),
-              ),
-            ),
-          SizedBox(
-            width: totalWidth,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: V2Spacing.sm, vertical: 8),
-              child: Text(
-                total == 0 ? '0' : formatYen(total),
-                textAlign: TextAlign.right,
-                style: V2Typography.numericCell.copyWith(
-                    color: total == 0
-                        ? V2Colors.textMuted
-                        : V2Colors.textPrimary,
-                    fontWeight: FontWeight.w700),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SubtotalRow extends StatelessWidget {
-  final String label;
-  final List<int> monthly;
-  final int total;
-  final double labelWidth;
-  final double monthWidth;
-  final double totalWidth;
-  final bool emphasize;
-  const _SubtotalRow({
-    required this.label,
-    required this.monthly,
-    required this.total,
-    required this.labelWidth,
-    required this.monthWidth,
-    required this.totalWidth,
-    this.emphasize = false,
-  });
+class _BodyRow extends StatelessWidget {
+  final _PLRow row;
+  const _BodyRow({required this.row});
 
   Color _colorFor(int v) {
     if (v == 0) return V2Colors.textMuted;
@@ -600,56 +568,92 @@ class _SubtotalRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ハイライト行（黄色背景）
-    final bg =
-        emphasize ? const Color(0xFFFEF9C3) : const Color(0xFFFFFBEB);
+    final isSubtotal = row.kind == _RowKind.subtotal;
+    final isEmphasize = row.kind == _RowKind.emphasize;
+    final isDetail = row.kind == _RowKind.detail;
+    final highlightBg = isSubtotal
+        ? const Color(0xFFFFFBEB)
+        : (isEmphasize ? const Color(0xFFFEF9C3) : null);
+
+    final labelStyle = isDetail
+        ? V2Typography.caption.copyWith(
+            color: V2Colors.textSecondary)
+        : (isSubtotal || isEmphasize)
+            ? V2Typography.bodyStrong.copyWith(
+                color: V2Colors.textPrimary,
+                fontWeight: isEmphasize
+                    ? FontWeight.w800
+                    : FontWeight.w700)
+            : V2Typography.body;
+
+    Color valueColor(int v) {
+      if (isDetail) {
+        return v == 0
+            ? V2Colors.textMuted
+            : V2Colors.textSecondary;
+      }
+      if (isSubtotal || isEmphasize) return _colorFor(v);
+      return v == 0 ? V2Colors.textMuted : V2Colors.textPrimary;
+    }
+
+    final cellPadding = isDetail
+        ? const EdgeInsets.symmetric(horizontal: 8, vertical: 5)
+        : const EdgeInsets.symmetric(horizontal: 8, vertical: 8);
+
     return Container(
       decoration: BoxDecoration(
-        color: bg,
-        border: const Border(
-            top: BorderSide(color: V2Colors.border, width: 1)),
+        color: highlightBg,
+        border: Border(
+            top: BorderSide(
+                color: isSubtotal || isEmphasize
+                    ? V2Colors.border
+                    : V2Colors.divider,
+                width: 1)),
       ),
       child: Row(
         children: [
           SizedBox(
-            width: labelWidth,
+            width: _PLTable.labelColWidth,
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: V2Spacing.md, vertical: 9),
-              child: Text(label,
-                  style: V2Typography.bodyStrong.copyWith(
-                      color: V2Colors.textPrimary,
-                      fontWeight: emphasize
-                          ? FontWeight.w800
-                          : FontWeight.w700)),
+              padding: EdgeInsets.fromLTRB(
+                  isDetail ? 28 : 12,
+                  cellPadding.vertical / 2,
+                  12,
+                  cellPadding.vertical / 2),
+              child: Text(row.label, style: labelStyle),
             ),
           ),
-          for (final v in monthly)
+          for (final v in row.monthly)
             SizedBox(
-              width: monthWidth,
+              width: _PLTable.monthColWidth,
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: V2Spacing.sm, vertical: 9),
+                padding: cellPadding,
                 child: Text(
                   v == 0 ? '0' : formatYen(v),
                   textAlign: TextAlign.right,
                   style: V2Typography.numericCell.copyWith(
-                      color: _colorFor(v),
-                      fontWeight: FontWeight.w700),
+                      color: valueColor(v),
+                      fontSize: isDetail ? 11 : 13,
+                      fontWeight: (isSubtotal || isEmphasize)
+                          ? FontWeight.w700
+                          : (isDetail
+                              ? FontWeight.w500
+                              : FontWeight.w600)),
                 ),
               ),
             ),
           SizedBox(
-            width: totalWidth,
+            width: _PLTable.totalColWidth,
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: V2Spacing.sm, vertical: 9),
+              padding: cellPadding,
               child: Text(
-                total == 0 ? '0' : formatYen(total),
+                row.total == 0 ? '0' : formatYen(row.total),
                 textAlign: TextAlign.right,
                 style: V2Typography.numericCell.copyWith(
-                    color: _colorFor(total),
-                    fontSize: emphasize ? 14 : 13,
+                    color: valueColor(row.total),
+                    fontSize: isEmphasize
+                        ? 14
+                        : (isDetail ? 11 : 13),
                     fontWeight: FontWeight.w800),
               ),
             ),
