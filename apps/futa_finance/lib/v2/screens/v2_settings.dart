@@ -86,22 +86,41 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
         return const V2SidebarOrderPanel();
       case 'category':
         return _embedV1(const CategoryEditorScreen(),
-            title: 'カテゴリ編集');
+            title: 'カテゴリ',
+            note: '収支のカテゴリ（大分類・小分類）を編集します',
+            icon: Icons.label_outline,
+            iconColor: V2Colors.badgePurple);
       case 'wallet':
         return _embedV1(const AccountEditorScreen(),
-            title: 'ウォレット（銀行/現金/電子マネー）');
+            title: 'ウォレット（銀行 / 現金 / 電子マネー）',
+            note: '資金口座を登録・編集します。事業/個人モードで別管理。',
+            icon: Icons.account_balance_wallet_outlined,
+            iconColor: V2Colors.badgeBlue);
       case 'card':
         return _embedV1(const CardEditorScreen(),
-            title: 'クレジットカード');
+            title: 'クレジットカード',
+            note: 'クレカを登録・編集します。引落日や累積額の表示に使われます。',
+            icon: Icons.credit_card_outlined,
+            iconColor: V2Colors.negative);
       case 'incomeMaster':
         return _embedV1(const IncomeMasterScreen(),
-            title: '収入マスタ');
+            title: '収入マスタ',
+            note:
+                '継続収入・単発収入のテンプレを登録。入金記録時に呼び出せます。',
+            icon: Icons.savings_outlined,
+            iconColor: V2Colors.positive);
       case 'subscription':
         return _embedV1(const SubscriptionListScreen(),
-            title: '固定費・サブスク');
+            title: '固定費・サブスク',
+            note: '毎月・毎年の固定支払（家賃・サブスク等）を管理します。',
+            icon: Icons.event_repeat,
+            iconColor: V2Colors.warning);
       case 'checklist':
         return _embedV1(const ChecklistEditorScreen(),
-            title: '月末締めチェックリスト');
+            title: '月末締めチェックリスト',
+            note: '月末締めの確認項目（2階層）を編集。動的リンクで銀行/クレカと自動紐付け。',
+            icon: Icons.checklist,
+            iconColor: V2Colors.info);
       case 'backup':
         return const V2BackupPanel();
       default:
@@ -109,12 +128,23 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
     }
   }
 
-  Widget _embedV1(Widget child,
-      {required String title, String? note}) {
+  /// v1 編集画面を v2.1 風ヘッダー付きで右パネルに埋め込む共通ラッパー。
+  /// AppBar は Theme で潰し、ClipRRect で V2Card の角丸に合わせる。
+  Widget _embedV1(Widget child, {
+    required String title,
+    String? note,
+    IconData? icon,
+    Color? iconColor,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _PanelHeader(title: title, note: note),
+        _PanelHeaderWithIcon(
+          title: title,
+          note: note,
+          icon: icon,
+          iconColor: iconColor,
+        ),
         const SizedBox(height: V2Spacing.sm),
         Expanded(
           child: V2Card(
@@ -138,6 +168,65 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// v2.1 風のパネルヘッダー（アイコンバッジ + タイトル + 説明）。
+/// 設定タブの各エディタ panel で共通使用。
+class _PanelHeaderWithIcon extends StatelessWidget {
+  final String title;
+  final String? note;
+  final IconData? icon;
+  final Color? iconColor;
+  const _PanelHeaderWithIcon({
+    required this.title,
+    this.note,
+    this.icon,
+    this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          V2Spacing.sm, 0, V2Spacing.sm, V2Spacing.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          if (icon != null) ...[
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: (iconColor ?? V2Colors.accent)
+                    .withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(
+                    V2Spacing.radiusSm),
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon,
+                  size: 20,
+                  color: iconColor ?? V2Colors.accent),
+            ),
+            const SizedBox(width: V2Spacing.md),
+          ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: V2Typography.h1),
+                if (note != null) ...[
+                  const SizedBox(height: V2Spacing.xs),
+                  Text(note!,
+                      style: V2Typography.caption.copyWith(
+                          color: V2Colors.textSecondary)),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
