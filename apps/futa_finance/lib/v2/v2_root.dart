@@ -3,8 +3,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../data/app_mode.dart';
 import '../data/ui_preferences.dart';
-import '../screens/cards_screen.dart';
-import '../screens/dev_lab_screen.dart';
 import '../screens/expense_input_screen.dart';
 import '../screens/income_input_screen.dart';
 import '../screens/settings_screen.dart';
@@ -12,6 +10,8 @@ import '../screens/transfer_input_screen.dart';
 import 'layout/shell.dart';
 import 'layout/topnav_shell.dart';
 import 'screens/v2_asset.dart';
+import 'screens/v2_cards.dart';
+import 'screens/v2_devlab.dart';
 import 'screens/v2_expenses.dart';
 import 'screens/v2_home.dart';
 import 'screens/v2_home_topnav.dart';
@@ -123,17 +123,18 @@ class _V2RootState extends State<V2Root> {
       // 資産: v2.1 ネイティブ実装（種別別セクション + 通帳遷移）
       case 'asset':
         return V2AssetScreen(accent: accent);
-      // 以下は v1 画面を v2.1 シェル内に表示（順次 v2.1 ネイティブに置換中）。
-      // 各画面の AppBar は Theme で高さ 0 にして潰し、v2.1 ヘッダー一本に統一。
+      // クレカ: v2.1 ネイティブ実装（当月利用 + 過去 6 ヶ月推移 + 一覧）
       case 'cards':
-        return _wrapV1(const CardsScreen());
+        return V2CardsScreen(accent: accent);
       // 集計: v2.1 ネイティブ実装（会計風 PL 月次表 + v1 集計画面へのリンク）
       case 'report':
         return V2ReportScreen(accent: accent);
+      // 設定: v1 画面を v2.1 シェル内に埋め込み（機能多すぎ＆AppBar 統合済み）。
       case 'settings':
         return _wrapV1(const SettingsScreen());
+      // 開発中: v2.1 風バナー + v1 DevLab を埋め込み（事業モード専用）
       case 'devLab':
-        return _wrapV1(const DevLabScreen());
+        return V2DevLabScreen(accent: accent);
       default:
         return V2HomeTopNavScreen(accent: accent);
     }
