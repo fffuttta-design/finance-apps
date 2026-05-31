@@ -3,7 +3,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../data/app_mode.dart';
 import '../data/ui_preferences.dart';
-import '../screens/asset_screen.dart';
 import '../screens/cards_screen.dart';
 import '../screens/dev_lab_screen.dart';
 import '../screens/expense_input_screen.dart';
@@ -13,6 +12,7 @@ import '../screens/settings_screen.dart';
 import '../screens/transfer_input_screen.dart';
 import 'layout/shell.dart';
 import 'layout/topnav_shell.dart';
+import 'screens/v2_asset.dart';
 import 'screens/v2_expenses.dart';
 import 'screens/v2_home.dart';
 import 'screens/v2_home_topnav.dart';
@@ -120,10 +120,11 @@ class _V2RootState extends State<V2Root> {
       // 収入: v2.1 ネイティブ実装（見込み/確定の状態バッジ付きテーブル）
       case 'income':
         return V2IncomeScreen(accent: accent);
+      // 資産: v2.1 ネイティブ実装（種別別セクション + 通帳遷移）
+      case 'asset':
+        return V2AssetScreen(accent: accent);
       // 以下は v1 画面を v2.1 シェル内に表示（順次 v2.1 ネイティブに置換中）。
       // 各画面の AppBar は Theme で高さ 0 にして潰し、v2.1 ヘッダー一本に統一。
-      case 'asset':
-        return _wrapV1(const AssetScreen());
       case 'cards':
         return _wrapV1(const CardsScreen());
       case 'report':

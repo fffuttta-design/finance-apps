@@ -35,14 +35,14 @@ class FutaFinanceApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // モード変更時にテーマ（特に scaffoldBackgroundColor）を再構築するため、
-    // AppModeManager を listenable にして MaterialApp ごと rebuild する。
-    // また UiPreferences の v1/v2 切替にも追従する。
+    // MaterialApp 自体は mode 依存にしない（毎回再ビルドすると重い）。
+    // モード依存の色は _AuthGate の中で Theme widget をかぶせて吸収する。
+    // UiPreferences は v1/v2 切替で MaterialApp 内側の Theme を切替えるため
+    // ここで listen するが、トップレベル MaterialApp は const 化できないので
+    // builder は最小限の処理にとどめる。
     return ListenableBuilder(
-      listenable: Listenable.merge(
-          [AppModeManager.instance, UiPreferences.instance]),
+      listenable: UiPreferences.instance,
       builder: (context, _) {
-        final mode = AppModeManager.instance.current;
         return MaterialApp(
           title: 'FutaFinance',
           debugShowCheckedModeBanner: false,
@@ -56,16 +56,14 @@ class FutaFinanceApp extends StatelessWidget {
             Locale('en', 'US'),
           ],
           locale: const Locale('ja', 'JP'),
-          // v1 のテーマは MaterialApp に直接渡す（ダイアログ・スナックバー等の
-          // デフォルトを担保）。v2 のときは _AuthGate の中で Theme widget で
-          // 上書きするので、ここではテーマ判定をしない。
+          // 共通の固定テーマ。mode 依存の scaffoldBackgroundColor は
+          // _AuthGate 内側で Theme で上書きする。
           theme: ThemeData(
             useMaterial3: true,
             colorScheme: ColorScheme.fromSeed(
-              seedColor: mode.accentColor,
+              seedColor: const Color(0xFF1A237E),
               brightness: Brightness.light,
             ),
-            scaffoldBackgroundColor: mode.backgroundTint,
             appBarTheme: const AppBarTheme(
               backgroundColor: Colors.white,
               foregroundColor: Color(0xFF111827),

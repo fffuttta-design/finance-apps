@@ -408,30 +408,36 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
         child: Center(child: CircularProgressIndicator()),
       );
     }
-    return LayoutBuilder(builder: (ctx, c) {
-      final wide = c.maxWidth >= 1000;
-      if (wide) {
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    // Shell の Expanded 内で content として展開されるため、
+    // ホームの 3 カラム / 縦並びがコンテンツ高を超えた場合に
+    // スクロールできるよう、最上位に SingleChildScrollView を置く。
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(vertical: V2Spacing.xl),
+      child: LayoutBuilder(builder: (ctx, c) {
+        final wide = c.maxWidth >= 1000;
+        if (wide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(width: 240, child: _LeftAssetSummary(state: this)),
+              const SizedBox(width: V2Spacing.lg),
+              Expanded(child: _CenterColumn(state: this)),
+              const SizedBox(width: V2Spacing.lg),
+              SizedBox(width: 240, child: _RightSidebar(state: this)),
+            ],
+          );
+        }
+        return Column(
           children: [
-            SizedBox(width: 240, child: _LeftAssetSummary(state: this)),
-            const SizedBox(width: V2Spacing.lg),
-            Expanded(child: _CenterColumn(state: this)),
-            const SizedBox(width: V2Spacing.lg),
-            SizedBox(width: 240, child: _RightSidebar(state: this)),
+            _LeftAssetSummary(state: this),
+            const SizedBox(height: V2Spacing.lg),
+            _CenterColumn(state: this),
+            const SizedBox(height: V2Spacing.lg),
+            _RightSidebar(state: this),
           ],
         );
-      }
-      return Column(
-        children: [
-          _LeftAssetSummary(state: this),
-          const SizedBox(height: V2Spacing.lg),
-          _CenterColumn(state: this),
-          const SizedBox(height: V2Spacing.lg),
-          _RightSidebar(state: this),
-        ],
-      );
-    });
+      }),
+    );
   }
 }
 
