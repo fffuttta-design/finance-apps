@@ -5,7 +5,6 @@ import '../data/app_mode.dart';
 import '../data/ui_preferences.dart';
 import '../screens/expense_input_screen.dart';
 import '../screens/income_input_screen.dart';
-import '../screens/settings_screen.dart';
 import '../screens/transfer_input_screen.dart';
 import 'layout/shell.dart';
 import 'layout/topnav_shell.dart';
@@ -17,6 +16,7 @@ import 'screens/v2_home.dart';
 import 'screens/v2_home_topnav.dart';
 import 'screens/v2_income.dart';
 import 'screens/v2_report.dart';
+import 'screens/v2_settings.dart';
 import 'theme/colors.dart';
 import 'theme/mode_accent.dart';
 import 'theme/spacing.dart';
@@ -129,32 +129,15 @@ class _V2RootState extends State<V2Root> {
       // 集計: v2.1 ネイティブ実装（会計風 PL 月次表 + v1 集計画面へのリンク）
       case 'report':
         return V2ReportScreen(accent: accent);
-      // 設定: v1 画面を v2.1 シェル内に埋め込み（機能多すぎ＆AppBar 統合済み）。
+      // 設定: v2.1 ネイティブ（マスター/ディテール、左メニュー + 右パネル）
       case 'settings':
-        return _wrapV1(const SettingsScreen());
+        return V2SettingsScreen(accent: accent);
       // 開発中: v2.1 風バナー + v1 DevLab を埋め込み（事業モード専用）
       case 'devLab':
         return V2DevLabScreen(accent: accent);
       default:
         return V2HomeTopNavScreen(accent: accent);
     }
-  }
-
-  /// v1 画面の AppBar を Theme で完全に潰すラッパー。
-  /// AppBar に含まれる title/actions は v2.1 ヘッダーで代替するため見た目から消す。
-  Widget _wrapV1(Widget v1Screen) {
-    return Theme(
-      data: Theme.of(context).copyWith(
-        appBarTheme: const AppBarTheme(
-          toolbarHeight: 0,
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-        ),
-      ),
-      child: v1Screen,
-    );
   }
 
   String _titleFor(String id) {
