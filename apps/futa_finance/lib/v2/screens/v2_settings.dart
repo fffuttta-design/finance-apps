@@ -7,8 +7,8 @@ import '../../screens/card_editor_screen.dart';
 import '../../screens/category_editor_screen.dart';
 import '../../screens/checklist_editor_screen.dart';
 import '../../screens/income_master_screen.dart';
-import '../../screens/settings_screen.dart';
 import '../../screens/subscription_list_screen.dart';
+import 'panels/v2_backup_panel.dart';
 import 'panels/v2_sidebar_order_panel.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
@@ -103,11 +103,7 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
         return _embedV1(const ChecklistEditorScreen(),
             title: '月末締めチェックリスト');
       case 'backup':
-        // v1 設定画面の「データ管理」セクションに飛ばす
-        return _embedV1(const SettingsScreen(),
-            title: 'バックアップ / 取り込み',
-            note:
-                '設定画面の「データ管理」セクションでバックアップ書き出し / 取り込みができます。');
+        return const V2BackupPanel();
       default:
         return const _DisplayPanel();
     }
