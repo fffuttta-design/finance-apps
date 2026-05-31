@@ -8,7 +8,6 @@ import '../screens/cards_screen.dart';
 import '../screens/dev_lab_screen.dart';
 import '../screens/expense_input_screen.dart';
 import '../screens/income_input_screen.dart';
-import '../screens/income_screen.dart';
 import '../screens/report_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/transfer_input_screen.dart';
@@ -17,6 +16,7 @@ import 'layout/topnav_shell.dart';
 import 'screens/v2_expenses.dart';
 import 'screens/v2_home.dart';
 import 'screens/v2_home_topnav.dart';
+import 'screens/v2_income.dart';
 import 'theme/colors.dart';
 import 'theme/mode_accent.dart';
 import 'theme/spacing.dart';
@@ -117,10 +117,11 @@ class _V2RootState extends State<V2Root> {
       // 支出: v2.1 ネイティブ実装（マネフォクラウド寄りのテーブル中心）
       case 'expenses':
         return V2ExpensesScreen(accent: accent);
-      // Phase 2〜6: v1 画面を v2.1 シェル内に表示（順次 v2.1 ネイティブに置換中）。
-      // 各画面の AppBar は Theme で高さ 0 にして潰し、v2.1 ヘッダー一本に統一。
+      // 収入: v2.1 ネイティブ実装（見込み/確定の状態バッジ付きテーブル）
       case 'income':
-        return _wrapV1(const IncomeScreen());
+        return V2IncomeScreen(accent: accent);
+      // 以下は v1 画面を v2.1 シェル内に表示（順次 v2.1 ネイティブに置換中）。
+      // 各画面の AppBar は Theme で高さ 0 にして潰し、v2.1 ヘッダー一本に統一。
       case 'asset':
         return _wrapV1(const AssetScreen());
       case 'cards':
