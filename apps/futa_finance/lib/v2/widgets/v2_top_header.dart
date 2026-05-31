@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../data/app_mode.dart';
 import '../theme/colors.dart';
@@ -11,7 +12,8 @@ import '../theme/typography.dart';
 /// 個人モード: 白背景 + ME 風のオレンジロゴ
 ///
 /// このコントラストで「いま事業/個人どっちにいるか」が一目で分かる。
-class V2TopHeader extends StatelessWidget {
+/// アプリ名の下にバージョン番号を小さく表示。
+class V2TopHeader extends StatefulWidget {
   /// 現在のアプリモード
   final AppMode mode;
 
@@ -32,20 +34,41 @@ class V2TopHeader extends StatelessWidget {
     this.modeSwitcher,
   });
 
-  bool get _isBusiness => mode == AppMode.business;
+  @override
+  State<V2TopHeader> createState() => _V2TopHeaderState();
+}
 
-  /// 事業=ネイビー / 個人=白
+class _V2TopHeaderState extends State<V2TopHeader> {
+  String? _versionLabel;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() => _versionLabel = 'v${info.version}');
+    } catch (_) {/* ignore */}
+  }
+
+  bool get _isBusiness => widget.mode == AppMode.business;
+
   Color get _bg =>
       _isBusiness ? V2Colors.sidebar : V2Colors.surface;
 
-  /// 文字色（背景に応じて反転）
   Color get _fg =>
       _isBusiness ? V2Colors.sidebarText : V2Colors.textPrimary;
 
-  /// 境界線（ダーク背景時は同じネイビーで自然に消す）
-  Color get _border => _isBusiness
-      ? V2Colors.sidebarDivider
-      : V2Colors.border;
+  Color get _versionFg => _isBusiness
+      ? V2Colors.sidebarTextMuted
+      : V2Colors.textMuted;
+
+  Color get _border =>
+      _isBusiness ? V2Colors.sidebarDivider : V2Colors.border;
 
   @override
   Widget build(BuildContext context) {
@@ -58,26 +81,50 @@ class V2TopHeader extends StatelessWidget {
         ),
       ),
       padding: const EdgeInsets.symmetric(
-          horizontal: V2Spacing.xl, vertical: V2Spacing.sm),
+          horizontal: V2Spacing.xl, vertical: V2Spacing.xs),
       child: Row(
         children: [
           _logo(),
           const SizedBox(width: V2Spacing.sm),
-          Text(
-            'FutaFinance',
-            style: V2Typography.h2.copyWith(
-                color: _fg,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.2),
+          // アプリ名 + バージョン（2 行）
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'FutaFinance',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.2,
+                  height: 1.1,
+                  color: _fg,
+                ),
+              ),
+              if (_versionLabel != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  _versionLabel!,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    height: 1.0,
+                    color: _versionFg,
+                    fontFeatures: V2Typography.tabularNums,
+                  ),
+                ),
+              ],
+            ],
           ),
           const Spacer(),
-          if (modeSwitcher != null) ...[
-            SizedBox(width: 240, child: modeSwitcher!),
+          if (widget.modeSwitcher != null) ...[
+            SizedBox(width: 240, child: widget.modeSwitcher!),
             const SizedBox(width: V2Spacing.md),
           ],
-          for (var i = 0; i < actions.length; i++) ...[
+          for (var i = 0; i < widget.actions.length; i++) ...[
             if (i > 0) const SizedBox(width: V2Spacing.sm),
-            actions[i],
+            widget.actions[i],
           ],
         ],
       ),
@@ -87,7 +134,7 @@ class V2TopHeader extends StatelessWidget {
   Widget _logo() {
     // 事業時: 白背景にネイビーの「財」（コントラスト確保）
     // 個人時: アクセント(オレンジ)背景に白の「財」
-    final bg = _isBusiness ? Colors.white : accent;
+    final bg = _isBusiness ? Colors.white : widget.accent;
     final fg = _isBusiness ? V2Colors.sidebar : Colors.white;
     return Container(
       width: 32,
