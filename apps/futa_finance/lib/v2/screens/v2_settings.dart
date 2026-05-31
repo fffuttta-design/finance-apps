@@ -6,9 +6,9 @@ import '../../screens/account_editor_screen.dart';
 import '../../screens/card_editor_screen.dart';
 import '../../screens/category_editor_screen.dart';
 import '../../screens/checklist_editor_screen.dart';
-import '../../screens/income_master_screen.dart';
 import '../../screens/subscription_list_screen.dart';
 import 'panels/v2_backup_panel.dart';
+import 'panels/v2_income_master_panel.dart';
 import 'panels/v2_sidebar_order_panel.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
@@ -103,12 +103,7 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
             icon: Icons.credit_card_outlined,
             iconColor: V2Colors.negative);
       case 'incomeMaster':
-        return _embedV1(const IncomeMasterScreen(),
-            title: '収入マスタ',
-            note:
-                '継続収入・単発収入のテンプレを登録。入金記録時に呼び出せます。',
-            icon: Icons.savings_outlined,
-            iconColor: V2Colors.positive);
+        return const V2IncomeMasterPanel();
       case 'subscription':
         return _embedV1(const SubscriptionListScreen(),
             title: '固定費・サブスク',
