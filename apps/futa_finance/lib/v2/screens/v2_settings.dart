@@ -8,8 +8,8 @@ import '../../screens/category_editor_screen.dart';
 import '../../screens/checklist_editor_screen.dart';
 import '../../screens/income_master_screen.dart';
 import '../../screens/settings_screen.dart';
-import '../../screens/sidebar_order_screen.dart';
 import '../../screens/subscription_list_screen.dart';
+import 'panels/v2_sidebar_order_panel.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
@@ -83,8 +83,7 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
       case 'display':
         return const _DisplayPanel();
       case 'sidebarOrder':
-        return _embedV1(const SidebarOrderScreen(),
-            title: 'サイドバー並び順');
+        return const V2SidebarOrderPanel();
       case 'category':
         return _embedV1(const CategoryEditorScreen(),
             title: 'カテゴリ編集');
