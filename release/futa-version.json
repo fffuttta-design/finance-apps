@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.106",
-    "buildNumber":  "107",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.106/futa-finance-v1.0.106.apk",
-    "releaseNotes":  "v1.0.106+107 リリース"
+    "version":  "1.0.108",
+    "buildNumber":  "109",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.108/futa-finance-v1.0.108.apk",
+    "releaseNotes":  "v1.0.108 事業/個人モード切替のカクつき改善"
 }
