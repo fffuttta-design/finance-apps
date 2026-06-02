@@ -30,6 +30,14 @@
           }
         },
         {
+          "client_id": "746983928581-r9ajtmh86eh20ms0mdp5n1mqrhk04k74.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.futa.finance",
+            "certificate_hash": "396351754366ed6566fba052a598736913b10665"
+          }
+        },
+        {
           "client_id": "746983928581-5g5ueg00evu0ubccej0km8cbciq3kb86.apps.googleusercontent.com",
           "client_type": 3
         }
