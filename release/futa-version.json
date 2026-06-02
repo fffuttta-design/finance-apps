@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.116",
-    "buildNumber":  "117",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.116/futa-finance-v1.0.116.apk",
-    "releaseNotes":  "v1.0.116 サインイン設定更新(リリース鍵SHA登録反映)"
+    "version":  "1.0.117",
+    "buildNumber":  "118",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.117/futa-finance-v1.0.117.apk",
+    "releaseNotes":  "v1.0.117 支出タブ刷新(経費明細を上/固定費・変動費を別カード/変動費は月別実額)"
 }
