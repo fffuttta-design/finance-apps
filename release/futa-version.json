@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.122",
-    "buildNumber":  "123",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.122/futa-finance-v1.0.122.apk",
-    "releaseNotes":  "v1.0.122 即PL化第2段(収入を売上科目化・営業外収益自動分類)＋整理"
+    "version":  "1.0.123",
+    "buildNumber":  "124",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.123/futa-finance-v1.0.123.apk",
+    "releaseNotes":  "v1.0.123 月チップ順序/収入2段/変動費は前月/引落日ダッシュ整理"
 }
