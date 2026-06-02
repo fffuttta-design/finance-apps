@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.130",
-    "buildNumber":  "131",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.130/futa-finance-v1.0.130.apk",
-    "releaseNotes":  "業績の事業年度を決算期(10月〜翌9月)に変更"
+    "version":  "1.0.131",
+    "buildNumber":  "132",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.131/futa-finance-v1.0.131.apk",
+    "releaseNotes":  "事業/個人 切替の高速化を全タブ(支出/収入/業績)へ拡張"
 }
