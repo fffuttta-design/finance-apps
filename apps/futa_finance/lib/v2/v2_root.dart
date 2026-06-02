@@ -3,6 +3,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../data/app_mode.dart';
 import '../data/data_migration_service.dart';
+import '../data/repository_provider.dart';
 import '../data/ui_preferences.dart';
 import '../screens/expense_input_screen.dart';
 import '../screens/income_input_screen.dart';
@@ -49,6 +50,10 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
     scheduleStartupUpdateCheck();
     // 事業用カテゴリをPL構成へ一度だけ移行（業務モード時のみ・idempotent）。
     DataMigrationService.migratePLCategoriesIfNeeded();
+    // 起動が落ち着いた頃に逆モードのデータを裏で先読み（初回切替を速く）。
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      RepositoryProvider.prefetchOtherMode();
+    });
   }
 
   @override

@@ -1,3 +1,4 @@
+import 'app_mode.dart';
 import 'checklist_repository.dart';
 import 'income_source_repository.dart';
 import 'month_closing_repository.dart';
@@ -46,5 +47,20 @@ class RepositoryProvider {
     ChecklistRepository.useLocal();
     _firestoreActive = false;
     _currentUid = null;
+  }
+
+  /// 現在と逆のモードのデータを裏で先読みしてキャッシュを温める。
+  /// 起動後に1回呼ぶと、事業⇄個人の初回切替のもたつきが軽減される。
+  /// Firestore 利用時のみ意味がある（Local は元々即時）。
+  static Future<void> prefetchOtherMode() async {
+    if (!_firestoreActive) return;
+    final other = AppModeManager.instance.current == AppMode.business
+        ? 'personal'
+        : 'business';
+    await Future.wait([
+      TransactionRepository.instance.prefetch(other),
+      SettingsRepository.instance.prefetch(other),
+      MonthlySnapshotRepository.instance.prefetch(other),
+    ]);
   }
 }

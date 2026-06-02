@@ -22,6 +22,9 @@ abstract class MonthlySnapshotRepository {
   Future<MonthlySnapshotConfig> load();
   Future<void> save(MonthlySnapshotConfig config);
   Future<void> upsert(MonthlySnapshot snapshot);
+
+  /// 指定モードの月初残高を裏で先読みしてキャッシュを温める。既定は何もしない。
+  Future<void> prefetch(String modeKey) async {}
 }
 
 class LocalMonthlySnapshotRepository
@@ -65,6 +68,9 @@ class LocalMonthlySnapshotRepository
     final cfg = await load();
     await save(cfg.upsert(snapshot));
   }
+
+  @override
+  Future<void> prefetch(String modeKey) async {} // Local は即時のため不要
 }
 
 class FirestoreMonthlySnapshotRepository
@@ -83,6 +89,14 @@ class FirestoreMonthlySnapshotRepository
   DocumentReference<Map<String, dynamic>> _docFor(String modeKey) =>
       FirebaseFirestore.instance
           .doc('users/$uid/config/${modeKey}_monthly_snapshots');
+
+  @override
+  Future<void> prefetch(String modeKey) async {
+    if (_cache.containsKey(modeKey)) return;
+    try {
+      await _fetch(modeKey);
+    } catch (_) {}
+  }
 
   @override
   Future<MonthlySnapshotConfig> load() async {

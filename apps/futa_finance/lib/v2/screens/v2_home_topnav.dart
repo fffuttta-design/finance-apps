@@ -959,8 +959,9 @@ class _CenterColumn extends StatelessWidget {
 }
 
 /// 月を横並びチップで切り替えるバー（横スクロール）。
-/// 当月を左端に置き、右へスクロールすると過去月。範囲外の選択月は追加表示。
-class _MonthChipsBar extends StatelessWidget {
+/// 当社の決算年度（10月〜翌9月）の12ヶ月を左→右で昇順に並べ、
+/// 初期表示は当月（選択月）が見えるよう自動スクロールする。
+class _MonthChipsBar extends StatefulWidget {
   final DateTime selected;
   final Color accent;
   final ValueChanged<DateTime> onSelect;
@@ -971,43 +972,91 @@ class _MonthChipsBar extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  State<_MonthChipsBar> createState() => _MonthChipsBarState();
+}
+
+class _MonthChipsBarState extends State<_MonthChipsBar> {
+  final _controller = ScrollController();
+  static const _chipWidth = 54.0;
+  static const _gap = 8.0;
+
+  /// 決算年度（10月開始）の12ヶ月（Oct→翌Sep, 昇順）。
+  /// 選択月が範囲外なら追加して並べ替える。
+  List<DateTime> _buildMonths() {
     final now = DateTime.now();
-    final base = DateTime(now.year, now.month);
-    // 新しい月が先頭（左）。当月→12ヶ月前。
+    final fyStartYear = now.month >= 10 ? now.year : now.year - 1;
     final months = <DateTime>[
-      for (int i = 0; i <= 12; i++) DateTime(base.year, base.month - i),
+      for (int i = 0; i < 12; i++) DateTime(fyStartYear, 10 + i),
     ];
-    if (!months.any(
-        (m) => m.year == selected.year && m.month == selected.month)) {
-      months.add(DateTime(selected.year, selected.month));
-      months.sort((a, b) => b.compareTo(a));
+    if (!months.any((m) =>
+        m.year == widget.selected.year &&
+        m.month == widget.selected.month)) {
+      months.add(DateTime(widget.selected.year, widget.selected.month));
+      months.sort((a, b) => a.compareTo(b));
     }
+    return months;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _scrollToSelected());
+  }
+
+  @override
+  void didUpdateWidget(covariant _MonthChipsBar old) {
+    super.didUpdateWidget(old);
+    if (old.selected != widget.selected) {
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _scrollToSelected());
+    }
+  }
+
+  void _scrollToSelected() {
+    if (!_controller.hasClients) return;
+    final months = _buildMonths();
+    final idx = months.indexWhere((m) =>
+        m.year == widget.selected.year &&
+        m.month == widget.selected.month);
+    if (idx < 0) return;
+    final target = idx * (_chipWidth + _gap);
+    _controller.jumpTo(
+        target.clamp(0.0, _controller.position.maxScrollExtent));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final months = _buildMonths();
     return SizedBox(
       height: 52,
       child: ListView.separated(
+        controller: _controller,
         scrollDirection: Axis.horizontal,
-        // データは新しい順だが reverse で「古い→新しい(右が当月)」に並べる。
-        // 初期表示は右端=当月が見える。
-        reverse: true,
         padding: EdgeInsets.zero,
         itemCount: months.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: _gap),
         itemBuilder: (context, i) {
           final m = months[i];
-          final isSel =
-              m.year == selected.year && m.month == selected.month;
+          final isSel = m.year == widget.selected.year &&
+              m.month == widget.selected.month;
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => onSelect(m),
+            onTap: () => widget.onSelect(m),
             child: Container(
-              width: 54,
+              width: _chipWidth,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: isSel ? accent : V2Colors.surfaceMuted,
+                color: isSel ? widget.accent : V2Colors.surfaceMuted,
                 borderRadius: BorderRadius.circular(V2Spacing.radiusSm),
-                border:
-                    Border.all(color: isSel ? accent : V2Colors.border),
+                border: Border.all(
+                    color: isSel ? widget.accent : V2Colors.border),
               ),
               child: Center(
                 child: Text('${m.month}月',

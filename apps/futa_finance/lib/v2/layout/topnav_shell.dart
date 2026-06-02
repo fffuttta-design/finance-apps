@@ -47,7 +47,10 @@ class V2TopNavShell extends StatelessWidget {
             // スクロールは各画面側に任せる（v1 画面は ListView を持ち、
             // v2.1 ネイティブ画面は内部で SingleChildScrollView を持つ）。
             Expanded(
-              child: Center(
+              // 横は中央寄せ・縦は上揃え。Center だと内容が少ないタブ（収入など）が
+              // 上下中央に寄ってしまい他タブと位置がズレるため topCenter にする。
+              child: Align(
+                alignment: Alignment.topCenter,
                 child: ConstrainedBox(
                   constraints:
                       BoxConstraints(maxWidth: maxContentWidth),

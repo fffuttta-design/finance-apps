@@ -46,6 +46,10 @@ abstract class TransactionRepository {
 
   /// 全削除。
   Future<void> clear();
+
+  /// 指定モード('business'/'personal')のデータを裏で先読みしてキャッシュを温める。
+  /// モード切替の初回もたつき軽減用。既定は何もしない（Local は元々即時）。
+  Future<void> prefetch(String modeKey) async {}
 }
 
 /// SharedPreferences ベースのローカル永続化実装。
@@ -132,6 +136,9 @@ class LocalTransactionRepository implements TransactionRepository {
   Future<void> clear() async {
     await _saveAll([]);
   }
+
+  @override
+  Future<void> prefetch(String modeKey) async {} // Local は即時のため不要
 }
 
 /// Firestore ベースの実装。リアルタイム同期＋オフラインキャッシュ対応。
@@ -198,6 +205,23 @@ class FirestoreTransactionRepository implements TransactionRepository {
 
   @override
   Stream<List<Transaction>> get stream => _controller.stream;
+
+  @override
+  Future<void> prefetch(String modeKey) async {
+    if (_cache.containsKey(modeKey)) return; // 既に温まっていれば何もしない
+    try {
+      final snap =
+          await _coll.where('mode', isEqualTo: modeKey).get();
+      final list = <Transaction>[];
+      for (final d in snap.docs) {
+        try {
+          final data = Map<String, dynamic>.from(d.data())..remove('mode');
+          list.add(Transaction.fromJson(data));
+        } catch (_) {}
+      }
+      _cache[modeKey] = list;
+    } catch (_) {}
+  }
 
   @override
   Future<List<Transaction>> loadAll() async {

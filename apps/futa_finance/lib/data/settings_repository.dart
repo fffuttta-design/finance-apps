@@ -27,6 +27,10 @@ abstract class SettingsRepository {
   Future<void> saveCategories(CategoryConfig config);
   Future<PaymentMethodsConfig> loadPayments();
   Future<void> savePayments(PaymentMethodsConfig config);
+
+  /// 指定モードのカテゴリ/支払方法を裏で先読みしてキャッシュを温める。
+  /// 既定は何もしない（Local は元々即時）。
+  Future<void> prefetch(String modeKey) async {}
 }
 
 /// SharedPreferences ベースのローカル実装。
@@ -100,6 +104,9 @@ class LocalSettingsRepository implements SettingsRepository {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kPayments, config.toJsonString());
   }
+
+  @override
+  Future<void> prefetch(String modeKey) async {} // Local は即時のため不要
 }
 
 class FirestoreSettingsRepository implements SettingsRepository {
@@ -130,6 +137,18 @@ class FirestoreSettingsRepository implements SettingsRepository {
   DocumentReference<Map<String, dynamic>> _paymentsDocFor(String modeKey) =>
       FirebaseFirestore.instance
           .doc('users/$uid/config/${modeKey}_payments');
+
+  @override
+  Future<void> prefetch(String modeKey) async {
+    try {
+      if (!_categoriesCache.containsKey(modeKey)) {
+        await _fetchCategories(modeKey);
+      }
+      if (!_paymentsCache.containsKey(modeKey)) {
+        await _fetchPayments(modeKey);
+      }
+    } catch (_) {}
+  }
 
   @override
   Future<CategoryConfig> loadCategories() async {
