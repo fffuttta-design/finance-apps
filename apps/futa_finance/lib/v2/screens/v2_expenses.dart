@@ -526,6 +526,9 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
 // 毎月引落予定セクション（固定費 / 変動費）
 // ═════════════════════════════════════════════════
 
+/// 毎月支出予定の並び替えモード。
+enum _ChargeSort { amountDesc, amountAsc, majorAsc, majorDesc }
+
 class _MonthlyChargesSection extends StatefulWidget {
   final List<core.Subscription> charges;
   final void Function(String id) onTapItem;
@@ -552,19 +555,64 @@ class _MonthlyChargesSection extends StatefulWidget {
 class _MonthlyChargesSectionState extends State<_MonthlyChargesSection> {
   bool _fixedExpanded = true;
   bool _variableExpanded = true;
+  _ChargeSort _sort = _ChargeSort.amountDesc;
+
+  /// 並び替えを適用したコピーを返す。
+  List<core.Subscription> _sorted(List<core.Subscription> list) {
+    final l = [...list];
+    int amt(core.Subscription s) => s.amountForMonth(widget.ym);
+    String maj(core.Subscription s) => (s.plMajor ?? '').trim();
+    int byMajor(core.Subscription a, core.Subscription b, bool asc) {
+      final am = maj(a), bm = maj(b);
+      // 未設定は常に末尾へ。
+      if (am.isEmpty && bm.isEmpty) return 0;
+      if (am.isEmpty) return 1;
+      if (bm.isEmpty) return -1;
+      return asc ? am.compareTo(bm) : bm.compareTo(am);
+    }
+
+    switch (_sort) {
+      case _ChargeSort.amountDesc:
+        l.sort((a, b) => amt(b).compareTo(amt(a)));
+        break;
+      case _ChargeSort.amountAsc:
+        l.sort((a, b) => amt(a).compareTo(amt(b)));
+        break;
+      case _ChargeSort.majorAsc:
+        l.sort((a, b) => byMajor(a, b, true));
+        break;
+      case _ChargeSort.majorDesc:
+        l.sort((a, b) => byMajor(a, b, false));
+        break;
+    }
+    return l;
+  }
+
+  String get _sortLabel {
+    switch (_sort) {
+      case _ChargeSort.amountDesc:
+        return '金額↓';
+      case _ChargeSort.amountAsc:
+        return '金額↑';
+      case _ChargeSort.majorAsc:
+        return '科目↑';
+      case _ChargeSort.majorDesc:
+        return '科目↓';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     if (widget.charges.isEmpty) return const SizedBox.shrink();
-    final fixed = widget.charges
+    final fixed = _sorted(widget.charges
         .where((s) =>
             s.amountType == core.SubscriptionAmountType.fixed)
-        .toList();
-    final variable = widget.charges
+        .toList());
+    final variable = _sorted(widget.charges
         .where((s) =>
             s.amountType ==
             core.SubscriptionAmountType.variable)
-        .toList();
+        .toList());
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -579,6 +627,46 @@ class _MonthlyChargesSectionState extends State<_MonthlyChargesSection> {
               Text('毎月支出予定',
                   style: V2Typography.h2
                       .copyWith(color: V2Colors.textPrimary)),
+              const Spacer(),
+              // 並び替え
+              PopupMenuButton<_ChargeSort>(
+                tooltip: '並び替え',
+                onSelected: (v) => setState(() => _sort = v),
+                itemBuilder: (_) => const [
+                  PopupMenuItem(
+                      value: _ChargeSort.amountDesc,
+                      child: Text('金額が高い順')),
+                  PopupMenuItem(
+                      value: _ChargeSort.amountAsc,
+                      child: Text('金額が安い順')),
+                  PopupMenuItem(
+                      value: _ChargeSort.majorAsc,
+                      child: Text('会計科目 昇順')),
+                  PopupMenuItem(
+                      value: _ChargeSort.majorDesc,
+                      child: Text('会計科目 降順')),
+                ],
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: V2Colors.surfaceMuted,
+                    borderRadius:
+                        BorderRadius.circular(V2Spacing.radiusSm),
+                    border: Border.all(color: V2Colors.border),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.swap_vert, size: 14),
+                      const SizedBox(width: 4),
+                      Text(_sortLabel,
+                          style: V2Typography.caption.copyWith(
+                              fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),

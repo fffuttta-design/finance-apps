@@ -49,6 +49,16 @@ class UiPreferences extends ChangeNotifier {
   static const v2VariantSidebar = 'sidebar';
   static const v2VariantTopNav = 'topnav';
 
+  /// ホーム（広い画面）の総資産カラム幅。ユーザーがドラッグで調整・永続化。
+  static const _kHomeAssetWidth = 'futa.ui.home_asset_width';
+  static const homeAssetWidthMin = 240.0;
+  static const homeAssetWidthMax = 560.0;
+  static const homeAssetWidthDefault = 320.0;
+  double _homeAssetWidth = homeAssetWidthDefault;
+
+  /// ホームの総資産カラム幅（広い画面のみ使用）。
+  double get homeAssetColumnWidth => _homeAssetWidth;
+
   bool _hideInactive = false;
   List<String> _sidebarOrder = List.of(defaultSidebarOrder);
   bool? _useV2Ui;
@@ -118,7 +128,20 @@ class UiPreferences extends ChangeNotifier {
     _v2Variant = (variant == v2VariantSidebar)
         ? v2VariantSidebar
         : v2VariantTopNav;
+    // ホーム総資産カラム幅
+    final w = prefs.getDouble(_kHomeAssetWidth) ?? homeAssetWidthDefault;
+    _homeAssetWidth = w.clamp(homeAssetWidthMin, homeAssetWidthMax);
     _loaded = true;
+    notifyListeners();
+  }
+
+  /// ホームの総資産カラム幅を更新して永続化（範囲内にクランプ）。
+  Future<void> setHomeAssetColumnWidth(double w) async {
+    final c = w.clamp(homeAssetWidthMin, homeAssetWidthMax);
+    if (c == _homeAssetWidth) return;
+    _homeAssetWidth = c;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_kHomeAssetWidth, c);
     notifyListeners();
   }
 

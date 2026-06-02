@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/app_mode.dart';
 import '../../data/backup_repository.dart';
+import '../../data/ui_preferences.dart';
 import '../../data/monthly_snapshot_repository.dart';
 import '../../data/payments_change_notifier.dart';
 import '../../data/settings_repository.dart';
@@ -58,6 +59,9 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
 
   /// 当月支出の口座別内訳展開
   bool _expenseBreakdownExpanded = false;
+
+  /// ホーム（広い画面）の総資産カラム幅。ドラッグで調整・永続化。
+  late double _assetWidth = UiPreferences.instance.homeAssetColumnWidth;
 
   @override
   void onModeChanged() => _load();
@@ -366,8 +370,19 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(width: 320, child: _LeftAssetSummary(state: this)),
-              const SizedBox(width: V2Spacing.lg),
+              SizedBox(
+                  width: _assetWidth,
+                  child: _LeftAssetSummary(state: this)),
+              // ドラッグで総資産カラムの幅を調整（保存される）。
+              _ColumnResizeHandle(
+                onDrag: (dx) => setState(() {
+                  _assetWidth = (_assetWidth + dx).clamp(
+                      UiPreferences.homeAssetWidthMin,
+                      UiPreferences.homeAssetWidthMax);
+                }),
+                onDragEnd: () => UiPreferences.instance
+                    .setHomeAssetColumnWidth(_assetWidth),
+              ),
               Expanded(child: _CenterColumn(state: this)),
             ],
           );
@@ -954,6 +969,56 @@ class _CenterColumn extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 総資産カラムとメインカラムの間のドラッグ仕切り（幅調整・広い画面用）。
+class _ColumnResizeHandle extends StatefulWidget {
+  final ValueChanged<double> onDrag;
+  final VoidCallback onDragEnd;
+  const _ColumnResizeHandle(
+      {required this.onDrag, required this.onDragEnd});
+
+  @override
+  State<_ColumnResizeHandle> createState() => _ColumnResizeHandleState();
+}
+
+class _ColumnResizeHandleState extends State<_ColumnResizeHandle> {
+  bool _hover = false;
+  bool _drag = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = _hover || _drag;
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeLeftRight,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onHorizontalDragStart: (_) => setState(() => _drag = true),
+        onHorizontalDragUpdate: (d) => widget.onDrag(d.delta.dx),
+        onHorizontalDragEnd: (_) {
+          setState(() => _drag = false);
+          widget.onDragEnd();
+        },
+        child: SizedBox(
+          width: V2Spacing.lg,
+          child: Center(
+            child: Container(
+              width: 4,
+              height: 40,
+              decoration: BoxDecoration(
+                color: active
+                    ? V2Colors.accent
+                    : V2Colors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
