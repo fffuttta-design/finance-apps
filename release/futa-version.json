@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.115",
-    "buildNumber":  "116",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.115/futa-finance-v1.0.115.apk",
-    "releaseNotes":  "v1.0.115 業績タブ刷新/サブスク即編集/ホーム月チップ 他"
+    "version":  "1.0.116",
+    "buildNumber":  "117",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.116/futa-finance-v1.0.116.apk",
+    "releaseNotes":  "v1.0.116 サインイン設定更新(リリース鍵SHA登録反映)"
 }
