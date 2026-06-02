@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.138",
-    "buildNumber":  "139",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.138/futa-finance-v1.0.138.apk",
-    "releaseNotes":  "開発中タブに借入金・負債マスタを新設し簡易BS(資産-負債=純資産)に反映"
+    "version":  "1.0.139",
+    "buildNumber":  "140",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.139/futa-finance-v1.0.139.apk",
+    "releaseNotes":  "開発中タブに資金繰り表(先6ヶ月の資金予測・マイナス警告)を追加"
 }
