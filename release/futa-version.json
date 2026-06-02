@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.113",
-    "buildNumber":  "114",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.113/futa-finance-v1.0.113.apk",
-    "releaseNotes":  "v1.0.113 アプリアイコン刷新（新デザイン）＋リリース鍵署名"
+    "version":  "1.0.114",
+    "buildNumber":  "115",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.114/futa-finance-v1.0.114.apk",
+    "releaseNotes":  "v1.0.114 UIを上タブ版に一本化＋ホームの月収支を上に"
 }
