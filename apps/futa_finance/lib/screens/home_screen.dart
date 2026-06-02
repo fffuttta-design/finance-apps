@@ -584,79 +584,41 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
         children: [
           // ── 当月の収支のみシンプルに ──
           // 月初残高/推定残高/実測残高は「残高」セクションへ移動済。
-          _flowRow(
-              AppModeManager.instance.current == AppMode.business
-                  ? '+ 当月売上（確定）'
-                  : '+ 当月収入',
-              formatYen(incomeConfirmed, withSign: true),
-              const Color(0xFF16A34A)),
+          // 当月売上（確定） / 収入 — リスト風の長方形カード
+          _flowListItem(
+            label: AppModeManager.instance.current == AppMode.business
+                ? '＋ 当月売上（確定）'
+                : '＋ 当月収入',
+            value: formatYen(incomeConfirmed, withSign: true),
+            fg: const Color(0xFF16A34A),
+            bg: const Color(0xFFECFDF5),
+            border: const Color(0xFFA7F3D0),
+          ),
+          // 当月売上（見込み）— 金額がある時だけ
           if (incomePending > 0)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(
-                children: [
-                  const Icon(Icons.hourglass_top,
-                      size: 14, color: Color(0xFFD97706)),
-                  const SizedBox(width: 4),
-                  const Text('+ 当月売上（見込み）',
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFFD97706),
-                          fontWeight: FontWeight.w600)),
-                  const Spacer(),
-                  Text(
-                    formatYen(incomePending, withSign: true),
-                    style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFFD97706),
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.w700),
-                  ),
-                ],
-              ),
+            _flowListItem(
+              label: '＋ 当月売上（見込み）',
+              value: formatYen(incomePending, withSign: true),
+              fg: const Color(0xFFD97706),
+              bg: const Color(0xFFFFFBEB),
+              border: const Color(0xFFFDE68A),
+              leadingIcon: Icons.hourglass_top,
             ),
-          // 経費行: タップで内訳展開
-          InkWell(
-            borderRadius: BorderRadius.circular(4),
+          // 当月経費 / 支出 — タップで内訳展開
+          _flowListItem(
+            label: AppModeManager.instance.current == AppMode.business
+                ? '－ 当月経費'
+                : '－ 当月支出',
+            value: formatYen(-expense, withSign: true),
+            fg: const Color(0xFFDC2626),
+            bg: const Color(0xFFFEF2F2),
+            border: const Color(0xFFFECACA),
+            showExpand: expenseBreakdown.isNotEmpty,
+            expanded: _expenseBreakdownExpanded,
             onTap: expenseBreakdown.isEmpty
                 ? null
                 : () => setState(() => _expenseBreakdownExpanded =
                     !_expenseBreakdownExpanded),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  Text(
-                    AppModeManager.instance.current == AppMode.business
-                        ? '- 当月経費'
-                        : '- 当月支出',
-                    style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFFDC2626),
-                        fontWeight: FontWeight.w600),
-                  ),
-                  if (expenseBreakdown.isNotEmpty) ...[
-                    const SizedBox(width: 4),
-                    Icon(
-                      _expenseBreakdownExpanded
-                          ? Icons.expand_less
-                          : Icons.expand_more,
-                      size: 16,
-                      color: const Color(0xFF9CA3AF),
-                    ),
-                  ],
-                  const Spacer(),
-                  Text(
-                    formatYen(-expense, withSign: true),
-                    style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFFDC2626),
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'monospace'),
-                  ),
-                ],
-              ),
-            ),
           ),
           if (_expenseBreakdownExpanded &&
               expenseBreakdown.isNotEmpty) ...[
@@ -878,25 +840,61 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
     }).toList();
   }
 
-  Widget _flowRow(String label, String value, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+  /// フローの収支行を「淡い色背景＋枠」のリストアイテムとして描画する。
+  /// [showExpand] が true の時は展開シェブロンを出し、[onTap] で開閉する。
+  Widget _flowListItem({
+    required String label,
+    required String value,
+    required Color fg,
+    required Color bg,
+    required Color border,
+    IconData? leadingIcon,
+    bool showExpand = false,
+    bool expanded = false,
+    VoidCallback? onTap,
+  }) {
+    final content = Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: border),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style: TextStyle(
-                  fontSize: 12, color: color, fontWeight: FontWeight.w500)),
+          if (leadingIcon != null) ...[
+            Icon(leadingIcon, size: 15, color: fg),
+            const SizedBox(width: 6),
+          ],
+          Flexible(
+            child: Text(label,
+                style: TextStyle(
+                    fontSize: 13, color: fg, fontWeight: FontWeight.w600),
+                overflow: TextOverflow.ellipsis),
+          ),
+          if (showExpand) ...[
+            const SizedBox(width: 4),
+            Icon(expanded ? Icons.expand_less : Icons.expand_more,
+                size: 16, color: fg.withValues(alpha: 0.7)),
+          ],
+          const Spacer(),
           Text(
             value,
             style: TextStyle(
-                fontSize: 13,
-                color: color,
+                fontSize: 15,
+                color: fg,
                 fontFamily: 'monospace',
-                fontWeight: FontWeight.w600),
+                fontWeight: FontWeight.w700),
           ),
         ],
       ),
+    );
+    if (onTap == null) return content;
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: onTap,
+      child: content,
     );
   }
 
@@ -997,7 +995,7 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
     return _card(
       icon: Icons.account_balance_wallet,
       iconColor: const Color(0xFF1A237E),
-      title: '残高',
+      title: '総資産',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1268,15 +1266,7 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Text(
-            '総資産',
-            style: TextStyle(
-                fontSize: 11,
-                color: Color(0xFF6B7280),
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5),
-          ),
-          const SizedBox(height: 4),
+          // 見出し（セクションタイトル「総資産」）と重複するため小ラベルは削除。
           Text(
             formatYen(total),
             style: const TextStyle(
@@ -1324,9 +1314,15 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
           ),
         );
       },
-      borderRadius: BorderRadius.circular(6),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 2),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+        ),
         child: Row(
           children: [
             // ロゴ画像（iconUrl があれば画像、無ければ種別の絵文字フォールバック）
@@ -1385,9 +1381,15 @@ class _HomeScreenState extends State<HomeScreen> with ModeAwareMixin {
           ),
         );
       },
-      borderRadius: BorderRadius.circular(6),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 2),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF2F2),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFFECACA)),
+        ),
         child: Row(
           children: [
             // ロゴ画像（iconUrl があれば画像、無ければ 💳 フォールバック）
