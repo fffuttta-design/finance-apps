@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.136",
-    "buildNumber":  "137",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.136/futa-finance-v1.0.136.apk",
-    "releaseNotes":  "業績PLに当月/1年トグルを追加(デフォルト当月)"
+    "version":  "1.0.137",
+    "buildNumber":  "138",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.137/futa-finance-v1.0.137.apk",
+    "releaseNotes":  "ホーム総資産カラム幅をドラッグ調整(保存)。毎月支出予定の並び替え(金額・会計科目)。"
 }
