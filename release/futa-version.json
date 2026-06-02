@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.123",
-    "buildNumber":  "124",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.123/futa-finance-v1.0.123.apk",
-    "releaseNotes":  "v1.0.123 月チップ順序/収入2段/変動費は前月/引落日ダッシュ整理"
+    "version":  "1.0.124",
+    "buildNumber":  "125",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.124/futa-finance-v1.0.124.apk",
+    "releaseNotes":  "v1.0.124 設定画面のスマホ対応"
 }
