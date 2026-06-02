@@ -17,8 +17,6 @@ import '../../data/settings_repository.dart';
 import '../../data/transaction_repository.dart';
 import '../../screens/account_detail_screen.dart';
 import '../../screens/card_detail_screen.dart';
-import '../../screens/expense_input_screen.dart';
-import '../../screens/income_input_screen.dart';
 import '../../utils/formatters.dart';
 import '../../utils/thousands_separator_input_formatter.dart';
 import '../../widgets/brand_logo.dart';
@@ -391,22 +389,6 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
       .where((t) => t.date.year == month.year && t.date.month == month.month)
       .toList();
 
-  // ── 入力モーダル呼び出し（v1 機能の再利用） ──
-
-  void _openExpenseInput() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const ExpenseInputScreen()),
-    );
-  }
-
-  void _openIncomeInput() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const IncomeInputScreen()),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -693,53 +675,7 @@ class _CenterColumn extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // ── カンタン入力 ──────────────────
-        V2Card(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.bolt, size: 18, color: state.widget.accent),
-                  const SizedBox(width: V2Spacing.sm),
-                  Text('カンタン入力',
-                      style: V2Typography.h2
-                          .copyWith(color: V2Colors.textPrimary)),
-                ],
-              ),
-              const SizedBox(height: V2Spacing.md),
-              Wrap(
-                spacing: V2Spacing.sm,
-                runSpacing: V2Spacing.sm,
-                children: [
-                  _QuickInputButton(
-                    label: isBusiness ? '経費を記録' : '支出を記録',
-                    icon: Icons.remove_circle_outline,
-                    fg: V2Colors.negative,
-                    bg: V2Colors.negativeSoft,
-                    onTap: state._openExpenseInput,
-                  ),
-                  _QuickInputButton(
-                    label: isBusiness ? '売上を記録' : '収入を記録',
-                    icon: Icons.add_circle_outline,
-                    fg: V2Colors.positive,
-                    bg: V2Colors.positiveSoft,
-                    onTap: state._openIncomeInput,
-                  ),
-                ],
-              ),
-              const SizedBox(height: V2Spacing.sm),
-              Text(
-                isBusiness
-                    ? '銀行/カードの支払いや、入金を記録します'
-                    : '日々の支出や収入を記録します',
-                style: V2Typography.micro
-                    .copyWith(color: V2Colors.textSecondary),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: V2Spacing.lg),
+        // カンタン入力セクションは廃止（右上「記録」ボタンで代替）。
         // ── 月の収支（最新の入出金より上に表示）──────────────────
         V2Card(
           child: Column(
@@ -1051,69 +987,17 @@ class _MonthChipsBar extends StatelessWidget {
                 border:
                     Border.all(color: isSel ? accent : V2Colors.border),
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('${m.month}月',
-                      style: V2Typography.bodyStrong.copyWith(
-                          color: isSel
-                              ? Colors.white
-                              : V2Colors.textPrimary,
-                          fontWeight: FontWeight.w700)),
-                  Text("'${(m.year % 100).toString().padLeft(2, '0')}",
-                      style: V2Typography.micro.copyWith(
-                          color: isSel
-                              ? Colors.white.withValues(alpha: 0.85)
-                              : V2Colors.textMuted)),
-                ],
+              child: Center(
+                child: Text('${m.month}月',
+                    style: V2Typography.bodyStrong.copyWith(
+                        color: isSel
+                            ? Colors.white
+                            : V2Colors.textPrimary,
+                        fontWeight: FontWeight.w700)),
               ),
             ),
           );
         },
-      ),
-    );
-  }
-}
-
-class _QuickInputButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final Color fg;
-  final Color bg;
-  final VoidCallback onTap;
-  const _QuickInputButton({
-    required this.label,
-    required this.icon,
-    required this.fg,
-    required this.bg,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-              horizontal: V2Spacing.md, vertical: V2Spacing.sm),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(V2Spacing.radiusSm),
-            border: Border.all(color: fg.withValues(alpha: 0.25)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 16, color: fg),
-              const SizedBox(width: V2Spacing.sm),
-              Text(label,
-                  style: V2Typography.body.copyWith(
-                      color: fg, fontWeight: FontWeight.w700)),
-            ],
-          ),
-        ),
       ),
     );
   }

@@ -37,6 +37,15 @@ class V2TopNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tabs = [
+      for (final item in items)
+        _Tab(
+          item: item,
+          selected: item.id == currentId,
+          accent: accent,
+          onTap: () => onSelect(item.id),
+        ),
+    ];
     return Container(
       decoration: const BoxDecoration(
         color: V2Colors.surface,
@@ -44,23 +53,25 @@ class V2TopNav extends StatelessWidget {
           bottom: BorderSide(color: V2Colors.border, width: 1),
         ),
       ),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxWidth),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              for (final item in items)
-                _Tab(
-                  item: item,
-                  selected: item.id == currentId,
-                  accent: accent,
-                  onTap: () => onSelect(item.id),
-                ),
-            ],
-          ),
-        ),
-      ),
+      child: LayoutBuilder(builder: (context, c) {
+        // 画面が十分広ければ中央寄せで均等配置。
+        // 狭い（スマホ）ときはタブが収まらないので横スクロールにする。
+        if (c.maxWidth >= maxWidth) {
+          return Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: tabs,
+              ),
+            ),
+          );
+        }
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(children: tabs),
+        );
+      }),
     );
   }
 }
