@@ -106,6 +106,7 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     DateTime? nextDate = initial?.nextBillingDate;
     String? paymentMethod = initial?.paymentMethod;
     String? plMajor = initial?.plMajor;
+    String? startYm = initial?.startYearMonth;
 
     // 会計科目（PL科目）候補 = 現モードの大カテゴリ名（番号なし素の名前）。
     final catConfig = await _settings.loadCategories();
@@ -161,6 +162,60 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
       if (picked != null) setLocal(() => nextDate = picked);
     }
 
+    Future<void> pickStartMonth(StateSetter setLocal) async {
+      DateTime temp = startYm != null && startYm!.contains('-')
+          ? DateTime(int.parse(startYm!.split('-')[0]),
+              int.parse(startYm!.split('-')[1]))
+          : DateTime.now();
+      final picked = await showModalBottomSheet<DateTime>(
+        context: context,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (sheet) => SafeArea(
+          child: SizedBox(
+            height: 280,
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(sheet, null),
+                        child: const Text('キャンセル')),
+                    const Text('計上開始年月',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    TextButton(
+                        onPressed: () => Navigator.pop(sheet, temp),
+                        child: const Text('完了',
+                            style: TextStyle(
+                                color: Color(0xFF1A237E),
+                                fontWeight: FontWeight.w700))),
+                  ],
+                ),
+                Container(height: 1, color: const Color(0xFFE5E7EB)),
+                Expanded(
+                  child: CupertinoDatePicker(
+                    mode: CupertinoDatePickerMode.monthYear,
+                    initialDateTime: temp,
+                    minimumDate: DateTime(2018),
+                    maximumDate: DateTime(2035, 12, 31),
+                    dateOrder: DatePickerDateOrder.ymd,
+                    onDateTimeChanged: (d) => temp = d,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      if (picked != null) {
+        setLocal(() => startYm =
+            '${picked.year}-${picked.month.toString().padLeft(2, '0')}');
+      }
+    }
+
     // 編集フォームを BottomSheet で表示する。
     // - 上端のハンドルでドラッグ可能感を出す
     // - 高さは画面の92%、内部は SingleChildScrollView でスクロール
@@ -213,6 +268,10 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
               plMajor: (plMajor == null || plMajor!.trim().isEmpty)
                   ? null
                   : plMajor!.trim(),
+              startYearMonth:
+                  (startYm == null || startYm!.trim().isEmpty)
+                      ? null
+                      : startYm,
               // 変動費の月別実額は編集で消さない（保持）。
               monthlyActuals: initial?.monthlyActuals ?? const {},
             );
@@ -496,6 +555,44 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                               onChanged: (v) =>
                                   setLocal(() => plMajor = v),
                             ),
+                            if (plMajor != null) ...[
+                              const SizedBox(height: 10),
+                              InkWell(
+                                onTap: () => pickStartMonth(setLocal),
+                                child: InputDecorator(
+                                  decoration: InputDecoration(
+                                    labelText: '計上開始年月（任意）',
+                                    floatingLabelBehavior:
+                                        FloatingLabelBehavior.always,
+                                    helperText:
+                                        'この月より前は業績PLに計上しません（未来は当月まで）',
+                                    suffixIcon: startYm != null
+                                        ? IconButton(
+                                            icon: const Icon(
+                                                Icons.clear,
+                                                size: 18),
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            onPressed: () => setLocal(
+                                                () => startYm = null),
+                                          )
+                                        : const Icon(
+                                            Icons.calendar_today,
+                                            size: 18),
+                                  ),
+                                  child: Text(
+                                    startYm == null
+                                        ? '未設定（開始から計上）'
+                                        : '${startYm!.split('-')[0]}年${int.parse(startYm!.split('-')[1])}月〜',
+                                    style: TextStyle(
+                                        fontSize: 14,
+                                        color: startYm == null
+                                            ? const Color(0xFF9CA3AF)
+                                            : const Color(0xFF111827)),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                           const SizedBox(height: 16),
                           _logoUrlField(iconUrlCtrl, '🔁', setLocal),

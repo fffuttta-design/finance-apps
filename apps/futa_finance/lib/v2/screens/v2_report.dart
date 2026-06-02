@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../../data/app_mode.dart';
+import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
 import '../../screens/report_screen.dart';
 import '../../utils/formatters.dart';
@@ -103,6 +104,8 @@ class _V2ReportScreenState extends State<V2ReportScreen>
 
   StreamSubscription<List<core.Transaction>>? _sub;
   List<core.Transaction> _transactions = [];
+  // 会計科目(plMajor)を割り当てたサブスク（固定費/変動費）を PL に合算する。
+  List<core.Subscription> _subs = [];
   bool _loading = true;
 
   /// 表示モード。false=詳細（フルPL月次表）/ true=簡易（サマリー＋簡易月次表）。
@@ -138,9 +141,12 @@ class _V2ReportScreenState extends State<V2ReportScreen>
 
   Future<void> _load() async {
     final txns = await _txRepo.loadAll();
+    final subs =
+        (await SubscriptionRepository.instance.load()).subscriptions;
     if (!mounted) return;
     setState(() {
       _transactions = txns;
+      _subs = subs;
       _loading = false;
     });
   }
@@ -181,6 +187,69 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     return _PLCategory.other;
   }
 
+  /// 科目名（経費）→ PL大カテゴリ。サブスクの plMajor 分類に使う。
+  /// _classify の expense ブランチと同じ規則。
+  _PLCategory _classifyExpenseMajor(String rawMajor) {
+    final major = _bareMajor(rawMajor);
+    if (major == '法人税等' ||
+        major == '法人税' ||
+        major == '住民税' ||
+        major == '事業税' ||
+        major == '所得税') {
+      return _PLCategory.tax;
+    }
+    if (major.contains('特別')) return _PLCategory.extraExpense;
+    if (_nonOpExpenseItems.contains(major) || major.contains('営業外')) {
+      return _PLCategory.nonOpExpense;
+    }
+    if (major.contains('原価') ||
+        major.contains('仕入') ||
+        major.contains('外注')) {
+      return _PLCategory.cogs;
+    }
+    return _PLCategory.sga;
+  }
+
+  /// 当月の "YYYY-MM"（PL計上の上限月）。
+  String get _currentYm {
+    final n = DateTime.now();
+    return '${n.year}-${n.month.toString().padLeft(2, '0')}';
+  }
+
+  /// サブスク（plMajor 指定あり）の、指定科目の月次合算（12ヶ月）。
+  List<int> _subsMonthlyForMajor(String major) {
+    final months = _fyMonths;
+    final res = List<int>.filled(12, 0);
+    final cur = _currentYm;
+    for (final s in _subs) {
+      final pm = s.plMajor;
+      if (pm == null || _bareMajor(pm) != major) continue;
+      for (int i = 0; i < 12; i++) {
+        final m = months[i];
+        final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
+        res[i] += s.plAmountForMonth(ym, cur);
+      }
+    }
+    return res;
+  }
+
+  /// サブスク（plMajor 指定あり）の、指定大カテゴリの月次合算（12ヶ月）。
+  List<int> _subsMonthlyForCategory(_PLCategory c) {
+    final months = _fyMonths;
+    final res = List<int>.filled(12, 0);
+    final cur = _currentYm;
+    for (final s in _subs) {
+      final pm = s.plMajor;
+      if (pm == null || _classifyExpenseMajor(pm) != c) continue;
+      for (int i = 0; i < 12; i++) {
+        final m = months[i];
+        final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
+        res[i] += s.plAmountForMonth(ym, cur);
+      }
+    }
+    return res;
+  }
+
   /// 事業年度の各月（12 件）
   List<DateTime> get _fyMonths => List.generate(12, (i) {
         final m = _fyStartMonth + i;
@@ -200,6 +269,11 @@ class _V2ReportScreenState extends State<V2ReportScreen>
       if (idx < 0) continue;
       result[idx] += t.amount;
     }
+    // サブスク（会計科目を紐付けたもの）を合算。
+    final subs = _subsMonthlyForCategory(c);
+    for (int i = 0; i < 12; i++) {
+      result[i] += subs[i];
+    }
     return result;
   }
 
@@ -215,6 +289,13 @@ class _V2ReportScreenState extends State<V2ReportScreen>
       if (idx < 0) continue;
       result[idx] += t.amount;
     }
+    // この科目に紐付くサブスクを合算（同じ大カテゴリのときのみ）。
+    if (_classifyExpenseMajor(major) == c) {
+      final subs = _subsMonthlyForMajor(major);
+      for (int i = 0; i < 12; i++) {
+        result[i] += subs[i];
+      }
+    }
     return result;
   }
 
@@ -226,6 +307,16 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     for (final t in _transactions) {
       if (_classify(t) != c) continue;
       final major = _bareMajor(t.category.major);
+      if (major.isEmpty) continue;
+      if (knownItems.contains(major)) continue;
+      if (seen.add(major)) list.add(major);
+    }
+    // 標準科目リストに無い科目を持つサブスクも内訳行として出す。
+    for (final s in _subs) {
+      final pm = s.plMajor;
+      if (pm == null) continue;
+      if (_classifyExpenseMajor(pm) != c) continue;
+      final major = _bareMajor(pm);
       if (major.isEmpty) continue;
       if (knownItems.contains(major)) continue;
       if (seen.add(major)) list.add(major);
