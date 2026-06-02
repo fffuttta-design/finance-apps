@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.119",
-    "buildNumber":  "120",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.119/futa-finance-v1.0.119.apk",
-    "releaseNotes":  "v1.0.119 タブ横スクロール/月チップ年表記削除/カンタン入力廃止"
+    "version":  "1.0.120",
+    "buildNumber":  "121",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.120/futa-finance-v1.0.120.apk",
+    "releaseNotes":  "v1.0.120 経費明細2段表示/ウォレット一覧/資産タブ廃止"
 }
