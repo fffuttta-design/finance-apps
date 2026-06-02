@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.131",
-    "buildNumber":  "132",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.131/futa-finance-v1.0.131.apk",
-    "releaseNotes":  "事業/個人 切替の高速化を全タブ(支出/収入/業績)へ拡張"
+    "version":  "1.0.132",
+    "buildNumber":  "133",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.132/futa-finance-v1.0.132.apk",
+    "releaseNotes":  "業績PLの科目照合を改善(標準科目が正しく集計・その他激減)/外注費を売上原価に"
 }
