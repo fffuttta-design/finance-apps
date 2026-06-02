@@ -154,11 +154,17 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     final categories = _subscriptions.categoriesInOrder
         .where((c) => c != core.SubscriptionConfig.uncategorizedKey)
         .toList();
+    // 会計科目（PL科目）候補 = 現モードの大カテゴリ名（番号なし素の名前）。
+    final catConfig = await _settings.loadCategories();
+    final accountingMajors =
+        catConfig.majors.map((m) => m.name).toList();
+    if (!mounted) return;
     final edited = await showSubscriptionEditSheet(
       context,
       initial: _subscriptions.subscriptions[idx],
       paymentMethods: paymentMethods,
       categories: categories,
+      accountingMajors: accountingMajors,
     );
     if (edited == null) return;
     final newList = [..._subscriptions.subscriptions];

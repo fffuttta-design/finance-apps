@@ -16,6 +16,7 @@ Future<Subscription?> showSubscriptionEditSheet(
   Subscription? initial,
   required List<String> paymentMethods,
   required List<String> categories,
+  List<String> accountingMajors = const [],
 }) {
   final nameCtrl = TextEditingController(text: initial?.name ?? '');
   final amountCtrl = TextEditingController(
@@ -30,6 +31,8 @@ Future<Subscription?> showSubscriptionEditSheet(
       initial?.amountType ?? SubscriptionAmountType.fixed;
   DateTime? nextDate = initial?.nextBillingDate;
   String? paymentMethod = initial?.paymentMethod;
+  // 紐づける会計科目（PL科目）。accountingMajors に無い値でも保持する。
+  String? plMajor = initial?.plMajor;
 
   Future<void> pickAnnualDate(StateSetter setLocal) async {
     DateTime temp = nextDate ?? DateTime.now();
@@ -152,6 +155,9 @@ Future<Subscription?> showSubscriptionEditSheet(
           final category = categoryCtrl.text.trim().isEmpty
               ? null
               : categoryCtrl.text.trim();
+          final pl = (plMajor == null || plMajor!.trim().isEmpty)
+              ? null
+              : plMajor!.trim();
           final result = Subscription(
             id: initial?.id ??
                 DateTime.now().microsecondsSinceEpoch.toString(),
@@ -167,6 +173,7 @@ Future<Subscription?> showSubscriptionEditSheet(
             memo: memo,
             iconUrl: iconUrl,
             category: category,
+            plMajor: pl,
             // 変動費の月別実額は編集で消さない（保持）。
             monthlyActuals: initial?.monthlyActuals ?? const {},
           );
@@ -393,6 +400,40 @@ Future<Subscription?> showSubscriptionEditSheet(
                                           () => categoryCtrl.text = c),
                                     ))
                                 .toList(),
+                          ),
+                        ],
+                        if (accountingMajors.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          DropdownButtonFormField<String>(
+                            initialValue:
+                                accountingMajors.contains(plMajor)
+                                    ? plMajor
+                                    : null,
+                            isExpanded: true,
+                            decoration: InputDecoration(
+                              labelText: '会計科目（任意・業績PLに合算）',
+                              floatingLabelBehavior:
+                                  FloatingLabelBehavior.always,
+                              helperText:
+                                  '「固定費」は支払形態。実体の科目（通信費・賃借料等）を選ぶとPLに反映',
+                              suffixIcon: plMajor != null
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear,
+                                          size: 18),
+                                      visualDensity:
+                                          VisualDensity.compact,
+                                      tooltip: '会計科目をクリア',
+                                      onPressed: () =>
+                                          setLocal(() => plMajor = null),
+                                    )
+                                  : null,
+                            ),
+                            items: accountingMajors
+                                .map((m) => DropdownMenuItem(
+                                    value: m, child: Text(m)))
+                                .toList(),
+                            onChanged: (v) =>
+                                setLocal(() => plMajor = v),
                           ),
                         ],
                         const SizedBox(height: 16),

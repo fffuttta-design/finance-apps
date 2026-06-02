@@ -105,6 +105,13 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
         initial?.amountType ?? SubscriptionAmountType.fixed;
     DateTime? nextDate = initial?.nextBillingDate;
     String? paymentMethod = initial?.paymentMethod;
+    String? plMajor = initial?.plMajor;
+
+    // 会計科目（PL科目）候補 = 現モードの大カテゴリ名（番号なし素の名前）。
+    final catConfig = await _settings.loadCategories();
+    final accountingMajors =
+        catConfig.majors.map((m) => m.name).toList();
+    if (!context.mounted) return null;
 
     Future<void> pickAnnualDate(StateSetter setLocal) async {
       DateTime temp = nextDate ?? DateTime.now();
@@ -203,6 +210,9 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
               memo: memo,
               iconUrl: iconUrl,
               category: category,
+              plMajor: (plMajor == null || plMajor!.trim().isEmpty)
+                  ? null
+                  : plMajor!.trim(),
               // 変動費の月別実額は編集で消さない（保持）。
               monthlyActuals: initial?.monthlyActuals ?? const {},
             );
@@ -451,6 +461,40 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                                             () => categoryCtrl.text = c),
                                       ))
                                   .toList(),
+                            ),
+                          ],
+                          if (accountingMajors.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            DropdownButtonFormField<String>(
+                              initialValue:
+                                  accountingMajors.contains(plMajor)
+                                      ? plMajor
+                                      : null,
+                              isExpanded: true,
+                              decoration: InputDecoration(
+                                labelText: '会計科目（任意・業績PLに合算）',
+                                floatingLabelBehavior:
+                                    FloatingLabelBehavior.always,
+                                helperText:
+                                    '「固定費」は支払形態。実体の科目（通信費・賃借料等）を選ぶとPLに反映',
+                                suffixIcon: plMajor != null
+                                    ? IconButton(
+                                        icon: const Icon(Icons.clear,
+                                            size: 18),
+                                        visualDensity:
+                                            VisualDensity.compact,
+                                        tooltip: '会計科目をクリア',
+                                        onPressed: () => setLocal(
+                                            () => plMajor = null),
+                                      )
+                                    : null,
+                              ),
+                              items: accountingMajors
+                                  .map((m) => DropdownMenuItem(
+                                      value: m, child: Text(m)))
+                                  .toList(),
+                              onChanged: (v) =>
+                                  setLocal(() => plMajor = v),
                             ),
                           ],
                           const SizedBox(height: 16),

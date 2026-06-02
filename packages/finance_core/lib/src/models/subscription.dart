@@ -54,6 +54,12 @@ class Subscription {
   /// 一覧画面のセクション分けに使用。null/空欄なら「未分類」扱い。
   final String? category;
 
+  /// 紐づける会計科目（PL科目）。任意。例: "通信費", "賃借料", "水道光熱費"。
+  /// 業績PLでこの科目に合算される（「固定費」自体は会計科目ではなく支払形態なので、
+  /// 実体の科目をここで指定する）。null/空欄なら PL 未集計。
+  /// 値は CategoryConfig の大カテゴリ名（番号プレフィックス無しの素の名前）。
+  final String? plMajor;
+
   /// 変動費の「その月の実額」。キー = "YYYY-MM"（例: "2026-06"）→ 金額(円)。
   /// 未入力の月は 0 扱い。固定費では未使用。月ごとに独立（翌月は未入力=0）。
   final Map<String, int> monthlyActuals;
@@ -70,6 +76,7 @@ class Subscription {
     this.memo,
     this.iconUrl,
     this.category,
+    this.plMajor,
     this.monthlyActuals = const {},
   });
 
@@ -107,6 +114,7 @@ class Subscription {
         'memo': memo,
         'iconUrl': iconUrl,
         'category': category,
+        'plMajor': plMajor,
         'monthlyActuals': monthlyActuals,
       };
 
@@ -130,6 +138,7 @@ class Subscription {
         memo: j['memo'] as String?,
         iconUrl: j['iconUrl'] as String?,
         category: j['category'] as String?,
+        plMajor: j['plMajor'] as String?,
         monthlyActuals: (j['monthlyActuals'] as Map<String, dynamic>?)
                 ?.map((k, v) =>
                     MapEntry(k, (v as num?)?.toInt() ?? 0)) ??
@@ -148,6 +157,8 @@ class Subscription {
     String? iconUrl,
     String? category,
     bool clearCategory = false,
+    String? plMajor,
+    bool clearPlMajor = false,
     Map<String, int>? monthlyActuals,
   }) =>
       Subscription(
@@ -162,6 +173,7 @@ class Subscription {
         memo: memo ?? this.memo,
         iconUrl: iconUrl ?? this.iconUrl,
         category: clearCategory ? null : (category ?? this.category),
+        plMajor: clearPlMajor ? null : (plMajor ?? this.plMajor),
         monthlyActuals: monthlyActuals ?? this.monthlyActuals,
       );
 }
