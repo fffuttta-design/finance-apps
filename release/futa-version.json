@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.134",
-    "buildNumber":  "135",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.134/futa-finance-v1.0.134.apk",
-    "releaseNotes":  "収入タブ上揃え/ホーム月チップを決算年度(10月〜9月)に/事業個人の初回切替を高速化(逆モード先読み)"
+    "version":  "1.0.135",
+    "buildNumber":  "136",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.135/futa-finance-v1.0.135.apk",
+    "releaseNotes":  "サブスクを会計科目で業績PLに合算(開始月以降・当月まで計上)"
 }
