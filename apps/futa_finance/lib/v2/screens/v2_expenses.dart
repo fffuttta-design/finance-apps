@@ -8,6 +8,7 @@ import '../../data/app_mode.dart';
 import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
+import '../../screens/account_detail_screen.dart';
 import '../../screens/card_detail_screen.dart';
 import '../../screens/expense_input_screen.dart';
 import '../../utils/formatters.dart';
@@ -167,32 +168,53 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     if (mounted) await _load();
   }
 
-  /// クレカ一覧シートを開く（旧クレカタブの代替）。各カード → 詳細画面へ。
-  Future<void> _openCardList() async {
+  /// ウォレット一覧シート（銀行/現金/電子マネー/クレカ）。
+  /// 各ウォレットの「当月の収支（フロー・振替込み）」を表示し、タップで詳細へ。
+  Future<void> _openWalletList() async {
+    final banks = _payments.bankAccounts;
     final cards = _payments.creditCards;
-    if (cards.isEmpty) {
+    if (banks.isEmpty && cards.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('クレジットカードが未登録です（設定 → ウォレット）')),
+        const SnackBar(content: Text('ウォレットが未登録です（設定 → ウォレット）')),
       );
       return;
     }
-    // 当月利用（表示中の月の expense をカード別集計）
-    final usage = <String, int>{};
-    for (final t in _transactions) {
-      if (t.type != core.TransactionType.expense) continue;
-      if (t.date.year != _focused.year ||
-          t.date.month != _focused.month) {
-        continue;
+    bool inMonth(core.Transaction t) =>
+        t.date.year == _focused.year && t.date.month == _focused.month;
+    // 銀行/現金/電子マネーの当月フロー（収入+ / 支出- / 振替±）
+    int bankFlow(String name) {
+      int net = 0;
+      for (final t in _transactions) {
+        if (!inMonth(t)) continue;
+        if (t.type == core.TransactionType.transfer) {
+          if (t.transferFromAccount == name) net -= t.amount;
+          if (t.transferToAccount == name) net += t.amount;
+          continue;
+        }
+        if (t.paymentMethod != name) continue;
+        if (t.type == core.TransactionType.income) {
+          net += t.amount;
+        } else {
+          net -= t.amount;
+        }
       }
-      if (cards.any((c) => c.name == t.paymentMethod)) {
-        usage[t.paymentMethod] =
-            (usage[t.paymentMethod] ?? 0) + t.amount;
-      }
+      return net;
     }
+
+    int cardUsage(String name) {
+      int sum = 0;
+      for (final t in _transactions) {
+        if (!inMonth(t)) continue;
+        if (t.type != core.TransactionType.expense) continue;
+        if (t.paymentMethod == name) sum += t.amount;
+      }
+      return sum;
+    }
+
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.white,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -200,52 +222,99 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
               child: Row(
                 children: [
-                  Icon(Icons.credit_card,
+                  const Icon(Icons.account_balance_wallet_outlined,
                       size: 18, color: Color(0xFF1A237E)),
-                  SizedBox(width: 8),
-                  Text('クレジットカード',
+                  const SizedBox(width: 8),
+                  const Text('ウォレット',
                       style: TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w700)),
+                  const Spacer(),
+                  Text('${_focused.month}月の収支',
+                      style: V2Typography.micro
+                          .copyWith(color: V2Colors.textMuted)),
                 ],
               ),
             ),
-            for (final c in cards)
-              ListTile(
-                leading: BrandLogo(
-                  iconUrl: c.iconUrl,
-                  fallbackIcon: Icons.credit_card,
-                  size: 28,
-                  borderRadius: 4,
-                ),
-                title: Text(c.name),
-                subtitle: c.paymentDay != null
-                    ? Text('引落 ${c.paymentDay}日')
-                    : null,
-                trailing: Text(
-                  '当月 -${formatYen(usage[c.name] ?? 0)}',
-                  style: const TextStyle(
-                      color: Color(0xFFDC2626),
-                      fontWeight: FontWeight.w700),
-                ),
-                onTap: () {
-                  Navigator.pop(sheet);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => CardDetailScreen(card: c)),
-                  ).then((_) {
-                    if (mounted) _load();
-                  });
-                },
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final b in banks)
+                    _walletTile(
+                      iconUrl: b.iconUrl,
+                      name: b.name,
+                      sub: b.accountType.shortLabel,
+                      flow: bankFlow(b.name),
+                      onTap: () {
+                        Navigator.pop(sheet);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) =>
+                                  AccountDetailScreen(account: b)),
+                        ).then((_) {
+                          if (mounted) _load();
+                        });
+                      },
+                    ),
+                  for (final c in cards)
+                    _walletTile(
+                      iconUrl: c.iconUrl,
+                      name: c.name,
+                      sub: 'クレカ',
+                      flow: -cardUsage(c.name),
+                      fallbackIcon: Icons.credit_card,
+                      onTap: () {
+                        Navigator.pop(sheet);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => CardDetailScreen(card: c)),
+                        ).then((_) {
+                          if (mounted) _load();
+                        });
+                      },
+                    ),
+                ],
               ),
+            ),
             const SizedBox(height: 8),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _walletTile({
+    String? iconUrl,
+    required String name,
+    required String sub,
+    required int flow,
+    IconData fallbackIcon = Icons.account_balance,
+    required VoidCallback onTap,
+  }) {
+    final color = flow > 0
+        ? V2Colors.positive
+        : (flow < 0 ? V2Colors.negative : V2Colors.textMuted);
+    return ListTile(
+      leading: BrandLogo(
+          iconUrl: iconUrl,
+          fallbackIcon: fallbackIcon,
+          size: 28,
+          borderRadius: 4),
+      title: Text(name),
+      subtitle: Text(sub,
+          style: V2Typography.micro.copyWith(color: V2Colors.textMuted)),
+      trailing: Text(formatYen(flow, withSign: true),
+          style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontFeatures: V2Typography.tabularNums)),
+      onTap: onTap,
     );
   }
 
@@ -359,13 +428,14 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
             ),
           ),
           const SizedBox(height: V2Spacing.sm),
-          // ── クレカ一覧ボタン（旧クレカタブの代替・カード一覧→詳細） ──
+          // ── ウォレット一覧ボタン（銀行/現金/電子/クレカ→各詳細） ──
           Align(
             alignment: Alignment.centerRight,
             child: OutlinedButton.icon(
-              onPressed: _openCardList,
-              icon: const Icon(Icons.credit_card, size: 16),
-              label: const Text('クレカ一覧'),
+              onPressed: _openWalletList,
+              icon: const Icon(
+                  Icons.account_balance_wallet_outlined, size: 16),
+              label: const Text('ウォレット一覧'),
               style: OutlinedButton.styleFrom(
                 visualDensity: VisualDensity.compact,
                 minimumSize: const Size(0, 34),
@@ -832,41 +902,7 @@ class _ExpensesTable extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // ヘッダー行
-        Container(
-          color: V2Colors.surfaceMuted,
-          padding: const EdgeInsets.symmetric(
-              horizontal: V2Spacing.lg, vertical: 7),
-          child: Row(
-            children: [
-              SizedBox(
-                  width: 56,
-                  child: Text('日付',
-                      style: V2Typography.tableHeader)),
-              const SizedBox(width: V2Spacing.sm),
-              SizedBox(
-                  width: 120,
-                  child: Text('カテゴリ',
-                      style: V2Typography.tableHeader)),
-              const SizedBox(width: V2Spacing.sm),
-              Expanded(
-                  child: Text('内容',
-                      style: V2Typography.tableHeader)),
-              const SizedBox(width: V2Spacing.sm),
-              SizedBox(
-                  width: 140,
-                  child: Text('支払方法',
-                      style: V2Typography.tableHeader)),
-              const SizedBox(width: V2Spacing.sm),
-              SizedBox(
-                  width: 100,
-                  child: Text('金額',
-                      style: V2Typography.tableHeader,
-                      textAlign: TextAlign.right)),
-            ],
-          ),
-        ),
-        // データ行
+        // データ行（スマホで潰れないよう、列ヘッダーは廃止し2段表示）
         for (final t in rows) _ExpenseRow(
           t: t,
           iconUrl: _iconUrlFor(t.paymentMethod),
@@ -921,68 +957,74 @@ class _ExpenseRowState extends State<_ExpenseRow> {
                 top: BorderSide(color: V2Colors.divider, width: 1)),
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // 日付（M/D・2段）
               SizedBox(
-                width: 56,
+                width: 38,
                 child: Text(
                     '${widget.t.date.month}/${widget.t.date.day}',
                     style: V2Typography.numericCell),
               ),
               const SizedBox(width: V2Spacing.sm),
-              SizedBox(
-                width: 120,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: V2Colors.surfaceMuted,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: Text(_categoryLabel(),
-                      style: V2Typography.micro,
-                      overflow: TextOverflow.ellipsis),
-                ),
-              ),
-              const SizedBox(width: V2Spacing.sm),
+              // 中央: 1段目=カテゴリ＋内容、2段目=支払方法
               Expanded(
-                child: Text(
-                  widget.t.description.isEmpty
-                      ? '—'
-                      : widget.t.description,
-                  style: V2Typography.body,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: V2Spacing.sm),
-              SizedBox(
-                width: 140,
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    BrandLogo(
-                      iconUrl: widget.iconUrl,
-                      fallbackIcon: Icons.account_balance,
-                      size: 14,
-                      borderRadius: 3,
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: V2Colors.surfaceMuted,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Text(_categoryLabel(),
+                              style: V2Typography.micro),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            widget.t.description.isEmpty
+                                ? '—'
+                                : widget.t.description,
+                            style: V2Typography.body,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(widget.t.paymentMethod,
-                          style: V2Typography.caption,
-                          overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        BrandLogo(
+                          iconUrl: widget.iconUrl,
+                          fallbackIcon: Icons.account_balance,
+                          size: 13,
+                          borderRadius: 3,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(widget.t.paymentMethod,
+                              style: V2Typography.micro.copyWith(
+                                  color: V2Colors.textMuted),
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: V2Spacing.sm),
-              SizedBox(
-                width: 100,
-                child: Text(
-                  '-${formatYen(widget.t.amount)}',
-                  textAlign: TextAlign.right,
-                  style: V2Typography.numericCell.copyWith(
-                      color: V2Colors.negative,
-                      fontWeight: FontWeight.w700),
-                ),
+              // 金額（右・固定幅なしで見切れ防止）
+              Text(
+                '-${formatYen(widget.t.amount)}',
+                style: V2Typography.numericCell.copyWith(
+                    color: V2Colors.negative,
+                    fontWeight: FontWeight.w700),
               ),
             ],
           ),

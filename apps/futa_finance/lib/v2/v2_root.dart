@@ -8,7 +8,6 @@ import '../screens/income_input_screen.dart';
 import '../screens/transfer_input_screen.dart';
 import 'layout/shell.dart';
 import 'layout/topnav_shell.dart';
-import 'screens/v2_asset.dart';
 import 'screens/v2_devlab.dart';
 import 'screens/v2_expenses.dart';
 import 'screens/v2_home.dart';
@@ -84,10 +83,6 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
           label: '収入',
           icon: Icons.savings_outlined),
       const V2NavItem(
-          id: 'asset',
-          label: '資産',
-          icon: Icons.account_balance_wallet_outlined),
-      const V2NavItem(
           id: 'report',
           label: '業績',
           icon: Icons.bar_chart_outlined),
@@ -118,10 +113,8 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
       // 収入: v2.1 ネイティブ実装（見込み/確定の状態バッジ付きテーブル）
       case 'income':
         return V2IncomeScreen(accent: accent);
-      // 資産: v2.1 ネイティブ実装（種別別セクション + 通帳遷移）
-      case 'asset':
-        return V2AssetScreen(accent: accent);
-      // クレカタブは廃止。カード一覧は支出タブ上部の「クレカ」ボタンから開く。
+      // 資産タブは廃止。口座/カードはホームの総資産や支出の「ウォレット一覧」から。
+      // クレカタブも廃止。カード一覧は支出タブ上部の「ウォレット一覧」ボタンから開く。
       // 集計: v2.1 ネイティブ実装（会計風 PL 月次表 + v1 集計画面へのリンク）
       case 'report':
         return V2ReportScreen(accent: accent);
