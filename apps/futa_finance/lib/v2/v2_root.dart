@@ -94,7 +94,7 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
           icon: Icons.credit_card_outlined),
       const V2NavItem(
           id: 'report',
-          label: '集計',
+          label: '業績',
           icon: Icons.bar_chart_outlined),
       const V2NavItem(
           id: 'settings',

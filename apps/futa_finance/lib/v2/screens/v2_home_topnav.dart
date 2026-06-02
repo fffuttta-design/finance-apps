@@ -98,6 +98,11 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
     });
   }
 
+  /// 月チップ列からの絶対指定（外側 widget から呼べる公開メソッド）
+  void selectMonth(DateTime m) {
+    setState(() => _selectedMonth = DateTime(m.year, m.month));
+  }
+
   /// 内訳の開閉トグル（外側 widget から呼べる公開メソッド）
   void toggleInitialBreakdown() {
     setState(() => _initialBreakdownExpanded = !_initialBreakdownExpanded);
@@ -713,27 +718,16 @@ class _CenterColumn extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(Icons.chevron_left, size: 18),
-                    onPressed: () => state.shiftMonth(-1),
-                  ),
-                  Text('${state._selectedMonth.month}月の収支',
-                      style: V2Typography.h2
-                          .copyWith(color: V2Colors.textPrimary)),
-                  const SizedBox(width: V2Spacing.sm),
-                  Text(
-                    '(${state._selectedMonth.year}年)',
-                    style: V2Typography.caption,
-                  ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(Icons.chevron_right, size: 18),
-                    onPressed: () => state.shiftMonth(1),
-                  ),
-                ],
+              Text(
+                  '${state._selectedMonth.year}年${state._selectedMonth.month}月の収支',
+                  style: V2Typography.h2
+                      .copyWith(color: V2Colors.textPrimary)),
+              const SizedBox(height: V2Spacing.sm),
+              // 月を横並びチップで切替（横スクロール）
+              _MonthChipsBar(
+                selected: state._selectedMonth,
+                accent: state.widget.accent,
+                onSelect: state.selectMonth,
               ),
               const SizedBox(height: V2Spacing.sm),
               _SummaryRow(
@@ -978,6 +972,78 @@ class _CenterColumn extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 月を横並びチップで切り替えるバー（横スクロール）。
+/// 当月を左端に置き、右へスクロールすると過去月。範囲外の選択月は追加表示。
+class _MonthChipsBar extends StatelessWidget {
+  final DateTime selected;
+  final Color accent;
+  final ValueChanged<DateTime> onSelect;
+  const _MonthChipsBar({
+    required this.selected,
+    required this.accent,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final base = DateTime(now.year, now.month);
+    // 新しい月が先頭（左）。当月→12ヶ月前。
+    final months = <DateTime>[
+      for (int i = 0; i <= 12; i++) DateTime(base.year, base.month - i),
+    ];
+    if (!months.any(
+        (m) => m.year == selected.year && m.month == selected.month)) {
+      months.add(DateTime(selected.year, selected.month));
+      months.sort((a, b) => b.compareTo(a));
+    }
+    return SizedBox(
+      height: 52,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.zero,
+        itemCount: months.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final m = months[i];
+          final isSel =
+              m.year == selected.year && m.month == selected.month;
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => onSelect(m),
+            child: Container(
+              width: 54,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: isSel ? accent : V2Colors.surfaceMuted,
+                borderRadius: BorderRadius.circular(V2Spacing.radiusSm),
+                border:
+                    Border.all(color: isSel ? accent : V2Colors.border),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('${m.month}月',
+                      style: V2Typography.bodyStrong.copyWith(
+                          color: isSel
+                              ? Colors.white
+                              : V2Colors.textPrimary,
+                          fontWeight: FontWeight.w700)),
+                  Text("'${(m.year % 100).toString().padLeft(2, '0')}",
+                      style: V2Typography.micro.copyWith(
+                          color: isSel
+                              ? Colors.white.withValues(alpha: 0.85)
+                              : V2Colors.textMuted)),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }

@@ -8,9 +8,9 @@ import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
 import '../../screens/expense_input_screen.dart';
-import '../../screens/subscription_list_screen.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/brand_logo.dart';
+import '../../widgets/subscription_edit_sheet.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
@@ -136,12 +136,30 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     );
   }
 
+  /// 引落予定の項目タップ → その場で編集シート（設定カード）を直接開く。
+  /// 設定画面に遷移せず、保存したら即リストへ反映する。
   Future<void> _openSubscriptionEdit(String id) async {
-    await Navigator.push(
+    final idx =
+        _subscriptions.subscriptions.indexWhere((s) => s.id == id);
+    if (idx < 0) return;
+    final paymentMethods = <String>[
+      ..._payments.bankAccounts.map((b) => b.name),
+      ..._payments.creditCards.map((c) => c.name),
+    ];
+    final categories = _subscriptions.categoriesInOrder
+        .where((c) => c != core.SubscriptionConfig.uncategorizedKey)
+        .toList();
+    final edited = await showSubscriptionEditSheet(
       context,
-      MaterialPageRoute(
-          builder: (_) => SubscriptionListScreen(initialEditId: id)),
+      initial: _subscriptions.subscriptions[idx],
+      paymentMethods: paymentMethods,
+      categories: categories,
     );
+    if (edited == null) return;
+    final newList = [..._subscriptions.subscriptions];
+    newList[idx] = edited;
+    await _subscriptionRepo
+        .save(_subscriptions.copyWith(subscriptions: newList));
     if (mounted) await _load();
   }
 

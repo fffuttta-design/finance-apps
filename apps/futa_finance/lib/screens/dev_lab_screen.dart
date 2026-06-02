@@ -1,3 +1,7 @@
+// PL の年度サマリー/会計風月次表は「業績」タブへ移設済み。
+// それらが使っていた補助メソッド(_plRow/_ratioBadge/_accountingTable/_isCostOfSales)は
+// 将来の参照用に残置するため未使用警告を抑制する。
+// ignore_for_file: unused_element
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -200,35 +204,10 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
             t.date.month == m.month)
         .fold<int>(0, (s, t) => s + t.amount);
 
-    // 月別の原価/販管費を分けて集計
-    int costInMonth(DateTime m) => _transactions
-        .where((t) =>
-            t.type == core.TransactionType.expense &&
-            t.date.year == m.year &&
-            t.date.month == m.month &&
-            _isCostOfSales(t.category.major))
-        .fold<int>(0, (s, t) => s + t.amount);
-
-    int sgaInMonth(DateTime m) => _transactions
-        .where((t) =>
-            t.type == core.TransactionType.expense &&
-            t.date.year == m.year &&
-            t.date.month == m.month &&
-            !_isCostOfSales(t.category.major))
-        .fold<int>(0, (s, t) => s + t.amount);
-
-    final yearIncome =
-        months.fold<int>(0, (s, m) => s + incomeIn(m));
+    // 年度サマリー / 会計風月次表は「業績」タブへ移動済み。
+    // ここでは月次推移とカテゴリ別経費の比率に使う合計のみ残す。
     final yearExpense =
         months.fold<int>(0, (s, m) => s + expenseIn(m));
-    final yearProfit = yearIncome - yearExpense;
-    final yearCost = months.fold<int>(0, (s, m) => s + costInMonth(m));
-    final yearSga = months.fold<int>(0, (s, m) => s + sgaInMonth(m));
-    final yearGrossProfit = yearIncome - yearCost; // 粗利
-
-    // 比率（売上が0なら0扱い）
-    double pct(int part) =>
-        yearIncome == 0 ? 0 : part / yearIncome * 100;
 
     // カテゴリ別経費（直近12ヶ月）
     final categoryTotals = <String, int>{};
@@ -250,65 +229,6 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
             '原価判定はカテゴリ名に「原価」「外注」「仕入」「材料」を含むものを自動判別。\n'
             '後で「会計科目マッピング」UIで個別調整できるようにする予定。'),
         const SizedBox(height: 12),
-        // 年間サマリー（主役）
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE5E7EB)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text('直近12ヶ月',
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF9CA3AF),
-                      letterSpacing: 1)),
-              const SizedBox(height: 6),
-              _plRow('売上', yearIncome, const Color(0xFF16A34A)),
-              _plRow('原価', -yearCost, const Color(0xFFDC2626)),
-              const Divider(),
-              _plRow('粗利（売上 − 原価）', yearGrossProfit,
-                  yearGrossProfit >= 0
-                      ? const Color(0xFF16A34A)
-                      : const Color(0xFFDC2626)),
-              _plRow('販管費', -yearSga, const Color(0xFFDC2626)),
-              const Divider(),
-              _plRow('営業利益（粗利 − 販管費）', yearProfit,
-                  yearProfit >= 0
-                      ? const Color(0xFF16A34A)
-                      : const Color(0xFFDC2626),
-                  big: true),
-              if (yearIncome > 0) ...[
-                const SizedBox(height: 10),
-                // 3つの率を横並びで主役表示
-                Row(
-                  children: [
-                    Expanded(
-                        child: _ratioBadge(
-                            '原価率', pct(yearCost),
-                            const Color(0xFFDC2626))),
-                    const SizedBox(width: 6),
-                    Expanded(
-                        child: _ratioBadge(
-                            '粗利率', pct(yearGrossProfit),
-                            const Color(0xFF16A34A))),
-                    const SizedBox(width: 6),
-                    Expanded(
-                        child: _ratioBadge(
-                            '営業利益率', pct(yearProfit),
-                            yearProfit >= 0
-                                ? const Color(0xFF1A237E)
-                                : const Color(0xFFDC2626))),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
         // 月次テーブル
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
@@ -334,33 +254,6 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
                 return _plMonthRow(m, i, e);
               }),
             ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        // 会計風 PL 表（横スクロール）
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-          child: Row(children: [
-            Icon(Icons.table_chart_outlined,
-                size: 14, color: Color(0xFF6B7280)),
-            SizedBox(width: 4),
-            Text('会計風 月次表（横スクロール）',
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF6B7280))),
-          ]),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFE5E7EB)),
-          ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: _accountingTable(months, incomeIn, costInMonth,
-                sgaInMonth, yearIncome, yearCost, yearSga),
           ),
         ),
         const SizedBox(height: 16),

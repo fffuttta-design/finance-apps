@@ -99,6 +99,9 @@ class _V2ReportScreenState extends State<V2ReportScreen>
   List<core.Transaction> _transactions = [];
   bool _loading = true;
 
+  /// 表示モード。false=詳細（フルPL月次表）/ true=簡易（サマリー＋簡易月次表）。
+  bool _simple = false;
+
   final int _fyStartMonth = 6;
   late int _fyYear = _calcFyYear();
 
@@ -235,7 +238,6 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     }
 
     final months = _fyMonths;
-    final rows = _buildRows();
     final fyEndYear = _fyYear + 1;
 
     return SingleChildScrollView(
@@ -243,82 +245,254 @@ class _V2ReportScreenState extends State<V2ReportScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          V2Card(
-            padding: EdgeInsets.zero,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+          // 年度ナビ + 詳細/簡易 切替
+          Padding(
+            padding: const EdgeInsets.only(bottom: V2Spacing.md),
+            child: Row(
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                      V2Spacing.lg, V2Spacing.md, V2Spacing.lg, V2Spacing.sm),
-                  child: Row(
-                    children: [
-                      Icon(Icons.table_chart_outlined,
-                          size: 18, color: widget.accent),
-                      const SizedBox(width: V2Spacing.sm),
-                      Text('会計風 月次表（PL）',
-                          style: V2Typography.h2),
-                      const SizedBox(width: V2Spacing.sm),
-                      Text('← 横スクロール →',
-                          style: V2Typography.micro.copyWith(
-                              color: V2Colors.textMuted)),
-                      const Spacer(),
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        icon: const Icon(Icons.chevron_left, size: 18),
-                        onPressed: () => _shiftYear(-1),
-                      ),
-                      Text(
-                        '$_fyYear 年度（$_fyStartMonth月〜$fyEndYear年5月）',
-                        style: V2Typography.body.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: V2Colors.textPrimary),
-                      ),
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        icon: const Icon(Icons.chevron_right, size: 18),
-                        onPressed: () => _shiftYear(1),
-                      ),
-                    ],
-                  ),
+                SegmentedButton<bool>(
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment(
+                        value: false,
+                        label: Text('詳細'),
+                        icon: Icon(Icons.table_rows, size: 16)),
+                    ButtonSegment(
+                        value: true,
+                        label: Text('簡易'),
+                        icon: Icon(Icons.summarize, size: 16)),
+                  ],
+                  selected: {_simple},
+                  onSelectionChanged: (s) =>
+                      setState(() => _simple = s.first),
                 ),
-                _PLTable(months: months, rows: rows),
-              ],
-            ),
-          ),
-          const SizedBox(height: V2Spacing.lg),
-          V2Card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('PL カテゴリ判定',
-                    style: V2Typography.bodyStrong.copyWith(
-                        color: V2Colors.textPrimary)),
-                const SizedBox(height: V2Spacing.sm),
+                const Spacer(),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.chevron_left, size: 18),
+                  onPressed: () => _shiftYear(-1),
+                ),
                 Text(
-                  '・通常 income → 売上高\n'
-                  '・「原価」「仕入」を含む expense → 売上原価\n'
-                  '・「営業外」or 受取利息/受取配当金/雑収入 → 営業外収益\n'
-                  '・「営業外」or 支払利息/雑損失 → 営業外費用\n'
-                  '・「特別」を含む → 特別利益 / 損失\n'
-                  '・法人税 / 住民税 / 事業税 / 所得税（完全一致） → 法人税等\n'
-                  '・上記以外の expense → 販売管理費（内訳は標準勘定科目で表示）',
-                  style: V2Typography.caption,
+                  '$_fyYear 年度（$_fyStartMonth月〜$fyEndYear年5月）',
+                  style: V2Typography.body.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: V2Colors.textPrimary),
                 ),
-                const SizedBox(height: V2Spacing.md),
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const ReportScreen()),
-                  ),
-                  icon: const Icon(Icons.open_in_new, size: 14),
-                  label: const Text(
-                      'v1 集計画面（カテゴリ別/月末締め）を開く'),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.chevron_right, size: 18),
+                  onPressed: () => _shiftYear(1),
                 ),
               ],
             ),
           ),
+          if (_simple) ...[
+            _simpleSummaryCard(),
+            const SizedBox(height: V2Spacing.lg),
+            _simpleTableCard(months),
+          ] else ...[
+            _detailedTableCard(months),
+            const SizedBox(height: V2Spacing.lg),
+            _categoryNoteCard(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ── 詳細：フル PL 月次表 ──
+  Widget _detailedTableCard(List<DateTime> months) {
+    return V2Card(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                V2Spacing.lg, V2Spacing.md, V2Spacing.lg, V2Spacing.sm),
+            child: Row(
+              children: [
+                Icon(Icons.table_chart_outlined,
+                    size: 18, color: widget.accent),
+                const SizedBox(width: V2Spacing.sm),
+                Text('会計風 月次表（PL）', style: V2Typography.h2),
+                const SizedBox(width: V2Spacing.sm),
+                Text('← 横スクロール →',
+                    style: V2Typography.micro
+                        .copyWith(color: V2Colors.textMuted)),
+              ],
+            ),
+          ),
+          _PLTable(months: months, rows: _buildRows()),
+        ],
+      ),
+    );
+  }
+
+  Widget _categoryNoteCard() {
+    return V2Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('PL カテゴリ判定',
+              style: V2Typography.bodyStrong
+                  .copyWith(color: V2Colors.textPrimary)),
+          const SizedBox(height: V2Spacing.sm),
+          Text(
+            '・通常 income → 売上高\n'
+            '・「原価」「仕入」を含む expense → 売上原価\n'
+            '・「営業外」or 受取利息/受取配当金/雑収入 → 営業外収益\n'
+            '・「営業外」or 支払利息/雑損失 → 営業外費用\n'
+            '・「特別」を含む → 特別利益 / 損失\n'
+            '・法人税 / 住民税 / 事業税 / 所得税（完全一致） → 法人税等\n'
+            '・上記以外の expense → 販売管理費（内訳は標準勘定科目で表示）',
+            style: V2Typography.caption,
+          ),
+          const SizedBox(height: V2Spacing.md),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ReportScreen()),
+            ),
+            icon: const Icon(Icons.open_in_new, size: 14),
+            label: const Text('v1 集計画面（カテゴリ別/月末締め）を開く'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── 簡易：サマリー（売上/原価/粗利/販管費/営業利益＋各率） ──
+  Widget _simpleSummaryCard() {
+    final sales =
+        _monthlyForCategory(_PLCategory.sales).fold<int>(0, (s, v) => s + v);
+    final cogs =
+        _monthlyForCategory(_PLCategory.cogs).fold<int>(0, (s, v) => s + v);
+    final sga =
+        _monthlyForCategory(_PLCategory.sga).fold<int>(0, (s, v) => s + v);
+    final gross = sales - cogs;
+    final oper = gross - sga;
+    double pct(int part) => sales == 0 ? 0 : part / sales * 100;
+
+    return V2Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('年度サマリー', style: V2Typography.caption),
+          const SizedBox(height: V2Spacing.sm),
+          _summaryRow('売上', sales, V2Colors.positive),
+          _summaryRow('原価', -cogs, V2Colors.negative),
+          _summaryRow('粗利（売上 − 原価）', gross, V2Colors.positive,
+              strong: true),
+          _summaryRow('販管費', -sga, V2Colors.negative),
+          const Divider(),
+          _summaryRow('営業利益（粗利 − 販管費）', oper,
+              oper >= 0 ? V2Colors.positive : V2Colors.negative,
+              strong: true, big: true),
+          const SizedBox(height: V2Spacing.md),
+          Row(
+            children: [
+              Expanded(
+                  child: _ratioBadge('原価率', pct(cogs),
+                      const Color(0xFFDC2626))),
+              const SizedBox(width: V2Spacing.sm),
+              Expanded(
+                  child: _ratioBadge('粗利率', pct(gross),
+                      const Color(0xFF16A34A))),
+              const SizedBox(width: V2Spacing.sm),
+              Expanded(
+                  child: _ratioBadge('営業利益率', pct(oper),
+                      const Color(0xFF1A237E))),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryRow(String label, int amount, Color color,
+      {bool strong = false, bool big = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: strong
+                  ? V2Typography.bodyStrong
+                      .copyWith(color: V2Colors.textPrimary)
+                  : V2Typography.body),
+          Text(formatYen(amount, withSign: true),
+              style: TextStyle(
+                  fontSize: big ? 22 : 15,
+                  fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
+                  color: color,
+                  fontFeatures: V2Typography.tabularNums)),
+        ],
+      ),
+    );
+  }
+
+  Widget _ratioBadge(String label, double pct, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(V2Spacing.radiusSm),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        children: [
+          Text(label,
+              style: V2Typography.micro.copyWith(color: color)),
+          const SizedBox(height: 2),
+          Text('${pct.toStringAsFixed(1)}%',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                  fontFeatures: V2Typography.tabularNums)),
+        ],
+      ),
+    );
+  }
+
+  // ── 簡易：会計風 月次表（横スクロール・売上/原価/粗利/販管費/営業利益のみ） ──
+  Widget _simpleTableCard(List<DateTime> months) {
+    final sales = _monthlyForCategory(_PLCategory.sales);
+    final cogs = _monthlyForCategory(_PLCategory.cogs);
+    final sga = _monthlyForCategory(_PLCategory.sga);
+    final gross = _diff(sales, cogs);
+    final oper = _diff(gross, sga);
+    final rows = <_PLRow>[
+      _PLRow(label: '売上', monthly: sales, kind: _RowKind.data),
+      _PLRow(label: '原価', monthly: cogs, kind: _RowKind.data),
+      _PLRow(label: '粗利', monthly: gross, kind: _RowKind.subtotal),
+      _PLRow(label: '販管費', monthly: sga, kind: _RowKind.data),
+      _PLRow(label: '営業利益', monthly: oper, kind: _RowKind.emphasize),
+    ];
+    return V2Card(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                V2Spacing.lg, V2Spacing.md, V2Spacing.lg, V2Spacing.sm),
+            child: Row(
+              children: [
+                Icon(Icons.table_chart_outlined,
+                    size: 18, color: widget.accent),
+                const SizedBox(width: V2Spacing.sm),
+                Text('会計風 月次表（簡易）', style: V2Typography.h2),
+                const SizedBox(width: V2Spacing.sm),
+                Text('← 横スクロール →',
+                    style: V2Typography.micro
+                        .copyWith(color: V2Colors.textMuted)),
+              ],
+            ),
+          ),
+          _PLTable(months: months, rows: rows),
         ],
       ),
     );
