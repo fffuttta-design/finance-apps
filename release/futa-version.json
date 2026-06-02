@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.135",
-    "buildNumber":  "136",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.135/futa-finance-v1.0.135.apk",
-    "releaseNotes":  "サブスクを会計科目で業績PLに合算(開始月以降・当月まで計上)"
+    "version":  "1.0.136",
+    "buildNumber":  "137",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.136/futa-finance-v1.0.136.apk",
+    "releaseNotes":  "業績PLに当月/1年トグルを追加(デフォルト当月)"
 }
