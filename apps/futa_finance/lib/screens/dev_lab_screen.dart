@@ -15,6 +15,7 @@ import '../data/liability.dart';
 import '../data/liability_repository.dart';
 import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
+import '../data/subscription_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
@@ -31,7 +32,7 @@ class DevLabScreen extends StatefulWidget {
   State<DevLabScreen> createState() => _DevLabScreenState();
 }
 
-enum _LabView { pl, bs, budget }
+enum _LabView { pl, bs, cashflow, budget }
 
 class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
   @override
@@ -117,6 +118,8 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
           children: [
             Expanded(child: _seg(_LabView.pl, 'PL', Icons.assessment)),
             Expanded(child: _seg(_LabView.bs, 'BS', Icons.balance)),
+            Expanded(child: _seg(
+                _LabView.cashflow, '資金繰り', Icons.water_drop_outlined)),
             Expanded(child: _seg(_LabView.budget, '予算', Icons.event_note)),
           ],
         ),
@@ -173,6 +176,7 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
     return switch (_view) {
       _LabView.pl => _plView(),
       _LabView.bs => _bsView(),
+      _LabView.cashflow => _cashflowView(),
       _LabView.budget => _budgetView(),
     };
   }
@@ -1006,6 +1010,238 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
       note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
     );
     await LiabilityRepository.instance.upsert(item);
+  }
+
+  // ── 資金繰り表（プロトタイプ）──────────────────────────
+  Widget _cashflowView() {
+    return FutureBuilder<(core.SubscriptionConfig, BudgetItemsConfig)>(
+      future: () async {
+        final s = await SubscriptionRepository.instance.load();
+        final b = await BudgetItemRepository.instance.load();
+        return (s, b);
+      }(),
+      builder: (context, snap) {
+        if (!snap.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return _cashflowBody(snap.data!.$1, snap.data!.$2);
+      },
+    );
+  }
+
+  Widget _cashflowBody(
+      core.SubscriptionConfig subs, BudgetItemsConfig budgets) {
+    final p = _payments!;
+    final now = DateTime.now();
+
+    // 現在の現預金合計（銀行+現金+電子マネー）。
+    final bankNames = p.bankAccounts.map((b) => b.name).toSet();
+    final delta = <String, int>{};
+    for (final t in _transactions) {
+      if (t.type == core.TransactionType.transfer) {
+        if (t.transferFromAccount != null &&
+            bankNames.contains(t.transferFromAccount)) {
+          delta[t.transferFromAccount!] =
+              (delta[t.transferFromAccount!] ?? 0) - t.amount;
+        }
+        if (t.transferToAccount != null &&
+            bankNames.contains(t.transferToAccount)) {
+          delta[t.transferToAccount!] =
+              (delta[t.transferToAccount!] ?? 0) + t.amount;
+        }
+        continue;
+      }
+      if (!bankNames.contains(t.paymentMethod)) continue;
+      if (t.type == core.TransactionType.income) {
+        delta[t.paymentMethod] = (delta[t.paymentMethod] ?? 0) + t.amount;
+      } else {
+        delta[t.paymentMethod] = (delta[t.paymentMethod] ?? 0) - t.amount;
+      }
+    }
+    final startCash = p.bankAccounts.fold<int>(
+        0, (s, b) => s + ((b.startingBalance ?? 0) + (delta[b.name] ?? 0)));
+
+    // 想定月収入 = 直近3ヶ月（当月除く）の実収入平均。
+    int incomeIn(int year, int month) => _transactions
+        .where((t) =>
+            t.type == core.TransactionType.income &&
+            t.date.year == year &&
+            t.date.month == month)
+        .fold<int>(0, (s, t) => s + t.amount);
+    int sum3 = 0;
+    for (int i = 1; i <= 3; i++) {
+      final m = DateTime(now.year, now.month - i);
+      sum3 += incomeIn(m.year, m.month);
+    }
+    final assumedIncome = (sum3 / 3).round();
+
+    // 毎月の固定的支出（月次サブスク目安 ＋ 借入返済）。
+    int monthlyFixed = 0;
+    for (final s in subs.subscriptions) {
+      if (s.cycle == core.SubscriptionCycle.monthly) monthlyFixed += s.amount;
+    }
+    final monthlyRepay = _liabilities.monthlyRepaymentTotal;
+
+    // 各月の臨時支出（年払いサブスク ＋ 税金/保険の予定）。
+    int spotFor(DateTime m) {
+      int v = 0;
+      for (final s in subs.subscriptions) {
+        if (s.cycle == core.SubscriptionCycle.annually) {
+          final nb = s.nextBillingDate;
+          if (nb != null && nb.month == m.month) v += s.amount;
+        }
+      }
+      for (final bi in budgets.items) {
+        for (final sp in bi.schedule) {
+          if (sp.month == m.month) v += sp.amount;
+        }
+      }
+      return v;
+    }
+
+    final rows = <Widget>[];
+    int cash = startCash;
+    int minCash = startCash;
+    for (int i = 0; i < 6; i++) {
+      final m = DateTime(now.year, now.month + i);
+      final income = assumedIncome;
+      final outflow = monthlyFixed + monthlyRepay + spotFor(m);
+      final net = income - outflow;
+      cash += net;
+      if (cash < minCash) minCash = cash;
+      rows.add(_cfRow('${m.year}/${m.month}月', income, outflow, net, cash));
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      children: [
+        _devNote('資金繰り表 - プロトタイプ',
+            '現預金 ${formatYen(startCash)} を起点に、想定収入（直近3ヶ月平均）と支出予定（固定費＋借入返済＋年払い＋税金/保険）から先6ヶ月の残高を予測。'),
+        const SizedBox(height: 12),
+        if (minCash < 0)
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEE2E2),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFDC2626)),
+            ),
+            child: Text(
+              '⚠️ 6ヶ月以内に資金がマイナス（最小 ${formatYen(minCash)}）になる見込みです。',
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF991B1B)),
+            ),
+          ),
+        // ヘッダー
+        Container(
+          color: const Color(0xFFF3F4F6),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            children: const [
+              SizedBox(
+                  width: 56,
+                  child: Text('月',
+                      style: TextStyle(
+                          fontSize: 11, fontWeight: FontWeight.w700))),
+              Expanded(
+                  child: Text('想定収入',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                          fontSize: 11, fontWeight: FontWeight.w700))),
+              Expanded(
+                  child: Text('支出予定',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                          fontSize: 11, fontWeight: FontWeight.w700))),
+              Expanded(
+                  child: Text('差引',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                          fontSize: 11, fontWeight: FontWeight.w700))),
+              Expanded(
+                  child: Text('月末残高',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                          fontSize: 11, fontWeight: FontWeight.w800))),
+            ],
+          ),
+        ),
+        ...rows,
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFEF3C7),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Text(
+            '※ プロトタイプ。想定収入は直近3ヶ月平均の概算です。変動費は目安額、年払いは請求月、税金/保険は「予算」タブの予定日で計上しています。',
+            style: TextStyle(fontSize: 11, color: Color(0xFF92400E)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _cfRow(
+      String label, int income, int outflow, int net, int endCash) {
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(
+            bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: Row(
+        children: [
+          SizedBox(
+              width: 56,
+              child: Text(label,
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600))),
+          Expanded(
+            child: Text(formatYen(income),
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF16A34A),
+                    fontFamily: 'monospace')),
+          ),
+          Expanded(
+            child: Text('-${formatYen(outflow)}',
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFFDC2626),
+                    fontFamily: 'monospace')),
+          ),
+          Expanded(
+            child: Text(formatYen(net, withSign: true),
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: net >= 0
+                        ? const Color(0xFF16A34A)
+                        : const Color(0xFFDC2626),
+                    fontFamily: 'monospace')),
+          ),
+          Expanded(
+            child: Text(formatYen(endCash),
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: endCash >= 0
+                        ? const Color(0xFF111827)
+                        : const Color(0xFFDC2626),
+                    fontFamily: 'monospace')),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _bsSection(
