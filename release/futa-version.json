@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.108",
-    "buildNumber":  "109",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.108/futa-finance-v1.0.108.apk",
-    "releaseNotes":  "v1.0.108 事業/個人モード切替のカクつき改善"
+    "version":  "1.0.109",
+    "buildNumber":  "110",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.109/futa-finance-v1.0.109.apk",
+    "releaseNotes":  "v1.0.109 Android Googleサインイン修復(このPCのSHA-1登録)"
 }
