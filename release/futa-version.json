@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.133",
-    "buildNumber":  "134",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.133/futa-finance-v1.0.133.apk",
-    "releaseNotes":  "固定費/変動費に会計科目を紐付け可能に(C2入力側)"
+    "version":  "1.0.134",
+    "buildNumber":  "135",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.134/futa-finance-v1.0.134.apk",
+    "releaseNotes":  "収入タブ上揃え/ホーム月チップを決算年度(10月〜9月)に/事業個人の初回切替を高速化(逆モード先読み)"
 }
