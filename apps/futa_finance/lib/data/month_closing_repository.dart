@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:finance_core/finance_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -67,30 +69,51 @@ class FirestoreMonthClosingRepository implements MonthClosingRepository {
   FirestoreMonthClosingRepository({required this.uid});
   final String uid;
 
+  /// モード別メモリキャッシュ。モード切替直後の即表示用（裏で最新取得）。
+  final Map<String, MonthClosingConfig> _cache = {};
+
   String get _modeKey =>
       AppModeManager.instance.current == AppMode.business
           ? 'business'
           : 'personal';
 
-  DocumentReference<Map<String, dynamic>> get _doc => FirebaseFirestore
-      .instance
-      .doc('users/$uid/config/${_modeKey}_month_closing');
+  DocumentReference<Map<String, dynamic>> _docFor(String modeKey) =>
+      FirebaseFirestore.instance
+          .doc('users/$uid/config/${modeKey}_month_closing');
 
   @override
   Future<MonthClosingConfig> load() async {
-    final snap = await _doc.get();
-    final raw = snap.data()?['json'] as String?;
-    if (raw == null) return MonthClosingConfig.empty();
-    try {
-      return MonthClosingConfig.fromJsonString(raw);
-    } catch (_) {
-      return MonthClosingConfig.empty();
+    final mk = _modeKey;
+    final cached = _cache[mk];
+    if (cached != null) {
+      unawaited(_fetch(mk));
+      return cached;
     }
+    return _fetch(mk);
+  }
+
+  Future<MonthClosingConfig> _fetch(String modeKey) async {
+    final snap = await _docFor(modeKey).get();
+    final raw = snap.data()?['json'] as String?;
+    MonthClosingConfig result;
+    if (raw == null) {
+      result = MonthClosingConfig.empty();
+    } else {
+      try {
+        result = MonthClosingConfig.fromJsonString(raw);
+      } catch (_) {
+        result = MonthClosingConfig.empty();
+      }
+    }
+    _cache[modeKey] = result;
+    return result;
   }
 
   @override
   Future<void> save(MonthClosingConfig config) async {
-    await _doc.set({
+    final mk = _modeKey;
+    _cache[mk] = config;
+    await _docFor(mk).set({
       'json': config.toJsonString(),
       'updatedAt': FieldValue.serverTimestamp(),
     });

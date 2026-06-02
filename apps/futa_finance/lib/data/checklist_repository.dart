@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:finance_core/finance_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -65,36 +67,57 @@ class FirestoreChecklistRepository implements ChecklistRepository {
   FirestoreChecklistRepository({required this.uid});
   final String uid;
 
+  /// モード別メモリキャッシュ。モード切替直後の即表示用（裏で最新取得）。
+  final Map<String, ChecklistConfig> _cache = {};
+
   String get _modeKey =>
       AppModeManager.instance.current == AppMode.business
           ? 'business'
           : 'personal';
 
-  ChecklistConfig _defaultsForCurrentMode() {
-    return AppModeManager.instance.current == AppMode.business
+  ChecklistConfig _defaultsFor(String modeKey) {
+    return modeKey == 'business'
         ? ChecklistConfig.businessDefaults()
         : ChecklistConfig.personalDefaults();
   }
 
-  DocumentReference<Map<String, dynamic>> get _doc => FirebaseFirestore
-      .instance
-      .doc('users/$uid/config/${_modeKey}_checklist');
+  DocumentReference<Map<String, dynamic>> _docFor(String modeKey) =>
+      FirebaseFirestore.instance
+          .doc('users/$uid/config/${modeKey}_checklist');
 
   @override
   Future<ChecklistConfig> load() async {
-    final snap = await _doc.get();
-    final raw = snap.data()?['json'] as String?;
-    if (raw == null) return _defaultsForCurrentMode();
-    try {
-      return ChecklistConfig.fromJsonString(raw);
-    } catch (_) {
-      return _defaultsForCurrentMode();
+    final mk = _modeKey;
+    final cached = _cache[mk];
+    if (cached != null) {
+      unawaited(_fetch(mk));
+      return cached;
     }
+    return _fetch(mk);
+  }
+
+  Future<ChecklistConfig> _fetch(String modeKey) async {
+    final snap = await _docFor(modeKey).get();
+    final raw = snap.data()?['json'] as String?;
+    ChecklistConfig result;
+    if (raw == null) {
+      result = _defaultsFor(modeKey);
+    } else {
+      try {
+        result = ChecklistConfig.fromJsonString(raw);
+      } catch (_) {
+        result = _defaultsFor(modeKey);
+      }
+    }
+    _cache[modeKey] = result;
+    return result;
   }
 
   @override
   Future<void> save(ChecklistConfig config) async {
-    await _doc.set({
+    final mk = _modeKey;
+    _cache[mk] = config;
+    await _docFor(mk).set({
       'json': config.toJsonString(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
