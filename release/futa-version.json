@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.109",
-    "buildNumber":  "110",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.109/futa-finance-v1.0.109.apk",
-    "releaseNotes":  "v1.0.109 Android Googleサインイン修復(このPCのSHA-1登録)"
+    "version":  "1.0.110",
+    "buildNumber":  "111",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.110/futa-finance-v1.0.110.apk",
+    "releaseNotes":  "v1.0.110 v2UIでもアプリ内アップデート通知に対応"
 }
