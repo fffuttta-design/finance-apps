@@ -82,6 +82,12 @@ const List<String> _nonOpExpenseItems = [
   '雑損失',
 ];
 
+/// 取引の大分類は「0.役員報酬」のように番号プレフィックス付きで保存される一方、
+/// 上の標準科目リストは番号なし。照合時に先頭の「N.」を取り除いて正規化する。
+/// これで番号がズレても標準科目に正しく集計され、「○○（その他）」化を防ぐ。
+String _bareMajor(String major) =>
+    major.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
+
 /// v2.1 集計タブ：会計風月次表（PL）。
 class V2ReportScreen extends StatefulWidget {
   final Color accent;
@@ -142,7 +148,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
   /// 大カテゴリ分類。
   /// 法人税等の判定は major の完全一致のみ（租税公課は販管費）。
   _PLCategory _classify(core.Transaction t) {
-    final major = t.category.major.trim();
+    final major = _bareMajor(t.category.major);
     if (t.type == core.TransactionType.income) {
       if (major.contains('特別')) return _PLCategory.extraIncome;
       if (_nonOpIncomeItems.contains(major) ||
@@ -165,7 +171,9 @@ class _V2ReportScreenState extends State<V2ReportScreen>
           major.contains('営業外')) {
         return _PLCategory.nonOpExpense;
       }
-      if (major.contains('原価') || major.contains('仕入')) {
+      if (major.contains('原価') ||
+          major.contains('仕入') ||
+          major.contains('外注')) {
         return _PLCategory.cogs;
       }
       return _PLCategory.sga;
@@ -201,7 +209,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     final result = List<int>.filled(12, 0);
     for (final t in _transactions) {
       if (_classify(t) != c) continue;
-      if (t.category.major.trim() != major) continue;
+      if (_bareMajor(t.category.major) != major) continue;
       final idx = months.indexWhere(
           (m) => m.year == t.date.year && m.month == t.date.month);
       if (idx < 0) continue;
@@ -217,7 +225,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     final list = <String>[];
     for (final t in _transactions) {
       if (_classify(t) != c) continue;
-      final major = t.category.major.trim();
+      final major = _bareMajor(t.category.major);
       if (major.isEmpty) continue;
       if (knownItems.contains(major)) continue;
       if (seen.add(major)) list.add(major);
