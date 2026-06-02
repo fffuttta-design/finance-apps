@@ -152,17 +152,14 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final mode = AppModeManager.instance.current;
-    final variant = UiPreferences.instance.v2Variant;
-    final accent = V2ModeAccent.of(mode);
-
-    if (variant == UiPreferences.v2VariantTopNav) {
-      return _buildTopNav(context, accent);
-    }
-    return _buildSidebar(context, accent);
+    // UI は上タブ版（v2.1）に一本化。サイドバー版・v1 への切替は廃止。
+    final accent = V2ModeAccent.of(AppModeManager.instance.current);
+    return _buildTopNav(context, accent);
   }
 
-  /// マネフォクラウド風（既定）: 左サイドバー + メイン
+  /// マネフォクラウド風: 左サイドバー + メイン。
+  /// UI を上タブ版に一本化したため現在は未使用（将来の参照用に残置）。
+  // ignore: unused_element
   Widget _buildSidebar(BuildContext context, Color accent) {
     final mode = AppModeManager.instance.current;
     return V2Shell(
@@ -211,12 +208,6 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
   Widget _buildTopNav(BuildContext context, Color accent) {
     final mode = AppModeManager.instance.current;
     final isBusiness = mode == AppMode.business;
-    // ダーク背景上のアクションボタンは透過＋白枠で読めるように
-    final outlinedFg =
-        isBusiness ? Colors.white : V2Colors.textBody;
-    final outlinedBorder = isBusiness
-        ? Colors.white.withValues(alpha: 0.35)
-        : V2Colors.border;
     return V2TopNavShell(
       header: V2TopHeader(
         mode: mode,
@@ -228,29 +219,6 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
             mode: mode,
             onDark: isBusiness,
             onSelected: _openRecord,
-          ),
-          OutlinedButton.icon(
-            onPressed: () async {
-              await UiPreferences.instance.setV2Variant(
-                  UiPreferences.v2VariantSidebar);
-            },
-            icon: const Icon(Icons.view_sidebar, size: 14),
-            label: const Text('サイドバー版 (v2)'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: outlinedFg,
-              side: BorderSide(color: outlinedBorder),
-            ),
-          ),
-          OutlinedButton.icon(
-            onPressed: () async {
-              await UiPreferences.instance.setUseV2Ui(false);
-            },
-            icon: const Icon(Icons.history, size: 14),
-            label: const Text('v1 (旧)'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: outlinedFg,
-              side: BorderSide(color: outlinedBorder),
-            ),
           ),
         ],
       ),

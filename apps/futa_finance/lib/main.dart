@@ -1,5 +1,4 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -11,7 +10,6 @@ import 'data/repository_provider.dart';
 import 'data/ui_preferences.dart';
 import 'firebase_options.dart';
 import 'screens/auth_screen.dart';
-import 'screens/root_screen.dart';
 import 'v2/theme/app_theme.dart';
 import 'v2/v2_root.dart';
 
@@ -166,18 +164,12 @@ class _AuthGateState extends State<_AuthGate> {
           );
         }
 
-        // v1/v2 切替（自動 or 設定の手動値）。
-        // v2 のときは V2Theme でラップして v2 配下の widget 全体に適用する。
-        final width = MediaQuery.sizeOf(context).width;
-        final useV2 = UiPreferences.instance.resolveUseV2(
-            isWeb: kIsWeb, width: width);
-        if (useV2) {
-          return Theme(
-            data: V2Theme.light(),
-            child: const V2Root(),
-          );
-        }
-        return const RootScreen();
+        // UI は v2（上タブ版）に一本化。v1/サイドバー版は廃止。
+        // V2Theme で v2 配下の widget 全体にテーマを適用する。
+        return Theme(
+          data: V2Theme.light(),
+          child: const V2Root(),
+        );
       },
     );
   }

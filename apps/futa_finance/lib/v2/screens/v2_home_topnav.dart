@@ -708,33 +708,7 @@ class _CenterColumn extends StatelessWidget {
           ),
         ),
         const SizedBox(height: V2Spacing.lg),
-        // ── 最新の入出金 ──────────────────
-        V2Card(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text('最新の入出金',
-                      style: V2Typography.h2
-                          .copyWith(color: V2Colors.textPrimary)),
-                ],
-              ),
-              const SizedBox(height: V2Spacing.md),
-              if (recentTop.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Text('取引記録はまだありません',
-                      style: V2Typography.caption.copyWith(
-                          color: V2Colors.textSecondary)),
-                )
-              else
-                for (final t in recentTop) _TransactionRow(t: t),
-            ],
-          ),
-        ),
-        const SizedBox(height: V2Spacing.lg),
-        // ── 月の収支 ──────────────────
+        // ── 月の収支（最新の入出金より上に表示）──────────────────
         V2Card(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -974,6 +948,32 @@ class _CenterColumn extends StatelessWidget {
                   ),
                 ],
               ],
+            ],
+          ),
+        ),
+        const SizedBox(height: V2Spacing.lg),
+        // ── 最新の入出金 ──────────────────
+        V2Card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text('最新の入出金',
+                      style: V2Typography.h2
+                          .copyWith(color: V2Colors.textPrimary)),
+                ],
+              ),
+              const SizedBox(height: V2Spacing.md),
+              if (recentTop.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text('取引記録はまだありません',
+                      style: V2Typography.caption.copyWith(
+                          color: V2Colors.textSecondary)),
+                )
+              else
+                for (final t in recentTop) _TransactionRow(t: t),
             ],
           ),
         ),
