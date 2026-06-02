@@ -115,6 +115,16 @@ class _V2ReportScreenState extends State<V2ReportScreen>
   final int _fyStartMonth = 10;
   late int _fyYear = _calcFyYear();
 
+  /// 表示期間。false=当月（単月PL）/ true=1年（年度12ヶ月表）。デフォルトは当月。
+  bool _yearView = false;
+
+  /// 当月モードで表示する月（デフォルト=今月）。
+  late DateTime _selMonth =
+      DateTime(DateTime.now().year, DateTime.now().month);
+
+  /// 表示対象の月リスト（当月=1件、1年=12件）。集計・表はこれを基準に並べる。
+  List<DateTime> get _displayMonths => _yearView ? _fyMonths : [_selMonth];
+
   int _calcFyYear() {
     final now = DateTime.now();
     return now.month >= _fyStartMonth ? now.year : now.year - 1;
@@ -218,13 +228,13 @@ class _V2ReportScreenState extends State<V2ReportScreen>
 
   /// サブスク（plMajor 指定あり）の、指定科目の月次合算（12ヶ月）。
   List<int> _subsMonthlyForMajor(String major) {
-    final months = _fyMonths;
-    final res = List<int>.filled(12, 0);
+    final months = _displayMonths;
+    final res = List<int>.filled(months.length, 0);
     final cur = _currentYm;
     for (final s in _subs) {
       final pm = s.plMajor;
       if (pm == null || _bareMajor(pm) != major) continue;
-      for (int i = 0; i < 12; i++) {
+      for (int i = 0; i < months.length; i++) {
         final m = months[i];
         final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
         res[i] += s.plAmountForMonth(ym, cur);
@@ -235,13 +245,13 @@ class _V2ReportScreenState extends State<V2ReportScreen>
 
   /// サブスク（plMajor 指定あり）の、指定大カテゴリの月次合算（12ヶ月）。
   List<int> _subsMonthlyForCategory(_PLCategory c) {
-    final months = _fyMonths;
-    final res = List<int>.filled(12, 0);
+    final months = _displayMonths;
+    final res = List<int>.filled(months.length, 0);
     final cur = _currentYm;
     for (final s in _subs) {
       final pm = s.plMajor;
       if (pm == null || _classifyExpenseMajor(pm) != c) continue;
-      for (int i = 0; i < 12; i++) {
+      for (int i = 0; i < months.length; i++) {
         final m = months[i];
         final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
         res[i] += s.plAmountForMonth(ym, cur);
@@ -260,8 +270,8 @@ class _V2ReportScreenState extends State<V2ReportScreen>
 
   /// 指定大カテゴリの月次集計
   List<int> _monthlyForCategory(_PLCategory c) {
-    final months = _fyMonths;
-    final result = List<int>.filled(12, 0);
+    final months = _displayMonths;
+    final result = List<int>.filled(months.length, 0);
     for (final t in _transactions) {
       if (_classify(t) != c) continue;
       final idx = months.indexWhere(
@@ -271,7 +281,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     }
     // サブスク（会計科目を紐付けたもの）を合算。
     final subs = _subsMonthlyForCategory(c);
-    for (int i = 0; i < 12; i++) {
+    for (int i = 0; i < months.length; i++) {
       result[i] += subs[i];
     }
     return result;
@@ -279,8 +289,8 @@ class _V2ReportScreenState extends State<V2ReportScreen>
 
   /// 指定大カテゴリ × 指定 major の月次集計
   List<int> _monthlyForItem(_PLCategory c, String major) {
-    final months = _fyMonths;
-    final result = List<int>.filled(12, 0);
+    final months = _displayMonths;
+    final result = List<int>.filled(months.length, 0);
     for (final t in _transactions) {
       if (_classify(t) != c) continue;
       if (_bareMajor(t.category.major) != major) continue;
@@ -292,7 +302,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     // この科目に紐付くサブスクを合算（同じ大カテゴリのときのみ）。
     if (_classifyExpenseMajor(major) == c) {
       final subs = _subsMonthlyForMajor(major);
-      for (int i = 0; i < 12; i++) {
+      for (int i = 0; i < months.length; i++) {
         result[i] += subs[i];
       }
     }
@@ -328,6 +338,11 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     setState(() => _fyYear += delta);
   }
 
+  void _shiftMonth(int delta) {
+    setState(() =>
+        _selMonth = DateTime(_selMonth.year, _selMonth.month + delta));
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -337,7 +352,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
       );
     }
 
-    final months = _fyMonths;
+    final months = _displayMonths;
     // 期末（期首の前月）。期首が1月のときだけ同年内で完結する。
     final fyEndMonth = _fyStartMonth == 1 ? 12 : _fyStartMonth - 1;
     final fyEndYear = _fyStartMonth == 1 ? _fyYear : _fyYear + 1;
@@ -347,11 +362,32 @@ class _V2ReportScreenState extends State<V2ReportScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 年度ナビ + 詳細/簡易 切替
+          // 期間(当月/1年) + 詳細/簡易 切替 + 月/年ナビ
           Padding(
             padding: const EdgeInsets.only(bottom: V2Spacing.md),
-            child: Row(
+            child: Wrap(
+              spacing: V2Spacing.md,
+              runSpacing: V2Spacing.sm,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
+                // 当月 / 1年
+                SegmentedButton<bool>(
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment(
+                        value: false,
+                        label: Text('当月'),
+                        icon: Icon(Icons.today, size: 16)),
+                    ButtonSegment(
+                        value: true,
+                        label: Text('1年'),
+                        icon: Icon(Icons.calendar_month, size: 16)),
+                  ],
+                  selected: {_yearView},
+                  onSelectionChanged: (s) =>
+                      setState(() => _yearView = s.first),
+                ),
+                // 詳細 / 簡易
                 SegmentedButton<bool>(
                   showSelectedIcon: false,
                   segments: const [
@@ -368,23 +404,20 @@ class _V2ReportScreenState extends State<V2ReportScreen>
                   onSelectionChanged: (s) =>
                       setState(() => _simple = s.first),
                 ),
-                const Spacer(),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.chevron_left, size: 18),
-                  onPressed: () => _shiftYear(-1),
-                ),
-                Text(
-                  '$_fyYear 年度（$_fyStartMonth月〜$fyEndYear年$fyEndMonth月）',
-                  style: V2Typography.body.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: V2Colors.textPrimary),
-                ),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.chevron_right, size: 18),
-                  onPressed: () => _shiftYear(1),
-                ),
+                // ナビ（当月=月送り / 1年=年度送り）
+                if (_yearView)
+                  _NavBar(
+                    label:
+                        '$_fyYear 年度（$_fyStartMonth月〜$fyEndYear年$fyEndMonth月）',
+                    onPrev: () => _shiftYear(-1),
+                    onNext: () => _shiftYear(1),
+                  )
+                else
+                  _NavBar(
+                    label: '${_selMonth.year}年${_selMonth.month}月',
+                    onPrev: () => _shiftMonth(-1),
+                    onNext: () => _shiftMonth(1),
+                  ),
               ],
             ),
           ),
@@ -425,7 +458,10 @@ class _V2ReportScreenState extends State<V2ReportScreen>
               ],
             ),
           ),
-          _PLTable(months: months, rows: _buildRows()),
+          _PLTable(
+              months: months,
+              rows: _buildRows(),
+              totalLabel: _yearView ? '年度累計' : '合計'),
         ],
       ),
     );
@@ -480,7 +516,8 @@ class _V2ReportScreenState extends State<V2ReportScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('年度サマリー', style: V2Typography.caption),
+          Text(_yearView ? '年度サマリー' : '当月サマリー',
+              style: V2Typography.caption),
           const SizedBox(height: V2Spacing.sm),
           _summaryRow('売上', sales, V2Colors.positive),
           _summaryRow('原価', -cogs, V2Colors.negative),
@@ -594,7 +631,10 @@ class _V2ReportScreenState extends State<V2ReportScreen>
               ],
             ),
           ),
-          _PLTable(months: months, rows: rows),
+          _PLTable(
+              months: months,
+              rows: rows,
+              totalLabel: _yearView ? '年度累計' : '合計'),
         ],
       ),
     );
@@ -760,10 +800,48 @@ class _PLRow {
 // テーブル本体（横スクロール）
 // ═════════════════════════════════════════════════
 
+/// 月／年度を前後に送るナビ（◀ ラベル ▶）。
+class _NavBar extends StatelessWidget {
+  final String label;
+  final VoidCallback onPrev;
+  final VoidCallback onNext;
+  const _NavBar(
+      {required this.label, required this.onPrev, required this.onNext});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.chevron_left, size: 18),
+          onPressed: onPrev,
+        ),
+        Text(
+          label,
+          style: V2Typography.body.copyWith(
+              fontWeight: FontWeight.w700,
+              color: V2Colors.textPrimary),
+        ),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.chevron_right, size: 18),
+          onPressed: onNext,
+        ),
+      ],
+    );
+  }
+}
+
 class _PLTable extends StatelessWidget {
   final List<DateTime> months;
   final List<_PLRow> rows;
-  const _PLTable({required this.months, required this.rows});
+  final String totalLabel;
+  const _PLTable(
+      {required this.months,
+      required this.rows,
+      this.totalLabel = '年度累計'});
 
   static const labelColWidth = 160.0;
   static const monthColWidth = 90.0;
@@ -780,7 +858,7 @@ class _PLTable extends StatelessWidget {
         ),
         child: Column(
           children: [
-            _HeaderRow(months: months),
+            _HeaderRow(months: months, totalLabel: totalLabel),
             for (final r in rows) _BodyRow(row: r),
           ],
         ),
@@ -791,7 +869,8 @@ class _PLTable extends StatelessWidget {
 
 class _HeaderRow extends StatelessWidget {
   final List<DateTime> months;
-  const _HeaderRow({required this.months});
+  final String totalLabel;
+  const _HeaderRow({required this.months, this.totalLabel = '年度累計'});
 
   @override
   Widget build(BuildContext context) {
@@ -827,7 +906,7 @@ class _HeaderRow extends StatelessWidget {
               padding: const EdgeInsets.symmetric(
                   horizontal: V2Spacing.sm, vertical: 8),
               child: Text(
-                '年度累計',
+                totalLabel,
                 style: V2Typography.tableHeader.copyWith(
                     color: V2Colors.textPrimary,
                     fontWeight: FontWeight.w800),
