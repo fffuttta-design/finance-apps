@@ -528,9 +528,17 @@ class _V2ReportScreenState extends State<V2ReportScreen>
 
     final rows = <_PLRow>[];
 
-    // ── 売上 ──
+    // ── 売上（科目＝収入源別に内訳表示） ──
     rows.add(_PLRow(
         label: '売上高', monthly: salesMonthly, kind: _RowKind.data));
+    // 売上の内訳（収入源＝売上科目ごと）。出現順。
+    for (final m in _unlistedMajors(_PLCategory.sales, const [])) {
+      rows.add(_PLRow(
+        label: m,
+        monthly: _monthlyForItem(_PLCategory.sales, m),
+        kind: _RowKind.detail,
+      ));
+    }
     rows.add(_PLRow(
         label: '売上原価', monthly: cogsMonthly, kind: _RowKind.data));
     rows.add(_PLRow(

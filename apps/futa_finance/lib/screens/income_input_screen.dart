@@ -247,9 +247,11 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       date: _date,
       type: core.TransactionType.income,
+      // 大カテゴリ＝収入源名（＝売上科目）。PLが売上を科目別に内訳表示でき、
+      // 「受取利息/受取配当金/雑収入」等の名前なら自動で営業外収益に分類される。
       category: core.Category(
-        major: '収入',
-        sub: _selectedSource!.clientName ?? _selectedSource!.name,
+        major: _selectedSource!.name,
+        sub: _selectedSource!.clientName ?? '',
       ),
       paymentMethod: _receiveAccount!,
       description: _descCtrl.text.trim(),
