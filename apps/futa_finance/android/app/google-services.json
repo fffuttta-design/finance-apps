@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "746983928581-m0u0kercu05p439641h2ve23qhg9l153.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.futa.finance",
+            "certificate_hash": "dbb5fc78d92341884536302f9c40b540b0a2b26f"
+          }
+        },
+        {
           "client_id": "746983928581-5g5ueg00evu0ubccej0km8cbciq3kb86.apps.googleusercontent.com",
           "client_type": 3
         }
