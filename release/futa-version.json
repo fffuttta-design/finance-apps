@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.128",
-    "buildNumber":  "129",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.128/futa-finance-v1.0.128.apk",
-    "releaseNotes":  "設定: ウォレット→支払方法マスタ(クレカ統合)/カテゴリ→支出カテゴリをセクション分け表示"
+    "version":  "1.0.129",
+    "buildNumber":  "130",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.129/futa-finance-v1.0.129.apk",
+    "releaseNotes":  "事業/個人 切替を高速化(モード別キャッシュで即表示)/表示設定の旧バージョン項目を削除"
 }
