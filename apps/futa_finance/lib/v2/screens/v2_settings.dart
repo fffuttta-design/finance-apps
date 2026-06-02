@@ -42,10 +42,9 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
       _MenuItem('sidebarOrder', 'サイドバー並び順', Icons.view_sidebar_outlined),
     ]),
     _MenuGroup(title: 'マスタデータ', items: [
-      _MenuItem('category', 'カテゴリ', Icons.label_outline),
-      _MenuItem('wallet', 'ウォレット（銀行/現金/電子マネー）',
+      _MenuItem('category', '支出カテゴリ', Icons.label_outline),
+      _MenuItem('wallet', '支払方法マスタ',
           Icons.account_balance_wallet_outlined),
-      _MenuItem('card', 'クレジットカード', Icons.credit_card_outlined),
       _MenuItem('incomeMaster', '収入マスタ', Icons.savings_outlined),
       _MenuItem('subscription', '固定費・サブスク', Icons.event_repeat),
       _MenuItem('checklist', '月末締めチェックリスト', Icons.checklist),
@@ -141,22 +140,12 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
         return const V2SidebarOrderPanel();
       case 'category':
         return _embedV1(const CategoryEditorScreen(),
-            title: 'カテゴリ',
-            note: '収支のカテゴリ（大分類・小分類）を編集します',
+            title: '支出カテゴリ',
+            note: '支出のカテゴリ（大分類・小分類）を編集します。会計科目のセクションごとに表示されます。',
             icon: Icons.label_outline,
             iconColor: V2Colors.badgePurple);
       case 'wallet':
-        return _embedV1(const AccountEditorScreen(),
-            title: 'ウォレット（銀行 / 現金 / 電子マネー）',
-            note: '資金口座を登録・編集します。事業/個人モードで別管理。',
-            icon: Icons.account_balance_wallet_outlined,
-            iconColor: V2Colors.badgeBlue);
-      case 'card':
-        return _embedV1(const CardEditorScreen(),
-            title: 'クレジットカード',
-            note: 'クレカを登録・編集します。引落日や累積額の表示に使われます。',
-            icon: Icons.credit_card_outlined,
-            iconColor: V2Colors.negative);
+        return const _PaymentMethodMasterPanel();
       case 'incomeMaster':
         return const V2IncomeMasterPanel();
       case 'subscription':
@@ -279,6 +268,91 @@ class _PanelHeaderWithIcon extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════
+// 支払方法マスタ（口座 / クレジットカードを1画面に統合）
+// ═════════════════════════════════════════════════
+
+/// 旧「ウォレット」＋「クレジットカード」を統合した支払方法マスタ。
+/// 上部トグルで「口座（銀行/現金/電子マネー）」と「クレジットカード」を切替え、
+/// それぞれ既存の v1 エディタを右パネルに埋め込む。
+class _PaymentMethodMasterPanel extends StatefulWidget {
+  const _PaymentMethodMasterPanel();
+
+  @override
+  State<_PaymentMethodMasterPanel> createState() =>
+      _PaymentMethodMasterPanelState();
+}
+
+class _PaymentMethodMasterPanelState
+    extends State<_PaymentMethodMasterPanel> {
+  int _tab = 0; // 0=口座, 1=クレジットカード
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _PanelHeaderWithIcon(
+          title: '支払方法マスタ',
+          note: '銀行 / 現金 / 電子マネー と クレジットカードを登録・編集します。'
+              '事業 / 個人モードで別管理。',
+          icon: Icons.account_balance_wallet_outlined,
+          iconColor: V2Colors.badgeBlue,
+        ),
+        const SizedBox(height: V2Spacing.sm),
+        // ── 口座 / カード トグル ──
+        Align(
+          alignment: Alignment.centerLeft,
+          child: SegmentedButton<int>(
+            segments: const [
+              ButtonSegment(
+                value: 0,
+                label: Text('口座'),
+                icon: Icon(Icons.account_balance, size: 16),
+              ),
+              ButtonSegment(
+                value: 1,
+                label: Text('クレジットカード'),
+                icon: Icon(Icons.credit_card, size: 16),
+              ),
+            ],
+            selected: {_tab},
+            onSelectionChanged: (s) => setState(() => _tab = s.first),
+            showSelectedIcon: false,
+            style: ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              textStyle: WidgetStatePropertyAll(V2Typography.caption),
+            ),
+          ),
+        ),
+        const SizedBox(height: V2Spacing.sm),
+        Expanded(
+          child: V2Card(
+            padding: EdgeInsets.zero,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(V2Spacing.radiusLg),
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  appBarTheme: const AppBarTheme(
+                    toolbarHeight: 0,
+                    elevation: 0,
+                    backgroundColor: Colors.transparent,
+                    surfaceTintColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                  ),
+                ),
+                child: _tab == 0
+                    ? const AccountEditorScreen()
+                    : const CardEditorScreen(),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

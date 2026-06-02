@@ -139,14 +139,6 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
     _update(list);
   }
 
-  void _moveMajor(int oldIndex, int newIndex) {
-    final list = [..._config!.majors];
-    if (newIndex > oldIndex) newIndex--;
-    final item = list.removeAt(oldIndex);
-    list.insert(newIndex, item);
-    _update(list);
-  }
-
   Future<void> _pickIcon(int index) async {
     final current = _config!.majors[index].iconKey;
     final newEmoji =
@@ -163,7 +155,7 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'カテゴリ編集',
+          '支出カテゴリ',
           style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
@@ -184,136 +176,152 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
       ),
       body: CenteredBody(
         child: config == null
-          ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-              child: ReorderableListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: config.majors.length,
-                onReorder: _moveMajor,
-                buildDefaultDragHandles: false,
-                itemBuilder: (context, index) {
-                  final major = config.majors[index];
-                  return Container(
-                    key: ValueKey('major-$index-${major.name}'),
-                    margin: const EdgeInsets.only(bottom: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
-                    ),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(10),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => CategorySubEditorScreen(
-                                majorIndex: index),
-                          ),
-                        ).then((_) => _load()); // 戻り後に再読込
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 8),
-                        child: Row(
-                          children: [
-                            ReorderableDragStartListener(
-                              index: index,
-                              child: const Padding(
-                                padding: EdgeInsets.all(4),
-                                child: Icon(Icons.drag_indicator,
-                                    color: Color(0xFF9CA3AF)),
-                              ),
-                            ),
-                            // アイコン（タップで変更）
-                            InkWell(
-                              onTap: () => _pickIcon(index),
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE0E7FF),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: categoryIconWidget(
-                                  major.iconKey,
-                                  color: const Color(0xFF1A237E),
-                                  size: 22,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    major.displayName(index),
-                                    style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF111827)),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Row(
-                                    children: [
-                                      if (major.section != null &&
-                                          major.section!.isNotEmpty) ...[
-                                        Container(
-                                          padding:
-                                              const EdgeInsets.symmetric(
-                                                  horizontal: 6,
-                                                  vertical: 1),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFE0E7FF),
-                                            borderRadius:
-                                                BorderRadius.circular(3),
-                                          ),
-                                          child: Text(major.section!,
-                                              style: const TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight:
-                                                      FontWeight.w700,
-                                                  color: Color(0xFF1A237E))),
-                                        ),
-                                        const SizedBox(width: 6),
-                                      ],
-                                      Text(
-                                        '${major.subs.length}件の小カテゴリ',
-                                        style: const TextStyle(
-                                            fontSize: 11,
-                                            color: Color(0xFF9CA3AF)),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              visualDensity: VisualDensity.compact,
-                              icon: const Icon(Icons.edit,
-                                  size: 18, color: Color(0xFF6B7280)),
-                              onPressed: () => _renameMajor(index),
-                              tooltip: '名前変更',
-                            ),
-                            IconButton(
-                              visualDensity: VisualDensity.compact,
-                              icon: const Icon(Icons.delete_outline,
-                                  size: 18, color: Color(0xFFDC2626)),
-                              onPressed: () => _deleteMajor(index),
-                              tooltip: '削除',
-                            ),
-                            const Icon(Icons.chevron_right,
-                                color: Color(0xFF9CA3AF)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
+            ? const Center(child: CircularProgressIndicator())
+            : SafeArea(child: _buildSectioned(config)),
+      ),
+    );
+  }
+
+  /// 大カテゴリをセクション（会計科目のまとまり）ごとに見出し付きで表示。
+  /// 一律フラットだと数が多くて見づらいので、セクションで束ねる。
+  /// 並び順（=表示番号）は変更しない（過去取引の参照とズレないようにするため）。
+  Widget _buildSectioned(CategoryConfig config) {
+    // セクション → そのセクションに属する (グローバル index, 大カテゴリ) のリスト。
+    // index は config.majors 上の位置（displayName / 編集操作で使う）。
+    final bySection = <String, List<(int, MajorCategory)>>{};
+    for (var i = 0; i < config.majors.length; i++) {
+      final m = config.majors[i];
+      final key = (m.section == null || m.section!.isEmpty)
+          ? 'その他'
+          : m.section!;
+      bySection.putIfAbsent(key, () => []).add((i, m));
+    }
+    final sections = config.sectionsInOrder;
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        for (final section in sections) ...[
+          _sectionHeader(section, bySection[section]?.length ?? 0),
+          for (final (index, major)
+              in bySection[section] ?? const <(int, MajorCategory)>[])
+            _majorCard(index, major),
+          const SizedBox(height: 10),
+        ],
+      ],
+    );
+  }
+
+  Widget _sectionHeader(String section, int count) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 8, left: 2),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 16,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A237E),
+              borderRadius: BorderRadius.circular(2),
             ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            section,
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1A237E)),
+          ),
+          const SizedBox(width: 6),
+          Text('$count',
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF9CA3AF))),
+        ],
+      ),
+    );
+  }
+
+  Widget _majorCard(int index, MajorCategory major) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CategorySubEditorScreen(majorIndex: index),
+            ),
+          ).then((_) => _load()); // 戻り後に再読込
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            children: [
+              // アイコン（タップで変更）
+              InkWell(
+                onTap: () => _pickIcon(index),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0E7FF),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: categoryIconWidget(
+                    major.iconKey,
+                    color: const Color(0xFF1A237E),
+                    size: 22,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      major.displayName(index),
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF111827)),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${major.subs.length}件の小カテゴリ',
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF9CA3AF)),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.edit,
+                    size: 18, color: Color(0xFF6B7280)),
+                onPressed: () => _renameMajor(index),
+                tooltip: '名前変更',
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.delete_outline,
+                    size: 18, color: Color(0xFFDC2626)),
+                onPressed: () => _deleteMajor(index),
+                tooltip: '削除',
+              ),
+              const Icon(Icons.chevron_right, color: Color(0xFF9CA3AF)),
+            ],
+          ),
+        ),
       ),
     );
   }
