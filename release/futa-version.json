@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.127",
-    "buildNumber":  "128",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.127/futa-finance-v1.0.127.apk",
-    "releaseNotes":  "総資産カード刷新(月初残高を統合)/設定にバージョン・更新確認を追加/月チップは右が最新"
+    "version":  "1.0.128",
+    "buildNumber":  "129",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.128/futa-finance-v1.0.128.apk",
+    "releaseNotes":  "設定: ウォレット→支払方法マスタ(クレカ統合)/カテゴリ→支出カテゴリをセクション分け表示"
 }
