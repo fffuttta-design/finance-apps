@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.137",
-    "buildNumber":  "138",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.137/futa-finance-v1.0.137.apk",
-    "releaseNotes":  "ホーム総資産カラム幅をドラッグ調整(保存)。毎月支出予定の並び替え(金額・会計科目)。"
+    "version":  "1.0.138",
+    "buildNumber":  "139",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.138/futa-finance-v1.0.138.apk",
+    "releaseNotes":  "開発中タブに借入金・負債マスタを新設し簡易BS(資産-負債=純資産)に反映"
 }
