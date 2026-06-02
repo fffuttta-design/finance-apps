@@ -102,7 +102,8 @@ class _V2ReportScreenState extends State<V2ReportScreen>
   /// 表示モード。false=詳細（フルPL月次表）/ true=簡易（サマリー＋簡易月次表）。
   bool _simple = false;
 
-  final int _fyStartMonth = 6;
+  /// 決算期の期首月。当社は 10月〜翌9月 が事業年度。
+  final int _fyStartMonth = 10;
   late int _fyYear = _calcFyYear();
 
   int _calcFyYear() {
@@ -238,7 +239,9 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     }
 
     final months = _fyMonths;
-    final fyEndYear = _fyYear + 1;
+    // 期末（期首の前月）。期首が1月のときだけ同年内で完結する。
+    final fyEndMonth = _fyStartMonth == 1 ? 12 : _fyStartMonth - 1;
+    final fyEndYear = _fyStartMonth == 1 ? _fyYear : _fyYear + 1;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(vertical: V2Spacing.xl),
@@ -273,7 +276,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
                   onPressed: () => _shiftYear(-1),
                 ),
                 Text(
-                  '$_fyYear 年度（$_fyStartMonth月〜$fyEndYear年5月）',
+                  '$_fyYear 年度（$_fyStartMonth月〜$fyEndYear年$fyEndMonth月）',
                   style: V2Typography.body.copyWith(
                       fontWeight: FontWeight.w700,
                       color: V2Colors.textPrimary),
