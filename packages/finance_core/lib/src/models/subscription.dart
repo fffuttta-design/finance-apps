@@ -54,6 +54,10 @@ class Subscription {
   /// 一覧画面のセクション分けに使用。null/空欄なら「未分類」扱い。
   final String? category;
 
+  /// 変動費の「その月の実額」。キー = "YYYY-MM"（例: "2026-06"）→ 金額(円)。
+  /// 未入力の月は 0 扱い。固定費では未使用。月ごとに独立（翌月は未入力=0）。
+  final Map<String, int> monthlyActuals;
+
   const Subscription({
     required this.id,
     required this.name,
@@ -66,7 +70,12 @@ class Subscription {
     this.memo,
     this.iconUrl,
     this.category,
+    this.monthlyActuals = const {},
   });
+
+  /// 指定月("YYYY-MM")の表示金額。変動費は未入力なら0、固定費は定額。
+  int amountForMonth(String ym) =>
+      isVariable ? (monthlyActuals[ym] ?? 0) : amount;
 
   /// サイクル表示名。
   String get cycleLabel =>
@@ -98,6 +107,7 @@ class Subscription {
         'memo': memo,
         'iconUrl': iconUrl,
         'category': category,
+        'monthlyActuals': monthlyActuals,
       };
 
   factory Subscription.fromJson(Map<String, dynamic> j) => Subscription(
@@ -120,6 +130,10 @@ class Subscription {
         memo: j['memo'] as String?,
         iconUrl: j['iconUrl'] as String?,
         category: j['category'] as String?,
+        monthlyActuals: (j['monthlyActuals'] as Map<String, dynamic>?)
+                ?.map((k, v) =>
+                    MapEntry(k, (v as num?)?.toInt() ?? 0)) ??
+            const {},
       );
 
   Subscription copyWith({
@@ -134,6 +148,7 @@ class Subscription {
     String? iconUrl,
     String? category,
     bool clearCategory = false,
+    Map<String, int>? monthlyActuals,
   }) =>
       Subscription(
         id: id,
@@ -147,6 +162,7 @@ class Subscription {
         memo: memo ?? this.memo,
         iconUrl: iconUrl ?? this.iconUrl,
         category: clearCategory ? null : (category ?? this.category),
+        monthlyActuals: monthlyActuals ?? this.monthlyActuals,
       );
 }
 

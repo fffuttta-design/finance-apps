@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../../data/app_mode.dart';
@@ -9,6 +10,7 @@ import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
 import '../../screens/expense_input_screen.dart';
 import '../../utils/formatters.dart';
+import '../../utils/thousands_separator_input_formatter.dart';
 import '../../widgets/brand_logo.dart';
 import '../../widgets/subscription_edit_sheet.dart';
 import '../theme/colors.dart';
@@ -51,8 +53,9 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
   late DateTime _focused =
       DateTime(DateTime.now().year, DateTime.now().month);
 
-  /// 引落予定セクションの開閉
-  bool _monthlyChargesExpanded = true;
+  /// 表示中の月キー "YYYY-MM"（変動費の実額参照用）。
+  String get _ymKey =>
+      '${_focused.year}-${_focused.month.toString().padLeft(2, '0')}';
 
   @override
   void onModeChanged() => _load();
@@ -163,6 +166,60 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     if (mounted) await _load();
   }
 
+  /// 変動費の「その月の実額」をその場で入力（未入力は0／月ごと独立）。
+  Future<void> _inputVariableActual(core.Subscription s) async {
+    final ym = _ymKey;
+    final current = s.monthlyActuals[ym] ?? 0;
+    final ctrl = TextEditingController(
+        text: current > 0 ? formatAmount(current) : '');
+    final result = await showDialog<int?>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('${_focused.month}月の「${s.name}」'),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            ThousandsSeparatorInputFormatter(),
+          ],
+          decoration: InputDecoration(
+            labelText: '実額（円）',
+            hintText: s.amount > 0 ? '目安 ${formatYen(s.amount)}' : null,
+            prefixText: '¥ ',
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, -1),
+              child: const Text('クリア')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, null),
+              child: const Text('キャンセル')),
+          FilledButton(
+              onPressed: () =>
+                  Navigator.pop(context, parseAmount(ctrl.text) ?? 0),
+              child: const Text('保存')),
+        ],
+      ),
+    );
+    if (result == null) return; // キャンセル
+    final idx = _subscriptions.subscriptions.indexWhere((x) => x.id == s.id);
+    if (idx < 0) return;
+    final m = Map<String, int>.from(s.monthlyActuals);
+    if (result <= 0) {
+      m.remove(ym);
+    } else {
+      m[ym] = result;
+    }
+    final list = [..._subscriptions.subscriptions];
+    list[idx] = s.copyWith(monthlyActuals: m);
+    await _subscriptionRepo
+        .save(_subscriptions.copyWith(subscriptions: list));
+    if (mounted) await _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -219,20 +276,7 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
             ),
           ),
           const SizedBox(height: V2Spacing.lg),
-          // ── 毎月引落予定（固定費 / 変動費） ─────────────
-          _MonthlyChargesSection(
-            charges: _monthlyCharges,
-            expanded: _monthlyChargesExpanded,
-            onToggle: () => setState(() =>
-                _monthlyChargesExpanded = !_monthlyChargesExpanded),
-            onTapItem: _openSubscriptionEdit,
-            isCurrentMonth:
-                _focused.year == DateTime.now().year &&
-                    _focused.month == DateTime.now().month,
-          ),
-          if (_monthlyCharges.isNotEmpty)
-            const SizedBox(height: V2Spacing.lg),
-          // ── 取引一覧テーブル ────────────────────
+          // ── 取引一覧（経費明細）を上に ────────────────────
           V2Card(
             padding: EdgeInsets.zero,
             child: Column(
@@ -286,6 +330,17 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
               ],
             ),
           ),
+          if (_monthlyCharges.isNotEmpty)
+            const SizedBox(height: V2Spacing.lg),
+          // ── 毎月支出予定（固定費 / 変動費）を経費明細の下に ──────
+          _MonthlyChargesSection(
+            charges: _monthlyCharges,
+            onTapItem: _openSubscriptionEdit,
+            isCurrentMonth: _focused.year == DateTime.now().year &&
+                _focused.month == DateTime.now().month,
+            ym: _ymKey,
+            onInputVariable: _inputVariableActual,
+          ),
         ],
       ),
     );
@@ -298,16 +353,20 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
 
 class _MonthlyChargesSection extends StatefulWidget {
   final List<core.Subscription> charges;
-  final bool expanded;
-  final VoidCallback onToggle;
   final void Function(String id) onTapItem;
   final bool isCurrentMonth;
+
+  /// 表示中の月キー "YYYY-MM"（変動費の実額参照用）。
+  final String ym;
+
+  /// 変動費の月額入力を開くコールバック。
+  final void Function(core.Subscription s) onInputVariable;
   const _MonthlyChargesSection({
     required this.charges,
-    required this.expanded,
-    required this.onToggle,
     required this.onTapItem,
     required this.isCurrentMonth,
+    required this.ym,
+    required this.onInputVariable,
   });
 
   @override
@@ -322,8 +381,6 @@ class _MonthlyChargesSectionState extends State<_MonthlyChargesSection> {
   @override
   Widget build(BuildContext context) {
     if (widget.charges.isEmpty) return const SizedBox.shrink();
-    final total =
-        widget.charges.fold<int>(0, (s, c) => s + c.amount);
     final fixed = widget.charges
         .where((s) =>
             s.amountType == core.SubscriptionAmountType.fixed)
@@ -334,49 +391,136 @@ class _MonthlyChargesSectionState extends State<_MonthlyChargesSection> {
             core.SubscriptionAmountType.variable)
         .toList();
 
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: V2Spacing.sm),
+          child: Row(
+            children: [
+              const Icon(Icons.event_repeat,
+                  size: 18, color: Color(0xFFEA580C)),
+              const SizedBox(width: V2Spacing.sm),
+              Text('毎月支出予定',
+                  style: V2Typography.h2
+                      .copyWith(color: V2Colors.textPrimary)),
+            ],
+          ),
+        ),
+        // 固定費カード
+        if (fixed.isNotEmpty)
+          _ChargeCard(
+            title: '固定費（定額）',
+            icon: Icons.lock_outline,
+            accent: const Color(0xFF1A237E),
+            bg: const Color(0xFFE0E7FF),
+            charges: fixed,
+            isVariable: false,
+            ym: widget.ym,
+            isCurrentMonth: widget.isCurrentMonth,
+            expanded: _fixedExpanded,
+            onToggle: () =>
+                setState(() => _fixedExpanded = !_fixedExpanded),
+            onTapItem: widget.onTapItem,
+            onInputVariable: widget.onInputVariable,
+          ),
+        if (fixed.isNotEmpty && variable.isNotEmpty)
+          const SizedBox(height: V2Spacing.lg),
+        // 変動費カード（その月の実額。未入力は0）
+        if (variable.isNotEmpty)
+          _ChargeCard(
+            title: '変動費',
+            icon: Icons.bolt_outlined,
+            accent: const Color(0xFFEA580C),
+            bg: const Color(0xFFFFEDD5),
+            charges: variable,
+            isVariable: true,
+            ym: widget.ym,
+            isCurrentMonth: widget.isCurrentMonth,
+            expanded: _variableExpanded,
+            onToggle: () =>
+                setState(() => _variableExpanded = !_variableExpanded),
+            onTapItem: widget.onTapItem,
+            onInputVariable: widget.onInputVariable,
+          ),
+      ],
+    );
+  }
+}
+
+/// 固定費 / 変動費 を1枚ずつのカードで表示する。
+class _ChargeCard extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Color accent;
+  final Color bg;
+  final List<core.Subscription> charges;
+  final bool isVariable;
+  final String ym;
+  final bool isCurrentMonth;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final void Function(String id) onTapItem;
+  final void Function(core.Subscription s) onInputVariable;
+  const _ChargeCard({
+    required this.title,
+    required this.icon,
+    required this.accent,
+    required this.bg,
+    required this.charges,
+    required this.isVariable,
+    required this.ym,
+    required this.isCurrentMonth,
+    required this.expanded,
+    required this.onToggle,
+    required this.onTapItem,
+    required this.onInputVariable,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final subtotal =
+        charges.fold<int>(0, (s, c) => s + c.amountForMonth(ym));
+    final today = DateTime.now();
     return V2Card(
       padding: EdgeInsets.zero,
       child: Column(
         children: [
-          // ヘッダー（全体開閉）
           InkWell(
-            onTap: widget.onToggle,
+            onTap: onToggle,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                  V2Spacing.lg, V2Spacing.md, V2Spacing.lg, V2Spacing.md),
+              padding: const EdgeInsets.fromLTRB(V2Spacing.lg,
+                  V2Spacing.md, V2Spacing.lg, V2Spacing.md),
               child: Row(
                 children: [
-                  const Icon(Icons.event_repeat,
-                      size: 18, color: Color(0xFFEA580C)),
+                  Icon(icon, size: 16, color: accent),
                   const SizedBox(width: V2Spacing.sm),
-                  Text('毎月引落予定',
-                      style: V2Typography.h2.copyWith(
-                          color: V2Colors.textPrimary)),
-                  const SizedBox(width: V2Spacing.sm),
+                  Text(title,
+                      style: V2Typography.h2.copyWith(color: accent)),
+                  const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 6, vertical: 1),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFEDD5),
+                      color: bg,
                       borderRadius: BorderRadius.circular(3),
                     ),
-                    child: Text('${widget.charges.length}',
-                        style: const TextStyle(
+                    child: Text('${charges.length}',
+                        style: TextStyle(
                             fontSize: 11,
-                            color: Color(0xFFEA580C),
+                            color: accent,
                             fontWeight: FontWeight.w700)),
                   ),
                   const Spacer(),
-                  Text(formatYen(total),
+                  Text(formatYen(subtotal),
                       style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: V2Colors.textPrimary,
-                          fontFeatures:
-                              V2Typography.tabularNums)),
-                  const SizedBox(width: V2Spacing.sm),
+                          fontFeatures: V2Typography.tabularNums)),
+                  const SizedBox(width: 6),
                   Icon(
-                      widget.expanded
+                      expanded
                           ? Icons.expand_less
                           : Icons.expand_more,
                       size: 18,
@@ -385,127 +529,20 @@ class _MonthlyChargesSectionState extends State<_MonthlyChargesSection> {
               ),
             ),
           ),
-          if (widget.expanded) ...[
-            const Divider(height: 1),
-            if (fixed.isNotEmpty)
-              _SubSection(
-                title: '固定費（定額）',
-                icon: Icons.lock_outline,
-                accent: const Color(0xFF1A237E),
-                bg: const Color(0xFFE0E7FF),
-                charges: fixed,
-                expanded: _fixedExpanded,
-                onToggle: () => setState(
-                    () => _fixedExpanded = !_fixedExpanded),
-                onTapItem: widget.onTapItem,
-                isCurrentMonth: widget.isCurrentMonth,
+          if (expanded)
+            for (final s in charges)
+              _ChargeRow(
+                s: s,
+                isCurrentMonth: isCurrentMonth,
+                today: today,
+                isVariable: isVariable,
+                monthAmount: s.amountForMonth(ym),
+                onTap: () => onTapItem(s.id),
+                onInputAmount:
+                    isVariable ? () => onInputVariable(s) : null,
               ),
-            if (fixed.isNotEmpty && variable.isNotEmpty)
-              const Divider(height: 1),
-            if (variable.isNotEmpty)
-              _SubSection(
-                title: '変動費',
-                icon: Icons.bolt_outlined,
-                accent: const Color(0xFFEA580C),
-                bg: const Color(0xFFFFEDD5),
-                charges: variable,
-                expanded: _variableExpanded,
-                onToggle: () => setState(() =>
-                    _variableExpanded = !_variableExpanded),
-                onTapItem: widget.onTapItem,
-                isCurrentMonth: widget.isCurrentMonth,
-              ),
-          ],
         ],
       ),
-    );
-  }
-}
-
-class _SubSection extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final Color accent;
-  final Color bg;
-  final List<core.Subscription> charges;
-  final bool expanded;
-  final VoidCallback onToggle;
-  final void Function(String id) onTapItem;
-  final bool isCurrentMonth;
-  const _SubSection({
-    required this.title,
-    required this.icon,
-    required this.accent,
-    required this.bg,
-    required this.charges,
-    required this.expanded,
-    required this.onToggle,
-    required this.onTapItem,
-    required this.isCurrentMonth,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final subtotal =
-        charges.fold<int>(0, (s, c) => s + c.amount);
-    final today = DateTime.now();
-    return Column(
-      children: [
-        InkWell(
-          onTap: onToggle,
-          child: Container(
-            color: V2Colors.surfaceMuted,
-            padding: const EdgeInsets.symmetric(
-                horizontal: V2Spacing.lg, vertical: 8),
-            child: Row(
-              children: [
-                Icon(icon, size: 14, color: accent),
-                const SizedBox(width: 6),
-                Text(title,
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: accent)),
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 5, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: bg,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: Text('${charges.length}',
-                      style: TextStyle(
-                          fontSize: 10,
-                          color: accent,
-                          fontWeight: FontWeight.w700)),
-                ),
-                const Spacer(),
-                Text(formatYen(subtotal),
-                    style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: V2Colors.textBody)),
-                const SizedBox(width: 6),
-                Icon(
-                    expanded
-                        ? Icons.expand_less
-                        : Icons.expand_more,
-                    size: 16,
-                    color: V2Colors.textMuted),
-              ],
-            ),
-          ),
-        ),
-        if (expanded)
-          for (final s in charges)
-            _ChargeRow(
-              s: s,
-              isCurrentMonth: isCurrentMonth,
-              today: today,
-              onTap: () => onTapItem(s.id),
-            ),
-      ],
     );
   }
 }
@@ -515,11 +552,23 @@ class _ChargeRow extends StatelessWidget {
   final bool isCurrentMonth;
   final DateTime today;
   final VoidCallback onTap;
+
+  /// 変動費かどうか。変動費は当月の実額（未入力は0）を入力ピルで表示。
+  final bool isVariable;
+
+  /// 表示中の月の金額（固定費=定額、変動費=その月の実額。未入力は0）。
+  final int monthAmount;
+
+  /// 変動費の月額入力を開く（変動費のみ非null）。
+  final VoidCallback? onInputAmount;
   const _ChargeRow({
     required this.s,
     required this.isCurrentMonth,
     required this.today,
     required this.onTap,
+    this.isVariable = false,
+    required this.monthAmount,
+    this.onInputAmount,
   });
 
   @override
@@ -597,12 +646,59 @@ class _ChargeRow extends StatelessWidget {
               ),
               const SizedBox(width: V2Spacing.sm),
             ],
-            Text(formatYen(s.amount),
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: V2Colors.textPrimary,
-                    fontFeatures: V2Typography.tabularNums)),
+            if (isVariable) ...[
+              // 変動費: 当月の実額をタップして入力。未入力は¥0。目安を薄く併記。
+              if (s.amount > 0)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Text('目安 ${formatYen(s.amount)}',
+                      style: V2Typography.micro
+                          .copyWith(color: V2Colors.textMuted)),
+                ),
+              InkWell(
+                onTap: onInputAmount,
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: monthAmount > 0
+                        ? const Color(0xFFFFEDD5)
+                        : V2Colors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                        color: monthAmount > 0
+                            ? const Color(0xFFEA580C)
+                            : V2Colors.border),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(formatYen(monthAmount),
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: monthAmount > 0
+                                  ? const Color(0xFFEA580C)
+                                  : V2Colors.textMuted,
+                              fontFeatures: V2Typography.tabularNums)),
+                      const SizedBox(width: 3),
+                      Icon(Icons.edit,
+                          size: 12,
+                          color: monthAmount > 0
+                              ? const Color(0xFFEA580C)
+                              : V2Colors.textMuted),
+                    ],
+                  ),
+                ),
+              ),
+            ] else
+              Text(formatYen(monthAmount),
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: V2Colors.textPrimary,
+                      fontFeatures: V2Typography.tabularNums)),
           ],
         ),
       ),

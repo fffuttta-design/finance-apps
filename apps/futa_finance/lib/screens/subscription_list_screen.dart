@@ -203,6 +203,8 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
               memo: memo,
               iconUrl: iconUrl,
               category: category,
+              // 変動費の月別実額は編集で消さない（保持）。
+              monthlyActuals: initial?.monthlyActuals ?? const {},
             );
             Navigator.pop(ctx, result);
           }
