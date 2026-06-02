@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../data/app_mode.dart';
 import '../../data/ui_preferences.dart';
+import '../../data/update_flow.dart';
 import '../../screens/account_editor_screen.dart';
 import '../../screens/card_editor_screen.dart';
 import '../../screens/category_editor_screen.dart';
@@ -51,6 +53,9 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
     _MenuGroup(title: 'データ管理', items: [
       _MenuItem('backup', 'バックアップ / 取り込み',
           Icons.cloud_upload_outlined),
+    ]),
+    _MenuGroup(title: 'アプリ情報', items: [
+      _MenuItem('about', 'バージョン・更新確認', Icons.info_outline),
     ]),
   ];
 
@@ -168,6 +173,8 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
             iconColor: V2Colors.info);
       case 'backup':
         return const V2BackupPanel();
+      case 'about':
+        return const _AboutPanel();
       default:
         return const _DisplayPanel();
     }
@@ -641,6 +648,124 @@ class _SelectorChip extends StatelessWidget {
               size: 16, color: V2Colors.accent),
         ],
       ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════
+// アプリ情報パネル（v2.1 ネイティブ）: バージョン表示 + 更新確認
+// ═════════════════════════════════════════════════
+
+class _AboutPanel extends StatefulWidget {
+  const _AboutPanel();
+
+  @override
+  State<_AboutPanel> createState() => _AboutPanelState();
+}
+
+class _AboutPanelState extends State<_AboutPanel> {
+  String? _version;
+  String? _buildNumber;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInfo();
+  }
+
+  Future<void> _loadInfo() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() {
+        _version = info.version;
+        _buildNumber = info.buildNumber;
+      });
+    } catch (_) {/* ignore */}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final versionText =
+        _version == null ? '読み込み中...' : 'v$_version';
+    final buildText = _buildNumber == null ? '' : ' (build $_buildNumber)';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _PanelHeader(
+          title: 'アプリ情報',
+          note: '現在のバージョンの確認と、最新版へのアップデートができます。',
+        ),
+        const SizedBox(height: V2Spacing.sm),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                V2Card(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: V2Spacing.lg, vertical: V2Spacing.lg),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: V2Colors.accent.withValues(alpha: 0.12),
+                          borderRadius:
+                              BorderRadius.circular(V2Spacing.radiusSm),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.smartphone,
+                            size: 20, color: V2Colors.accent),
+                      ),
+                      const SizedBox(width: V2Spacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('現在のバージョン',
+                                style: V2Typography.micro.copyWith(
+                                    color: V2Colors.textSecondary)),
+                            const SizedBox(height: 2),
+                            Text('$versionText$buildText',
+                                style: V2Typography.bodyStrong.copyWith(
+                                    fontFeatures:
+                                        V2Typography.tabularNums)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: V2Spacing.md),
+                SizedBox(
+                  height: 46,
+                  child: FilledButton.icon(
+                    onPressed: () => UpdateFlow.checkManually(context),
+                    icon: const Icon(Icons.system_update, size: 18),
+                    label: const Text('最新バージョンを確認'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: V2Colors.accent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(V2Spacing.radiusMd),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: V2Spacing.sm),
+                Text(
+                  'Android では最新版があればこの場でダウンロードしてインストールできます。'
+                  'Web は再読み込みで最新になります。',
+                  style: V2Typography.micro
+                      .copyWith(color: V2Colors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
