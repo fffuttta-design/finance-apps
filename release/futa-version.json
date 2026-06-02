@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.121",
-    "buildNumber":  "122",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.121/futa-finance-v1.0.121.apk",
-    "releaseNotes":  "v1.0.121 事業カテゴリをPL科目＋セクションに(即PL化 第1段)"
+    "version":  "1.0.122",
+    "buildNumber":  "123",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.122/futa-finance-v1.0.122.apk",
+    "releaseNotes":  "v1.0.122 即PL化第2段(収入を売上科目化・営業外収益自動分類)＋整理"
 }
