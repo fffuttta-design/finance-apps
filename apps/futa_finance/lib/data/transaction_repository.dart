@@ -149,6 +149,11 @@ class FirestoreTransactionRepository implements TransactionRepository {
   final _controller = StreamController<List<Transaction>>.broadcast();
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _firestoreSub;
 
+  /// モード別（'business'/'personal'）の最新取引リストのメモリキャッシュ。
+  /// モード切替直後にネットワーク往復を待たず前回値を即表示するために使う。
+  /// 現モードのリスナーが届くたびに最新へ更新される。
+  final Map<String, List<Transaction>> _cache = {};
+
   String get _modeKey =>
       AppModeManager.instance.current == AppMode.business
           ? 'business'
@@ -162,6 +167,8 @@ class FirestoreTransactionRepository implements TransactionRepository {
 
   void _attachListener() {
     _firestoreSub?.cancel();
+    // リスナー購読時点のモードを固定（後でモードが変わっても正しいバケツへ）。
+    final mk = _modeKey;
     _firestoreSub = _query.snapshots().listen((snap) {
       final list = <Transaction>[];
       for (final d in snap.docs) {
@@ -171,12 +178,16 @@ class FirestoreTransactionRepository implements TransactionRepository {
           list.add(Transaction.fromJson(data));
         } catch (_) {}
       }
+      _cache[mk] = List<Transaction>.from(list);
       _controller.add(list);
     });
   }
 
   void _onModeChange() {
     _attachListener();
+    // 新モードの前回キャッシュがあれば、リスナーの初回到着を待たず即流す。
+    final cached = _cache[_modeKey];
+    if (cached != null) _controller.add(List<Transaction>.from(cached));
   }
 
   void dispose() {
@@ -190,6 +201,10 @@ class FirestoreTransactionRepository implements TransactionRepository {
 
   @override
   Future<List<Transaction>> loadAll() async {
+    final mk = _modeKey;
+    final cached = _cache[mk];
+    // キャッシュがあれば即返す（リスナーが裏で最新へ更新し続ける）。
+    if (cached != null) return List<Transaction>.from(cached);
     final snap = await _query.get();
     final list = <Transaction>[];
     for (final d in snap.docs) {
@@ -198,6 +213,7 @@ class FirestoreTransactionRepository implements TransactionRepository {
         list.add(Transaction.fromJson(data));
       } catch (_) {}
     }
+    _cache[mk] = List<Transaction>.from(list);
     return list;
   }
 

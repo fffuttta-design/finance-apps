@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:finance_core/finance_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -104,40 +106,65 @@ class FirestoreSettingsRepository implements SettingsRepository {
   FirestoreSettingsRepository({required this.uid});
   final String uid;
 
+  /// モード別（'business'/'personal'）のメモリキャッシュ。
+  /// モード切替直後にネットワーク往復を待たず前回値を即返すために使う。
+  /// load 時はキャッシュを即返し、裏で最新を取得してキャッシュ更新（次回反映）。
+  final Map<String, CategoryConfig> _categoriesCache = {};
+  final Map<String, PaymentMethodsConfig> _paymentsCache = {};
+
   String get _modeKey =>
       AppModeManager.instance.current == AppMode.business
           ? 'business'
           : 'personal';
 
-  CategoryConfig _defaultsForCurrentMode() {
-    return AppModeManager.instance.current == AppMode.business
+  CategoryConfig _defaultsFor(String modeKey) {
+    return modeKey == 'business'
         ? CategoryConfig.businessDefaults()
         : CategoryConfig.personalDefaults();
   }
 
-  DocumentReference<Map<String, dynamic>> get _categoriesDoc =>
+  DocumentReference<Map<String, dynamic>> _categoriesDocFor(String modeKey) =>
       FirebaseFirestore.instance
-          .doc('users/$uid/config/${_modeKey}_categories');
+          .doc('users/$uid/config/${modeKey}_categories');
 
-  DocumentReference<Map<String, dynamic>> get _paymentsDoc =>
+  DocumentReference<Map<String, dynamic>> _paymentsDocFor(String modeKey) =>
       FirebaseFirestore.instance
-          .doc('users/$uid/config/${_modeKey}_payments');
+          .doc('users/$uid/config/${modeKey}_payments');
 
   @override
   Future<CategoryConfig> loadCategories() async {
-    final snap = await _categoriesDoc.get();
-    final raw = snap.data()?['json'] as String?;
-    if (raw == null) return _defaultsForCurrentMode();
-    try {
-      return CategoryConfig.fromJsonString(raw);
-    } catch (_) {
-      return _defaultsForCurrentMode();
+    final mk = _modeKey;
+    final cached = _categoriesCache[mk];
+    if (cached != null) {
+      // 裏で最新を取得してキャッシュ更新（cross-device 変更を次回に反映）。
+      unawaited(_fetchCategories(mk));
+      return cached;
     }
+    return _fetchCategories(mk);
+  }
+
+  Future<CategoryConfig> _fetchCategories(String modeKey) async {
+    final snap = await _categoriesDocFor(modeKey).get();
+    final raw = snap.data()?['json'] as String?;
+    CategoryConfig result;
+    if (raw == null) {
+      result = _defaultsFor(modeKey);
+    } else {
+      try {
+        result = CategoryConfig.fromJsonString(raw);
+      } catch (_) {
+        result = _defaultsFor(modeKey);
+      }
+    }
+    _categoriesCache[modeKey] = result;
+    return result;
   }
 
   @override
   Future<void> saveCategories(CategoryConfig config) async {
-    await _categoriesDoc.set({
+    final mk = _modeKey;
+    _categoriesCache[mk] = config;
+    await _categoriesDocFor(mk).set({
       'json': config.toJsonString(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
@@ -145,19 +172,37 @@ class FirestoreSettingsRepository implements SettingsRepository {
 
   @override
   Future<PaymentMethodsConfig> loadPayments() async {
-    final snap = await _paymentsDoc.get();
-    final raw = snap.data()?['json'] as String?;
-    if (raw == null) return PaymentMethodsConfig.empty();
-    try {
-      return PaymentMethodsConfig.fromJsonString(raw);
-    } catch (_) {
-      return PaymentMethodsConfig.empty();
+    final mk = _modeKey;
+    final cached = _paymentsCache[mk];
+    if (cached != null) {
+      unawaited(_fetchPayments(mk));
+      return cached;
     }
+    return _fetchPayments(mk);
+  }
+
+  Future<PaymentMethodsConfig> _fetchPayments(String modeKey) async {
+    final snap = await _paymentsDocFor(modeKey).get();
+    final raw = snap.data()?['json'] as String?;
+    PaymentMethodsConfig result;
+    if (raw == null) {
+      result = PaymentMethodsConfig.empty();
+    } else {
+      try {
+        result = PaymentMethodsConfig.fromJsonString(raw);
+      } catch (_) {
+        result = PaymentMethodsConfig.empty();
+      }
+    }
+    _paymentsCache[modeKey] = result;
+    return result;
   }
 
   @override
   Future<void> savePayments(PaymentMethodsConfig config) async {
-    await _paymentsDoc.set({
+    final mk = _modeKey;
+    _paymentsCache[mk] = config;
+    await _paymentsDocFor(mk).set({
       'json': config.toJsonString(),
       'updatedAt': FieldValue.serverTimestamp(),
     });

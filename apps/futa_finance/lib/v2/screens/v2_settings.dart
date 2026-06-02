@@ -541,21 +541,6 @@ class _DisplayPanel extends StatelessWidget {
                 child: Column(
                   children: [
                     _SettingTile(
-                      icon: Icons.dashboard_customize_outlined,
-                      iconColor: V2Colors.accent,
-                      title: 'UI バージョン',
-                      subtitle:
-                          '自動: Web は v2.1（推奨）、Android は v1。',
-                      trailing: _UiVersionSelector(),
-                    ),
-                    _SettingTile(
-                      icon: Icons.view_compact_outlined,
-                      iconColor: V2Colors.badgeBlue,
-                      title: 'v2 レイアウト',
-                      subtitle: 'サイドバー版 (v2) / 上タブ版 (v2.1) の切替',
-                      trailing: _V2VariantSelector(),
-                    ),
-                    _SettingTile(
                       icon: Icons.visibility_off_outlined,
                       iconColor: V2Colors.textSecondary,
                       title: '未使用のウォレット/カードを隠す',
@@ -632,95 +617,6 @@ class _SettingTile extends StatelessWidget {
             trailing,
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _UiVersionSelector extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final v = UiPreferences.instance.useV2Ui;
-    final label = v == null
-        ? '自動'
-        : (v ? 'v2.1 を強制' : 'v1 (旧)');
-    return PopupMenuButton<bool?>(
-      tooltip: '切替',
-      onSelected: (val) =>
-          UiPreferences.instance.setUseV2Ui(val),
-      itemBuilder: (_) => [
-        CheckedPopupMenuItem(
-          value: null,
-          checked: v == null,
-          child: const Text('自動（推奨）'),
-        ),
-        CheckedPopupMenuItem(
-          value: true,
-          checked: v == true,
-          child: const Text('v2.1 を強制'),
-        ),
-        CheckedPopupMenuItem(
-          value: false,
-          checked: v == false,
-          child: const Text('v1 を強制（旧 UI / 非推奨）'),
-        ),
-      ],
-      child: _SelectorChip(label: label),
-    );
-  }
-}
-
-class _V2VariantSelector extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final variant = UiPreferences.instance.v2Variant;
-    final isTopNav = variant == UiPreferences.v2VariantTopNav;
-    final label = isTopNav ? '上タブ (v2.1)' : 'サイドバー (v2)';
-    return PopupMenuButton<String>(
-      tooltip: '切替',
-      onSelected: (val) =>
-          UiPreferences.instance.setV2Variant(val),
-      itemBuilder: (_) => [
-        CheckedPopupMenuItem(
-          value: UiPreferences.v2VariantSidebar,
-          checked: !isTopNav,
-          child: const Text('サイドバー (v2)\nマネフォクラウド風'),
-        ),
-        CheckedPopupMenuItem(
-          value: UiPreferences.v2VariantTopNav,
-          checked: isTopNav,
-          child: const Text('上タブ (v2.1)\nマネフォ ME 風'),
-        ),
-      ],
-      child: _SelectorChip(label: label),
-    );
-  }
-}
-
-class _SelectorChip extends StatelessWidget {
-  final String label;
-  const _SelectorChip({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-          horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: V2Colors.accentSoft,
-        borderRadius: BorderRadius.circular(V2Spacing.radiusSm),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label,
-              style: V2Typography.caption.copyWith(
-                  color: V2Colors.accent,
-                  fontWeight: FontWeight.w700)),
-          const SizedBox(width: 2),
-          const Icon(Icons.arrow_drop_down,
-              size: 16, color: V2Colors.accent),
-        ],
       ),
     );
   }
