@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.111",
-    "buildNumber":  "112",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.111/futa-finance-v1.0.111.apk",
-    "releaseNotes":  "v1.0.111 アイコン刷新＋ホームの収支/総資産をリスト表示に改善"
+    "version":  "1.0.112",
+    "buildNumber":  "113",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.112/futa-finance-v1.0.112.apk",
+    "releaseNotes":  "v1.0.112 リリース鍵に切替（恒久対策）"
 }
