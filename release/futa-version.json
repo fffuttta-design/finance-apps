@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.132",
-    "buildNumber":  "133",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.132/futa-finance-v1.0.132.apk",
-    "releaseNotes":  "業績PLの科目照合を改善(標準科目が正しく集計・その他激減)/外注費を売上原価に"
+    "version":  "1.0.133",
+    "buildNumber":  "134",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.133/futa-finance-v1.0.133.apk",
+    "releaseNotes":  "固定費/変動費に会計科目を紐付け可能に(C2入力側)"
 }
