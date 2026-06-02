@@ -21,6 +21,7 @@ import 'theme/colors.dart';
 import 'theme/mode_accent.dart';
 import 'theme/spacing.dart';
 import 'theme/typography.dart';
+import '../widgets/startup_update_mixin.dart';
 import 'widgets/v2_mode_switcher.dart';
 import 'widgets/v2_sidebar.dart';
 import 'widgets/v2_top_header.dart';
@@ -35,7 +36,7 @@ class V2Root extends StatefulWidget {
   State<V2Root> createState() => _V2RootState();
 }
 
-class _V2RootState extends State<V2Root> {
+class _V2RootState extends State<V2Root> with StartupUpdateMixin {
   String _currentId = 'home';
   String? _versionLabel;
 
@@ -45,6 +46,8 @@ class _V2RootState extends State<V2Root> {
     AppModeManager.instance.addListener(_onChange);
     UiPreferences.instance.addListener(_onChange);
     _loadVersion();
+    // 起動時にアプリ内アップデート（APK配信）をチェックして通知（v1と共通）。
+    scheduleStartupUpdateCheck();
   }
 
   @override
