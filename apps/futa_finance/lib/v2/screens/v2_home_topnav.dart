@@ -15,6 +15,8 @@ import '../../data/monthly_snapshot_repository.dart';
 import '../../data/payments_change_notifier.dart';
 import '../../data/settings_repository.dart';
 import '../../data/transaction_repository.dart';
+import '../../screens/account_detail_screen.dart';
+import '../../screens/card_detail_screen.dart';
 import '../../screens/expense_input_screen.dart';
 import '../../screens/income_input_screen.dart';
 import '../../utils/formatters.dart';
@@ -432,11 +434,13 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
             ],
           );
         }
+        // モバイル並び順: カンタン入力 / ◯月の収支 / 最新の入出金（中央）
+        // → 総資産 → 月初残高。
         return Column(
           children: [
-            _LeftAssetSummary(state: this),
-            const SizedBox(height: V2Spacing.lg),
             _CenterColumn(state: this),
+            const SizedBox(height: V2Spacing.lg),
+            _LeftAssetSummary(state: this),
             const SizedBox(height: V2Spacing.lg),
             _RightSidebar(state: this),
           ],
@@ -509,15 +513,20 @@ class _LeftAssetSummary extends StatelessWidget {
             padding: EdgeInsets.symmetric(vertical: V2Spacing.md),
             child: Divider(height: 1),
           ),
-          // 銀行口座リスト
+          // 銀行口座リスト（タップで通帳＝口座詳細へ）
           for (final b in state._payments.bankAccounts)
             _AssetTile(
               icon: b.iconUrl,
               label: b.name,
               value: formatYen(state._bankBalanceOf(b)),
               valueColor: V2Colors.textPrimary,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => AccountDetailScreen(account: b)),
+              ),
             ),
-          // クレカ当月利用（マイナス表示）
+          // クレカ当月利用（マイナス表示・タップでカード詳細へ）
           for (final c in state._payments.creditCards)
             if ((cardUsage[c.name] ?? 0) > 0)
               _AssetTile(
@@ -525,6 +534,11 @@ class _LeftAssetSummary extends StatelessWidget {
                 label: c.name,
                 value: '-${formatYen(cardUsage[c.name] ?? 0)}',
                 valueColor: V2Colors.negative,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => CardDetailScreen(card: c)),
+                ),
               ),
           if (state._payments.bankAccounts.isEmpty &&
               state._payments.creditCards.isEmpty)
@@ -572,16 +586,18 @@ class _AssetTile extends StatelessWidget {
   final String label;
   final String value;
   final Color valueColor;
+  final VoidCallback? onTap;
   const _AssetTile({
     required this.icon,
     required this.label,
     required this.value,
     required this.valueColor,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final row = Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
@@ -602,8 +618,19 @@ class _AssetTile extends StatelessWidget {
                   color: valueColor,
                   fontWeight: FontWeight.w700,
                   fontFeatures: V2Typography.tabularNums)),
+          if (onTap != null) ...[
+            const SizedBox(width: 2),
+            const Icon(Icons.chevron_right,
+                size: 14, color: V2Colors.textMuted),
+          ],
         ],
       ),
+    );
+    if (onTap == null) return row;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: row,
     );
   }
 }

@@ -72,63 +72,78 @@ class _V2TopHeaderState extends State<V2TopHeader> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 56,
-      decoration: BoxDecoration(
-        color: _bg,
-        border: Border(
-          bottom: BorderSide(color: _border, width: 1),
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(
-          horizontal: V2Spacing.xl, vertical: V2Spacing.xs),
-      child: Row(
-        children: [
-          _logo(),
-          const SizedBox(width: V2Spacing.sm),
-          // アプリ名 + バージョン（2 行）
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'FutaFinance',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.2,
-                  height: 1.1,
-                  color: _fg,
-                ),
-              ),
-              if (_versionLabel != null) ...[
-                const SizedBox(height: 2),
-                Text(
-                  _versionLabel!,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    height: 1.0,
-                    color: _versionFg,
-                    fontFeatures: V2Typography.tabularNums,
-                  ),
-                ),
-              ],
-            ],
+    return LayoutBuilder(builder: (context, c) {
+      // 狭い画面（スマホ）はアプリ名/バージョンを省略し、モード切替を可変幅にして
+      // 記録ボタンまで収まるようにする（横幅オーバーで見切れるのを防ぐ）。
+      final narrow = c.maxWidth < 600;
+      return Container(
+        height: 56,
+        decoration: BoxDecoration(
+          color: _bg,
+          border: Border(
+            bottom: BorderSide(color: _border, width: 1),
           ),
-          const Spacer(),
-          if (widget.modeSwitcher != null) ...[
-            SizedBox(width: 240, child: widget.modeSwitcher!),
-            const SizedBox(width: V2Spacing.md),
+        ),
+        padding: EdgeInsets.symmetric(
+            horizontal: narrow ? V2Spacing.md : V2Spacing.xl,
+            vertical: V2Spacing.xs),
+        child: Row(
+          children: [
+            _logo(),
+            if (!narrow) ...[
+              const SizedBox(width: V2Spacing.sm),
+              // アプリ名 + バージョン（2 行）
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'FutaFinance',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
+                      height: 1.1,
+                      color: _fg,
+                    ),
+                  ),
+                  if (_versionLabel != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      _versionLabel!,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        height: 1.0,
+                        color: _versionFg,
+                        fontFeatures: V2Typography.tabularNums,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const Spacer(),
+              if (widget.modeSwitcher != null) ...[
+                SizedBox(width: 240, child: widget.modeSwitcher!),
+                const SizedBox(width: V2Spacing.md),
+              ],
+            ] else ...[
+              const SizedBox(width: V2Spacing.sm),
+              if (widget.modeSwitcher != null) ...[
+                Expanded(child: widget.modeSwitcher!),
+                const SizedBox(width: V2Spacing.sm),
+              ] else
+                const Spacer(),
+            ],
+            for (var i = 0; i < widget.actions.length; i++) ...[
+              if (i > 0) const SizedBox(width: V2Spacing.sm),
+              widget.actions[i],
+            ],
           ],
-          for (var i = 0; i < widget.actions.length; i++) ...[
-            if (i > 0) const SizedBox(width: V2Spacing.sm),
-            widget.actions[i],
-          ],
-        ],
-      ),
-    );
+        ),
+      );
+    });
   }
 
   Widget _logo() {

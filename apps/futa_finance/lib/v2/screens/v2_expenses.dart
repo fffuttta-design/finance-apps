@@ -8,6 +8,7 @@ import '../../data/app_mode.dart';
 import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
+import '../../screens/card_detail_screen.dart';
 import '../../screens/expense_input_screen.dart';
 import '../../utils/formatters.dart';
 import '../../utils/thousands_separator_input_formatter.dart';
@@ -166,6 +167,88 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     if (mounted) await _load();
   }
 
+  /// クレカ一覧シートを開く（旧クレカタブの代替）。各カード → 詳細画面へ。
+  Future<void> _openCardList() async {
+    final cards = _payments.creditCards;
+    if (cards.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('クレジットカードが未登録です（設定 → ウォレット）')),
+      );
+      return;
+    }
+    // 当月利用（表示中の月の expense をカード別集計）
+    final usage = <String, int>{};
+    for (final t in _transactions) {
+      if (t.type != core.TransactionType.expense) continue;
+      if (t.date.year != _focused.year ||
+          t.date.month != _focused.month) {
+        continue;
+      }
+      if (cards.any((c) => c.name == t.paymentMethod)) {
+        usage[t.paymentMethod] =
+            (usage[t.paymentMethod] ?? 0) + t.amount;
+      }
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Row(
+                children: [
+                  Icon(Icons.credit_card,
+                      size: 18, color: Color(0xFF1A237E)),
+                  SizedBox(width: 8),
+                  Text('クレジットカード',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+            for (final c in cards)
+              ListTile(
+                leading: BrandLogo(
+                  iconUrl: c.iconUrl,
+                  fallbackIcon: Icons.credit_card,
+                  size: 28,
+                  borderRadius: 4,
+                ),
+                title: Text(c.name),
+                subtitle: c.paymentDay != null
+                    ? Text('引落 ${c.paymentDay}日')
+                    : null,
+                trailing: Text(
+                  '当月 -${formatYen(usage[c.name] ?? 0)}',
+                  style: const TextStyle(
+                      color: Color(0xFFDC2626),
+                      fontWeight: FontWeight.w700),
+                ),
+                onTap: () {
+                  Navigator.pop(sheet);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => CardDetailScreen(card: c)),
+                  ).then((_) {
+                    if (mounted) _load();
+                  });
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// 変動費の「その月の実額」をその場で入力（未入力は0／月ごと独立）。
   Future<void> _inputVariableActual(core.Subscription s) async {
     final ym = _ymKey;
@@ -275,7 +358,22 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
               ],
             ),
           ),
-          const SizedBox(height: V2Spacing.lg),
+          const SizedBox(height: V2Spacing.sm),
+          // ── クレカ一覧ボタン（旧クレカタブの代替・カード一覧→詳細） ──
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton.icon(
+              onPressed: _openCardList,
+              icon: const Icon(Icons.credit_card, size: 16),
+              label: const Text('クレカ一覧'),
+              style: OutlinedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                minimumSize: const Size(0, 34),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+            ),
+          ),
+          const SizedBox(height: V2Spacing.sm),
           // ── 取引一覧（経費明細）を上に ────────────────────
           V2Card(
             padding: EdgeInsets.zero,

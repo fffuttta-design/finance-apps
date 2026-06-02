@@ -9,7 +9,6 @@ import '../screens/transfer_input_screen.dart';
 import 'layout/shell.dart';
 import 'layout/topnav_shell.dart';
 import 'screens/v2_asset.dart';
-import 'screens/v2_cards.dart';
 import 'screens/v2_devlab.dart';
 import 'screens/v2_expenses.dart';
 import 'screens/v2_home.dart';
@@ -89,10 +88,6 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
           label: '資産',
           icon: Icons.account_balance_wallet_outlined),
       const V2NavItem(
-          id: 'cards',
-          label: 'クレカ',
-          icon: Icons.credit_card_outlined),
-      const V2NavItem(
           id: 'report',
           label: '業績',
           icon: Icons.bar_chart_outlined),
@@ -126,9 +121,7 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
       // 資産: v2.1 ネイティブ実装（種別別セクション + 通帳遷移）
       case 'asset':
         return V2AssetScreen(accent: accent);
-      // クレカ: v2.1 ネイティブ実装（当月利用 + 過去 6 ヶ月推移 + 一覧）
-      case 'cards':
-        return V2CardsScreen(accent: accent);
+      // クレカタブは廃止。カード一覧は支出タブ上部の「クレカ」ボタンから開く。
       // 集計: v2.1 ネイティブ実装（会計風 PL 月次表 + v1 集計画面へのリンク）
       case 'report':
         return V2ReportScreen(accent: accent);
