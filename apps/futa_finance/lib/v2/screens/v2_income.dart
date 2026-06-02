@@ -278,44 +278,7 @@ class _IncomeTable extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
-          color: V2Colors.surfaceMuted,
-          padding: const EdgeInsets.symmetric(
-              horizontal: V2Spacing.lg, vertical: 7),
-          child: Row(
-            children: [
-              SizedBox(
-                  width: 56,
-                  child: Text('日付',
-                      style: V2Typography.tableHeader)),
-              const SizedBox(width: V2Spacing.sm),
-              SizedBox(
-                  width: 70,
-                  child: Text('状態',
-                      style: V2Typography.tableHeader)),
-              const SizedBox(width: V2Spacing.sm),
-              SizedBox(
-                  width: 120,
-                  child: Text('カテゴリ',
-                      style: V2Typography.tableHeader)),
-              const SizedBox(width: V2Spacing.sm),
-              Expanded(
-                  child: Text('内容',
-                      style: V2Typography.tableHeader)),
-              const SizedBox(width: V2Spacing.sm),
-              SizedBox(
-                  width: 140,
-                  child: Text('入金先',
-                      style: V2Typography.tableHeader)),
-              const SizedBox(width: V2Spacing.sm),
-              SizedBox(
-                  width: 110,
-                  child: Text('金額',
-                      style: V2Typography.tableHeader,
-                      textAlign: TextAlign.right)),
-            ],
-          ),
-        ),
+        // スマホで潰れないよう列ヘッダーは廃止し2段表示
         for (final t in rows) _IncomeRow(
           t: t,
           iconUrl: _iconUrlFor(t.paymentMethod),
@@ -374,109 +337,92 @@ class _IncomeRowState extends State<_IncomeRow> {
                 top: BorderSide(color: V2Colors.divider, width: 1)),
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               SizedBox(
-                width: 56,
+                width: 38,
                 child: Text(
                     '${widget.t.date.month}/${widget.t.date.day}',
                     style: V2Typography.numericCell),
               ),
               const SizedBox(width: V2Spacing.sm),
-              SizedBox(
-                width: 70,
-                child: isPending
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: V2Colors.warningSoft,
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(Icons.hourglass_top,
-                                size: 10, color: V2Colors.warning),
-                            SizedBox(width: 3),
-                            Text('見込み',
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    color: V2Colors.warning,
-                                    fontWeight: FontWeight.w700)),
-                          ],
-                        ),
-                      )
-                    : Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: V2Colors.positiveSoft,
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: const Text('確定',
-                            style: TextStyle(
-                                fontSize: 10,
-                                color: V2Colors.positive,
-                                fontWeight: FontWeight.w700)),
-                      ),
-              ),
-              const SizedBox(width: V2Spacing.sm),
-              SizedBox(
-                width: 120,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: V2Colors.surfaceMuted,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: Text(_categoryLabel(),
-                      style: V2Typography.micro,
-                      overflow: TextOverflow.ellipsis),
-                ),
-              ),
-              const SizedBox(width: V2Spacing.sm),
               Expanded(
-                child: Text(
-                  widget.t.description.isEmpty
-                      ? '—'
-                      : widget.t.description,
-                  style: V2Typography.body,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: V2Spacing.sm),
-              SizedBox(
-                width: 140,
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    BrandLogo(
-                      iconUrl: widget.iconUrl,
-                      fallbackIcon: Icons.account_balance,
-                      size: 14,
-                      borderRadius: 3,
+                    Row(
+                      children: [
+                        // 状態（見込み/確定）バッジ
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: isPending
+                                ? V2Colors.warningSoft
+                                : V2Colors.positiveSoft,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Text(isPending ? '見込み' : '確定',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: isPending
+                                      ? V2Colors.warning
+                                      : V2Colors.positive,
+                                  fontWeight: FontWeight.w700)),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: V2Colors.surfaceMuted,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Text(_categoryLabel(),
+                              style: V2Typography.micro),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            widget.t.description.isEmpty
+                                ? '—'
+                                : widget.t.description,
+                            style: V2Typography.body,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(widget.t.paymentMethod,
-                          style: V2Typography.caption,
-                          overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        BrandLogo(
+                          iconUrl: widget.iconUrl,
+                          fallbackIcon: Icons.account_balance,
+                          size: 13,
+                          borderRadius: 3,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(widget.t.paymentMethod,
+                              style: V2Typography.micro.copyWith(
+                                  color: V2Colors.textMuted),
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: V2Spacing.sm),
-              SizedBox(
-                width: 110,
-                child: Text(
-                  '+${formatYen(widget.t.amount)}',
-                  textAlign: TextAlign.right,
-                  style: V2Typography.numericCell.copyWith(
-                      color: isPending
-                          ? V2Colors.warning
-                          : V2Colors.positive,
-                      fontWeight: FontWeight.w700),
-                ),
+              Text(
+                '+${formatYen(widget.t.amount)}',
+                style: V2Typography.numericCell.copyWith(
+                    color: isPending
+                        ? V2Colors.warning
+                        : V2Colors.positive,
+                    fontWeight: FontWeight.w700),
               ),
             ],
           ),

@@ -322,6 +322,7 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
   Future<void> _inputVariableActual(core.Subscription s) async {
     final ym = _ymKey;
     final current = s.monthlyActuals[ym] ?? 0;
+    final prev = s.monthlyActuals[prevYmKey(ym)] ?? 0;
     final ctrl = TextEditingController(
         text: current > 0 ? formatAmount(current) : '');
     final result = await showDialog<int?>(
@@ -338,8 +339,8 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
           ],
           decoration: InputDecoration(
             labelText: '実額（円）',
-            hintText: s.amount > 0 ? '目安 ${formatYen(s.amount)}' : null,
-            prefixText: '¥ ',
+            // プレースホルダは前月実額（無ければ非表示）。¥プレフィックスは外して窮屈さ解消。
+            hintText: prev > 0 ? '前月 ${formatYen(prev)}' : null,
           ),
         ),
         actions: [
@@ -704,6 +705,7 @@ class _ChargeCard extends StatelessWidget {
                 isCurrentMonth: isCurrentMonth,
                 today: today,
                 isVariable: isVariable,
+                ym: ym,
                 monthAmount: s.amountForMonth(ym),
                 onTap: () => onTapItem(s.id),
                 onInputAmount:
@@ -715,6 +717,18 @@ class _ChargeCard extends StatelessWidget {
   }
 }
 
+/// "YYYY-MM" の前月キーを返す。
+String prevYmKey(String ym) {
+  final parts = ym.split('-');
+  var y = int.parse(parts[0]);
+  var m = int.parse(parts[1]) - 1;
+  if (m < 1) {
+    m = 12;
+    y -= 1;
+  }
+  return '$y-${m.toString().padLeft(2, '0')}';
+}
+
 class _ChargeRow extends StatelessWidget {
   final core.Subscription s;
   final bool isCurrentMonth;
@@ -723,6 +737,9 @@ class _ChargeRow extends StatelessWidget {
 
   /// 変動費かどうか。変動費は当月の実額（未入力は0）を入力ピルで表示。
   final bool isVariable;
+
+  /// 表示中の月キー "YYYY-MM"（前月実額の参照に使う）。
+  final String ym;
 
   /// 表示中の月の金額（固定費=定額、変動費=その月の実額。未入力は0）。
   final int monthAmount;
@@ -735,6 +752,7 @@ class _ChargeRow extends StatelessWidget {
     required this.today,
     required this.onTap,
     this.isVariable = false,
+    required this.ym,
     required this.monthAmount,
     this.onInputAmount,
   });
@@ -770,12 +788,12 @@ class _ChargeRow extends StatelessWidget {
         child: Row(
           children: [
             SizedBox(
-              width: 38,
-              child: Text(day == null ? '—' : '$day日',
-                  style: TextStyle(
+              width: 36,
+              child: Text(day == null ? '' : '$day日',
+                  style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: V2Colors.warning,
+                      color: V2Colors.textSecondary,
                       fontFeatures: V2Typography.tabularNums)),
             ),
             BrandLogo(
@@ -815,14 +833,17 @@ class _ChargeRow extends StatelessWidget {
               const SizedBox(width: V2Spacing.sm),
             ],
             if (isVariable) ...[
-              // 変動費: 当月の実額をタップして入力。未入力は¥0。目安を薄く併記。
-              if (s.amount > 0)
-                Padding(
+              // 変動費: 当月の実額をタップ入力。未入力は¥0。前月の実額を薄く併記。
+              Builder(builder: (_) {
+                final prev = s.monthlyActuals[prevYmKey(ym)] ?? 0;
+                if (prev <= 0) return const SizedBox.shrink();
+                return Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: Text('目安 ${formatYen(s.amount)}',
+                  child: Text('前月 ${formatYen(prev)}',
                       style: V2Typography.micro
                           .copyWith(color: V2Colors.textMuted)),
-                ),
+                );
+              }),
               InkWell(
                 onTap: onInputAmount,
                 borderRadius: BorderRadius.circular(6),

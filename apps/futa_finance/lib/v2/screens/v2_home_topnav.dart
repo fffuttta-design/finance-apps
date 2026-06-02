@@ -968,6 +968,9 @@ class _MonthChipsBar extends StatelessWidget {
       height: 52,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
+        // データは新しい順だが reverse で「古い→新しい(右が当月)」に並べる。
+        // 初期表示は右端=当月が見える。
+        reverse: true,
         padding: EdgeInsets.zero,
         itemCount: months.length,
         separatorBuilder: (_, _) => const SizedBox(width: 8),
