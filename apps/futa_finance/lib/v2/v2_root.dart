@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../data/app_mode.dart';
+import '../data/data_migration_service.dart';
 import '../data/ui_preferences.dart';
 import '../screens/expense_input_screen.dart';
 import '../screens/income_input_screen.dart';
@@ -46,6 +47,8 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
     _loadVersion();
     // 起動時にアプリ内アップデート（APK配信）をチェックして通知（v1と共通）。
     scheduleStartupUpdateCheck();
+    // 事業用カテゴリをPL構成へ一度だけ移行（業務モード時のみ・idempotent）。
+    DataMigrationService.migratePLCategoriesIfNeeded();
   }
 
   @override
@@ -57,6 +60,8 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
 
   void _onChange() {
     if (mounted) setState(() {});
+    // 事業モードへ切替時にも移行を試行（個人で起動→事業に切替えた場合に対応）。
+    DataMigrationService.migratePLCategoriesIfNeeded();
   }
 
   Future<void> _loadVersion() async {

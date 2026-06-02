@@ -610,8 +610,17 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 key: ValueKey('major-$_majorDropdownNonce'),
                 initialValue: _majorCategory,
                 items: [
-                  ...majorNames.map((m) =>
-                      DropdownMenuItem(value: m, child: Text(m))),
+                  for (int i = 0; i < majorNames.length; i++)
+                    DropdownMenuItem(
+                      value: majorNames[i],
+                      child: Text(
+                        (categories.majors[i].section != null &&
+                                categories.majors[i].section!.isNotEmpty)
+                            ? '［${categories.majors[i].section}］${categories.majors[i].name}'
+                            : categories.majors[i].name,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   const DropdownMenuItem(
                     value: _kAddNewSentinel,
                     child: Row(

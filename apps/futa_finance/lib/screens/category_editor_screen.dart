@@ -256,11 +256,36 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
                                         color: Color(0xFF111827)),
                                   ),
                                   const SizedBox(height: 2),
-                                  Text(
-                                    '${major.subs.length}件の小カテゴリ',
-                                    style: const TextStyle(
-                                        fontSize: 11,
-                                        color: Color(0xFF9CA3AF)),
+                                  Row(
+                                    children: [
+                                      if (major.section != null &&
+                                          major.section!.isNotEmpty) ...[
+                                        Container(
+                                          padding:
+                                              const EdgeInsets.symmetric(
+                                                  horizontal: 6,
+                                                  vertical: 1),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFE0E7FF),
+                                            borderRadius:
+                                                BorderRadius.circular(3),
+                                          ),
+                                          child: Text(major.section!,
+                                              style: const TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight:
+                                                      FontWeight.w700,
+                                                  color: Color(0xFF1A237E))),
+                                        ),
+                                        const SizedBox(width: 6),
+                                      ],
+                                      Text(
+                                        '${major.subs.length}件の小カテゴリ',
+                                        style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Color(0xFF9CA3AF)),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),

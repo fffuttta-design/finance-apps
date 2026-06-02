@@ -99,49 +99,113 @@ class CategoryConfig {
         ),
       ]);
 
-  /// FutaFinance のデフォルト（スプシ準拠の8大カテゴリ + 絵文字）。
+  /// FutaFinance 事業用デフォルト（PL科目＋セクション。即PL化用）。
+  /// 既存カテゴリ（資材/会食/セルフカフェ等）は対応科目のサブに紐づけ済み。
   factory CategoryConfig.futaDefaults() => const CategoryConfig(majors: [
+        // ── 売上原価 ──
         MajorCategory(
-            name: '固定費(定額)',
-            iconKey: '📅',
-            subs: [
-              '通信費',
-              'ソフトウェア料金',
-              'ライセンス料金',
-              '顧問経費',
-              '賃料',
-              'コンサル・研修費',
-            ]),
+            name: '外注費', iconKey: '🤝', section: '売上原価', subs: []),
         MajorCategory(
-            name: '固定費(変動)',
-            iconKey: '💸',
-            subs: [
-              '通信費',
-              'ソフトウェア料金',
-              'ライセンス料金',
-              '顧問経費',
-              '賃料',
-              'コンサル・研修費',
-            ]),
+            name: '仕入', iconKey: '📥', section: '売上原価', subs: []),
+        // ── 人件費 ──
         MajorCategory(
-            name: '消耗品費',
-            iconKey: '📦',
-            subs: ['機材', '資材', '装飾品', 'ソフトウェア']),
+            name: '役員報酬', iconKey: '👔', section: '人件費', subs: []),
         MajorCategory(
-            name: '旅費交通費',
-            iconKey: '🚗',
-            subs: ['タクシー', '新幹線']),
+            name: '給与', iconKey: '💴', section: '人件費', subs: []),
         MajorCategory(
-            name: '交際費', iconKey: '🍴', subs: ['会食']),
+            name: '雑給与', iconKey: '🧾', section: '人件費', subs: []),
         MajorCategory(
-            name: '研修費', iconKey: '🎓', subs: ['セミナー', 'コンサル']),
+            name: '賞与・退職金', iconKey: '🎁', section: '人件費', subs: []),
+        MajorCategory(
+            name: '法定福利費', iconKey: '🏥', section: '人件費', subs: []),
+        // ── 販管費 ──
+        MajorCategory(
+            name: '福利厚生費', iconKey: '☕', section: '販管費', subs: []),
+        MajorCategory(
+            name: '広告宣伝費', iconKey: '📣', section: '販管費', subs: []),
+        MajorCategory(
+            name: '交際費', iconKey: '🍴', section: '販管費', subs: ['会食']),
         MajorCategory(
             name: '会議費',
             iconKey: '💼',
-            subs: ['セルフカフェ', 'コワーキングスペース', '軽食', '会食']),
+            section: '販管費',
+            subs: ['セルフカフェ', 'コワーキングスペース', '軽食']),
         MajorCategory(
-            name: '雑費', iconKey: '🏷️', subs: ['営業用等', '新聞図書費']),
+            name: '旅費交通費',
+            iconKey: '🚗',
+            section: '販管費',
+            subs: ['タクシー', '新幹線']),
+        MajorCategory(
+            name: '通信費',
+            iconKey: '📶',
+            section: '販管費',
+            subs: ['ソフトウェア', 'ソフトウェア料金', 'ライセンス料金']),
+        MajorCategory(
+            name: '消耗品費',
+            iconKey: '📦',
+            section: '販管費',
+            subs: ['機材', '資材', '装飾品']),
+        MajorCategory(
+            name: '修繕費', iconKey: '🔧', section: '販管費', subs: []),
+        MajorCategory(
+            name: '水道光熱費', iconKey: '💡', section: '販管費', subs: []),
+        MajorCategory(
+            name: '新聞図書費', iconKey: '📚', section: '販管費', subs: []),
+        MajorCategory(
+            name: '諸会費', iconKey: '🎫', section: '販管費', subs: ['セミナー']),
+        MajorCategory(
+            name: '支払手数料', iconKey: '🏧', section: '販管費', subs: []),
+        MajorCategory(
+            name: '賃借料', iconKey: '🏢', section: '販管費', subs: ['賃料']),
+        MajorCategory(
+            name: '保険料', iconKey: '🛡️', section: '販管費', subs: []),
+        MajorCategory(
+            name: '租税公課', iconKey: '🧾', section: '販管費', subs: []),
+        MajorCategory(
+            name: '支払報酬',
+            iconKey: '📝',
+            section: '販管費',
+            subs: ['コンサル', 'コンサル・研修費', '顧問経費']),
+        // ── その他費用 ──
+        MajorCategory(
+            name: '減価償却費', iconKey: '📉', section: 'その他費用', subs: []),
+        MajorCategory(
+            name: '雑費', iconKey: '🏷️', section: 'その他費用', subs: ['営業用等']),
+        // ── 営業外費用 ──
+        MajorCategory(
+            name: '支払利息', iconKey: '🏦', section: '営業外費用', subs: []),
+        MajorCategory(
+            name: '雑損失', iconKey: '⚠️', section: '営業外費用', subs: []),
       ]);
+
+  /// セクションの登場順（最初に現れた順）。null/空は末尾「その他」にまとめる。
+  List<String> get sectionsInOrder {
+    final seen = <String>{};
+    final list = <String>[];
+    var hasUngrouped = false;
+    for (final m in majors) {
+      final s = m.section;
+      if (s == null || s.isEmpty) {
+        hasUngrouped = true;
+        continue;
+      }
+      if (seen.add(s)) list.add(s);
+    }
+    if (hasUngrouped) list.add('その他');
+    return list;
+  }
+
+  /// セクション→そのセクションに属する大カテゴリ（元の順序を保持）。
+  Map<String, List<MajorCategory>> get majorsBySection {
+    final map = <String, List<MajorCategory>>{};
+    for (final m in majors) {
+      final key = (m.section == null || m.section!.isEmpty)
+          ? 'その他'
+          : m.section!;
+      map.putIfAbsent(key, () => []).add(m);
+    }
+    return map;
+  }
 
   CategoryConfig copyWith({List<MajorCategory>? majors}) =>
       CategoryConfig(majors: majors ?? this.majors);
@@ -166,11 +230,16 @@ class MajorCategory {
   /// `subs: List<String>` の後方互換を維持する。
   final Map<String, String>? subIcons;
 
+  /// 所属セクション（PLのまとまり。例: "人件費" "販管費" "営業外費用"）。
+  /// null/空は「その他」グループ扱い。UI でセクション見出しに使う。
+  final String? section;
+
   const MajorCategory({
     required this.name,
     required this.subs,
     this.iconKey,
     this.subIcons,
+    this.section,
   });
 
   /// インデックス付きの表示名（例: "0.固定費(定額)"）。
@@ -184,6 +253,7 @@ class MajorCategory {
         'subs': subs,
         'iconKey': iconKey,
         'subIcons': subIcons,
+        'section': section,
       };
 
   factory MajorCategory.fromJson(Map<String, dynamic> json) => MajorCategory(
@@ -192,6 +262,7 @@ class MajorCategory {
         iconKey: json['iconKey'] as String?,
         subIcons: (json['subIcons'] as Map<String, dynamic>?)
             ?.map((k, v) => MapEntry(k, v as String)),
+        section: json['section'] as String?,
       );
 
   MajorCategory copyWith({
@@ -199,11 +270,13 @@ class MajorCategory {
     List<String>? subs,
     String? iconKey,
     Map<String, String>? subIcons,
+    String? section,
   }) =>
       MajorCategory(
         name: name ?? this.name,
         subs: subs ?? this.subs,
         iconKey: iconKey ?? this.iconKey,
         subIcons: subIcons ?? this.subIcons,
+        section: section ?? this.section,
       );
 }

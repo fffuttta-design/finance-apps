@@ -22,6 +22,21 @@ class DataMigrationService {
 
   static const _migratedKeyPrefix = 'futa.firestore_migrated.';
 
+  /// 事業用カテゴリを PL 構成（科目＋セクション）へ一度だけ置き換える。
+  /// 業務モードがアクティブな時に実行。カテゴリ「定義」のみ差し替え、
+  /// 取引レコードは触らない（旧カテゴリ名は新科目のサブとして残してあるため、
+  /// 過去取引はそのまま表示・PLにも反映される）。idempotent。
+  static const _plCategoriesKey = 'futa.migration.pl_categories_v1';
+
+  static Future<void> migratePLCategoriesIfNeeded() async {
+    if (AppModeManager.instance.current != AppMode.business) return;
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_plCategoriesKey) == true) return;
+    await SettingsRepository.instance
+        .saveCategories(CategoryConfig.futaDefaults());
+    await prefs.setBool(_plCategoriesKey, true);
+  }
+
   /// 必要なら移行を実行する（idempotent、複数回呼んでもOK）。
   static Future<void> migrateLocalToFirestoreIfNeeded(String uid) async {
     final prefs = await SharedPreferences.getInstance();
