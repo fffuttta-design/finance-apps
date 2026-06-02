@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.120",
-    "buildNumber":  "121",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.120/futa-finance-v1.0.120.apk",
-    "releaseNotes":  "v1.0.120 経費明細2段表示/ウォレット一覧/資産タブ廃止"
+    "version":  "1.0.121",
+    "buildNumber":  "122",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.121/futa-finance-v1.0.121.apk",
+    "releaseNotes":  "v1.0.121 事業カテゴリをPL科目＋セクションに(即PL化 第1段)"
 }
