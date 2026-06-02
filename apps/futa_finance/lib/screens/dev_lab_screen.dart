@@ -11,6 +11,8 @@ import 'package:finance_core/finance_core.dart' as core;
 import '../data/app_mode.dart';
 import '../data/budget_item.dart';
 import '../data/budget_item_repository.dart';
+import '../data/liability.dart';
+import '../data/liability_repository.dart';
 import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
@@ -39,6 +41,7 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
   StreamSubscription<List<core.Transaction>>? _sub;
   List<core.Transaction> _transactions = [];
   core.PaymentMethodsConfig? _payments;
+  LiabilitiesConfig _liabilities = LiabilitiesConfig.empty();
   _LabView _view = _LabView.pl;
 
   @override
@@ -50,22 +53,26 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
       setState(() => _transactions = list);
     });
     PaymentsChangeNotifier.instance.addListener(_load);
+    LiabilityRepository.instance.addListener(_load);
   }
 
   @override
   void dispose() {
     _sub?.cancel();
     PaymentsChangeNotifier.instance.removeListener(_load);
+    LiabilityRepository.instance.removeListener(_load);
     super.dispose();
   }
 
   Future<void> _load() async {
     final p = await _settings.loadPayments();
     final txns = await TransactionRepository.instance.loadAll();
+    final liab = await LiabilityRepository.instance.load();
     if (!mounted) return;
     setState(() {
       _payments = p;
       _transactions = txns;
+      _liabilities = liab;
     });
   }
 
@@ -712,7 +719,9 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
     }
     final cardLiability =
         cardUsage.values.fold<int>(0, (s, v) => s + v);
-    final liabilityTotal = cardLiability;
+    // 借入金・負債マスタの残高合計。
+    final loanTotal = _liabilities.totalBalance;
+    final liabilityTotal = cardLiability + loanTotal;
 
     final netWorth = assetTotal - liabilityTotal;
 
@@ -720,7 +729,7 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         _devNote('BS（貸借対照表） - プロトタイプ',
-            '資産 − 負債 = 純資産。負債モデル未実装のため、クレカの当月利用を暫定的に負債扱い。'),
+            '資産 − 負債 = 純資産。負債＝借入金マスタの残高 ＋ クレカの当月利用。'),
         const SizedBox(height: 12),
         // 純資産（主役）
         Container(
@@ -775,25 +784,228 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
           _BsItem('電子マネー', emoneyTotal),
         ]),
         const SizedBox(height: 12),
-        // 負債セクション
+        // 負債セクション（借入金マスタ + クレカ当月利用）
         _bsSection('負債', const Color(0xFFDC2626), liabilityTotal, [
-          _BsItem('クレカ当月利用（暫定）', cardLiability),
+          for (final l in _liabilities.items)
+            _BsItem('${l.kind.emoji} ${l.name}', l.balance),
+          _BsItem('クレカ当月利用', cardLiability),
         ]),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFEF3C7),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: const Text(
-            '⚠️ 借入金/未払金などの本格的な負債モデルは未実装。\n'
-            '今は「クレカの当月利用」だけを負債として暫定計算しています。',
-            style: TextStyle(fontSize: 11, color: Color(0xFF92400E)),
-          ),
+        const SizedBox(height: 12),
+        // 借入金・負債マスタの管理
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '借入金・負債マスタ（${_liabilities.items.length}件）',
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF374151)),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => _editLiability(null),
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('追加'),
+            ),
+          ],
         ),
+        if (_liabilities.items.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text('借入金は未登録です。「追加」から登録できます。',
+                style: TextStyle(
+                    fontSize: 11, color: Color(0xFF9CA3AF))),
+          )
+        else
+          for (final l in _liabilities.items)
+            Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${l.kind.emoji} ${l.name}',
+                            style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600)),
+                        Text(
+                          [
+                            l.kind.label,
+                            if (l.lender != null) l.lender!,
+                            if (l.monthlyRepayment != null)
+                              '月返済 ${formatYen(l.monthlyRepayment!)}',
+                          ].join(' ・ '),
+                          style: const TextStyle(
+                              fontSize: 10, color: Color(0xFF9CA3AF)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(formatYen(l.balance),
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFDC2626),
+                          fontFamily: 'monospace')),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.edit,
+                        size: 16, color: Color(0xFF6B7280)),
+                    onPressed: () => _editLiability(l),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.delete_outline,
+                        size: 16, color: Color(0xFFDC2626)),
+                    onPressed: () => _deleteLiability(l),
+                  ),
+                ],
+              ),
+            ),
       ],
     );
+  }
+
+  Future<void> _deleteLiability(Liability l) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('${l.name} を削除？'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626)),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('削除'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) await LiabilityRepository.instance.remove(l.id);
+  }
+
+  Future<void> _editLiability(Liability? initial) async {
+    final nameCtrl = TextEditingController(text: initial?.name ?? '');
+    final balanceCtrl = TextEditingController(
+        text: initial != null ? formatAmount(initial.balance) : '');
+    final lenderCtrl =
+        TextEditingController(text: initial?.lender ?? '');
+    final repayCtrl = TextEditingController(
+        text: initial?.monthlyRepayment != null
+            ? formatAmount(initial!.monthlyRepayment!)
+            : '');
+    final noteCtrl = TextEditingController(text: initial?.note ?? '');
+    LiabilityKind kind = initial?.kind ?? LiabilityKind.loan;
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(initial == null ? '借入金・負債を追加' : '負債を編集'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  autofocus: initial == null,
+                  decoration: const InputDecoration(
+                      labelText: '名前（例: ○○銀行 運転資金）'),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<LiabilityKind>(
+                  initialValue: kind,
+                  decoration: const InputDecoration(labelText: '種別'),
+                  items: LiabilityKind.values
+                      .map((k) => DropdownMenuItem(
+                          value: k,
+                          child: Text('${k.emoji} ${k.label}')))
+                      .toList(),
+                  onChanged: (v) =>
+                      setLocal(() => kind = v ?? LiabilityKind.loan),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: balanceCtrl,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    ThousandsSeparatorInputFormatter(),
+                  ],
+                  decoration: const InputDecoration(
+                      labelText: '現在残高（円）', prefixText: '¥ '),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: lenderCtrl,
+                  decoration:
+                      const InputDecoration(labelText: '借入先（任意）'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: repayCtrl,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    ThousandsSeparatorInputFormatter(),
+                  ],
+                  decoration: const InputDecoration(
+                      labelText: '毎月の返済額（任意・資金繰り用）',
+                      prefixText: '¥ '),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: noteCtrl,
+                  decoration:
+                      const InputDecoration(labelText: '備考（任意）'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('キャンセル')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('保存')),
+          ],
+        ),
+      ),
+    );
+
+    if (saved != true) return;
+    final name = nameCtrl.text.trim();
+    if (name.isEmpty) return;
+    final balance = parseAmount(balanceCtrl.text) ?? 0;
+    final repay = parseAmount(repayCtrl.text);
+    final item = Liability(
+      id: initial?.id ??
+          DateTime.now().microsecondsSinceEpoch.toString(),
+      name: name,
+      kind: kind,
+      balance: balance,
+      lender: lenderCtrl.text.trim().isEmpty
+          ? null
+          : lenderCtrl.text.trim(),
+      monthlyRepayment: (repay == null || repay == 0) ? null : repay,
+      note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
+    );
+    await LiabilityRepository.instance.upsert(item);
   }
 
   Widget _bsSection(
