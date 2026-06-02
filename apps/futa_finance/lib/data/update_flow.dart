@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -69,6 +70,43 @@ class UpdateFlow {
             ],
           ),
           content: Text('現在 ${r.currentFull} が最新バージョンです。'),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // Web は APK のダウンロード/インストールができないので、再読み込みを案内。
+    if (kIsWeb) {
+      await showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.system_update, color: _accent),
+              SizedBox(width: 8),
+              Text('新しいバージョン'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('現在: ${r.currentFull}'),
+              Text('最新: ${r.latestFull}',
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              const Text(
+                'ページを再読み込み（Ctrl+Shift+R）すると最新になります。',
+                style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+              ),
+            ],
+          ),
           actions: [
             FilledButton(
               onPressed: () => Navigator.pop(context),
