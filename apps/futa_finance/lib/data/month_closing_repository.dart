@@ -25,20 +25,33 @@ class LocalMonthClosingRepository implements MonthClosingRepository {
   String get _key =>
       'futa.${AppModeManager.instance.current.keyPrefix}.month_closing';
 
+  // モード別の解析済みキャッシュ。切替時の再解析を避ける。
+  final Map<String, MonthClosingConfig> _cache = {};
+
   @override
   Future<MonthClosingConfig> load() async {
+    final prefix = AppModeManager.instance.current.keyPrefix;
+    final cached = _cache[prefix];
+    if (cached != null) return cached;
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key);
-    if (raw == null) return MonthClosingConfig.empty();
-    try {
-      return MonthClosingConfig.fromJsonString(raw);
-    } catch (_) {
-      return MonthClosingConfig.empty();
+    MonthClosingConfig result;
+    if (raw == null) {
+      result = MonthClosingConfig.empty();
+    } else {
+      try {
+        result = MonthClosingConfig.fromJsonString(raw);
+      } catch (_) {
+        result = MonthClosingConfig.empty();
+      }
     }
+    _cache[prefix] = result;
+    return result;
   }
 
   @override
   Future<void> save(MonthClosingConfig config) async {
+    _cache[AppModeManager.instance.current.keyPrefix] = config;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_key, config.toJsonString());
   }

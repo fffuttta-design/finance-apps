@@ -55,6 +55,11 @@ class LocalTransactionRepository implements TransactionRepository {
   String get _key =>
       'futa.${AppModeManager.instance.current.keyPrefix}.transactions';
 
+  /// モード別の解析済みキャッシュ（prefix 'b'/'p' → 取引リスト）。
+  /// モード切替のたびに JSON を読み直して解析し直すのを避ける。
+  /// 書き込みは全て [_saveAll] を通るため、ここを更新すれば整合性が保てる。
+  final Map<String, List<Transaction>> _cache = {};
+
   final _controller = StreamController<List<Transaction>>.broadcast();
 
   @override
@@ -62,20 +67,32 @@ class LocalTransactionRepository implements TransactionRepository {
 
   @override
   Future<List<Transaction>> loadAll() async {
+    final prefix = AppModeManager.instance.current.keyPrefix;
+    final cached = _cache[prefix];
+    // キャッシュは外部での書き換えを防ぐためコピーを返す。
+    if (cached != null) return List<Transaction>.from(cached);
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key);
-    if (raw == null || raw.isEmpty) return [];
+    if (raw == null || raw.isEmpty) {
+      _cache[prefix] = const [];
+      return [];
+    }
     try {
       final list = (jsonDecode(raw) as List)
           .map((e) => Transaction.fromJson(e as Map<String, dynamic>))
           .toList();
+      _cache[prefix] = List<Transaction>.from(list);
       return list;
     } catch (_) {
+      _cache[prefix] = const [];
       return [];
     }
   }
 
   Future<void> _saveAll(List<Transaction> txns) async {
+    // キャッシュを先に更新（次回 loadAll が即返せる）。
+    _cache[AppModeManager.instance.current.keyPrefix] =
+        List<Transaction>.from(txns);
     final prefs = await SharedPreferences.getInstance();
     final json = jsonEncode(txns.map((t) => t.toJson()).toList());
     await prefs.setString(_key, json);

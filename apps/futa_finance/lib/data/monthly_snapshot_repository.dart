@@ -27,20 +27,33 @@ class LocalMonthlySnapshotRepository
   String get _key =>
       'futa.${AppModeManager.instance.current.keyPrefix}.monthly_snapshots';
 
+  // モード別の解析済みキャッシュ。切替時の再解析を避ける。
+  final Map<String, MonthlySnapshotConfig> _cache = {};
+
   @override
   Future<MonthlySnapshotConfig> load() async {
+    final prefix = AppModeManager.instance.current.keyPrefix;
+    final cached = _cache[prefix];
+    if (cached != null) return cached;
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key);
-    if (raw == null) return MonthlySnapshotConfig.empty();
-    try {
-      return MonthlySnapshotConfig.fromJsonString(raw);
-    } catch (_) {
-      return MonthlySnapshotConfig.empty();
+    MonthlySnapshotConfig result;
+    if (raw == null) {
+      result = MonthlySnapshotConfig.empty();
+    } else {
+      try {
+        result = MonthlySnapshotConfig.fromJsonString(raw);
+      } catch (_) {
+        result = MonthlySnapshotConfig.empty();
+      }
     }
+    _cache[prefix] = result;
+    return result;
   }
 
   @override
   Future<void> save(MonthlySnapshotConfig config) async {
+    _cache[AppModeManager.instance.current.keyPrefix] = config;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_key, config.toJsonString());
   }

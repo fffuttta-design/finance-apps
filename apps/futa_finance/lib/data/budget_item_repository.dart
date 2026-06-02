@@ -13,18 +13,31 @@ class BudgetItemRepository extends ChangeNotifier {
 
   String _key() => 'futa.${AppModeManager.instance.current.keyPrefix}.budget_items';
 
+  // モード別の解析済みキャッシュ。切替時の再解析を避ける。
+  final Map<String, BudgetItemsConfig> _cache = {};
+
   Future<BudgetItemsConfig> load() async {
+    final prefix = AppModeManager.instance.current.keyPrefix;
+    final cached = _cache[prefix];
+    if (cached != null) return cached;
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key());
-    if (raw == null) return BudgetItemsConfig.empty();
-    try {
-      return BudgetItemsConfig.fromJsonString(raw);
-    } catch (_) {
-      return BudgetItemsConfig.empty();
+    BudgetItemsConfig result;
+    if (raw == null) {
+      result = BudgetItemsConfig.empty();
+    } else {
+      try {
+        result = BudgetItemsConfig.fromJsonString(raw);
+      } catch (_) {
+        result = BudgetItemsConfig.empty();
+      }
     }
+    _cache[prefix] = result;
+    return result;
   }
 
   Future<void> save(BudgetItemsConfig config) async {
+    _cache[AppModeManager.instance.current.keyPrefix] = config;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_key(), config.toJsonString());
     notifyListeners();

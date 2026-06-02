@@ -34,6 +34,11 @@ class LocalSettingsRepository implements SettingsRepository {
   String get _kPayments =>
       'futa.${AppModeManager.instance.current.keyPrefix}.payments';
 
+  // モード別の解析済みキャッシュ（prefix 'b'/'p' → Config）。
+  // 切替のたびに JSON を解析し直すのを避ける。書き込みは save* を通る。
+  final Map<String, CategoryConfig> _categoriesCache = {};
+  final Map<String, PaymentMethodsConfig> _paymentsCache = {};
+
   CategoryConfig _defaultsForCurrentMode() {
     return AppModeManager.instance.current == AppMode.business
         ? CategoryConfig.businessDefaults()
@@ -42,36 +47,54 @@ class LocalSettingsRepository implements SettingsRepository {
 
   @override
   Future<CategoryConfig> loadCategories() async {
+    final prefix = AppModeManager.instance.current.keyPrefix;
+    final cached = _categoriesCache[prefix];
+    if (cached != null) return cached;
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_kCategories);
-    if (raw == null) return _defaultsForCurrentMode();
-    try {
-      return CategoryConfig.fromJsonString(raw);
-    } catch (_) {
-      return _defaultsForCurrentMode();
-    }
+    final result = raw == null
+        ? _defaultsForCurrentMode()
+        : (() {
+            try {
+              return CategoryConfig.fromJsonString(raw);
+            } catch (_) {
+              return _defaultsForCurrentMode();
+            }
+          })();
+    _categoriesCache[prefix] = result;
+    return result;
   }
 
   @override
   Future<void> saveCategories(CategoryConfig config) async {
+    _categoriesCache[AppModeManager.instance.current.keyPrefix] = config;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kCategories, config.toJsonString());
   }
 
   @override
   Future<PaymentMethodsConfig> loadPayments() async {
+    final prefix = AppModeManager.instance.current.keyPrefix;
+    final cached = _paymentsCache[prefix];
+    if (cached != null) return cached;
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_kPayments);
-    if (raw == null) return PaymentMethodsConfig.empty();
-    try {
-      return PaymentMethodsConfig.fromJsonString(raw);
-    } catch (_) {
-      return PaymentMethodsConfig.empty();
-    }
+    final result = raw == null
+        ? PaymentMethodsConfig.empty()
+        : (() {
+            try {
+              return PaymentMethodsConfig.fromJsonString(raw);
+            } catch (_) {
+              return PaymentMethodsConfig.empty();
+            }
+          })();
+    _paymentsCache[prefix] = result;
+    return result;
   }
 
   @override
   Future<void> savePayments(PaymentMethodsConfig config) async {
+    _paymentsCache[AppModeManager.instance.current.keyPrefix] = config;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kPayments, config.toJsonString());
   }

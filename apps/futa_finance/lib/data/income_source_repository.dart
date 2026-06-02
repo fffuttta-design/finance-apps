@@ -24,20 +24,33 @@ class LocalIncomeSourceRepository implements IncomeSourceRepository {
   String get _key =>
       'futa.${AppModeManager.instance.current.keyPrefix}.income_sources';
 
+  // モード別の解析済みキャッシュ。切替時の再解析を避ける。
+  final Map<String, IncomeSourceConfig> _cache = {};
+
   @override
   Future<IncomeSourceConfig> load() async {
+    final prefix = AppModeManager.instance.current.keyPrefix;
+    final cached = _cache[prefix];
+    if (cached != null) return cached;
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key);
-    if (raw == null) return IncomeSourceConfig.empty();
-    try {
-      return IncomeSourceConfig.fromJsonString(raw);
-    } catch (_) {
-      return IncomeSourceConfig.empty();
+    IncomeSourceConfig result;
+    if (raw == null) {
+      result = IncomeSourceConfig.empty();
+    } else {
+      try {
+        result = IncomeSourceConfig.fromJsonString(raw);
+      } catch (_) {
+        result = IncomeSourceConfig.empty();
+      }
     }
+    _cache[prefix] = result;
+    return result;
   }
 
   @override
   Future<void> save(IncomeSourceConfig config) async {
+    _cache[AppModeManager.instance.current.keyPrefix] = config;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_key, config.toJsonString());
   }

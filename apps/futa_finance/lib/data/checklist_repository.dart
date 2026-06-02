@@ -24,6 +24,9 @@ class LocalChecklistRepository implements ChecklistRepository {
   String get _key =>
       'futa.${AppModeManager.instance.current.keyPrefix}.checklist';
 
+  // モード別の解析済みキャッシュ。切替時の再解析を避ける。
+  final Map<String, ChecklistConfig> _cache = {};
+
   ChecklistConfig _defaultsForCurrentMode() {
     return AppModeManager.instance.current == AppMode.business
         ? ChecklistConfig.businessDefaults()
@@ -32,18 +35,27 @@ class LocalChecklistRepository implements ChecklistRepository {
 
   @override
   Future<ChecklistConfig> load() async {
+    final prefix = AppModeManager.instance.current.keyPrefix;
+    final cached = _cache[prefix];
+    if (cached != null) return cached;
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key);
-    if (raw == null) return _defaultsForCurrentMode();
-    try {
-      return ChecklistConfig.fromJsonString(raw);
-    } catch (_) {
-      return _defaultsForCurrentMode();
-    }
+    final result = raw == null
+        ? _defaultsForCurrentMode()
+        : (() {
+            try {
+              return ChecklistConfig.fromJsonString(raw);
+            } catch (_) {
+              return _defaultsForCurrentMode();
+            }
+          })();
+    _cache[prefix] = result;
+    return result;
   }
 
   @override
   Future<void> save(ChecklistConfig config) async {
+    _cache[AppModeManager.instance.current.keyPrefix] = config;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_key, config.toJsonString());
   }

@@ -91,9 +91,12 @@ class AppModeManager extends ChangeNotifier {
   Future<void> setMode(AppMode mode) async {
     if (_mode == mode) return;
     _mode = mode;
+    // UI を即座に更新する。永続化（ディスク書き込み）の完了は待たない＝
+    // 切替直後のカクつき/もたつきを防ぐ。notifyListeners() は同期的に走るため
+    // この時点で各画面のリビルドが始まる。
+    notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_modeKey, mode.name);
-    notifyListeners();
   }
 }
 

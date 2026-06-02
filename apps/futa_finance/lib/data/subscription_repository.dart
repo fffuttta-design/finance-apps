@@ -25,20 +25,33 @@ class LocalSubscriptionRepository implements SubscriptionRepository {
   String get _key =>
       'futa.${AppModeManager.instance.current.keyPrefix}.subscriptions';
 
+  // モード別の解析済みキャッシュ。切替時の再解析を避ける。
+  final Map<String, SubscriptionConfig> _cache = {};
+
   @override
   Future<SubscriptionConfig> load() async {
+    final prefix = AppModeManager.instance.current.keyPrefix;
+    final cached = _cache[prefix];
+    if (cached != null) return cached;
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key);
-    if (raw == null) return SubscriptionConfig.empty();
-    try {
-      return SubscriptionConfig.fromJsonString(raw);
-    } catch (_) {
-      return SubscriptionConfig.empty();
+    SubscriptionConfig result;
+    if (raw == null) {
+      result = SubscriptionConfig.empty();
+    } else {
+      try {
+        result = SubscriptionConfig.fromJsonString(raw);
+      } catch (_) {
+        result = SubscriptionConfig.empty();
+      }
     }
+    _cache[prefix] = result;
+    return result;
   }
 
   @override
   Future<void> save(SubscriptionConfig config) async {
+    _cache[AppModeManager.instance.current.keyPrefix] = config;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_key, config.toJsonString());
   }
