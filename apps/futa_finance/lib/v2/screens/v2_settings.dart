@@ -10,6 +10,7 @@ import '../../screens/subscription_list_screen.dart';
 import 'panels/v2_backup_panel.dart';
 import 'panels/v2_income_master_panel.dart';
 import 'panels/v2_sidebar_order_panel.dart';
+import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
@@ -53,29 +54,78 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
     ]),
   ];
 
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: V2Spacing.xl),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── 左: メニュー ──
-          SizedBox(
-            width: 240,
-            child: _SettingsMenu(
-              groups: _menus,
-              currentId: _currentId,
-              accent: widget.accent,
-              onSelect: (id) => setState(() => _currentId = id),
+  String _titleFor(String id) {
+    for (final g in _menus) {
+      for (final it in g.items) {
+        if (it.id == id) return it.label;
+      }
+    }
+    return '設定';
+  }
+
+  /// 狭い画面（スマホ）：メニュー項目タップで該当パネルをフルスクリーンで開く。
+  void _openPanelScreen(String id) {
+    setState(() => _currentId = id);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Theme(
+          data: V2Theme.light(),
+          child: Scaffold(
+            backgroundColor: V2Colors.surfaceMuted,
+            appBar: AppBar(
+              title: Text(_titleFor(id),
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w700)),
+            ),
+            body: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(V2Spacing.lg),
+                child: _buildPanel(),
+              ),
             ),
           ),
-          const SizedBox(width: V2Spacing.lg),
-          // ── 右: パネル ──
-          Expanded(child: _buildPanel()),
-        ],
+        ),
       ),
     );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, c) {
+      // 広い画面：左メニュー＋右パネルのマスター/ディテール。
+      if (c.maxWidth >= 900) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: V2Spacing.xl),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 240,
+                child: _SettingsMenu(
+                  groups: _menus,
+                  currentId: _currentId,
+                  accent: widget.accent,
+                  onSelect: (id) => setState(() => _currentId = id),
+                ),
+              ),
+              const SizedBox(width: V2Spacing.lg),
+              Expanded(child: _buildPanel()),
+            ],
+          ),
+        );
+      }
+      // 狭い画面（スマホ）：メニューだけを縦に。タップで各設定をフルスクリーンへ。
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: V2Spacing.lg),
+        child: _SettingsMenu(
+          groups: _menus,
+          currentId: '',
+          accent: widget.accent,
+          onSelect: _openPanelScreen,
+        ),
+      );
+    });
   }
 
   Widget _buildPanel() {
