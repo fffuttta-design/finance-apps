@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.157",
-    "buildNumber":  "158",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.157/futa-finance-v1.0.157.apk",
-    "releaseNotes":  "OCRに内訳(品目)を備考へ/カード利用累計を撤去/レシート読み取りを高速化"
+    "version":  "1.0.158",
+    "buildNumber":  "159",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.158/futa-finance-v1.0.158.apk",
+    "releaseNotes":  "記録/編集/OCR入力を全画面からポップアップ(モーダルシート)に変更"
 }
