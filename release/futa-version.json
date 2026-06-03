@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.147",
-    "buildNumber":  "148",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.147/futa-finance-v1.0.147.apk",
-    "releaseNotes":  "ホームの月送り矢印を追加。クレカの利用累計の文言を分かりやすく"
+    "version":  "1.0.148",
+    "buildNumber":  "149",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.148/futa-finance-v1.0.148.apk",
+    "releaseNotes":  "業績の当月表示崩れ(NaN)を修正。当月経費に固定費を加算し推定残高にも反映"
 }
