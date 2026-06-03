@@ -4,9 +4,11 @@
 // ignore_for_file: unused_element
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
+import 'package:image_picker/image_picker.dart';
 
 import '../data/app_mode.dart';
 import '../data/budget_item.dart';
@@ -14,11 +16,13 @@ import '../data/budget_item_repository.dart';
 import '../data/liability.dart';
 import '../data/liability_repository.dart';
 import '../data/payments_change_notifier.dart';
+import '../data/receipt_ocr.dart';
 import '../data/settings_repository.dart';
 import '../data/subscription_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
+import 'expense_input_screen.dart';
 
 /// 🧪 開発中ラボ（事業モード専用）
 ///
@@ -97,9 +101,192 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
         child: Column(
           children: [
             _viewToggle(),
+            _ocrButton(),
             Expanded(child: _buildBody()),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _ocrButton() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: _runOcr,
+          icon: const Icon(Icons.document_scanner_outlined, size: 18),
+          label: const Text('レシート読取（OCR）→ 支出入力'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF1A237E),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _runOcr() async {
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('レシート読取は Android アプリでご利用ください')),
+      );
+      return;
+    }
+    // 取得元（カメラ/ギャラリー）を選択。
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('カメラで撮影'),
+              onTap: () => Navigator.pop(sheet, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('ギャラリーから選択'),
+              onTap: () => Navigator.pop(sheet, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    // 読取中インジケータ。
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const AlertDialog(
+        content: Row(children: [
+          SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2.5)),
+          SizedBox(width: 16),
+          Text('レシートを読み取り中...'),
+        ]),
+      ),
+    );
+
+    ReceiptOcrResult? result;
+    String? error;
+    try {
+      result = await ReceiptOcr.instance.captureAndRecognize(source: source);
+    } catch (e) {
+      error = '$e';
+    }
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop(); // インジケータを閉じる
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('読取に失敗しました: $error')),
+      );
+      return;
+    }
+    if (result == null) return; // キャンセル
+
+    await _showOcrResult(result);
+  }
+
+  Future<void> _showOcrResult(ReceiptOcrResult r) async {
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(children: [
+          Icon(Icons.document_scanner, color: Color(0xFF1A237E)),
+          SizedBox(width: 8),
+          Text('読み取り結果'),
+        ]),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _ocrField('金額',
+                  r.amount != null ? formatYen(r.amount!) : '— 認識できず'),
+              _ocrField(
+                  '日付',
+                  r.date != null
+                      ? '${r.date!.year}/${r.date!.month}/${r.date!.day}'
+                      : '— 認識できず（今日になります）'),
+              _ocrField('店名', r.storeName ?? '— 認識できず'),
+              const SizedBox(height: 10),
+              const Text('読み取り全文',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF6B7280))),
+              const SizedBox(height: 4),
+              Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(maxHeight: 160),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: SingleChildScrollView(
+                  child: Text(
+                    r.rawText.isEmpty ? '(文字を認識できませんでした)' : r.rawText,
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF374151)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('閉じる')),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.edit_note, size: 18),
+            label: const Text('この内容で支出入力'),
+          ),
+        ],
+      ),
+    );
+    if (go != true || !mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ExpenseInputScreen(
+          initialAmount: r.amount,
+          initialDate: r.date,
+          initialDescription: r.storeName,
+        ),
+      ),
+    );
+  }
+
+  Widget _ocrField(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          SizedBox(
+              width: 48,
+              child: Text(label,
+                  style: const TextStyle(
+                      fontSize: 12, color: Color(0xFF6B7280)))),
+          Expanded(
+            child: Text(value,
+                style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF111827))),
+          ),
+        ],
       ),
     );
   }
