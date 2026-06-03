@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.145",
-    "buildNumber":  "146",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.145/futa-finance-v1.0.145.apk",
-    "releaseNotes":  "OCR金額精度を改善(¥付き数字のみ+店コード等の誤検出を除外)"
+    "version":  "1.0.146",
+    "buildNumber":  "147",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.146/futa-finance-v1.0.146.apk",
+    "releaseNotes":  "旧サイドバー版の死コードを削除(UI一本化の整理・挙動変更なし)"
 }
