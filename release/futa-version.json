@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.146",
-    "buildNumber":  "147",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.146/futa-finance-v1.0.146.apk",
-    "releaseNotes":  "旧サイドバー版の死コードを削除(UI一本化の整理・挙動変更なし)"
+    "version":  "1.0.147",
+    "buildNumber":  "148",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.147/futa-finance-v1.0.147.apk",
+    "releaseNotes":  "ホームの月送り矢印を追加。クレカの利用累計の文言を分かりやすく"
 }
