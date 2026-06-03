@@ -302,7 +302,10 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
         ),
       ),
       body: SafeArea(
-        child: sources.sources.isEmpty
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: sources.sources.isEmpty
             ? _emptySourcesPrompt()
             : Form(
                 key: _formKey,
@@ -502,6 +505,8 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                   ],
                 ),
               ),
+          ),
+        ),
       ),
     );
   }

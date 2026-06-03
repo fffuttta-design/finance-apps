@@ -208,7 +208,10 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -311,6 +314,8 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
               ),
             ),
           ],
+        ),
+      ),
         ),
       ),
     );

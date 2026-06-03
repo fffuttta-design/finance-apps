@@ -602,7 +602,10 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         ),
       ),
       body: SafeArea(
-        child: Form(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: Form(
           key: _formKey,
           child: ListView(
             padding: const EdgeInsets.all(16),
@@ -932,6 +935,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 ),
               ),
             ],
+          ),
+            ),
           ),
         ),
       ),
