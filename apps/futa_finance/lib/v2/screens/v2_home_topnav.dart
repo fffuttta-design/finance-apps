@@ -715,10 +715,35 @@ class _CenterColumn extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                  '${state._selectedMonth.year}年${state._selectedMonth.month}月の収支',
-                  style: V2Typography.h2
-                      .copyWith(color: V2Colors.textPrimary)),
+              Row(
+                children: [
+                  Text(
+                      '${state._selectedMonth.year}年${state._selectedMonth.month}月の収支',
+                      style: V2Typography.h2
+                          .copyWith(color: V2Colors.textPrimary)),
+                  const Spacer(),
+                  // 月送り（前月/翌月）。
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    iconSize: 22,
+                    icon: const Icon(Icons.chevron_left),
+                    onPressed: () => state.shiftMonth(-1),
+                    tooltip: '前の月',
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    iconSize: 22,
+                    icon: const Icon(Icons.chevron_right),
+                    onPressed: () => state.shiftMonth(1),
+                    tooltip: '次の月',
+                  ),
+                ],
+              ),
               const SizedBox(height: V2Spacing.sm),
               // 月を横並びチップで切替（横スクロール）
               _MonthChipsBar(

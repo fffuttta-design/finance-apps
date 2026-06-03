@@ -852,8 +852,17 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               if (hasBalanceTracking) ...[
                 const SizedBox(height: 16),
                 _label(isCard
-                    ? '累積後の利用額（円）— 自動計算・編集可'
+                    ? 'この支出を含むカード利用累計（円）— 自動計算・編集可'
                     : '支出後の残高（円）— 自動計算・編集可'),
+                if (isCard)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 4, top: 2, bottom: 4),
+                    child: Text(
+                      'クレカは残高でなく「利用累計」で管理します。今回の支出を足した累計が入ります（実際の利用額とズレたら手修正可）。',
+                      style: TextStyle(
+                          fontSize: 11, color: Color(0xFF6B7280)),
+                    ),
+                  ),
                 TextFormField(
                   controller: _balanceAfterCtrl,
                   focusNode: _balanceFocus,
