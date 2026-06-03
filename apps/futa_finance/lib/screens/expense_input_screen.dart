@@ -9,7 +9,8 @@ import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
 
 /// 支払元のカテゴリ。UI 上はまずこれを選択 → 該当の項目プルダウンが切り替わる。
-enum _PayCategory { card, bank, cash, emoney }
+/// 表示順 = クレカ・電子・現金・銀行（使用頻度の高い順）。
+enum _PayCategory { card, emoney, cash, bank }
 
 extension _PayCategoryX on _PayCategory {
   String get label {

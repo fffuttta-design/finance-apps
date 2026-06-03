@@ -8,6 +8,37 @@ import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
 
+/// 支払元のカテゴリ。表示順 = クレカ・電子・現金・銀行。
+enum _PayCat { card, emoney, cash, bank }
+
+extension _PayCatX on _PayCat {
+  String get label {
+    switch (this) {
+      case _PayCat.card:
+        return 'クレカ';
+      case _PayCat.emoney:
+        return '電子';
+      case _PayCat.cash:
+        return '現金';
+      case _PayCat.bank:
+        return '銀行';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case _PayCat.card:
+        return Icons.credit_card;
+      case _PayCat.emoney:
+        return Icons.phone_iphone;
+      case _PayCat.cash:
+        return Icons.payments;
+      case _PayCat.bank:
+        return Icons.account_balance;
+    }
+  }
+}
+
 /// レシートの品目ごとに「1品目=1取引」で複数まとめて記録する画面。
 /// 日付・支払方法・会計科目は共通で設定し、各品目の名前/金額は編集可。
 class ReceiptSplitScreen extends StatefulWidget {
@@ -44,6 +75,7 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
   String? _major;
   String? _sub;
   String? _paymentMethod;
+  _PayCat _payCat = _PayCat.card;
   bool _saving = false;
 
   late final List<_Row> _rows = widget.items
@@ -73,7 +105,40 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
     setState(() {
       _categories = c;
       _payments = p;
+      // 既定カテゴリ（クレカ）の先頭項目を支払方法に。
+      _applyPayCategoryDefault();
     });
+  }
+
+  /// 現カテゴリの先頭項目を _paymentMethod にセット（空ならクリア）。
+  void _applyPayCategoryDefault() {
+    final list = _methodsFor(_payCat);
+    _paymentMethod = list.isEmpty ? null : list.first;
+  }
+
+  /// 指定カテゴリの登録項目名リスト。
+  List<String> _methodsFor(_PayCat cat) {
+    final p = _payments;
+    if (p == null) return const [];
+    switch (cat) {
+      case _PayCat.card:
+        return p.creditCards.map((c) => c.name).toList();
+      case _PayCat.bank:
+        return p.bankAccounts
+            .where((b) => b.accountType == core.AccountType.bank)
+            .map((b) => b.name)
+            .toList();
+      case _PayCat.cash:
+        return p.bankAccounts
+            .where((b) => b.accountType == core.AccountType.cash)
+            .map((b) => b.name)
+            .toList();
+      case _PayCat.emoney:
+        return p.bankAccounts
+            .where((b) => b.accountType == core.AccountType.emoney)
+            .map((b) => b.name)
+            .toList();
+    }
   }
 
   List<String> get _majorNames {
@@ -92,15 +157,6 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
         .indexWhere((m) => m.displayName(c.majors.indexOf(m)) == _major);
     if (idx < 0) return const [];
     return c.majors[idx].subs;
-  }
-
-  List<String> get _allMethods {
-    final p = _payments;
-    if (p == null) return const [];
-    return [
-      ...p.creditCards.map((c) => c.name),
-      ...p.bankAccounts.map((b) => b.name),
-    ];
   }
 
   int get _includedTotal {
@@ -201,18 +257,56 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                         ),
                         const SizedBox(height: 12),
                         _label('支払方法（共通）'),
-                        DropdownButtonFormField<String>(
-                          initialValue: _allMethods.contains(_paymentMethod)
-                              ? _paymentMethod
-                              : null,
-                          items: _allMethods
-                              .map((m) => DropdownMenuItem(
-                                  value: m, child: Text(m)))
+                        // 1段目: カテゴリ選択（クレカ/電子/現金/銀行）。
+                        SegmentedButton<_PayCat>(
+                          segments: _PayCat.values
+                              .map((c) => ButtonSegment<_PayCat>(
+                                    value: c,
+                                    icon: Icon(c.icon, size: 16),
+                                    label: Text(c.label,
+                                        style: const TextStyle(fontSize: 12)),
+                                  ))
                               .toList(),
-                          onChanged: (v) =>
-                              setState(() => _paymentMethod = v),
-                          decoration: _dec('選択してください'),
+                          selected: {_payCat},
+                          showSelectedIcon: false,
+                          onSelectionChanged: (s) => setState(() {
+                            _payCat = s.first;
+                            _applyPayCategoryDefault();
+                          }),
+                          style: const ButtonStyle(
+                            visualDensity: VisualDensity.compact,
+                          ),
                         ),
+                        const SizedBox(height: 8),
+                        // 2段目: そのカテゴリの項目プルダウン。
+                        if (_methodsFor(_payCat).isEmpty)
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF3C7),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '${_payCat.label}が未登録です。設定で登録してください。',
+                              style: const TextStyle(
+                                  fontSize: 12, color: Color(0xFF92400E)),
+                            ),
+                          )
+                        else
+                          DropdownButtonFormField<String>(
+                            key: ValueKey('pay-${_payCat.name}'),
+                            initialValue:
+                                _methodsFor(_payCat).contains(_paymentMethod)
+                                    ? _paymentMethod
+                                    : null,
+                            items: _methodsFor(_payCat)
+                                .map((m) => DropdownMenuItem(
+                                    value: m, child: Text(m)))
+                                .toList(),
+                            onChanged: (v) =>
+                                setState(() => _paymentMethod = v),
+                            decoration: _dec('選択してください'),
+                          ),
                         const SizedBox(height: 12),
                         _label('大カテゴリ（共通）'),
                         DropdownButtonFormField<String>(
