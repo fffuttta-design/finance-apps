@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.161",
-    "buildNumber":  "162",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.161/futa-finance-v1.0.161.apk",
-    "releaseNotes":  "v1.0.161 固定費に追加ボタンを常設、開始月と終了月を記入可能に"
+    "version":  "1.0.162",
+    "buildNumber":  "163",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.162/futa-finance-v1.0.162.apk",
+    "releaseNotes":  "v1.0.162 経費明細一覧(並び替え・検索)を追加、レシート読取を記録メニューへ正式移管"
 }
