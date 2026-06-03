@@ -234,12 +234,17 @@ class MajorCategory {
   /// null/空は「その他」グループ扱い。UI でセクション見出しに使う。
   final String? section;
 
+  /// 休眠フラグ。true なら新規入力のカテゴリ候補から隠す（ほぼ使わない科目向け）。
+  /// 既存取引や集計には影響しない（編集画面では薄く表示して復帰可能）。
+  final bool inactive;
+
   const MajorCategory({
     required this.name,
     required this.subs,
     this.iconKey,
     this.subIcons,
     this.section,
+    this.inactive = false,
   });
 
   /// インデックス付きの表示名（例: "0.固定費(定額)"）。
@@ -254,6 +259,7 @@ class MajorCategory {
         'iconKey': iconKey,
         'subIcons': subIcons,
         'section': section,
+        'inactive': inactive,
       };
 
   factory MajorCategory.fromJson(Map<String, dynamic> json) => MajorCategory(
@@ -263,6 +269,7 @@ class MajorCategory {
         subIcons: (json['subIcons'] as Map<String, dynamic>?)
             ?.map((k, v) => MapEntry(k, v as String)),
         section: json['section'] as String?,
+        inactive: json['inactive'] as bool? ?? false,
       );
 
   MajorCategory copyWith({
@@ -271,6 +278,7 @@ class MajorCategory {
     String? iconKey,
     Map<String, String>? subIcons,
     String? section,
+    bool? inactive,
   }) =>
       MajorCategory(
         name: name ?? this.name,
@@ -278,5 +286,6 @@ class MajorCategory {
         iconKey: iconKey ?? this.iconKey,
         subIcons: subIcons ?? this.subIcons,
         section: section ?? this.section,
+        inactive: inactive ?? this.inactive,
       );
 }

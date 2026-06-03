@@ -639,16 +639,19 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 initialValue: _majorCategory,
                 items: [
                   for (int i = 0; i < majorNames.length; i++)
-                    DropdownMenuItem(
-                      value: majorNames[i],
-                      child: Text(
-                        (categories.majors[i].section != null &&
-                                categories.majors[i].section!.isNotEmpty)
-                            ? '［${categories.majors[i].section}］${categories.majors[i].name}'
-                            : categories.majors[i].name,
-                        overflow: TextOverflow.ellipsis,
+                    // 休眠カテゴリは候補から隠す（選択中の値だけは残す）。
+                    if (!categories.majors[i].inactive ||
+                        majorNames[i] == _majorCategory)
+                      DropdownMenuItem(
+                        value: majorNames[i],
+                        child: Text(
+                          (categories.majors[i].section != null &&
+                                  categories.majors[i].section!.isNotEmpty)
+                              ? '［${categories.majors[i].section}］${categories.majors[i].name}'
+                              : categories.majors[i].name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
                   const DropdownMenuItem(
                     value: _kAddNewSentinel,
                     child: Row(

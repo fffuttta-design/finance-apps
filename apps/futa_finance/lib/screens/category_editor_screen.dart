@@ -139,6 +139,12 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
     _update(list);
   }
 
+  void _toggleInactive(int index) {
+    final list = [..._config!.majors];
+    list[index] = list[index].copyWith(inactive: !list[index].inactive);
+    _update(list);
+  }
+
   Future<void> _pickIcon(int index) async {
     final current = _config!.majors[index].iconKey;
     final newEmoji =
@@ -285,24 +291,60 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      major.displayName(index),
-                      style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF111827)),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${major.subs.length}件の小カテゴリ',
-                      style: const TextStyle(
-                          fontSize: 11, color: Color(0xFF9CA3AF)),
-                    ),
-                  ],
+                child: Opacity(
+                  opacity: major.inactive ? 0.45 : 1,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        major.displayName(index),
+                        style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF111827)),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          if (major.inactive) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE5E7EB),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: const Text('休眠',
+                                  style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF6B7280))),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          Text(
+                            '${major.subs.length}件の小カテゴリ',
+                            style: const TextStyle(
+                                fontSize: 11, color: Color(0xFF9CA3AF)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                    major.inactive
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    size: 18,
+                    color: major.inactive
+                        ? const Color(0xFFEA580C)
+                        : const Color(0xFF9CA3AF)),
+                onPressed: () => _toggleInactive(index),
+                tooltip: major.inactive ? '休眠を解除' : '休眠にする（入力候補から隠す）',
               ),
               IconButton(
                 visualDensity: VisualDensity.compact,
