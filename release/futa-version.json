@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.165",
-    "buildNumber":  "166",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.165/futa-finance-v1.0.165.apk",
-    "releaseNotes":  "v1.0.165 品目ごと記録の合計を大きく表示、品目別に会計カテゴリ設定可、支払店舗を記録可能に"
+    "version":  "1.0.166",
+    "buildNumber":  "167",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.166/futa-finance-v1.0.166.apk",
+    "releaseNotes":  "v1.0.166 レシート読取は品目ごとを既定表示、品目カテゴリは未設定時は鉛筆アイコンのみの控えめ表示に"
 }
