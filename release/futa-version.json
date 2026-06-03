@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.144",
-    "buildNumber":  "145",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.144/futa-finance-v1.0.144.apk",
-    "releaseNotes":  "設定に取引の科目を一括付替ツールを追加(過去取引の科目付替・自動バックアップ付き)"
+    "version":  "1.0.145",
+    "buildNumber":  "146",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.145/futa-finance-v1.0.145.apk",
+    "releaseNotes":  "OCR金額精度を改善(¥付き数字のみ+店コード等の誤検出を除外)"
 }
