@@ -44,26 +44,52 @@ class ReceiptOcr {
   /// OCRテキストから金額・日付・店名を推定。
   ReceiptOcrResult _parse(String text) {
     final lines = text.split('\n');
-    final amountRe = RegExp(r'([0-9][0-9,]{0,9})');
+    // 金額として拾ってはいけない行（ID・電話・コード・ポイント・釣り等）。
+    bool isExcluded(String l) =>
+        l.contains('登録番号') ||
+        l.contains('電話') ||
+        l.contains('TEL') ||
+        l.contains('コード') ||
+        l.contains('会員') ||
+        l.contains('番号') ||
+        l.contains('ポイント') ||
+        l.contains('預') ||
+        l.contains('おつり') ||
+        l.contains('お釣') ||
+        l.contains('釣') ||
+        l.contains('有効期限');
 
-    int? maxAll; // 全体の最大金額
-    int? totalLine; // 「合計/お会計」行の最大金額
+    // ¥ / \ / ￥ が付いた数字だけを金額候補にする（店コードや電話番号の誤検出を防ぐ）。
+    final yenRe = RegExp(r'[¥\\￥]\s?([0-9][0-9,]{0,9})');
+    // フォールバック用: カンマ区切りの数字（1,065 など。3桁以上の金額っぽいもの）。
+    final commaRe = RegExp(r'([0-9]{1,3}(?:,[0-9]{3})+)');
+
+    int? maxYen; // ¥付きの最大額
+    int? totalLine; // 「合計」行の額
+    int? maxComma; // フォールバック
     for (final line in lines) {
+      if (isExcluded(line)) continue;
       final isTotal = line.contains('合計') ||
           line.contains('合 計') ||
+          line.contains('合計金額') ||
           line.contains('お会計') ||
           line.contains('お買上') ||
+          line.contains('買上') ||
           line.toLowerCase().contains('total');
-      for (final m in amountRe.allMatches(line)) {
+      for (final m in yenRe.allMatches(line)) {
         final v = int.tryParse(m.group(1)!.replaceAll(',', ''));
         if (v == null || v < 10 || v > 100000000) continue;
-        if (maxAll == null || v > maxAll) maxAll = v;
-        if (isTotal && (totalLine == null || v > totalLine)) {
-          totalLine = v;
-        }
+        if (maxYen == null || v > maxYen) maxYen = v;
+        if (isTotal && (totalLine == null || v > totalLine)) totalLine = v;
+      }
+      for (final m in commaRe.allMatches(line)) {
+        final v = int.tryParse(m.group(1)!.replaceAll(',', ''));
+        if (v == null || v < 100 || v > 100000000) continue;
+        if (maxComma == null || v > maxComma) maxComma = v;
       }
     }
-    final amount = totalLine ?? maxAll;
+    // 合計行の¥ > ¥付き最大 > カンマ数字最大 の優先で決定。
+    final amount = totalLine ?? maxYen ?? maxComma;
 
     // 店名: 最初の意味のある行（数字だけ/記号だけは除外）。
     String? store;
