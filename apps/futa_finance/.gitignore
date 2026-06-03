@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Gemini API key (OCRクラウド版・git管理しない)
+gemini.key

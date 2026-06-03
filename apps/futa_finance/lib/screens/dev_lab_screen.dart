@@ -19,6 +19,7 @@ import '../data/payments_change_notifier.dart';
 import '../data/pl_plan.dart';
 import '../data/pl_plan_repository.dart';
 import '../data/receipt_ocr.dart';
+import '../data/receipt_ocr_cloud.dart';
 import '../data/settings_repository.dart';
 import '../data/subscription_repository.dart';
 import '../data/transaction_repository.dart';
@@ -112,25 +113,46 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
   }
 
   Widget _ocrButton() {
+    final cloud = ReceiptOcrCloud.available;
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: SizedBox(
-        width: double.infinity,
-        child: OutlinedButton.icon(
-          onPressed: _runOcr,
-          icon: const Icon(Icons.document_scanner_outlined, size: 18),
-          label: const Text('レシート読取（OCR）→ 支出入力'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFF1A237E),
-            padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Column(
+        children: [
+          if (cloud)
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () => _runOcr(cloud: true),
+                icon: const Icon(Icons.auto_awesome, size: 18),
+                label: const Text('レシート読取（高精度・クラウド）→ 支出入力'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF1A237E),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
+            ),
+          if (cloud) const SizedBox(height: 6),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _runOcr(cloud: false),
+              icon: const Icon(Icons.document_scanner_outlined, size: 18),
+              label: Text(cloud
+                  ? '端末内で読取（オフライン）'
+                  : 'レシート読取（OCR）→ 支出入力'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF1A237E),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Future<void> _runOcr() async {
+  Future<void> _runOcr({required bool cloud}) async {
     if (kIsWeb) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -180,7 +202,10 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
     ReceiptOcrResult? result;
     String? error;
     try {
-      result = await ReceiptOcr.instance.captureAndRecognize(source: source);
+      result = cloud
+          ? await ReceiptOcrCloud.instance
+              .captureAndRecognize(source: source)
+          : await ReceiptOcr.instance.captureAndRecognize(source: source);
     } catch (e) {
       error = '$e';
     }

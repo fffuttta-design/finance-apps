@@ -70,7 +70,17 @@ if ([string]::IsNullOrWhiteSpace($ReleaseNotes)) {
 # === 2. APKビルド ===
 Write-Host "[1/5] APKビルド (release)..." -ForegroundColor Yellow
 Set-Location $appDir
-flutter build apk --release
+# Gemini APIキー(OCRクラウド版)を gemini.key から読み、dart-define で注入（gitには載せない）。
+$geminiKeyFile = Join-Path $appDir "gemini.key"
+$dartDefines = @()
+if (Test-Path $geminiKeyFile) {
+  $gk = (Get-Content $geminiKeyFile -Raw).Trim()
+  if (-not [string]::IsNullOrWhiteSpace($gk)) {
+    $dartDefines += "--dart-define=GEMINI_API_KEY=$gk"
+    Write-Host "  OCRクラウド用 GEMINI_API_KEY を注入" -ForegroundColor DarkGray
+  }
+}
+flutter build apk --release @dartDefines
 if ($LASTEXITCODE -ne 0) {
   Set-Location $root
   Write-Error "ビルド失敗"
