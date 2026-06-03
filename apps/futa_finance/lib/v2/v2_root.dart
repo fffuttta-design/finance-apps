@@ -60,34 +60,32 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
   }
 
   /// 現在のモードに応じて表示するナビ一覧。
+  /// 「設定→上タブの並び順」(UiPreferences.sidebarOrder)で並びを反映する。
   List<V2NavItem> get _navItems {
     final isBusiness =
         AppModeManager.instance.current == AppMode.business;
-    return [
-      const V2NavItem(
+    final all = <String, V2NavItem>{
+      'home': const V2NavItem(
           id: 'home', label: 'ホーム', icon: Icons.dashboard_outlined),
-      const V2NavItem(
-          id: 'expenses',
-          label: '支出',
-          icon: Icons.receipt_long_outlined),
-      const V2NavItem(
-          id: 'income',
-          label: '収入',
-          icon: Icons.savings_outlined),
-      const V2NavItem(
-          id: 'report',
-          label: '業績',
-          icon: Icons.bar_chart_outlined),
-      const V2NavItem(
-          id: 'settings',
-          label: '設定',
-          icon: Icons.settings_outlined),
+      'expenses': const V2NavItem(
+          id: 'expenses', label: '支出', icon: Icons.receipt_long_outlined),
+      'income': const V2NavItem(
+          id: 'income', label: '収入', icon: Icons.savings_outlined),
+      'report': const V2NavItem(
+          id: 'report', label: '業績', icon: Icons.bar_chart_outlined),
+      'settings': const V2NavItem(
+          id: 'settings', label: '設定', icon: Icons.settings_outlined),
       if (isBusiness)
-        const V2NavItem(
-            id: 'devLab',
-            label: '開発中',
-            icon: Icons.science_outlined),
-    ];
+        'devLab': const V2NavItem(
+            id: 'devLab', label: '開発中', icon: Icons.science_outlined),
+    };
+    final result = <V2NavItem>[];
+    for (final id in UiPreferences.instance.sidebarOrder) {
+      final item = all.remove(id);
+      if (item != null) result.add(item);
+    }
+    result.addAll(all.values); // 念のため残り（順序未登録のもの）
+    return result;
   }
 
   Widget _bodyFor(String id, {required Color accent}) {

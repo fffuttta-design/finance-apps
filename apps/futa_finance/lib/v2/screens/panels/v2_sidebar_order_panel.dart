@@ -39,20 +39,10 @@ class _V2SidebarOrderPanelState extends State<V2SidebarOrderPanel> {
       icon: Icons.savings_outlined,
       hint: '収入タブ'
     ),
-    'asset': (
-      label: '資産',
-      icon: Icons.account_balance_wallet_outlined,
-      hint: '資産タブ（ウォレット残高）'
-    ),
-    'cards': (
-      label: 'クレカ',
-      icon: Icons.credit_card_outlined,
-      hint: 'クレジットカードタブ'
-    ),
     'report': (
-      label: '集計',
+      label: '業績',
       icon: Icons.bar_chart_outlined,
-      hint: '集計タブ（PL / カテゴリ別 / 月末締め）'
+      hint: '業績タブ（PL）'
     ),
     'settings': (
       label: '設定',
@@ -119,11 +109,11 @@ class _V2SidebarOrderPanelState extends State<V2SidebarOrderPanel> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('サイドバー / 上タブの並び順',
+                    Text('上タブの並び順',
                         style: V2Typography.h1),
                     const SizedBox(height: V2Spacing.xs),
                     Text(
-                      'ドラッグでナビ項目を並び替え。v2.1 上タブ、v2 サイドバー、v1 サイドバーすべてに反映されます。',
+                      'ドラッグでタブの並び順を変更できます（上タブに反映）。',
                       style: V2Typography.caption.copyWith(
                           color: V2Colors.textSecondary),
                     ),

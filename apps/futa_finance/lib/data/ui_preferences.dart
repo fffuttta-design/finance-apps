@@ -22,13 +22,12 @@ class UiPreferences extends ChangeNotifier {
   /// 既存に該当しない/欠けている識別子は無視 or デフォルト末尾に追加。
   static const _kSidebarOrder = 'futa.ui.sidebar_order';
 
-  /// サイドバーで選択可能な全ナビ識別子（デフォルト並び）。
+  /// タブ（上ナビ）の選択可能な全識別子（デフォルト並び）。
+  /// v2.1 上タブに一本化済み。旧 v1 の asset/cards は廃止（report は「業績」）。
   static const defaultSidebarOrder = <String>[
     'home',
     'expenses',
     'income',
-    'asset',
-    'cards',
     'report',
     'settings',
     'devLab',
@@ -70,13 +69,14 @@ class UiPreferences extends ChangeNotifier {
   bool get hideInactive => _hideInactive;
   bool get loaded => _loaded;
 
-  /// 現在のサイドバー並び順（ユーザー保存値、欠けがあればデフォルトで補う）。
+  /// 現在のタブ並び順（ユーザー保存値）。
+  /// 廃止済みID(asset/cards 等)は除外し、欠けている現行IDは末尾に補完する。
   List<String> get sidebarOrder {
-    // 保存値に含まれない既知の識別子は末尾に補完（新タブ追加時にも壊さない）
-    final missing = defaultSidebarOrder
-        .where((id) => !_sidebarOrder.contains(id))
-        .toList();
-    return [..._sidebarOrder, ...missing];
+    final valid =
+        _sidebarOrder.where((id) => defaultSidebarOrder.contains(id));
+    final missing =
+        defaultSidebarOrder.where((id) => !valid.contains(id));
+    return [...valid, ...missing];
   }
 
   /// v2 UI 強制設定。null=自動判定。
