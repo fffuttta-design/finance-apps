@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.158",
-    "buildNumber":  "159",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.158/futa-finance-v1.0.158.apk",
-    "releaseNotes":  "記録/編集/OCR入力を全画面からポップアップ(モーダルシート)に変更"
+    "version":  "1.0.159",
+    "buildNumber":  "160",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.159/futa-finance-v1.0.159.apk",
+    "releaseNotes":  "v1.0.159 レシートOCRで単発記録か品目ごと記録か選べるように"
 }
