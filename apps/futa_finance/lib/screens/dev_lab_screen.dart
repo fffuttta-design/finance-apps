@@ -273,10 +273,21 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
               initialAmount: r.amount,
               initialDate: r.date,
               initialDescription: r.storeName,
-              initialMemo: r.memo,
+              // 単発でまとめて記録する場合も、読み取った明細は備考に残しておく。
+              initialMemo: _itemsMemo(r),
             ),
           );
     if (changed == true && mounted) await _load();
+  }
+
+  /// 単発記録時に備考へ入れる明細テキストを組み立てる。
+  /// 構造化された品目があればそれを優先（・品名 ¥金額）、無ければ memo を使う。
+  String? _itemsMemo(ReceiptOcrResult r) {
+    final items = r.items;
+    if (items != null && items.isNotEmpty) {
+      return items.map((it) => '・${it.name} ${formatYen(it.price)}').join('\n');
+    }
+    return r.memo;
   }
 
   Widget _viewToggle() {
