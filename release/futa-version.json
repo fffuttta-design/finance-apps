@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.151",
-    "buildNumber":  "152",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.151/futa-finance-v1.0.151.apk",
-    "releaseNotes":  "記録フォーム(支出/収入/振替)のweb全幅を中央寄せ・最大幅に"
+    "version":  "1.0.152",
+    "buildNumber":  "153",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.152/futa-finance-v1.0.152.apk",
+    "releaseNotes":  "タブ並び順から旧タブ(資産/クレカ)を削除し並び替えを上タブに反映"
 }
