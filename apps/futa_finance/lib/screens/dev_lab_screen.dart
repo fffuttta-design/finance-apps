@@ -16,6 +16,8 @@ import '../data/budget_item_repository.dart';
 import '../data/liability.dart';
 import '../data/liability_repository.dart';
 import '../data/payments_change_notifier.dart';
+import '../data/pl_plan.dart';
+import '../data/pl_plan_repository.dart';
 import '../data/receipt_ocr.dart';
 import '../data/settings_repository.dart';
 import '../data/subscription_repository.dart';
@@ -36,7 +38,7 @@ class DevLabScreen extends StatefulWidget {
   State<DevLabScreen> createState() => _DevLabScreenState();
 }
 
-enum _LabView { pl, bs, cashflow, budget }
+enum _LabView { pl, bs, cashflow, budget, plan }
 
 class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
   @override
@@ -301,14 +303,24 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
           borderRadius: BorderRadius.circular(8),
         ),
         padding: const EdgeInsets.all(3),
-        child: Row(
-          children: [
-            Expanded(child: _seg(_LabView.pl, 'PL', Icons.assessment)),
-            Expanded(child: _seg(_LabView.bs, 'BS', Icons.balance)),
-            Expanded(child: _seg(
-                _LabView.cashflow, '資金繰り', Icons.water_drop_outlined)),
-            Expanded(child: _seg(_LabView.budget, '予算', Icons.event_note)),
-          ],
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              SizedBox(width: 80, child: _seg(_LabView.pl, 'PL', Icons.assessment)),
+              SizedBox(width: 80, child: _seg(_LabView.bs, 'BS', Icons.balance)),
+              SizedBox(
+                  width: 96,
+                  child: _seg(_LabView.cashflow, '資金繰り',
+                      Icons.water_drop_outlined)),
+              SizedBox(
+                  width: 80,
+                  child: _seg(_LabView.budget, '予算', Icons.event_note)),
+              SizedBox(
+                  width: 88,
+                  child: _seg(_LabView.plan, '計画', Icons.flag_outlined)),
+            ],
+          ),
         ),
       ),
     );
@@ -365,6 +377,7 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
       _LabView.bs => _bsView(),
       _LabView.cashflow => _cashflowView(),
       _LabView.budget => _budgetView(),
+      _LabView.plan => _planView(),
     };
   }
 
@@ -1429,6 +1442,227 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
         ],
       ),
     );
+  }
+
+  // ── 経営計画（PL予実）プロトタイプ ───────────────────────
+  Widget _planView() {
+    final now = DateTime.now();
+    final fyStartYear = now.month >= 10 ? now.year : now.year - 1;
+    final fyStart = DateTime(fyStartYear, 10);
+
+    // 当事業年度（期初〜当月）の実績を集計。
+    int sales = 0, cogs = 0, sga = 0;
+    for (final t in _transactions) {
+      if (t.date.isBefore(fyStart) || t.date.isAfter(now)) continue;
+      if (t.type == core.TransactionType.income) {
+        sales += t.amount;
+      } else if (t.type == core.TransactionType.expense) {
+        if (_isCostOfSales(t.category.major)) {
+          cogs += t.amount;
+        } else {
+          sga += t.amount;
+        }
+      }
+    }
+
+    return AnimatedBuilder(
+      animation: PlPlanRepository.instance,
+      builder: (context, _) => FutureBuilder<PlPlanConfig>(
+        future: PlPlanRepository.instance.load(fyStartYear),
+        builder: (context, snap) {
+          if (!snap.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          return _planBody(snap.data!, fyStartYear, sales, cogs, sga);
+        },
+      ),
+    );
+  }
+
+  Widget _planBody(PlPlanConfig plan, int fyStartYear, int actualSales,
+      int actualCogs, int actualSga) {
+    final actualGross = actualSales - actualCogs;
+    final actualOper = actualGross - actualSga;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      children: [
+        _devNote('経営計画（PL予実） - プロトタイプ',
+            '$fyStartYear年10月〜${fyStartYear + 1}年9月の年間計画（赤字）と実績（期初〜当月）の対比。'),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: () => _editPlan(plan),
+            icon: const Icon(Icons.edit, size: 16),
+            label: const Text('計画を入力'),
+          ),
+        ),
+        // ヘッダー
+        Container(
+          color: const Color(0xFFF3F4F6),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            children: const [
+              SizedBox(
+                  width: 70,
+                  child: Text('科目',
+                      style: TextStyle(
+                          fontSize: 11, fontWeight: FontWeight.w700))),
+              Expanded(
+                  child: Text('計画',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFDC2626)))),
+              Expanded(
+                  child: Text('実績',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                          fontSize: 11, fontWeight: FontWeight.w700))),
+              Expanded(
+                  child: Text('進捗',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                          fontSize: 11, fontWeight: FontWeight.w700))),
+            ],
+          ),
+        ),
+        _planRow('売上高', plan.sales, actualSales, higherIsBetter: true),
+        _planRow('売上原価', plan.cogs, actualCogs, higherIsBetter: false),
+        _planRow('粗利', plan.grossPlan, actualGross,
+            higherIsBetter: true, strong: true),
+        _planRow('販管費', plan.sga, actualSga, higherIsBetter: false),
+        _planRow('営業利益', plan.operPlan, actualOper,
+            higherIsBetter: true, strong: true),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFEF3C7),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Text(
+            '※ プロトタイプ。実績は取引のみ（原価判定はカテゴリ名に「原価/外注/仕入/材料」を含むもの）。'
+            '将来は科目別・月別の計画入力に拡張予定。',
+            style: TextStyle(fontSize: 11, color: Color(0xFF92400E)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _planRow(String label, int plan, int actual,
+      {required bool higherIsBetter, bool strong = false}) {
+    final progress = plan == 0 ? null : (actual / plan * 100);
+    // 達成判定: 売上/利益は実績≧計画で良、原価/販管費は実績≦計画で良。
+    final good = plan == 0
+        ? null
+        : (higherIsBetter ? actual >= plan : actual <= plan);
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(
+            bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+      child: Row(
+        children: [
+          SizedBox(
+              width: 70,
+              child: Text(label,
+                  style: TextStyle(
+                      fontSize: strong ? 13 : 12,
+                      fontWeight:
+                          strong ? FontWeight.w800 : FontWeight.w600))),
+          Expanded(
+            child: Text(plan == 0 ? '—' : formatYen(plan),
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFFDC2626),
+                    fontFamily: 'monospace')),
+          ),
+          Expanded(
+            child: Text(formatYen(actual),
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
+                    fontFamily: 'monospace')),
+          ),
+          Expanded(
+            child: Text(
+                progress == null
+                    ? '—'
+                    : '${progress.toStringAsFixed(0)}%',
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: good == null
+                        ? const Color(0xFF9CA3AF)
+                        : (good
+                            ? const Color(0xFF16A34A)
+                            : const Color(0xFFDC2626)))),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _editPlan(PlPlanConfig plan) async {
+    final salesCtrl =
+        TextEditingController(text: plan.sales == 0 ? '' : formatAmount(plan.sales));
+    final cogsCtrl =
+        TextEditingController(text: plan.cogs == 0 ? '' : formatAmount(plan.cogs));
+    final sgaCtrl =
+        TextEditingController(text: plan.sga == 0 ? '' : formatAmount(plan.sga));
+
+    Widget field(String label, TextEditingController c) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: TextField(
+            controller: c,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              ThousandsSeparatorInputFormatter(),
+            ],
+            decoration:
+                InputDecoration(labelText: label, prefixText: '¥ '),
+          ),
+        );
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('年間計画を入力'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              field('売上高（年間計画）', salesCtrl),
+              field('売上原価（年間計画）', cogsCtrl),
+              field('販管費（年間計画）', sgaCtrl),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('保存')),
+        ],
+      ),
+    );
+    if (saved != true) return;
+    await PlPlanRepository.instance.save(plan.copyWith(
+      sales: parseAmount(salesCtrl.text) ?? 0,
+      cogs: parseAmount(cogsCtrl.text) ?? 0,
+      sga: parseAmount(sgaCtrl.text) ?? 0,
+    ));
   }
 
   Widget _bsSection(
