@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.159",
-    "buildNumber":  "160",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.159/futa-finance-v1.0.159.apk",
-    "releaseNotes":  "v1.0.159 レシートOCRで単発記録か品目ごと記録か選べるように"
+    "version":  "1.0.160",
+    "buildNumber":  "161",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.160/futa-finance-v1.0.160.apk",
+    "releaseNotes":  "v1.0.160 単発記録でも読み取った明細を備考に自動記入"
 }
