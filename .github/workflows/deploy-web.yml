@@ -1,13 +1,16 @@
-name: Deploy Web (FutaFinance)
+name: Deploy Web (FutaFinance + たくはる)
 
 # main ブランチ更新 or 手動実行で Flutter Web をビルドして gh-pages へデプロイ。
-# 公開URL: https://fffuttta-design.github.io/finance-apps/
+# 公開URL:
+#   FutaFinance        https://fffuttta-design.github.io/finance-apps/
+#   たくはるファイナンス   https://fffuttta-design.github.io/finance-apps/takuharu/
 
 on:
   push:
     branches: [main]
     paths:
       - 'apps/futa_finance/**'
+      - 'apps/takuharu_finance/**'
       - 'packages/finance_core/**'
       - '.github/workflows/deploy-web.yml'
   workflow_dispatch: # 手動実行も可能
@@ -41,13 +44,29 @@ jobs:
         run: flutter pub get
         working-directory: apps/futa_finance
 
-      - name: Build Web (release)
+      - name: Build Web - FutaFinance (release)
         # GitHub Pages のサブパスに合わせて base-href を /finance-apps/ に
         run: |
           flutter build web --release \
             --base-href "/finance-apps/" \
             --pwa-strategy=none
         working-directory: apps/futa_finance
+
+      - name: Install dependencies (takuharu_finance)
+        run: flutter pub get
+        working-directory: apps/takuharu_finance
+
+      - name: Build Web - たくはる (release)
+        # たくはるは /finance-apps/takuharu/ サブパスに公開
+        run: |
+          flutter build web --release \
+            --base-href "/finance-apps/takuharu/" \
+            --pwa-strategy=none
+        working-directory: apps/takuharu_finance
+
+      - name: Assemble combined site (takuharu under /takuharu)
+        # futa を gh-pages ルート、takuharu を /takuharu サブフォルダに同梱。
+        run: cp -r apps/takuharu_finance/build/web apps/futa_finance/build/web/takuharu
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v3
