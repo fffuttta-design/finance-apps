@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.139",
-    "buildNumber":  "140",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.139/futa-finance-v1.0.139.apk",
-    "releaseNotes":  "開発中タブに資金繰り表(先6ヶ月の資金予測・マイナス警告)を追加"
+    "version":  "1.0.140",
+    "buildNumber":  "141",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.140/futa-finance-v1.0.140.apk",
+    "releaseNotes":  "開発中タブにレシート読取(OCR・端末内ML Kit)を追加。撮影→読取→支出入力にプリフィル(Android専用)"
 }
