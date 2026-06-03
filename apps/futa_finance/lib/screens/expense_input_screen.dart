@@ -110,6 +110,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   final _usdAmountCtrl = TextEditingController(); // USD金額
   final _balanceAfterCtrl = TextEditingController();
   final _memoCtrl = TextEditingController();
+  final _receiptUrlCtrl = TextEditingController();
   final _amountFocus = FocusNode();
   final _balanceFocus = FocusNode();
   bool _saving = false;
@@ -168,6 +169,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     _usdAmountCtrl.dispose();
     _balanceAfterCtrl.dispose();
     _memoCtrl.dispose();
+    _receiptUrlCtrl.dispose();
     _amountFocus.dispose();
     _balanceFocus.dispose();
     super.dispose();
@@ -534,6 +536,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       description: _descCtrl.text.trim(),
       amount: amount,
       memo: _memoCtrl.text.trim().isEmpty ? null : _memoCtrl.text.trim(),
+      receiptUrl: _receiptUrlCtrl.text.trim().isEmpty
+          ? null
+          : _receiptUrlCtrl.text.trim(),
       originalCurrency: _currency == 'USD' ? 'USD' : null,
       originalAmount: usdAmount,
     );
@@ -896,6 +901,24 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 controller: _memoCtrl,
                 maxLines: 2,
                 decoration: _inputDecoration(),
+              ),
+              const SizedBox(height: 16),
+
+              _label('領収書リンク（任意）'),
+              TextFormField(
+                controller: _receiptUrlCtrl,
+                keyboardType: TextInputType.url,
+                decoration: _inputDecoration(hint: 'Drive等のURLを貼り付け')
+                    .copyWith(
+                  prefixIcon: const Icon(Icons.receipt_long_outlined),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(left: 4, top: 2),
+                child: Text(
+                  '領収書はGoogleドライブ等に保存し、その共有リンクを貼り付けてください（後で開けます）。',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                ),
               ),
               const SizedBox(height: 32),
 

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/app_mode.dart';
 import '../../data/settings_repository.dart';
@@ -129,14 +130,64 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     if (mounted) await _load();
   }
 
-  /// 既存取引の編集は当面サポートなし（v1 で行うか、Phase 9 で対応）
-  /// 行タップ時はサマリーをスナックバーで表示するに留める
+  /// 行タップで明細を表示。領収書リンクがあれば開けるボタンを出す。
   void _showTxnSummary(core.Transaction t) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-            '${t.date.month}/${t.date.day} ${t.description.isEmpty ? t.paymentMethod : t.description} -${formatYen(t.amount)}'),
-        duration: const Duration(seconds: 2),
+    final hasReceipt = t.receiptUrl != null && t.receiptUrl!.trim().isNotEmpty;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheet) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${t.date.year}/${t.date.month}/${t.date.day}　'
+                '${t.description.isEmpty ? t.paymentMethod : t.description}',
+                style: const TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '-${formatYen(t.amount)}　/　${t.category.major}'
+                '${t.category.sub.isNotEmpty ? ' › ${t.category.sub}' : ''}　/　${t.paymentMethod}',
+                style: const TextStyle(
+                    fontSize: 12, color: Color(0xFF6B7280)),
+              ),
+              if (t.memo != null && t.memo!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(t.memo!,
+                    style: const TextStyle(
+                        fontSize: 12, color: Color(0xFF374151))),
+              ],
+              const SizedBox(height: 16),
+              if (hasReceipt)
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () async {
+                      final uri = Uri.tryParse(t.receiptUrl!.trim());
+                      if (uri != null) {
+                        await launchUrl(uri,
+                            mode: LaunchMode.externalApplication);
+                      }
+                    },
+                    icon: const Icon(Icons.receipt_long, size: 18),
+                    label: const Text('領収書を開く'),
+                  ),
+                )
+              else
+                const Text('領収書リンクは未登録です',
+                    style:
+                        TextStyle(fontSize: 12, color: Color(0xFF9CA3AF))),
+            ],
+          ),
+        ),
       ),
     );
   }
