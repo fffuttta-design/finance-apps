@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.148",
-    "buildNumber":  "149",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.148/futa-finance-v1.0.148.apk",
-    "releaseNotes":  "業績の当月表示崩れ(NaN)を修正。当月経費に固定費を加算し推定残高にも反映"
+    "version":  "1.0.149",
+    "buildNumber":  "150",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.149/futa-finance-v1.0.149.apk",
+    "releaseNotes":  "領収書リンク(URL)添付に対応。支出入力で貼り付け→支出タブの行タップで開ける"
 }
