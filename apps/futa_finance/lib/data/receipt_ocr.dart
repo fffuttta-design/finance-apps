@@ -1,6 +1,13 @@
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 
+/// レシートの1品目（内訳）。
+class ReceiptItem {
+  final String name;
+  final int price;
+  const ReceiptItem({required this.name, required this.price});
+}
+
 /// レシートOCRの解析結果。
 class ReceiptOcrResult {
   final String rawText;
@@ -11,12 +18,16 @@ class ReceiptOcrResult {
   /// 内訳（品目）の要約。備考にプリフィルする（クラウド版で抽出）。
   final String? memo;
 
+  /// 構造化した品目一覧（クラウド版で抽出）。品目ごとの複数記録に使う。
+  final List<ReceiptItem>? items;
+
   const ReceiptOcrResult({
     required this.rawText,
     this.amount,
     this.date,
     this.storeName,
     this.memo,
+    this.items,
   });
 }
 

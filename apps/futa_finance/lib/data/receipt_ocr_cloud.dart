@@ -115,8 +115,9 @@ class ReceiptOcrCloud {
       } catch (_) {}
     }
 
-    // 内訳（品目）→ 備考用の要約文字列。
+    // 内訳（品目）→ 構造化リスト＋備考用の要約文字列。
     String? itemsMemo;
+    final structured = <ReceiptItem>[];
     final items = parsed['items'];
     if (items is List && items.isNotEmpty) {
       final lines = <String>[];
@@ -126,6 +127,7 @@ class ReceiptOcrCloud {
           final p = (it['price'] as num?)?.toInt();
           if (n.isEmpty) continue;
           lines.add(p != null ? '$n ¥$p' : n);
+          if (p != null) structured.add(ReceiptItem(name: n, price: p));
         }
       }
       if (lines.isNotEmpty) itemsMemo = lines.join('\n');
@@ -145,6 +147,7 @@ class ReceiptOcrCloud {
       date: date,
       storeName: store,
       memo: itemsMemo,
+      items: structured.isEmpty ? null : structured,
     );
   }
 }

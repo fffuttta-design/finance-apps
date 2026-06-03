@@ -27,6 +27,7 @@ import '../utils/formatters.dart';
 import '../utils/modal_input.dart';
 import '../utils/thousands_separator_input_formatter.dart';
 import 'expense_input_screen.dart';
+import 'receipt_split_screen.dart';
 
 /// 🧪 開発中ラボ（事業モード専用）
 ///
@@ -225,8 +226,6 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
   }
 
   Future<void> _showOcrResult(ReceiptOcrResult r) async {
-    // 読み取り結果は確認ダイアログを挟まず、そのまま支出入力フォームの
-    // テキストボックスに入れる（金額/取引内容/日付）。ユーザーはそこで訂正→保存。
     final nothing = r.amount == null &&
         (r.storeName == null || r.storeName!.trim().isEmpty);
     if (nothing) {
@@ -235,15 +234,48 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
             content: Text('うまく読み取れませんでした。フォームで手入力してください')),
       );
     }
-    final changed = await showInputSheet<bool>(
-      context,
-      ExpenseInputScreen(
-        initialAmount: r.amount,
-        initialDate: r.date,
-        initialDescription: r.storeName,
-        initialMemo: r.memo,
-      ),
-    );
+
+    // 品目が2件以上あれば「単発 / 品目ごと」を選ばせる。
+    final hasItems = r.items != null && r.items!.length >= 2;
+    bool perItem = false;
+    if (hasItems) {
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('記録方法を選択'),
+          content: Text('${r.items!.length}件の品目を読み取りました。どう記録しますか？'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, 'single'),
+                child: const Text('単発でまとめて')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, 'each'),
+                child: const Text('品目ごとに記録')),
+          ],
+        ),
+      );
+      if (choice == null || !mounted) return;
+      perItem = choice == 'each';
+    }
+
+    final changed = perItem
+        ? await showInputSheet<bool>(
+            context,
+            ReceiptSplitScreen(
+              items: r.items!,
+              date: r.date,
+              storeName: r.storeName,
+            ),
+          )
+        : await showInputSheet<bool>(
+            context,
+            ExpenseInputScreen(
+              initialAmount: r.amount,
+              initialDate: r.date,
+              initialDescription: r.storeName,
+              initialMemo: r.memo,
+            ),
+          );
     if (changed == true && mounted) await _load();
   }
 
