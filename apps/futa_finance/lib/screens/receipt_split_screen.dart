@@ -50,12 +50,16 @@ class ReceiptSplitScreen extends StatefulWidget {
   /// 「まとめて1件」を選ぶと [kReceiptSwitchMode] を返して閉じる。
   final bool showModeToggle;
 
+  /// OCRが推定した会計科目（素の名前）。共通大カテゴリの初期値に使う。
+  final String? initialCategoryMajor;
+
   const ReceiptSplitScreen({
     super.key,
     required this.items,
     this.date,
     this.storeName,
     this.showModeToggle = false,
+    this.initialCategoryMajor,
   });
 
   @override
@@ -123,7 +127,24 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
       _payments = p;
       // 既定カテゴリ（クレカ）の先頭項目を支払方法に。
       _applyPayCategoryDefault();
+      // OCRの科目候補があれば共通大カテゴリに自動セット。
+      _applyCategoryGuess();
     });
+  }
+
+  /// OCR推定科目（素の名前）を共通大カテゴリに反映。小カテゴリは先頭を仮選択。
+  void _applyCategoryGuess() {
+    final guess = widget.initialCategoryMajor?.trim();
+    if (guess == null || guess.isEmpty || _major != null) return;
+    String bare(String s) => s.replaceFirst(RegExp(r'^\d+\.'), '');
+    for (final name in _majorNames) {
+      if (bare(name) == guess) {
+        _major = name;
+        final subs = _subsForMajor(name);
+        if (subs.isNotEmpty) _sub = subs.first;
+        break;
+      }
+    }
   }
 
   /// 現カテゴリの先頭項目を _paymentMethod にセット（空ならクリア）。

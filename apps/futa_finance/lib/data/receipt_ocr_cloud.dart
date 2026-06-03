@@ -35,11 +35,12 @@ class ReceiptOcrCloud {
   Future<ReceiptOcrResult?> captureAndRecognize(
       {required ImageSource source}) async {
     final picker = ImagePicker();
-    // 高速化：解像度・画質を抑えてアップロード/推論を軽くする（レシートは十分読める）。
+    // 高速化：解像度・画質をさらに抑えてアップロード/推論を軽くする
+    // （レシートの文字は十分読める範囲）。モデルは精度優先で flash 据え置き。
     final xfile = await picker.pickImage(
       source: source,
-      imageQuality: 70,
-      maxWidth: 1280,
+      imageQuality: 55,
+      maxWidth: 1024,
     );
     if (xfile == null) return null;
 
@@ -148,6 +149,7 @@ class ReceiptOcrCloud {
       storeName: store,
       memo: itemsMemo,
       items: structured.isEmpty ? null : structured,
+      categoryGuess: (category != null && category.isNotEmpty) ? category : null,
     );
   }
 }

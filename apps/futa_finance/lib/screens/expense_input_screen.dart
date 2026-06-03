@@ -81,6 +81,7 @@ class ExpenseInputScreen extends StatefulWidget {
     this.initialDescription,
     this.initialMemo,
     this.initialStore,
+    this.initialCategoryMajor,
     this.editing,
     this.receiptItems,
   });
@@ -94,6 +95,9 @@ class ExpenseInputScreen extends StatefulWidget {
   final String? initialDescription;
   final String? initialMemo;
   final String? initialStore;
+
+  /// OCRが推定した会計科目（素の名前）。大カテゴリの初期候補に使う。
+  final String? initialCategoryMajor;
 
   /// 既存取引の編集（指定すると編集モード：全項目プリフィル＋更新/削除）。
   final core.Transaction? editing;
@@ -143,6 +147,15 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
 
   /// 双方向同期の再帰呼び出し防止フラグ。
   bool _syncing = false;
+
+  /// 過去の取引（カテゴリ予測の履歴学習に使う）。
+  List<core.Transaction> _history = const [];
+
+  /// ユーザーが手動でカテゴリを選んだか。true なら自動予測で上書きしない。
+  bool _categoryTouched = false;
+
+  /// 直近の予測でカテゴリを自動セットしたか（ヒント表示用）。
+  bool _categoryPredicted = false;
 
   /// 選択中の支払元がクレカ。null は未選択。
   core.RegisteredCreditCard? _cardFor(String? name) {
@@ -220,15 +233,22 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   Future<void> _load() async {
     final c = await _settings.loadCategories();
     final p = await _settings.loadPayments();
+    // カテゴリ予測（履歴学習）用に過去取引を読み込む。
+    List<core.Transaction> history = const [];
+    try {
+      history = await TransactionRepository.instance.loadAll();
+    } catch (_) {}
     if (!mounted) return;
     setState(() {
       _categories = c;
       _payments = p;
+      _history = history;
       final e = widget.editing;
       if (e != null) {
         // 編集モード：取引のカテゴリ・支払方法をそのまま復元。
         _majorCategory = e.category.major;
         _subCategory = e.category.sub;
+        _categoryTouched = true; // 既存値は予測で上書きしない
         _paymentMethod = e.paymentMethod;
         _payCategory = _categoryOf(e.paymentMethod) ?? _PayCategory.card;
         _onPaymentMethodChanged(e.paymentMethod);
@@ -242,7 +262,74 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         // プリセットなし → 現カテゴリ（デフォルト: クレカ）の最上位項目を選択。
         _applyCategoryDefault();
       }
+      // 新規時のカテゴリ自動予測：①OCR科目候補 → ②履歴(店舗/内容)。
+      if (e == null && !_categoryTouched) {
+        _autoPredictCategory(initial: true);
+      }
     });
+  }
+
+  /// カテゴリ自動予測。手動選択済みなら何もしない。
+  /// 優先: OCR科目候補 → 店舗一致の履歴 → 取引内容一致の履歴。
+  void _autoPredictCategory({bool initial = false}) {
+    if (_categoryTouched || widget.editing != null) return;
+    final cfg = _categories;
+    if (cfg == null) return;
+
+    String bare(String s) => s.replaceFirst(RegExp(r'^\d+\.'), '');
+
+    // ① OCR科目候補（初回のみ）。
+    if (initial) {
+      final guess = widget.initialCategoryMajor?.trim();
+      if (guess != null && guess.isNotEmpty) {
+        for (var i = 0; i < cfg.majors.length; i++) {
+          if (bare(cfg.majors[i].displayName(i)) == guess) {
+            _majorCategory = cfg.majors[i].displayName(i);
+            final subs = cfg.majors[i].subs;
+            _subCategory = subs.isNotEmpty ? subs.first : null;
+            _categoryPredicted = true;
+            return;
+          }
+        }
+      }
+    }
+
+    // ② 履歴学習：店舗 or 取引内容が一致する過去の支出から最頻カテゴリ。
+    final store = _storeCtrl.text.trim().toLowerCase();
+    final desc = _descCtrl.text.trim().toLowerCase();
+    if (store.isEmpty && desc.isEmpty) return;
+
+    final tally = <String, int>{}; // "majorsub" -> count
+    for (final t in _history) {
+      if (t.type != core.TransactionType.expense) continue;
+      final tStore = (t.store ?? '').trim().toLowerCase();
+      final tDesc = t.description.trim().toLowerCase();
+      var weight = 0;
+      if (store.isNotEmpty && tStore.isNotEmpty && tStore == store) {
+        weight = 3; // 店舗完全一致を最優先
+      } else if (desc.isNotEmpty &&
+          tDesc.isNotEmpty &&
+          (tDesc == desc || tDesc.contains(desc) || desc.contains(tDesc))) {
+        weight = 1;
+      }
+      if (weight == 0) continue;
+      final key = '${t.category.major}${t.category.sub}';
+      tally[key] = (tally[key] ?? 0) + weight;
+    }
+    if (tally.isEmpty) return;
+    final best =
+        tally.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+    final parts = best.split('');
+    final major = parts[0];
+    final sub = parts.length > 1 ? parts[1] : '';
+    // 候補が現在の大カテゴリ一覧に存在する場合のみ採用。
+    final exists = [
+      for (var i = 0; i < cfg.majors.length; i++) cfg.majors[i].displayName(i)
+    ].contains(major);
+    if (!exists) return;
+    _majorCategory = major;
+    _subCategory = sub.isEmpty ? null : sub;
+    _categoryPredicted = true;
   }
 
   /// 指定カテゴリの登録項目リスト（並び順そのまま、先頭が最上位）。
@@ -769,11 +856,26 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                     setState(() {
                       _majorCategory = v;
                       _subCategory = null;
+                      _categoryTouched = true; // 手動選択 → 予測で上書きしない
+                      _categoryPredicted = false;
                     });
                   }
                 },
                 decoration: _inputDecoration(hint: '選択してください'),
               ),
+              if (_categoryPredicted) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: const [
+                    Icon(Icons.auto_awesome,
+                        size: 13, color: Color(0xFF1A237E)),
+                    SizedBox(width: 4),
+                    Text('自動でカテゴリを予測しました（変更できます）',
+                        style: TextStyle(
+                            fontSize: 11, color: Color(0xFF1A237E))),
+                  ],
+                ),
+              ],
               const SizedBox(height: 16),
 
               _label('小カテゴリ'),
@@ -803,7 +905,11 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                         if (v == _kAddNewSentinel) {
                           await _addNewSubCategory();
                         } else {
-                          setState(() => _subCategory = v);
+                          setState(() {
+                            _subCategory = v;
+                            _categoryTouched = true;
+                            _categoryPredicted = false;
+                          });
                         }
                       },
                 decoration: _inputDecoration(
@@ -811,80 +917,15 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               ),
               const SizedBox(height: 16),
 
-              _label('支払方法'),
-              // 1段目: カテゴリ選択（クレカ/銀行/現金/電子）。
-              // 切替時はそのカテゴリの先頭項目を自動選択（よく使うやつをデフォに）。
-              SegmentedButton<_PayCategory>(
-                segments: _PayCategory.values
-                    .map((c) => ButtonSegment<_PayCategory>(
-                          value: c,
-                          icon: Icon(c.icon, size: 16),
-                          label: Text(c.label,
-                              style: const TextStyle(fontSize: 12)),
-                        ))
-                    .toList(),
-                selected: {_payCategory},
-                showSelectedIcon: false,
-                onSelectionChanged: (set) {
-                  setState(() {
-                    _payCategory = set.first;
-                  });
-                  _applyCategoryDefault();
-                },
-                style: ButtonStyle(
-                  visualDensity: VisualDensity.compact,
-                  padding: WidgetStateProperty.all(
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
-                ),
-              ),
-              const SizedBox(height: 8),
-              // 2段目: 選択カテゴリの項目プルダウン。
-              if (paymentMethods.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEF3C7),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '${_payCategory.label}が未登録です。設定 → 銀行口座 / クレジットカード で登録してください。',
-                    style: const TextStyle(
-                        fontSize: 12, color: Color(0xFF92400E)),
-                  ),
-                )
-              else
-                DropdownButtonFormField<String>(
-                  // カテゴリ切替で項目リストが変わると、前の選択値が無効に
-                  // なるケースがあるためカテゴリを Key に含めて再生成。
-                  key: ValueKey('pay-${_payCategory.name}'),
-                  initialValue: paymentMethods.contains(_paymentMethod)
-                      ? _paymentMethod
-                      : null,
-                  items: paymentMethods
-                      .map((p) =>
-                          DropdownMenuItem(value: p, child: Text(p)))
-                      .toList(),
-                  onChanged: _onPaymentMethodChanged,
-                  decoration: _inputDecoration(hint: '選択してください'),
-                ),
-              // クレカは「利用累計」を扱わない（分かりにくいため廃止）。残高表示は銀行系のみ。
-              if (hasBalanceTracking && !isCard) ...[
-                const SizedBox(height: 6),
-                Padding(
-                  padding: const EdgeInsets.only(left: 4),
-                  child: Text(
-                    '現在残高: ${formatYen(_currentBalance!)}',
-                    style: const TextStyle(
-                        fontSize: 11, color: Color(0xFF6B7280)),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 16),
-
               _label('取引内容'),
               TextFormField(
                 controller: _descCtrl,
                 decoration: _inputDecoration(),
+                onChanged: (_) {
+                  if (!_categoryTouched) {
+                    setState(() => _autoPredictCategory());
+                  }
+                },
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? '入力してください' : null,
               ),
@@ -897,6 +938,11 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                     .copyWith(
                   prefixIcon: const Icon(Icons.storefront_outlined, size: 18),
                 ),
+                onChanged: (_) {
+                  if (!_categoryTouched) {
+                    setState(() => _autoPredictCategory());
+                  }
+                },
               ),
               const SizedBox(height: 16),
 
@@ -966,32 +1012,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 },
               ),
 
-              // 残高欄は銀行系のみ（クレカの「利用累計」は廃止）。編集時も非表示。
-              if (hasBalanceTracking && widget.editing == null && !isCard) ...[
-                const SizedBox(height: 16),
-                _label('支出後の残高（円）— 自動計算・編集可'),
-                TextFormField(
-                  controller: _balanceAfterCtrl,
-                  focusNode: _balanceFocus,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    ThousandsSeparatorInputFormatter(),
-                  ],
-                  decoration: _inputDecoration().copyWith(
-                    prefixIcon: const Icon(
-                      Icons.account_balance,
-                      size: 18,
-                      color: Color(0xFFDC2626),
-                    ),
-                  ),
-                  style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 16,
-                      color: Color(0xFFDC2626),
-                      fontWeight: FontWeight.bold),
-                ),
-              ],
               const SizedBox(height: 16),
 
               _label('備考（任意）'),
@@ -1018,6 +1038,11 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                   style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
                 ),
               ),
+              const SizedBox(height: 16),
+
+              // 支払方法は最下部に配置（よく使う項目を上に、固定的な支払方法は下に）。
+              ..._paymentMethodSection(
+                  paymentMethods, hasBalanceTracking, isCard),
               const SizedBox(height: 32),
 
               FilledButton.icon(
@@ -1064,6 +1089,95 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       },
       style: const ButtonStyle(visualDensity: VisualDensity.compact),
     );
+  }
+
+  /// 支払方法セクション（画面下部に配置）。カテゴリ選択＋項目プルダウン＋
+  /// （銀行系のみ）現在残高表示・支出後残高入力。
+  List<Widget> _paymentMethodSection(
+      List<String> paymentMethods, bool hasBalanceTracking, bool isCard) {
+    return [
+      _label('支払方法'),
+      // 1段目: カテゴリ選択（クレカ/電子/現金/銀行）。
+      SegmentedButton<_PayCategory>(
+        segments: _PayCategory.values
+            .map((c) => ButtonSegment<_PayCategory>(
+                  value: c,
+                  icon: Icon(c.icon, size: 16),
+                  label: Text(c.label, style: const TextStyle(fontSize: 12)),
+                ))
+            .toList(),
+        selected: {_payCategory},
+        showSelectedIcon: false,
+        onSelectionChanged: (set) {
+          setState(() {
+            _payCategory = set.first;
+          });
+          _applyCategoryDefault();
+        },
+        style: ButtonStyle(
+          visualDensity: VisualDensity.compact,
+          padding: WidgetStateProperty.all(
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
+        ),
+      ),
+      const SizedBox(height: 8),
+      if (paymentMethods.isEmpty)
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFEF3C7),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            '${_payCategory.label}が未登録です。設定で登録してください。',
+            style: const TextStyle(fontSize: 12, color: Color(0xFF92400E)),
+          ),
+        )
+      else
+        DropdownButtonFormField<String>(
+          key: ValueKey('pay-${_payCategory.name}'),
+          initialValue:
+              paymentMethods.contains(_paymentMethod) ? _paymentMethod : null,
+          items: paymentMethods
+              .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+              .toList(),
+          onChanged: _onPaymentMethodChanged,
+          decoration: _inputDecoration(hint: '選択してください'),
+        ),
+      if (hasBalanceTracking && !isCard) ...[
+        const SizedBox(height: 6),
+        Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: Text(
+            '現在残高: ${formatYen(_currentBalance!)}',
+            style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+          ),
+        ),
+      ],
+      // 支出後の残高（銀行系のみ・新規時のみ）。
+      if (hasBalanceTracking && widget.editing == null && !isCard) ...[
+        const SizedBox(height: 12),
+        _label('支出後の残高（円）— 自動計算・編集可'),
+        TextFormField(
+          controller: _balanceAfterCtrl,
+          focusNode: _balanceFocus,
+          keyboardType: TextInputType.number,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            ThousandsSeparatorInputFormatter(),
+          ],
+          decoration: _inputDecoration().copyWith(
+            prefixIcon: const Icon(Icons.account_balance,
+                size: 18, color: Color(0xFFDC2626)),
+          ),
+          style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 16,
+              color: Color(0xFFDC2626),
+              fontWeight: FontWeight.bold),
+        ),
+      ],
+    ];
   }
 
   Widget _label(String text) => Padding(

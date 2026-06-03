@@ -117,6 +117,7 @@ Future<bool> _showOcrResult(BuildContext context, ReceiptOcrResult r) async {
           items: r.items!,
           date: r.date,
           storeName: r.storeName,
+          initialCategoryMajor: r.categoryGuess,
           showModeToggle: true,
         ),
       );
@@ -128,6 +129,7 @@ Future<bool> _showOcrResult(BuildContext context, ReceiptOcrResult r) async {
           initialDate: r.date,
           initialDescription: r.storeName,
           initialStore: r.storeName,
+          initialCategoryMajor: r.categoryGuess,
           initialMemo: _itemsMemo(r),
           // 品目が2件以上ある時だけトグルを出す。
           receiptItems: hasItems ? r.items : null,

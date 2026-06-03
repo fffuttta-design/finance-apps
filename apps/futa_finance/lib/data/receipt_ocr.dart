@@ -25,6 +25,9 @@ class ReceiptOcrResult {
   /// 構造化した品目一覧（クラウド版で抽出）。品目ごとの複数記録に使う。
   final List<ReceiptItem>? items;
 
+  /// 会計科目の推定（素の名前。例: "消耗品費"）。カテゴリ自動選択に使う。
+  final String? categoryGuess;
+
   const ReceiptOcrResult({
     required this.rawText,
     this.amount,
@@ -32,5 +35,6 @@ class ReceiptOcrResult {
     this.storeName,
     this.memo,
     this.items,
+    this.categoryGuess,
   });
 }
