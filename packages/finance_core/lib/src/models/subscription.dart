@@ -65,6 +65,11 @@ class Subscription {
   /// null なら下限なし。なお未来月は常に計上しない（当月まで）。
   final String? startYearMonth;
 
+  /// 計上終了年月（"YYYY-MM"）。任意。
+  /// 業績PLでこの月より後には計上しない（解約済みの固定費が計上され続けるのを防ぐ）。
+  /// null なら上限なし（継続中）。
+  final String? endYearMonth;
+
   /// 変動費の「その月の実額」。キー = "YYYY-MM"（例: "2026-06"）→ 金額(円)。
   /// 未入力の月は 0 扱い。固定費では未使用。月ごとに独立（翌月は未入力=0）。
   final Map<String, int> monthlyActuals;
@@ -83,6 +88,7 @@ class Subscription {
     this.category,
     this.plMajor,
     this.startYearMonth,
+    this.endYearMonth,
     this.monthlyActuals = const {},
   });
 
@@ -98,6 +104,9 @@ class Subscription {
   int plAmountForMonth(String ym, String currentYm) {
     if (ym.compareTo(currentYm) > 0) return 0;
     if (startYearMonth != null && ym.compareTo(startYearMonth!) < 0) {
+      return 0;
+    }
+    if (endYearMonth != null && ym.compareTo(endYearMonth!) > 0) {
       return 0;
     }
     if (cycle == SubscriptionCycle.monthly) {
@@ -142,6 +151,7 @@ class Subscription {
         'category': category,
         'plMajor': plMajor,
         'startYearMonth': startYearMonth,
+        'endYearMonth': endYearMonth,
         'monthlyActuals': monthlyActuals,
       };
 
@@ -167,6 +177,7 @@ class Subscription {
         category: j['category'] as String?,
         plMajor: j['plMajor'] as String?,
         startYearMonth: j['startYearMonth'] as String?,
+        endYearMonth: j['endYearMonth'] as String?,
         monthlyActuals: (j['monthlyActuals'] as Map<String, dynamic>?)
                 ?.map((k, v) =>
                     MapEntry(k, (v as num?)?.toInt() ?? 0)) ??
@@ -189,6 +200,8 @@ class Subscription {
     bool clearPlMajor = false,
     String? startYearMonth,
     bool clearStartYearMonth = false,
+    String? endYearMonth,
+    bool clearEndYearMonth = false,
     Map<String, int>? monthlyActuals,
   }) =>
       Subscription(
@@ -207,6 +220,9 @@ class Subscription {
         startYearMonth: clearStartYearMonth
             ? null
             : (startYearMonth ?? this.startYearMonth),
+        endYearMonth: clearEndYearMonth
+            ? null
+            : (endYearMonth ?? this.endYearMonth),
         monthlyActuals: monthlyActuals ?? this.monthlyActuals,
       );
 }
