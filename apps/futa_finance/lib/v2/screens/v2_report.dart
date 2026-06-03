@@ -774,13 +774,13 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     return rows;
   }
 
-  /// 配列同士の差分（同じ index 同士）
+  /// 配列同士の差分（同じ index 同士）。表示月数に追従（当月=1 / 1年=12）。
   List<int> _diff(List<int> a, List<int> b) =>
-      List.generate(12, (i) => a[i] - b[i]);
+      List.generate(a.length, (i) => a[i] - b[i]);
 
-  /// a + b - c
+  /// a + b - c（表示月数に追従）
   List<int> _addSub(List<int> a, List<int> b, List<int> c) =>
-      List.generate(12, (i) => a[i] + b[i] - c[i]);
+      List.generate(a.length, (i) => a[i] + b[i] - c[i]);
 }
 
 class _PLRow {

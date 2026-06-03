@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/app_mode.dart';
 import '../../data/backup_repository.dart';
+import '../../data/subscription_repository.dart';
 import '../../data/ui_preferences.dart';
 import '../../data/monthly_snapshot_repository.dart';
 import '../../data/payments_change_notifier.dart';
@@ -51,6 +52,8 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
   List<Transaction> _transactions = [];
   PaymentMethodsConfig _payments = PaymentMethodsConfig.empty();
   MonthlySnapshotConfig _snapshots = MonthlySnapshotConfig.empty();
+  // 当月経費に固定費（サブスク）を上乗せするためのサブスク一覧。
+  List<Subscription> _subs = [];
   bool _loading = true;
 
   /// 表示月（既定は今月、月切替で前後）
@@ -304,13 +307,24 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
     final txns = await _txRepo.loadAll();
     final payments = await _settings.loadPayments();
     final snapshots = await _snapshotRepo.load();
+    final subs = await SubscriptionRepository.instance.load();
     if (!mounted) return;
     setState(() {
       _transactions = txns;
       _payments = payments;
       _snapshots = snapshots;
+      _subs = subs.subscriptions;
       _loading = false;
     });
+  }
+
+  /// 指定月（[m]）に計上すべき固定費（サブスク）合計。
+  /// 月次=定額/変動の当月分、年払い=請求月のみ。未来月は計上しない（当月まで）。
+  int subsTotalForMonth(DateTime m) {
+    final now = DateTime.now();
+    final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
+    return _subs.fold<int>(0, (s, sub) => s + sub.plAmountForMonth(ym, curYm));
   }
 
   // ── 計算ヘルパー ──────────────────────────
@@ -671,18 +685,25 @@ class _CenterColumn extends StatelessWidget {
         .where((t) => t.type == TransactionType.income && t.isPending)
         .fold<int>(0, (s, t) => s + t.amount);
     final income = incomeConfirmed + incomePending;
-    final expense = monthTxns
+    final txExpense = monthTxns
         .where((t) => t.type == TransactionType.expense)
         .fold<int>(0, (s, t) => s + t.amount);
+    // 固定費（サブスク）の当月分を「当月経費」にあらかじめ加算。
+    final subTotal = state.subsTotalForMonth(state._selectedMonth);
+    final expense = txExpense + subTotal;
     final net = income - expense;
     final isBlack = net >= 0;
 
-    // 支出内訳（支払方法別）
+    // 支出内訳（支払方法別）＋固定費
     final expenseByMethod = <String, int>{};
     for (final t in monthTxns) {
       if (t.type != TransactionType.expense) continue;
       expenseByMethod[t.paymentMethod] =
           (expenseByMethod[t.paymentMethod] ?? 0) + t.amount;
+    }
+    if (subTotal > 0) {
+      expenseByMethod['固定費・サブスク'] =
+          (expenseByMethod['固定費・サブスク'] ?? 0) + subTotal;
     }
     final expenseBreakdown = expenseByMethod.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
