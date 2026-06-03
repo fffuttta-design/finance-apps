@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.154",
-    "buildNumber":  "155",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.154/futa-finance-v1.0.154.apk",
-    "releaseNotes":  "経費明細をタップで編集・削除できるように。業績は簡易を左＆既定表示に"
+    "version":  "1.0.155",
+    "buildNumber":  "156",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.155/futa-finance-v1.0.155.apk",
+    "releaseNotes":  "「取引の科目を一括付替」を削除(不要のため)"
 }
