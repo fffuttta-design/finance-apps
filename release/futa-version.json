@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.156",
-    "buildNumber":  "157",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.156/futa-finance-v1.0.156.apk",
-    "releaseNotes":  "OCR読み取り後は編集できる支出フォームに直接値を入れて訂正できるように"
+    "version":  "1.0.157",
+    "buildNumber":  "158",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.157/futa-finance-v1.0.157.apk",
+    "releaseNotes":  "OCRに内訳(品目)を備考へ/カード利用累計を撤去/レシート読み取りを高速化"
 }
