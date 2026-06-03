@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.164",
-    "buildNumber":  "165",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.164/futa-finance-v1.0.164.apk",
-    "releaseNotes":  "v1.0.164 レシート読取後は確認ダイアログ無しで直接入力、上部トグルで単発と品目ごとを切替"
+    "version":  "1.0.165",
+    "buildNumber":  "166",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.165/futa-finance-v1.0.165.apk",
+    "releaseNotes":  "v1.0.165 品目ごと記録の合計を大きく表示、品目別に会計カテゴリ設定可、支払店舗を記録可能に"
 }
