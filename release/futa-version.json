@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.166",
-    "buildNumber":  "167",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.166/futa-finance-v1.0.166.apk",
-    "releaseNotes":  "v1.0.166 レシート読取は品目ごとを既定表示、品目カテゴリは未設定時は鉛筆アイコンのみの控えめ表示に"
+    "version":  "1.0.167",
+    "buildNumber":  "168",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.167/futa-finance-v1.0.167.apk",
+    "releaseNotes":  "v1.0.167 カテゴリ自動予測、レシート読取の高速化、支払方法を入力画面の最下部へ"
 }
