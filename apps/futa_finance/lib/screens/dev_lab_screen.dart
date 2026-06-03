@@ -224,67 +224,17 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
   }
 
   Future<void> _showOcrResult(ReceiptOcrResult r) async {
-    final go = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(children: [
-          Icon(Icons.document_scanner, color: Color(0xFF1A237E)),
-          SizedBox(width: 8),
-          Text('読み取り結果'),
-        ]),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _ocrField('金額',
-                  r.amount != null ? formatYen(r.amount!) : '— 認識できず'),
-              _ocrField(
-                  '日付',
-                  r.date != null
-                      ? '${r.date!.year}/${r.date!.month}/${r.date!.day}'
-                      : '— 認識できず（今日になります）'),
-              _ocrField('店名', r.storeName ?? '— 認識できず'),
-              const SizedBox(height: 10),
-              const Text('読み取り全文',
-                  style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF6B7280))),
-              const SizedBox(height: 4),
-              Container(
-                width: double.infinity,
-                constraints: const BoxConstraints(maxHeight: 160),
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: SingleChildScrollView(
-                  child: Text(
-                    r.rawText.isEmpty ? '(文字を認識できませんでした)' : r.rawText,
-                    style: const TextStyle(
-                        fontSize: 11, color: Color(0xFF374151)),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('閉じる')),
-          FilledButton.icon(
-            onPressed: () => Navigator.pop(ctx, true),
-            icon: const Icon(Icons.edit_note, size: 18),
-            label: const Text('この内容で支出入力'),
-          ),
-        ],
-      ),
-    );
-    if (go != true || !mounted) return;
-    await Navigator.push(
+    // 読み取り結果は確認ダイアログを挟まず、そのまま支出入力フォームの
+    // テキストボックスに入れる（金額/取引内容/日付）。ユーザーはそこで訂正→保存。
+    final nothing = r.amount == null &&
+        (r.storeName == null || r.storeName!.trim().isEmpty);
+    if (nothing) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('うまく読み取れませんでした。フォームで手入力してください')),
+      );
+    }
+    final changed = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => ExpenseInputScreen(
@@ -294,28 +244,7 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
         ),
       ),
     );
-  }
-
-  Widget _ocrField(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        children: [
-          SizedBox(
-              width: 48,
-              child: Text(label,
-                  style: const TextStyle(
-                      fontSize: 12, color: Color(0xFF6B7280)))),
-          Expanded(
-            child: Text(value,
-                style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF111827))),
-          ),
-        ],
-      ),
-    );
+    if (changed == true && mounted) await _load();
   }
 
   Widget _viewToggle() {
