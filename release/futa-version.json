@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.142",
-    "buildNumber":  "143",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.142/futa-finance-v1.0.142.apk",
-    "releaseNotes":  "開発中タブにPL予実(経営計画)を追加。年間計画(赤字)vs実績を科目別に対比"
+    "version":  "1.0.143",
+    "buildNumber":  "144",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.143/futa-finance-v1.0.143.apk",
+    "releaseNotes":  "OCRの日本語モデルをbundled版に変更しDL待ちエラーを解消(即オフライン動作)"
 }
