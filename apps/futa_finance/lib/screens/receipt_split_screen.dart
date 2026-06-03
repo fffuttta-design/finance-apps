@@ -46,11 +46,16 @@ class ReceiptSplitScreen extends StatefulWidget {
   final DateTime? date;
   final String? storeName;
 
+  /// 上部に「まとめて1件 / 品目ごと」トグルを表示するか（OCRフローから true）。
+  /// 「まとめて1件」を選ぶと [kReceiptSwitchMode] を返して閉じる。
+  final bool showModeToggle;
+
   const ReceiptSplitScreen({
     super.key,
     required this.items,
     this.date,
     this.storeName,
+    this.showModeToggle = false,
   });
 
   @override
@@ -235,6 +240,32 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                     child: ListView(
                       padding: const EdgeInsets.all(16),
                       children: [
+                        if (widget.showModeToggle) ...[
+                          SegmentedButton<bool>(
+                            segments: const [
+                              ButtonSegment(
+                                  value: false,
+                                  icon: Icon(Icons.receipt_long, size: 16),
+                                  label: Text('まとめて1件',
+                                      style: TextStyle(fontSize: 12))),
+                              ButtonSegment(
+                                  value: true,
+                                  icon: Icon(Icons.list_alt, size: 16),
+                                  label: Text('品目ごと',
+                                      style: TextStyle(fontSize: 12))),
+                            ],
+                            selected: const {true},
+                            showSelectedIcon: false,
+                            onSelectionChanged: (s) {
+                              if (s.first == false) {
+                                Navigator.pop(context, kReceiptSwitchMode);
+                              }
+                            },
+                            style: const ButtonStyle(
+                                visualDensity: VisualDensity.compact),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
                         _label('日付'),
                         InkWell(
                           onTap: _pickDate,

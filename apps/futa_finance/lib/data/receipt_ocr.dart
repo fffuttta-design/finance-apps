@@ -1,3 +1,7 @@
+/// レシート記録ポップアップの「まとめて1件 / 品目ごと」切替時に
+/// Navigator.pop へ渡すセンチネル値。フロー側がこれを受けてもう片方を開く。
+const String kReceiptSwitchMode = '__switch_record_mode__';
+
 /// レシートの1品目（内訳）。
 class ReceiptItem {
   final String name;

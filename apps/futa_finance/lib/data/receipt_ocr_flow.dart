@@ -91,7 +91,8 @@ String? _itemsMemo(ReceiptOcrResult r) {
   return r.memo;
 }
 
-/// 読み取り結果を確認し、記録方法（単発 / 品目ごと）を選ばせて入力画面へ。
+/// 読み取り後、確認ダイアログを挟まず直接 入力ポップアップへ。
+/// ポップアップ上部のトグル（まとめて1件 / 品目ごと）でその場で切替できる。
 Future<bool> _showOcrResult(BuildContext context, ReceiptOcrResult r) async {
   final nothing = r.amount == null &&
       (r.storeName == null || r.storeName!.trim().isEmpty);
@@ -103,90 +104,40 @@ Future<bool> _showOcrResult(BuildContext context, ReceiptOcrResult r) async {
   }
 
   final hasItems = r.items != null && r.items!.length >= 2;
+  // 既定は「まとめて1件」。品目が無ければトグル自体を出さない。
+  var perItem = false;
 
-  // 合計額を必ず表示し、その場で記録方法を選べるダイアログ。
-  final choice = await showDialog<String>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('読み取り結果'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (r.storeName != null && r.storeName!.trim().isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text('店名: ${r.storeName!.trim()}',
-                  style: const TextStyle(
-                      fontSize: 13, color: Color(0xFF374151))),
-            ),
-          if (r.date != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(
-                  '日付: ${r.date!.year}/${r.date!.month}/${r.date!.day}',
-                  style: const TextStyle(
-                      fontSize: 13, color: Color(0xFF374151))),
-            ),
-          const SizedBox(height: 6),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              const Text('合計 ',
-                  style: TextStyle(fontSize: 13, color: Color(0xFF6B7280))),
-              Text(
-                r.amount != null ? formatYen(r.amount!) : '—',
-                style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF111827),
-                    fontFamily: 'monospace'),
-              ),
-            ],
-          ),
-          if (hasItems) ...[
-            const SizedBox(height: 8),
-            Text('品目 ${r.items!.length}件を読み取りました',
-                style: const TextStyle(
-                    fontSize: 12, color: Color(0xFF6B7280))),
-          ],
-        ],
-      ),
-      actionsOverflowButtonSpacing: 8,
-      actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(ctx, null),
-            child: const Text('キャンセル')),
-        if (hasItems)
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, 'each'),
-              child: const Text('品目ごとに記録')),
-        FilledButton(
-            onPressed: () => Navigator.pop(ctx, 'single'),
-            child: const Text('単発で記録')),
-      ],
-    ),
-  );
-  if (choice == null || !context.mounted) return false;
-
-  final changed = choice == 'each'
-      ? await showInputSheet<bool>(
-          context,
-          ReceiptSplitScreen(
-            items: r.items!,
-            date: r.date,
-            storeName: r.storeName,
-          ),
-        )
-      : await showInputSheet<bool>(
-          context,
-          ExpenseInputScreen(
-            initialAmount: r.amount,
-            initialDate: r.date,
-            initialDescription: r.storeName,
-            initialMemo: _itemsMemo(r),
-          ),
-        );
-  return changed == true;
+  while (true) {
+    if (!context.mounted) return false;
+    final Object? res;
+    if (perItem) {
+      res = await showInputSheet<Object>(
+        context,
+        ReceiptSplitScreen(
+          items: r.items!,
+          date: r.date,
+          storeName: r.storeName,
+          showModeToggle: true,
+        ),
+      );
+    } else {
+      res = await showInputSheet<Object>(
+        context,
+        ExpenseInputScreen(
+          initialAmount: r.amount,
+          initialDate: r.date,
+          initialDescription: r.storeName,
+          initialMemo: _itemsMemo(r),
+          // 品目が2件以上ある時だけトグルを出す。
+          receiptItems: hasItems ? r.items : null,
+        ),
+      );
+    }
+    // トグルで反対モードへ切替 → ループしてもう片方を開く。
+    if (res == kReceiptSwitchMode) {
+      perItem = !perItem;
+      continue;
+    }
+    return res == true;
+  }
 }
