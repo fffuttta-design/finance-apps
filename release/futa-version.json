@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.153",
-    "buildNumber":  "154",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.153/futa-finance-v1.0.153.apk",
-    "releaseNotes":  "支出カテゴリに休眠設定を追加(編集でトグル・休眠は入力候補から非表示)"
+    "version":  "1.0.154",
+    "buildNumber":  "155",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.154/futa-finance-v1.0.154.apk",
+    "releaseNotes":  "経費明細をタップで編集・削除できるように。業績は簡易を左＆既定表示に"
 }
