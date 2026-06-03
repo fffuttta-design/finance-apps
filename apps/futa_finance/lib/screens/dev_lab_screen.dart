@@ -4,11 +4,9 @@
 // ignore_for_file: unused_element
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
-import 'package:image_picker/image_picker.dart';
 
 import '../data/app_mode.dart';
 import '../data/budget_item.dart';
@@ -18,16 +16,11 @@ import '../data/liability_repository.dart';
 import '../data/payments_change_notifier.dart';
 import '../data/pl_plan.dart';
 import '../data/pl_plan_repository.dart';
-import '../data/receipt_ocr.dart';
-import '../data/receipt_ocr_cloud.dart';
 import '../data/settings_repository.dart';
 import '../data/subscription_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
-import '../utils/modal_input.dart';
 import '../utils/thousands_separator_input_formatter.dart';
-import 'expense_input_screen.dart';
-import 'receipt_split_screen.dart';
 
 /// 🧪 開発中ラボ（事業モード専用）
 ///
@@ -106,188 +99,11 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
         child: Column(
           children: [
             _viewToggle(),
-            _ocrButton(),
             Expanded(child: _buildBody()),
           ],
         ),
       ),
     );
-  }
-
-  Widget _ocrButton() {
-    final cloud = ReceiptOcrCloud.available;
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Column(
-        children: [
-          if (cloud)
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () => _runOcr(cloud: true),
-                icon: const Icon(Icons.auto_awesome, size: 18),
-                label: const Text('レシート読取（高精度・クラウド）→ 支出入力'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A237E),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                ),
-              ),
-            ),
-          if (cloud) const SizedBox(height: 6),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => _runOcr(cloud: false),
-              icon: const Icon(Icons.document_scanner_outlined, size: 18),
-              label: Text(cloud
-                  ? '端末内で読取（オフライン）'
-                  : 'レシート読取（OCR）→ 支出入力'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF1A237E),
-                padding: const EdgeInsets.symmetric(vertical: 10),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _runOcr({required bool cloud}) async {
-    if (kIsWeb) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('レシート読取は Android アプリでご利用ください')),
-      );
-      return;
-    }
-    // 取得元（カメラ/ギャラリー）を選択。
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      builder: (sheet) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('カメラで撮影'),
-              onTap: () => Navigator.pop(sheet, ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('ギャラリーから選択'),
-              onTap: () => Navigator.pop(sheet, ImageSource.gallery),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (source == null || !mounted) return;
-
-    // 読取中インジケータ。
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const AlertDialog(
-        content: Row(children: [
-          SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(strokeWidth: 2.5)),
-          SizedBox(width: 16),
-          Text('レシートを読み取り中...'),
-        ]),
-      ),
-    );
-
-    ReceiptOcrResult? result;
-    String? error;
-    try {
-      result = cloud
-          ? await ReceiptOcrCloud.instance
-              .captureAndRecognize(source: source)
-          : await ReceiptOcr.instance.captureAndRecognize(source: source);
-    } catch (e) {
-      error = '$e';
-    }
-    if (!mounted) return;
-    Navigator.of(context, rootNavigator: true).pop(); // インジケータを閉じる
-
-    if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('読取に失敗しました: $error')),
-      );
-      return;
-    }
-    if (result == null) return; // キャンセル
-
-    await _showOcrResult(result);
-  }
-
-  Future<void> _showOcrResult(ReceiptOcrResult r) async {
-    final nothing = r.amount == null &&
-        (r.storeName == null || r.storeName!.trim().isEmpty);
-    if (nothing) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('うまく読み取れませんでした。フォームで手入力してください')),
-      );
-    }
-
-    // 品目が2件以上あれば「単発 / 品目ごと」を選ばせる。
-    final hasItems = r.items != null && r.items!.length >= 2;
-    bool perItem = false;
-    if (hasItems) {
-      final choice = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('記録方法を選択'),
-          content: Text('${r.items!.length}件の品目を読み取りました。どう記録しますか？'),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, 'single'),
-                child: const Text('単発でまとめて')),
-            FilledButton(
-                onPressed: () => Navigator.pop(ctx, 'each'),
-                child: const Text('品目ごとに記録')),
-          ],
-        ),
-      );
-      if (choice == null || !mounted) return;
-      perItem = choice == 'each';
-    }
-
-    final changed = perItem
-        ? await showInputSheet<bool>(
-            context,
-            ReceiptSplitScreen(
-              items: r.items!,
-              date: r.date,
-              storeName: r.storeName,
-            ),
-          )
-        : await showInputSheet<bool>(
-            context,
-            ExpenseInputScreen(
-              initialAmount: r.amount,
-              initialDate: r.date,
-              initialDescription: r.storeName,
-              // 単発でまとめて記録する場合も、読み取った明細は備考に残しておく。
-              initialMemo: _itemsMemo(r),
-            ),
-          );
-    if (changed == true && mounted) await _load();
-  }
-
-  /// 単発記録時に備考へ入れる明細テキストを組み立てる。
-  /// 構造化された品目があればそれを優先（・品名 ¥金額）、無ければ memo を使う。
-  String? _itemsMemo(ReceiptOcrResult r) {
-    final items = r.items;
-    if (items != null && items.isNotEmpty) {
-      return items.map((it) => '・${it.name} ${formatYen(it.price)}').join('\n');
-    }
-    return r.memo;
   }
 
   Widget _viewToggle() {

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../data/app_mode.dart';
 import '../data/data_migration_service.dart';
+import '../data/receipt_ocr_cloud.dart';
+import '../data/receipt_ocr_flow.dart';
 import '../data/repository_provider.dart';
 import '../data/ui_preferences.dart';
 import '../screens/expense_input_screen.dart';
@@ -153,8 +155,13 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
     );
   }
 
-  /// 記録メニュー: 支出 / 収入 / 振替を選んで対応する入力モーダルを開く。
-  void _openRecord(String kind) {
+  /// 記録メニュー: レシート読取 / 支出 / 収入 / 振替を選んで対応する入力を開く。
+  Future<void> _openRecord(String kind) async {
+    // レシート読み取り（OCR）→ 記録方法を選んで入力。
+    if (kind == 'receipt') {
+      await runReceiptOcrFlow(context);
+      return;
+    }
     Widget? page;
     switch (kind) {
       case 'expense':
@@ -194,6 +201,19 @@ class _RecordMenuButton extends StatelessWidget {
       tooltip: '記録する',
       onSelected: onSelected,
       itemBuilder: (_) => [
+        // レシート読み取り（OCRが使える環境＝キー注入済みのAndroidのみ表示）。
+        if (ReceiptOcrCloud.available)
+          PopupMenuItem(
+            value: 'receipt',
+            child: Row(
+              children: [
+                const Icon(Icons.document_scanner_outlined,
+                    size: 16, color: Color(0xFF1A237E)),
+                const SizedBox(width: 8),
+                const Text('レシートで記録'),
+              ],
+            ),
+          ),
         PopupMenuItem(
           value: 'expense',
           child: Row(

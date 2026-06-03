@@ -13,6 +13,7 @@ import '../../utils/modal_input.dart';
 import '../../screens/account_detail_screen.dart';
 import '../../screens/card_detail_screen.dart';
 import '../../screens/expense_input_screen.dart';
+import '../../screens/expense_list_screen.dart';
 import '../../utils/formatters.dart';
 import '../../utils/thousands_separator_input_formatter.dart';
 import '../../widgets/brand_logo.dart';
@@ -127,6 +128,19 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const ExpenseInputScreen()),
+    );
+    if (mounted) await _load();
+  }
+
+  /// 経費明細の全件一覧（並び替え・検索）を開く。
+  Future<void> _openExpenseList() async {
+    final isBusiness = AppModeManager.instance.current == AppMode.business;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ExpenseListScreen(
+            title: isBusiness ? '経費明細一覧' : '支出明細一覧'),
+      ),
     );
     if (mounted) await _load();
   }
@@ -520,12 +534,33 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
                       V2Spacing.lg, V2Spacing.md, V2Spacing.lg, V2Spacing.sm),
                   child: Row(
                     children: [
-                      Icon(Icons.receipt_long_outlined,
-                          size: 18, color: widget.accent),
-                      const SizedBox(width: V2Spacing.sm),
-                      Text(isBusiness ? '経費明細' : '支出明細',
-                          style: V2Typography.h2),
-                      const Spacer(),
+                      // タイトルをタップ → 全件一覧（並び替え・検索）へ
+                      Expanded(
+                        child: InkWell(
+                          onTap: _openExpenseList,
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.receipt_long_outlined,
+                                    size: 18, color: widget.accent),
+                                const SizedBox(width: V2Spacing.sm),
+                                Text(isBusiness ? '経費明細' : '支出明細',
+                                    style: V2Typography.h2),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.chevron_right,
+                                    size: 18, color: V2Colors.textMuted),
+                                const Text('一覧',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: V2Colors.textMuted)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                       OutlinedButton.icon(
                         onPressed: () => _openInput(),
                         icon: const Icon(Icons.add, size: 14),

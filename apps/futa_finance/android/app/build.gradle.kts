@@ -62,10 +62,8 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
-            // R8(難読化/圧縮)を無効化。
-            // ML Kit text recognition は中国語/韓国語等の任意スクリプトクラスを
-            // 参照するが本アプリは日本語のみ同梱のため、R8 が未解決クラスで失敗する。
-            // 内部アプリでサイズ影響は軽微(ML Kit モデルが主因)なため無効化で回避。
+            // R8(難読化/圧縮)は無効のまま運用（内部配布アプリでサイズ影響は軽微、
+            // プラグイン由来の未解決クラスで R8 が失敗するのを避けるため）。
             isMinifyEnabled = false
             isShrinkResources = false
         }
@@ -74,13 +72,4 @@ android {
 
 flutter {
     source = "../.."
-}
-
-dependencies {
-    // ML Kit text recognition は既定で Latin のみ同梱。
-    // 日本語レシートを読むため Japanese モデルを追加する。
-    // ※ play-services 版(unbundled)はモデルを後からDLするため
-    //   「Waiting for the text optional module to be downloaded」エラーになる。
-    //   bundled 版(com.google.mlkit:*)を使い、モデルをAPKに同梱して即・オフライン動作させる。
-    implementation("com.google.mlkit:text-recognition-japanese:16.0.1")
 }
