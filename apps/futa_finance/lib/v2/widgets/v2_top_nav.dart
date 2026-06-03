@@ -3,7 +3,21 @@ import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
-import 'v2_sidebar.dart' show V2NavItem;
+
+/// ナビ項目（上タブ／旧サイドバー共通だったが、現在は上タブ専用）。
+class V2NavItem {
+  final String id;
+  final String label;
+  final IconData icon;
+  final String? badge;
+
+  const V2NavItem({
+    required this.id,
+    required this.label,
+    required this.icon,
+    this.badge,
+  });
+}
 
 /// マネフォ ME 風の上タブナビ。
 /// 白背景 + 横並びタブ + 選択中タブの下にアクセント色のアンダーラインバー。

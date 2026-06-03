@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 
 import '../data/app_mode.dart';
 import '../data/data_migration_service.dart';
@@ -8,25 +7,18 @@ import '../data/ui_preferences.dart';
 import '../screens/expense_input_screen.dart';
 import '../screens/income_input_screen.dart';
 import '../screens/transfer_input_screen.dart';
-import 'layout/shell.dart';
 import 'layout/topnav_shell.dart';
 import 'screens/v2_devlab.dart';
 import 'screens/v2_expenses.dart';
-import 'screens/v2_home.dart';
 import 'screens/v2_home_topnav.dart';
 import 'screens/v2_income.dart';
 import 'screens/v2_report.dart';
 import 'screens/v2_settings.dart';
-import 'theme/colors.dart';
 import 'theme/mode_accent.dart';
-import 'theme/spacing.dart';
-import 'theme/typography.dart';
 import '../widgets/startup_update_mixin.dart';
 import 'widgets/v2_mode_switcher.dart';
-import 'widgets/v2_sidebar.dart';
 import 'widgets/v2_top_header.dart';
 import 'widgets/v2_top_nav.dart';
-import 'widgets/v2_topbar.dart';
 
 /// v2 のルート。サイドバーのナビ選択を保持し、メイン領域を切り替える。
 class V2Root extends StatefulWidget {
@@ -38,14 +30,12 @@ class V2Root extends StatefulWidget {
 
 class _V2RootState extends State<V2Root> with StartupUpdateMixin {
   String _currentId = 'home';
-  String? _versionLabel;
 
   @override
   void initState() {
     super.initState();
     AppModeManager.instance.addListener(_onChange);
     UiPreferences.instance.addListener(_onChange);
-    _loadVersion();
     // 起動時にアプリ内アップデート（APK配信）をチェックして通知（v1と共通）。
     scheduleStartupUpdateCheck();
     // 事業用カテゴリをPL構成へ一度だけ移行（業務モード時のみ・idempotent）。
@@ -67,14 +57,6 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
     if (mounted) setState(() {});
     // 事業モードへ切替時にも移行を試行（個人で起動→事業に切替えた場合に対応）。
     DataMigrationService.migratePLCategoriesIfNeeded();
-  }
-
-  Future<void> _loadVersion() async {
-    try {
-      final info = await PackageInfo.fromPlatform();
-      if (!mounted) return;
-      setState(() => _versionLabel = 'v${info.version}');
-    } catch (_) {/* ignore */}
   }
 
   /// 現在のモードに応じて表示するナビ一覧。
@@ -111,12 +93,7 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
   Widget _bodyFor(String id, {required Color accent}) {
     switch (id) {
       case 'home':
-        // sidebar バリアント = 旧 v2 ホーム、topnav = v2.1 ホーム（実データ）
-        final variant = UiPreferences.instance.v2Variant;
-        if (variant == UiPreferences.v2VariantTopNav) {
-          return V2HomeTopNavScreen(accent: accent);
-        }
-        return const V2HomeScreen();
+        return V2HomeTopNavScreen(accent: accent);
       // 支出: v2.1 ネイティブ実装（マネフォクラウド寄りのテーブル中心）
       case 'expenses':
         return V2ExpensesScreen(accent: accent);
@@ -139,64 +116,11 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
     }
   }
 
-  String _titleFor(String id) {
-    return _navItems
-        .firstWhere((i) => i.id == id,
-            orElse: () => _navItems.first)
-        .label;
-  }
-
   @override
   Widget build(BuildContext context) {
     // UI は上タブ版（v2.1）に一本化。サイドバー版・v1 への切替は廃止。
     final accent = V2ModeAccent.of(AppModeManager.instance.current);
     return _buildTopNav(context, accent);
-  }
-
-  /// マネフォクラウド風: 左サイドバー + メイン。
-  /// UI を上タブ版に一本化したため現在は未使用（将来の参照用に残置）。
-  // ignore: unused_element
-  Widget _buildSidebar(BuildContext context, Color accent) {
-    final mode = AppModeManager.instance.current;
-    return V2Shell(
-      sidebar: V2Sidebar(
-        items: _navItems,
-        currentId: _currentId,
-        onSelect: (id) => setState(() => _currentId = id),
-        modeSwitcher: const V2ModeSwitcher(),
-        footer: _SidebarFooter(versionLabel: _versionLabel),
-      ),
-      topBar: V2TopBar(
-        title: _titleFor(_currentId),
-        breadcrumbs: [
-          mode == AppMode.business ? '事業' : '個人',
-        ],
-        actions: [
-          _RecordMenuButton(
-            accent: accent,
-            mode: mode,
-            onDark: false,
-            onSelected: _openRecord,
-          ),
-          OutlinedButton.icon(
-            onPressed: () async {
-              await UiPreferences.instance.setV2Variant(
-                  UiPreferences.v2VariantTopNav);
-            },
-            icon: const Icon(Icons.view_compact, size: 14),
-            label: const Text('上タブ版 (v2.1)'),
-          ),
-          OutlinedButton.icon(
-            onPressed: () async {
-              await UiPreferences.instance.setUseV2Ui(false);
-            },
-            icon: const Icon(Icons.history, size: 14),
-            label: const Text('v1 (旧)'),
-          ),
-        ],
-      ),
-      content: _bodyFor(_currentId, accent: accent),
-    );
   }
 
   /// マネフォ ME 風（v2.1）: 上タブ + 中央カラム
@@ -334,40 +258,3 @@ class _RecordMenuButton extends StatelessWidget {
   }
 }
 
-class _SidebarFooter extends StatelessWidget {
-  final String? versionLabel;
-  const _SidebarFooter({required this.versionLabel});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-          V2Spacing.lg, V2Spacing.md, V2Spacing.lg, V2Spacing.lg),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: V2Spacing.sm, vertical: 2),
-            decoration: BoxDecoration(
-              color: V2Colors.accent,
-              borderRadius: BorderRadius.circular(V2Spacing.radiusXs),
-            ),
-            child: const Text(
-              'v2 (β)',
-              style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700),
-            ),
-          ),
-          const Spacer(),
-          if (versionLabel != null)
-            Text(versionLabel!,
-                style: V2Typography.micro.copyWith(
-                    color: V2Colors.sidebarTextMuted,
-                    fontFeatures: V2Typography.tabularNums)),
-        ],
-      ),
-    );
-  }
-}
