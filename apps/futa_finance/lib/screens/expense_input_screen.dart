@@ -77,6 +77,7 @@ class ExpenseInputScreen extends StatefulWidget {
     this.initialAmount,
     this.initialDate,
     this.initialDescription,
+    this.initialMemo,
     this.editing,
   });
 
@@ -87,6 +88,7 @@ class ExpenseInputScreen extends StatefulWidget {
   final int? initialAmount;
   final DateTime? initialDate;
   final String? initialDescription;
+  final String? initialMemo;
 
   /// 既存取引の編集（指定すると編集モード：全項目プリフィル＋更新/削除）。
   final core.Transaction? editing;
@@ -175,6 +177,10 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       if (widget.initialDescription != null &&
           widget.initialDescription!.trim().isNotEmpty) {
         _descCtrl.text = widget.initialDescription!.trim();
+      }
+      if (widget.initialMemo != null &&
+          widget.initialMemo!.trim().isNotEmpty) {
+        _memoCtrl.text = widget.initialMemo!.trim();
       }
     }
     _load();
@@ -612,29 +618,19 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     }
     await TransactionRepository.instance.add(tx);
 
-    // 銀行/カードの残高/累積額を更新（新規記録時のみ）
-    if (_currentBalance != null && balanceAfter != null && _payments != null) {
-      if (_selectedIsCard) {
-        // クレジットカードの累積額を更新
-        final updatedCards = _payments!.creditCards.map((c) {
-          if (c.name == _paymentMethod) {
-            return c.copyWith(currentBalance: balanceAfter);
-          }
-          return c;
-        }).toList();
-        await _settings
-            .savePayments(_payments!.copyWith(creditCards: updatedCards));
-      } else {
-        // 銀行/現金/電子マネーの残高を更新
-        final updated = _payments!.bankAccounts.map((b) {
-          if (b.name == _paymentMethod) {
-            return b.copyWith(currentBalance: balanceAfter);
-          }
-          return b;
-        }).toList();
-        await _settings
-            .savePayments(_payments!.copyWith(bankAccounts: updated));
-      }
+    // 銀行/現金/電子マネーの残高のみ更新（新規記録時・クレカ累計は廃止）。
+    if (!_selectedIsCard &&
+        _currentBalance != null &&
+        balanceAfter != null &&
+        _payments != null) {
+      final updated = _payments!.bankAccounts.map((b) {
+        if (b.name == _paymentMethod) {
+          return b.copyWith(currentBalance: balanceAfter);
+        }
+        return b;
+      }).toList();
+      await _settings
+          .savePayments(_payments!.copyWith(bankAccounts: updated));
     }
 
     if (!mounted) return;
@@ -847,14 +843,13 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                   onChanged: _onPaymentMethodChanged,
                   decoration: _inputDecoration(hint: '選択してください'),
                 ),
-              if (hasBalanceTracking) ...[
+              // クレカは「利用累計」を扱わない（分かりにくいため廃止）。残高表示は銀行系のみ。
+              if (hasBalanceTracking && !isCard) ...[
                 const SizedBox(height: 6),
                 Padding(
                   padding: const EdgeInsets.only(left: 4),
                   child: Text(
-                    isCard
-                        ? '現在の累積額: ${formatYen(_currentBalance!)}'
-                        : '現在残高: ${formatYen(_currentBalance!)}',
+                    '現在残高: ${formatYen(_currentBalance!)}',
                     style: const TextStyle(
                         fontSize: 11, color: Color(0xFF6B7280)),
                   ),
@@ -937,20 +932,10 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 },
               ),
 
-              if (hasBalanceTracking && widget.editing == null) ...[
+              // 残高欄は銀行系のみ（クレカの「利用累計」は廃止）。編集時も非表示。
+              if (hasBalanceTracking && widget.editing == null && !isCard) ...[
                 const SizedBox(height: 16),
-                _label(isCard
-                    ? 'この支出を含むカード利用累計（円）— 自動計算・編集可'
-                    : '支出後の残高（円）— 自動計算・編集可'),
-                if (isCard)
-                  const Padding(
-                    padding: EdgeInsets.only(left: 4, top: 2, bottom: 4),
-                    child: Text(
-                      'クレカは残高でなく「利用累計」で管理します。今回の支出を足した累計が入ります（実際の利用額とズレたら手修正可）。',
-                      style: TextStyle(
-                          fontSize: 11, color: Color(0xFF6B7280)),
-                    ),
-                  ),
+                _label('支出後の残高（円）— 自動計算・編集可'),
                 TextFormField(
                   controller: _balanceAfterCtrl,
                   focusNode: _balanceFocus,
@@ -960,20 +945,16 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                     ThousandsSeparatorInputFormatter(),
                   ],
                   decoration: _inputDecoration().copyWith(
-                    prefixIcon: Icon(
-                      isCard ? Icons.credit_card : Icons.account_balance,
+                    prefixIcon: const Icon(
+                      Icons.account_balance,
                       size: 18,
-                      color: isCard
-                          ? const Color(0xFF7C3AED)
-                          : const Color(0xFFDC2626),
+                      color: Color(0xFFDC2626),
                     ),
                   ),
-                  style: TextStyle(
+                  style: const TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 16,
-                      color: isCard
-                          ? const Color(0xFF7C3AED)
-                          : const Color(0xFFDC2626),
+                      color: Color(0xFFDC2626),
                       fontWeight: FontWeight.bold),
                 ),
               ],

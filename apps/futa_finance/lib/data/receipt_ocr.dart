@@ -8,11 +8,15 @@ class ReceiptOcrResult {
   final DateTime? date;
   final String? storeName;
 
+  /// 内訳（品目）の要約。備考にプリフィルする（クラウド版で抽出）。
+  final String? memo;
+
   const ReceiptOcrResult({
     required this.rawText,
     this.amount,
     this.date,
     this.storeName,
+    this.memo,
   });
 }
 

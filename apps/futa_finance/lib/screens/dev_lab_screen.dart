@@ -241,6 +241,7 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
           initialAmount: r.amount,
           initialDate: r.date,
           initialDescription: r.storeName,
+          initialMemo: r.memo,
         ),
       ),
     );

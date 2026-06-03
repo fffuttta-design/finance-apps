@@ -26,7 +26,8 @@ class ReceiptOcrCloud {
   "store": 店名(文字列, 不明ならnull),
   "date": 日付("YYYY-MM-DD"形式, 不明ならnull),
   "total": 税込みの合計金額(整数・円, "合計/お会計"の値。値引後の実支払額。不明ならnull),
-  "category": 経費の会計科目の推定(次から1つ: 消耗品費,会議費,会食,交際費,旅費交通費,通信費,水道光熱費,新聞図書費,支払手数料,外注費,仕入,雑費。不明ならnull)
+  "category": 経費の会計科目の推定(次から1つ: 消耗品費,会議費,会食,交際費,旅費交通費,通信費,水道光熱費,新聞図書費,支払手数料,外注費,仕入,雑費。不明ならnull),
+  "items": 購入品目の配列([{"name": 品名, "price": 金額(整数・円)}], レジ袋等も含む。無ければ[])
 }
 合計は登録番号・電話番号・店コードなどの数字と混同しないこと。JSONのみを返すこと。''';
 
@@ -34,8 +35,12 @@ class ReceiptOcrCloud {
   Future<ReceiptOcrResult?> captureAndRecognize(
       {required ImageSource source}) async {
     final picker = ImagePicker();
-    final xfile =
-        await picker.pickImage(source: source, imageQuality: 85);
+    // 高速化：解像度・画質を抑えてアップロード/推論を軽くする（レシートは十分読める）。
+    final xfile = await picker.pickImage(
+      source: source,
+      imageQuality: 70,
+      maxWidth: 1280,
+    );
     if (xfile == null) return null;
 
     final bytes = await xfile.readAsBytes();
@@ -62,7 +67,11 @@ class ReceiptOcrCloud {
                 ]
               }
             ],
-            'generationConfig': {'responseMimeType': 'application/json'},
+            'generationConfig': {
+              'responseMimeType': 'application/json',
+              // 高速化：2.5 Flash の思考(thinking)を無効化してレイテンシ削減。
+              'thinkingConfig': {'thinkingBudget': 0},
+            },
           }),
         )
         .timeout(const Duration(seconds: 30));
@@ -106,11 +115,28 @@ class ReceiptOcrCloud {
       } catch (_) {}
     }
 
+    // 内訳（品目）→ 備考用の要約文字列。
+    String? itemsMemo;
+    final items = parsed['items'];
+    if (items is List && items.isNotEmpty) {
+      final lines = <String>[];
+      for (final it in items) {
+        if (it is Map) {
+          final n = (it['name'] as String?)?.trim() ?? '';
+          final p = (it['price'] as num?)?.toInt();
+          if (n.isEmpty) continue;
+          lines.add(p != null ? '$n ¥$p' : n);
+        }
+      }
+      if (lines.isNotEmpty) itemsMemo = lines.join('\n');
+    }
+
     final rawSummary = [
       if (store != null) '店名: $store',
       if (date != null) '日付: ${date.year}/${date.month}/${date.day}',
       if (total != null) '合計: ¥$total',
       if (category != null && category.isNotEmpty) '科目候補: $category',
+      if (itemsMemo != null) '内訳:\n$itemsMemo',
     ].join('\n');
 
     return ReceiptOcrResult(
@@ -118,6 +144,7 @@ class ReceiptOcrCloud {
       amount: total,
       date: date,
       storeName: store,
+      memo: itemsMemo,
     );
   }
 }
