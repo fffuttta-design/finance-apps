@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.163",
-    "buildNumber":  "164",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.163/futa-finance-v1.0.163.apk",
-    "releaseNotes":  "v1.0.163 OCRの品目ごと記録でも支払方法カテゴリを選べるように、表示順をクレカ電子現金銀行へ"
+    "version":  "1.0.164",
+    "buildNumber":  "165",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.164/futa-finance-v1.0.164.apk",
+    "releaseNotes":  "v1.0.164 レシート読取後は確認ダイアログ無しで直接入力、上部トグルで単発と品目ごとを切替"
 }
