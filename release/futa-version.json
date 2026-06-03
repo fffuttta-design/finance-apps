@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.162",
-    "buildNumber":  "163",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.162/futa-finance-v1.0.162.apk",
-    "releaseNotes":  "v1.0.162 経費明細一覧(並び替え・検索)を追加、レシート読取を記録メニューへ正式移管"
+    "version":  "1.0.163",
+    "buildNumber":  "164",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.163/futa-finance-v1.0.163.apk",
+    "releaseNotes":  "v1.0.163 OCRの品目ごと記録でも支払方法カテゴリを選べるように、表示順をクレカ電子現金銀行へ"
 }
