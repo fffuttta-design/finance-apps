@@ -62,6 +62,12 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+            // R8(難読化/圧縮)を無効化。
+            // ML Kit text recognition は中国語/韓国語等の任意スクリプトクラスを
+            // 参照するが本アプリは日本語のみ同梱のため、R8 が未解決クラスで失敗する。
+            // 内部アプリでサイズ影響は軽微(ML Kit モデルが主因)なため無効化で回避。
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
