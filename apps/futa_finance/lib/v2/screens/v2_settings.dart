@@ -7,6 +7,7 @@ import '../../data/update_flow.dart';
 import '../../screens/account_editor_screen.dart';
 import '../../screens/card_editor_screen.dart';
 import '../../screens/category_editor_screen.dart';
+import '../../screens/category_remap_screen.dart';
 import '../../screens/checklist_editor_screen.dart';
 import '../../screens/subscription_list_screen.dart';
 import 'panels/v2_backup_panel.dart';
@@ -52,6 +53,7 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
     _MenuGroup(title: 'データ管理', items: [
       _MenuItem('backup', 'バックアップ / 取り込み',
           Icons.cloud_upload_outlined),
+      _MenuItem('remap', '取引の科目を一括付替', Icons.swap_horiz),
     ]),
     _MenuGroup(title: 'アプリ情報', items: [
       _MenuItem('about', 'バージョン・更新確認', Icons.info_outline),
@@ -162,6 +164,8 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
             iconColor: V2Colors.info);
       case 'backup':
         return const V2BackupPanel();
+      case 'remap':
+        return const _RemapPanel();
       case 'about':
         return const _AboutPanel();
       default:
@@ -618,6 +622,49 @@ class _SettingTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════
+// 取引の科目を一括付替パネル
+// ═════════════════════════════════════════════════
+
+class _RemapPanel extends StatelessWidget {
+  const _RemapPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _PanelHeaderWithIcon(
+          title: '取引の科目を一括付替',
+          note: '旧カテゴリ名（固定費(定額)・研修費 等）を現在の会計科目へまとめて置き換えます。'
+              '経費取引が対象。実行前に自動バックアップを取得します。',
+          icon: Icons.swap_horiz,
+          iconColor: V2Colors.badgePurple,
+        ),
+        const SizedBox(height: V2Spacing.md),
+        SizedBox(
+          height: 46,
+          child: FilledButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const CategoryRemapScreen()),
+            ),
+            icon: const Icon(Icons.swap_horiz, size: 18),
+            label: const Text('一括付替を開く'),
+            style: FilledButton.styleFrom(
+              backgroundColor: V2Colors.accent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(V2Spacing.radiusMd),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
