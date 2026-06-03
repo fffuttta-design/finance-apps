@@ -75,3 +75,10 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // ML Kit text recognition は既定で Latin のみ同梱。
+    // 日本語レシートを読むため Japanese モデルを明示的に追加する
+    // （無いと TextRecognizer(japanese) 呼び出し時に NoClassDefFoundError で落ちる）。
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition-japanese:16.0.1")
+}
