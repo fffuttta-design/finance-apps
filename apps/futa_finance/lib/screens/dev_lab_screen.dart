@@ -24,6 +24,7 @@ import '../data/settings_repository.dart';
 import '../data/subscription_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
+import '../utils/modal_input.dart';
 import '../utils/thousands_separator_input_formatter.dart';
 import 'expense_input_screen.dart';
 
@@ -234,15 +235,13 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
             content: Text('うまく読み取れませんでした。フォームで手入力してください')),
       );
     }
-    final changed = await Navigator.push<bool>(
+    final changed = await showInputSheet<bool>(
       context,
-      MaterialPageRoute(
-        builder: (_) => ExpenseInputScreen(
-          initialAmount: r.amount,
-          initialDate: r.date,
-          initialDescription: r.storeName,
-          initialMemo: r.memo,
-        ),
+      ExpenseInputScreen(
+        initialAmount: r.amount,
+        initialDate: r.date,
+        initialDescription: r.storeName,
+        initialMemo: r.memo,
       ),
     );
     if (changed == true && mounted) await _load();

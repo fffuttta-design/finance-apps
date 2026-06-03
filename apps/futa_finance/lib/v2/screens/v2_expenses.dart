@@ -9,6 +9,7 @@ import '../../data/app_mode.dart';
 import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
+import '../../utils/modal_input.dart';
 import '../../screens/account_detail_screen.dart';
 import '../../screens/card_detail_screen.dart';
 import '../../screens/expense_input_screen.dart';
@@ -133,11 +134,8 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
   /// 行タップ：経費はその場で編集画面を開く。それ以外は明細シート。
   Future<void> _showTxnSummary(core.Transaction t) async {
     if (t.type == core.TransactionType.expense) {
-      final changed = await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(
-            builder: (_) => ExpenseInputScreen(editing: t)),
-      );
+      final changed =
+          await showInputSheet<bool>(context, ExpenseInputScreen(editing: t));
       if (changed == true && mounted) await _load();
       return;
     }

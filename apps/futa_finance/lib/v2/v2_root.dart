@@ -5,6 +5,7 @@ import '../data/data_migration_service.dart';
 import '../data/repository_provider.dart';
 import '../data/ui_preferences.dart';
 import '../screens/expense_input_screen.dart';
+import '../utils/modal_input.dart';
 import '../screens/income_input_screen.dart';
 import '../screens/transfer_input_screen.dart';
 import 'layout/topnav_shell.dart';
@@ -167,10 +168,8 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
         break;
     }
     if (page == null) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => page!),
-    );
+    // 全画面ではなくモーダルシート（ポップアップ風）で表示。
+    showInputSheet(context, page);
   }
 }
 
