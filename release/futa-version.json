@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.140",
-    "buildNumber":  "141",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.140/futa-finance-v1.0.140.apk",
-    "releaseNotes":  "開発中タブにレシート読取(OCR・端末内ML Kit)を追加。撮影→読取→支出入力にプリフィル(Android専用)"
+    "version":  "1.0.141",
+    "buildNumber":  "142",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.141/futa-finance-v1.0.141.apk",
+    "releaseNotes":  "OCRクラッシュ修正(ML Kit日本語モデル依存を追加)。撮影後に落ちる不具合を解消"
 }
