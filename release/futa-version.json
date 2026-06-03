@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.149",
-    "buildNumber":  "150",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.149/futa-finance-v1.0.149.apk",
-    "releaseNotes":  "領収書リンク(URL)添付に対応。支出入力で貼り付け→支出タブの行タップで開ける"
+    "version":  "1.0.150",
+    "buildNumber":  "151",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.150/futa-finance-v1.0.150.apk",
+    "releaseNotes":  "OCRクラウド版(高精度・Gemini)を追加。開発中タブに高精度ボタン併設"
 }
