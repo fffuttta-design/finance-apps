@@ -66,7 +66,14 @@ class _Row {
   bool include;
   final TextEditingController name;
   final TextEditingController amount;
+
+  /// 品目ごとのカテゴリ上書き（null なら共通カテゴリを継承）。
+  String? catMajor;
+  String? catSub;
+
   _Row(this.include, this.name, this.amount);
+
+  bool get hasOverride => catMajor != null && catSub != null;
 }
 
 class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
@@ -83,6 +90,9 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
   _PayCat _payCat = _PayCat.card;
   bool _saving = false;
 
+  late final TextEditingController _storeCtrl =
+      TextEditingController(text: widget.storeName ?? '');
+
   late final List<_Row> _rows = widget.items
       .map((it) => _Row(true, TextEditingController(text: it.name),
           TextEditingController(text: formatAmount(it.price))))
@@ -96,6 +106,7 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
 
   @override
   void dispose() {
+    _storeCtrl.dispose();
     for (final r in _rows) {
       r.name.dispose();
       r.amount.dispose();
@@ -155,14 +166,21 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
     ];
   }
 
-  List<String> get _subNames {
+  List<String> get _subNames => _subsForMajor(_major);
+
+  /// 指定した大カテゴリ表示名に属する小カテゴリ一覧。
+  List<String> _subsForMajor(String? major) {
     final c = _categories;
-    if (c == null || _major == null) return const [];
+    if (c == null || major == null) return const [];
     final idx = c.majors
-        .indexWhere((m) => m.displayName(c.majors.indexOf(m)) == _major);
+        .indexWhere((m) => m.displayName(c.majors.indexOf(m)) == major);
     if (idx < 0) return const [];
     return c.majors[idx].subs;
   }
+
+  /// 行の実効カテゴリ（上書きがあればそれ、無ければ共通）。
+  String? _effMajor(_Row r) => r.catMajor ?? _major;
+  String? _effSub(_Row r) => r.catSub ?? _sub;
 
   int get _includedTotal {
     int t = 0;
@@ -176,27 +194,38 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
   int get _includedCount => _rows.where((r) => r.include).length;
 
   Future<void> _save() async {
-    if (_major == null || _sub == null || _paymentMethod == null) {
+    if (_paymentMethod == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('支払方法・カテゴリを選んでください')),
+        const SnackBar(content: Text('支払方法を選んでください')),
       );
       return;
     }
+    final store = _storeCtrl.text.trim();
     final toSave = <core.Transaction>[];
     for (final r in _rows) {
       if (!r.include) continue;
       final amt = parseAmount(r.amount.text);
       if (amt == null || amt <= 0) continue;
+      final major = _effMajor(r);
+      final sub = _effSub(r);
+      // 共通も上書きも未設定の品目があればエラー（どのカテゴリか確定できない）。
+      if (major == null || sub == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('カテゴリ未設定の品目があります（共通カテゴリを選ぶか各品目で設定）')),
+        );
+        return;
+      }
       final name = r.name.text.trim();
       toSave.add(core.Transaction(
         id: '${DateTime.now().microsecondsSinceEpoch}-${toSave.length}',
         date: _date,
         type: core.TransactionType.expense,
-        category: core.Category(major: _major!, sub: _sub!),
+        category: core.Category(major: major, sub: sub),
         paymentMethod: _paymentMethod!,
-        description: name.isEmpty ? (widget.storeName ?? '品目') : name,
+        description: name.isEmpty ? (store.isEmpty ? '品目' : store) : name,
         amount: amt,
-        memo: widget.storeName,
+        store: store.isEmpty ? null : store,
       ));
     }
     if (toSave.isEmpty) {
@@ -287,6 +316,16 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
+                        _label('店舗（共通）'),
+                        TextField(
+                          controller: _storeCtrl,
+                          decoration: _dec('例: ファミリーマート')
+                              .copyWith(
+                            prefixIcon: const Icon(Icons.storefront_outlined,
+                                size: 18),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
                         _label('支払方法（共通）'),
                         // 1段目: カテゴリ選択（クレカ/電子/現金/銀行）。
                         SegmentedButton<_PayCat>(
@@ -339,7 +378,7 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                             decoration: _dec('選択してください'),
                           ),
                         const SizedBox(height: 12),
-                        _label('大カテゴリ（共通）'),
+                        _label('大カテゴリ（共通・各品目の初期値）'),
                         DropdownButtonFormField<String>(
                           key: ValueKey('maj-${_major ?? ''}'),
                           initialValue:
@@ -355,7 +394,7 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                           decoration: _dec('選択してください'),
                         ),
                         const SizedBox(height: 12),
-                        _label('小カテゴリ（共通）'),
+                        _label('小カテゴリ（共通・各品目の初期値）'),
                         DropdownButtonFormField<String>(
                           key: ValueKey('sub-${_major ?? ''}-${_sub ?? ''}'),
                           initialValue:
@@ -369,12 +408,49 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                               _major == null ? '先に大カテゴリを選択' : '選択してください'),
                         ),
                         const SizedBox(height: 16),
-                        Text('品目（$_includedCount件 / 合計 ${formatYen(_includedTotal)}）',
-                            style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF6B7280))),
-                        const SizedBox(height: 6),
+                        // 合計を大きく目立たせる。
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF2F2),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                                color: const Color(0xFFFECACA)),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text('合計',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF6B7280))),
+                                  Text('$_includedCount件',
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFF9CA3AF))),
+                                ],
+                              ),
+                              const Spacer(),
+                              Text(
+                                formatYen(_includedTotal),
+                                style: const TextStyle(
+                                    fontSize: 30,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFFDC2626),
+                                    fontFamily: 'monospace'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _label('品目'),
                         for (final r in _rows) _itemRow(r),
                       ],
                     ),
@@ -407,50 +483,205 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
   }
 
   Widget _itemRow(_Row r) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Row(
-        children: [
-          Checkbox(
-            value: r.include,
-            onChanged: (v) => setState(() => r.include = v ?? true),
-          ),
-          Expanded(
-            flex: 3,
-            child: TextField(
-              controller: r.name,
-              decoration: const InputDecoration(
-                  isDense: true, border: InputBorder.none, hintText: '品名'),
-            ),
-          ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 100,
-            child: TextField(
-              controller: r.amount,
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.right,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                ThousandsSeparatorInputFormatter(),
+    final dim = !r.include;
+    return Opacity(
+      opacity: dim ? 0.5 : 1,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Checkbox(
+                  value: r.include,
+                  onChanged: (v) => setState(() => r.include = v ?? true),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: TextField(
+                    controller: r.name,
+                    decoration: const InputDecoration(
+                        isDense: true,
+                        border: InputBorder.none,
+                        hintText: '品名'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 100,
+                  child: TextField(
+                    controller: r.amount,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.right,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      ThousandsSeparatorInputFormatter(),
+                    ],
+                    decoration: const InputDecoration(
+                        isDense: true,
+                        border: InputBorder.none,
+                        prefixText: '¥',
+                        hintText: '0'),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
               ],
-              decoration: const InputDecoration(
-                  isDense: true,
-                  border: InputBorder.none,
-                  prefixText: '¥',
-                  hintText: '0'),
-              onChanged: (_) => setState(() {}),
+            ),
+            // カテゴリ行（共通継承 or 品目別上書き）。
+            Padding(
+              padding: const EdgeInsets.only(left: 40, top: 2),
+              child: Row(
+                children: [
+                  Expanded(child: _itemCategoryChip(r)),
+                  if (r.hasOverride)
+                    InkWell(
+                      onTap: () => setState(() {
+                        r.catMajor = null;
+                        r.catSub = null;
+                      }),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4),
+                        child: Text('共通に戻す',
+                            style: TextStyle(
+                                fontSize: 10, color: Color(0xFF1A237E))),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 品目のカテゴリチップ（タップで上書き編集）。
+  Widget _itemCategoryChip(_Row r) {
+    final major = _effMajor(r);
+    final sub = _effSub(r);
+    final overridden = r.hasOverride;
+    final text = (major == null || sub == null)
+        ? 'カテゴリ未設定'
+        : '$major › $sub';
+    final color = overridden
+        ? const Color(0xFF1A237E)
+        : (major == null ? const Color(0xFFDC2626) : const Color(0xFF9CA3AF));
+    return InkWell(
+      onTap: () => _editItemCategory(r),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(overridden ? Icons.sell : Icons.sell_outlined,
+              size: 13, color: color),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              overridden ? text : (major == null ? text : '共通: $text'),
+              style: TextStyle(fontSize: 11, color: color),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
+          const SizedBox(width: 2),
+          Icon(Icons.edit, size: 11, color: color),
         ],
       ),
     );
+  }
+
+  /// 品目ごとのカテゴリ上書きを選ぶ（大→小）。共通に戻す選択肢付き。
+  Future<void> _editItemCategory(_Row r) async {
+    String? tmpMajor = r.catMajor ?? _major;
+    String? tmpSub = r.catSub ?? _sub;
+    final result = await showModalBottomSheet<List<String?>>(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheet) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          final subs = _subsForMajor(tmpMajor);
+          return Padding(
+            padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: 16 + MediaQuery.of(ctx).viewInsets.bottom),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('「${r.name.text.trim()}」のカテゴリ',
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue:
+                      _majorNames.contains(tmpMajor) ? tmpMajor : null,
+                  isExpanded: true,
+                  items: _majorNames
+                      .map((m) =>
+                          DropdownMenuItem(value: m, child: Text(m)))
+                      .toList(),
+                  onChanged: (v) => setLocal(() {
+                    tmpMajor = v;
+                    tmpSub = null;
+                  }),
+                  decoration: _dec('大カテゴリ'),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  initialValue: subs.contains(tmpSub) ? tmpSub : null,
+                  isExpanded: true,
+                  items: subs
+                      .map((s) =>
+                          DropdownMenuItem(value: s, child: Text(s)))
+                      .toList(),
+                  onChanged: (v) => setLocal(() => tmpSub = v),
+                  decoration: _dec(
+                      tmpMajor == null ? '先に大カテゴリを選択' : '小カテゴリ'),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () =>
+                            Navigator.pop(sheet, <String?>[null, null]),
+                        child: const Text('共通に従う'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: FilledButton(
+                        onPressed: (tmpMajor != null && tmpSub != null)
+                            ? () => Navigator.pop(
+                                sheet, <String?>[tmpMajor, tmpSub])
+                            : null,
+                        child: const Text('この品目に設定'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    if (result == null) return; // キャンセル
+    setState(() {
+      r.catMajor = result[0];
+      r.catSub = result[1];
+    });
   }
 
   Future<void> _pickDate() async {

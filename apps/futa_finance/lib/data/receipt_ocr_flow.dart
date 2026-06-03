@@ -127,6 +127,7 @@ Future<bool> _showOcrResult(BuildContext context, ReceiptOcrResult r) async {
           initialAmount: r.amount,
           initialDate: r.date,
           initialDescription: r.storeName,
+          initialStore: r.storeName,
           initialMemo: _itemsMemo(r),
           // 品目が2件以上ある時だけトグルを出す。
           receiptItems: hasItems ? r.items : null,

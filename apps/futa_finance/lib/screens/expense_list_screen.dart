@@ -287,6 +287,18 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                   const SizedBox(height: 2),
                   Row(
                     children: [
+                      if (t.store != null && t.store!.trim().isNotEmpty) ...[
+                        const Icon(Icons.storefront_outlined,
+                            size: 11, color: Color(0xFF9CA3AF)),
+                        const SizedBox(width: 3),
+                        Flexible(
+                          child: Text(t.store!.trim(),
+                              style: const TextStyle(
+                                  fontSize: 10, color: Color(0xFF6B7280)),
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
                       BrandLogo(
                         iconUrl: _iconUrlFor(t.paymentMethod),
                         fallbackIcon: Icons.account_balance,

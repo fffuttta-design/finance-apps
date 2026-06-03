@@ -80,6 +80,7 @@ class ExpenseInputScreen extends StatefulWidget {
     this.initialDate,
     this.initialDescription,
     this.initialMemo,
+    this.initialStore,
     this.editing,
     this.receiptItems,
   });
@@ -92,6 +93,7 @@ class ExpenseInputScreen extends StatefulWidget {
   final DateTime? initialDate;
   final String? initialDescription;
   final String? initialMemo;
+  final String? initialStore;
 
   /// 既存取引の編集（指定すると編集モード：全項目プリフィル＋更新/削除）。
   final core.Transaction? editing;
@@ -123,6 +125,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   final _usdAmountCtrl = TextEditingController(); // USD金額
   final _balanceAfterCtrl = TextEditingController();
   final _memoCtrl = TextEditingController();
+  final _storeCtrl = TextEditingController();
   final _receiptUrlCtrl = TextEditingController();
   final _amountFocus = FocusNode();
   final _balanceFocus = FocusNode();
@@ -168,6 +171,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       _amountCtrl.text = formatAmount(e.amount);
       _descCtrl.text = e.description;
       if (e.memo != null) _memoCtrl.text = e.memo!;
+      if (e.store != null) _storeCtrl.text = e.store!;
       if (e.receiptUrl != null) _receiptUrlCtrl.text = e.receiptUrl!;
       if (e.originalCurrency == 'USD') {
         _currency = 'USD';
@@ -189,6 +193,10 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
           widget.initialMemo!.trim().isNotEmpty) {
         _memoCtrl.text = widget.initialMemo!.trim();
       }
+      if (widget.initialStore != null &&
+          widget.initialStore!.trim().isNotEmpty) {
+        _storeCtrl.text = widget.initialStore!.trim();
+      }
     }
     _load();
     _amountCtrl.addListener(_syncBalanceFromAmount);
@@ -202,6 +210,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     _usdAmountCtrl.dispose();
     _balanceAfterCtrl.dispose();
     _memoCtrl.dispose();
+    _storeCtrl.dispose();
     _receiptUrlCtrl.dispose();
     _amountFocus.dispose();
     _balanceFocus.dispose();
@@ -608,6 +617,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       description: _descCtrl.text.trim(),
       amount: amount,
       memo: _memoCtrl.text.trim().isEmpty ? null : _memoCtrl.text.trim(),
+      store: _storeCtrl.text.trim().isEmpty ? null : _storeCtrl.text.trim(),
       receiptUrl: _receiptUrlCtrl.text.trim().isEmpty
           ? null
           : _receiptUrlCtrl.text.trim(),
@@ -877,6 +887,16 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 decoration: _inputDecoration(),
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? '入力してください' : null,
+              ),
+              const SizedBox(height: 16),
+
+              _label('店舗（任意）'),
+              TextFormField(
+                controller: _storeCtrl,
+                decoration: _inputDecoration(hint: '例: ファミリーマート')
+                    .copyWith(
+                  prefixIcon: const Icon(Icons.storefront_outlined, size: 18),
+                ),
               ),
               const SizedBox(height: 16),
 

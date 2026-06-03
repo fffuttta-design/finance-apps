@@ -42,6 +42,10 @@ class Transaction {
   /// 備考。
   final String? memo;
 
+  /// 支払店舗（例: "ファミリーマート"）。任意。
+  /// レシート1枚を品目ごとに複数記録した時に「どこで買ったか」を保持する。
+  final String? store;
+
   /// この取引が紐づく収入マスタID（収入時のみ）。
   final String? incomeSourceId;
 
@@ -75,6 +79,7 @@ class Transaction {
     required this.amount,
     this.receiptUrl,
     this.memo,
+    this.store,
     this.incomeSourceId,
     this.originalCurrency,
     this.originalAmount,
@@ -94,6 +99,7 @@ class Transaction {
         'amount': amount,
         'receiptUrl': receiptUrl,
         'memo': memo,
+        'store': store,
         'incomeSourceId': incomeSourceId,
         'originalCurrency': originalCurrency,
         'originalAmount': originalAmount,
@@ -118,6 +124,7 @@ class Transaction {
         amount: j['amount'] as int,
         receiptUrl: j['receiptUrl'] as String?,
         memo: j['memo'] as String?,
+        store: j['store'] as String?,
         incomeSourceId: j['incomeSourceId'] as String?,
         originalCurrency: j['originalCurrency'] as String?,
         originalAmount: (j['originalAmount'] as num?)?.toDouble(),
@@ -135,6 +142,7 @@ class Transaction {
     int? amount,
     String? receiptUrl,
     String? memo,
+    String? store,
     String? incomeSourceId,
     String? originalCurrency,
     double? originalAmount,
@@ -152,6 +160,7 @@ class Transaction {
         amount: amount ?? this.amount,
         receiptUrl: receiptUrl ?? this.receiptUrl,
         memo: memo ?? this.memo,
+        store: store ?? this.store,
         incomeSourceId: incomeSourceId ?? this.incomeSourceId,
         originalCurrency: originalCurrency ?? this.originalCurrency,
         originalAmount: originalAmount ?? this.originalAmount,
