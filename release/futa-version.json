@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.160",
-    "buildNumber":  "161",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.160/futa-finance-v1.0.160.apk",
-    "releaseNotes":  "v1.0.160 単発記録でも読み取った明細を備考に自動記入"
+    "version":  "1.0.161",
+    "buildNumber":  "162",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.161/futa-finance-v1.0.161.apk",
+    "releaseNotes":  "v1.0.161 固定費に追加ボタンを常設、開始月と終了月を記入可能に"
 }
