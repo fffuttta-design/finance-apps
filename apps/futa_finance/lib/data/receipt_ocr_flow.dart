@@ -104,8 +104,8 @@ Future<bool> _showOcrResult(BuildContext context, ReceiptOcrResult r) async {
   }
 
   final hasItems = r.items != null && r.items!.length >= 2;
-  // 既定は「まとめて1件」。品目が無ければトグル自体を出さない。
-  var perItem = false;
+  // 品目が2件以上あれば既定で「品目ごと」を開く（無ければ単発）。
+  var perItem = hasItems;
 
   while (true) {
     if (!context.mounted) return false;

@@ -562,33 +562,37 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
   }
 
   /// 品目のカテゴリチップ（タップで上書き編集）。
+  /// 未上書きは控えめな鉛筆アイコンのみ（共通を継承していることが前提）。
+  /// 上書き済みのときだけ、設定したカテゴリを淡色チップで表示する。
   Widget _itemCategoryChip(_Row r) {
-    final major = _effMajor(r);
-    final sub = _effSub(r);
-    final overridden = r.hasOverride;
-    final text = (major == null || sub == null)
-        ? 'カテゴリ未設定'
-        : '$major › $sub';
-    final color = overridden
-        ? const Color(0xFF1A237E)
-        : (major == null ? const Color(0xFFDC2626) : const Color(0xFF9CA3AF));
+    if (!r.hasOverride) {
+      // 初期表示は鉛筆アイコンだけ（個別設定できることが分かればよい）。
+      return InkWell(
+        onTap: () => _editItemCategory(r),
+        borderRadius: BorderRadius.circular(4),
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+          child: Icon(Icons.edit_outlined,
+              size: 14, color: Color(0xFFC4C8CF)),
+        ),
+      );
+    }
     return InkWell(
       onTap: () => _editItemCategory(r),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(overridden ? Icons.sell : Icons.sell_outlined,
-              size: 13, color: color),
+          const Icon(Icons.sell, size: 12, color: Color(0xFF6B7280)),
           const SizedBox(width: 4),
           Flexible(
             child: Text(
-              overridden ? text : (major == null ? text : '共通: $text'),
-              style: TextStyle(fontSize: 11, color: color),
+              '${r.catMajor} › ${r.catSub}',
+              style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
               overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 2),
-          Icon(Icons.edit, size: 11, color: color),
+          const Icon(Icons.edit, size: 11, color: Color(0xFF9CA3AF)),
         ],
       ),
     );
