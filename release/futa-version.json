@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.150",
-    "buildNumber":  "151",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.150/futa-finance-v1.0.150.apk",
-    "releaseNotes":  "OCRクラウド版(高精度・Gemini)を追加。開発中タブに高精度ボタン併設"
+    "version":  "1.0.151",
+    "buildNumber":  "152",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.151/futa-finance-v1.0.151.apk",
+    "releaseNotes":  "記録フォーム(支出/収入/振替)のweb全幅を中央寄せ・最大幅に"
 }
