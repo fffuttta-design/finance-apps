@@ -130,8 +130,17 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     if (mounted) await _load();
   }
 
-  /// 行タップで明細を表示。領収書リンクがあれば開けるボタンを出す。
-  void _showTxnSummary(core.Transaction t) {
+  /// 行タップ：経費はその場で編集画面を開く。それ以外は明細シート。
+  Future<void> _showTxnSummary(core.Transaction t) async {
+    if (t.type == core.TransactionType.expense) {
+      final changed = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+            builder: (_) => ExpenseInputScreen(editing: t)),
+      );
+      if (changed == true && mounted) await _load();
+      return;
+    }
     final hasReceipt = t.receiptUrl != null && t.receiptUrl!.trim().isNotEmpty;
     showModalBottomSheet<void>(
       context: context,

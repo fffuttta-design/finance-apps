@@ -109,7 +109,8 @@ class _V2ReportScreenState extends State<V2ReportScreen>
   bool _loading = true;
 
   /// 表示モード。false=詳細（フルPL月次表）/ true=簡易（サマリー＋簡易月次表）。
-  bool _simple = false;
+  /// 既定は簡易（軽くて見やすい）。
+  bool _simple = true;
 
   /// 決算期の期首月。当社は 10月〜翌9月 が事業年度。
   final int _fyStartMonth = 10;
@@ -387,18 +388,18 @@ class _V2ReportScreenState extends State<V2ReportScreen>
                   onSelectionChanged: (s) =>
                       setState(() => _yearView = s.first),
                 ),
-                // 詳細 / 簡易
+                // 簡易 / 詳細（簡易を左・既定）
                 SegmentedButton<bool>(
                   showSelectedIcon: false,
                   segments: const [
                     ButtonSegment(
-                        value: false,
-                        label: Text('詳細'),
-                        icon: Icon(Icons.table_rows, size: 16)),
-                    ButtonSegment(
                         value: true,
                         label: Text('簡易'),
                         icon: Icon(Icons.summarize, size: 16)),
+                    ButtonSegment(
+                        value: false,
+                        label: Text('詳細'),
+                        icon: Icon(Icons.table_rows, size: 16)),
                   ],
                   selected: {_simple},
                   onSelectionChanged: (s) =>

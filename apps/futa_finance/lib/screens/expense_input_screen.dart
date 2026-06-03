@@ -77,6 +77,7 @@ class ExpenseInputScreen extends StatefulWidget {
     this.initialAmount,
     this.initialDate,
     this.initialDescription,
+    this.editing,
   });
 
   /// 起動時に支払方法をプリセット（口座詳細画面から呼ばれた時など）。
@@ -86,6 +87,9 @@ class ExpenseInputScreen extends StatefulWidget {
   final int? initialAmount;
   final DateTime? initialDate;
   final String? initialDescription;
+
+  /// 既存取引の編集（指定すると編集モード：全項目プリフィル＋更新/削除）。
+  final core.Transaction? editing;
 
   @override
   State<ExpenseInputScreen> createState() => _ExpenseInputScreenState();
@@ -148,14 +152,30 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   @override
   void initState() {
     super.initState();
-    // レシートOCR等からのプリフィル。
-    if (widget.initialDate != null) _date = widget.initialDate!;
-    if (widget.initialAmount != null && widget.initialAmount! > 0) {
-      _amountCtrl.text = formatAmount(widget.initialAmount!);
-    }
-    if (widget.initialDescription != null &&
-        widget.initialDescription!.trim().isNotEmpty) {
-      _descCtrl.text = widget.initialDescription!.trim();
+    final e = widget.editing;
+    if (e != null) {
+      // 編集モード：取引の値をプリフィル（カテゴリ/支払方法は _load で設定）。
+      _date = e.date;
+      _amountCtrl.text = formatAmount(e.amount);
+      _descCtrl.text = e.description;
+      if (e.memo != null) _memoCtrl.text = e.memo!;
+      if (e.receiptUrl != null) _receiptUrlCtrl.text = e.receiptUrl!;
+      if (e.originalCurrency == 'USD') {
+        _currency = 'USD';
+        if (e.originalAmount != null) {
+          _usdAmountCtrl.text = e.originalAmount!.toString();
+        }
+      }
+    } else {
+      // レシートOCR等からのプリフィル。
+      if (widget.initialDate != null) _date = widget.initialDate!;
+      if (widget.initialAmount != null && widget.initialAmount! > 0) {
+        _amountCtrl.text = formatAmount(widget.initialAmount!);
+      }
+      if (widget.initialDescription != null &&
+          widget.initialDescription!.trim().isNotEmpty) {
+        _descCtrl.text = widget.initialDescription!.trim();
+      }
     }
     _load();
     _amountCtrl.addListener(_syncBalanceFromAmount);
@@ -182,8 +202,17 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     setState(() {
       _categories = c;
       _payments = p;
-      // 呼び出し元から支払方法プリセットがあれば、それに合わせてカテゴリも判定。
-      if (_paymentMethod == null && widget.initialPaymentMethod != null) {
+      final e = widget.editing;
+      if (e != null) {
+        // 編集モード：取引のカテゴリ・支払方法をそのまま復元。
+        _majorCategory = e.category.major;
+        _subCategory = e.category.sub;
+        _paymentMethod = e.paymentMethod;
+        _payCategory = _categoryOf(e.paymentMethod) ?? _PayCategory.card;
+        _onPaymentMethodChanged(e.paymentMethod);
+      } else if (_paymentMethod == null &&
+          widget.initialPaymentMethod != null) {
+        // 呼び出し元から支払方法プリセットがあれば、それに合わせてカテゴリも判定。
         _paymentMethod = widget.initialPaymentMethod;
         _payCategory = _categoryOf(_paymentMethod!) ?? _PayCategory.card;
         _onPaymentMethodChanged(_paymentMethod);
@@ -494,6 +523,35 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     if (picked != null) setState(() => _date = picked);
   }
 
+  Future<void> _deleteTxn() async {
+    final e = widget.editing;
+    if (e == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('この取引を削除？'),
+        content: Text(
+            '${e.date.month}/${e.date.day} ${e.description.isEmpty ? e.paymentMethod : e.description} −${formatYen(e.amount)}\n削除すると元に戻せません。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626)),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('削除'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _saving = true);
+    await TransactionRepository.instance.delete(e.id);
+    if (!mounted) return;
+    Navigator.pop(context, true);
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_majorCategory == null ||
@@ -526,8 +584,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     final balanceAfter = parseAmount(_balanceAfterCtrl.text);
 
     setState(() => _saving = true);
+    final editing = widget.editing;
     final tx = core.Transaction(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: editing?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
       date: _date,
       type: core.TransactionType.expense,
       category:
@@ -541,10 +600,19 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
           : _receiptUrlCtrl.text.trim(),
       originalCurrency: _currency == 'USD' ? 'USD' : null,
       originalAmount: usdAmount,
+      isPending: editing?.isPending ?? false,
     );
+    if (editing != null) {
+      // 編集：記録を更新するだけ（総資産等は取引から自動再計算される。
+      // 実測残高=displayBalance は実際には変わらないので触らない）。
+      await TransactionRepository.instance.update(tx);
+      if (!mounted) return;
+      Navigator.pop(context, true);
+      return;
+    }
     await TransactionRepository.instance.add(tx);
 
-    // 銀行/カードの残高/累積額を更新
+    // 銀行/カードの残高/累積額を更新（新規記録時のみ）
     if (_currentBalance != null && balanceAfter != null && _payments != null) {
       if (_selectedIsCard) {
         // クレジットカードの累積額を更新
@@ -591,8 +659,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('支出を記録',
-            style: TextStyle(
+        title: Text(widget.editing != null ? '支出を編集' : '支出を記録',
+            style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF111827))),
@@ -600,6 +668,15 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          if (widget.editing != null)
+            IconButton(
+              icon: const Icon(Icons.delete_outline,
+                  color: Color(0xFFDC2626)),
+              tooltip: 'この取引を削除',
+              onPressed: _saving ? null : _deleteTxn,
+            ),
+        ],
       ),
       body: SafeArea(
         child: Center(
@@ -860,7 +937,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 },
               ),
 
-              if (hasBalanceTracking) ...[
+              if (hasBalanceTracking && widget.editing == null) ...[
                 const SizedBox(height: 16),
                 _label(isCard
                     ? 'この支出を含むカード利用累計（円）— 自動計算・編集可'
@@ -931,7 +1008,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               FilledButton.icon(
                 onPressed: _saving ? null : _save,
                 icon: const Icon(Icons.check),
-                label: Text(_saving ? '保存中…' : '記録する'),
+                label: Text(_saving
+                    ? '保存中…'
+                    : (widget.editing != null ? '更新する' : '記録する')),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF1A237E),
                   padding: const EdgeInsets.symmetric(vertical: 14),
