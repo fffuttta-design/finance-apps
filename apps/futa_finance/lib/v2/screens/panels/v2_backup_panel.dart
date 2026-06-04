@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -57,9 +58,11 @@ class _V2BackupPanelState extends State<V2BackupPanel> {
           ShareParams(
             files: [
               XFile.fromData(
-                Uint8List.fromList(json.codeUnits),
+                // ★UTF-8 でエンコード（json.codeUnits は日本語が下位バイトに
+                //   切り詰められて文字化けするバグだった）。
+                Uint8List.fromList(utf8.encode(json)),
                 name: fileName,
-                mimeType: 'application/json',
+                mimeType: 'application/json; charset=utf-8',
               ),
             ],
             subject: 'FutaFinance バックアップ ($stamp)',
