@@ -805,6 +805,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 _recordModeToggle(perItem: false),
                 const SizedBox(height: 16),
               ],
+              // 金額をヒーローとして最上部に大きく表示。
+              _heroAmount(),
+              const SizedBox(height: 20),
               _label('日付'),
               InkWell(
                 onTap: _pickDate,
@@ -942,119 +945,14 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               ),
               const SizedBox(height: 16),
 
-              _label('店舗（任意）'),
-              TextFormField(
-                controller: _storeCtrl,
-                decoration: _inputDecoration(hint: '例: ファミリーマート')
-                    .copyWith(
-                  prefixIcon: const Icon(Icons.storefront_outlined, size: 18),
-                ),
-                onChanged: (_) {
-                  if (!_categoryTouched) {
-                    setState(() => _autoPredictCategory());
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // 通貨は 99% 円なので、デフォルトは「金額（円）」のみ表示。
-              // USD で記録したい時だけ右上の小さなリンクで切り替える。
-              Row(
-                children: [
-                  _label(_currency == 'USD'
-                      ? '概算金額（円）— 集計に使われる値'
-                      : '金額（円）'),
-                  const Spacer(),
-                  InkWell(
-                    onTap: () => setState(() {
-                      _currency = _currency == 'USD' ? 'JPY' : 'USD';
-                    }),
-                    borderRadius: BorderRadius.circular(4),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      child: Text(
-                        _currency == 'USD' ? '← 円に戻す' : '\$ USD で記録',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF6B7280),
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              if (_currency == 'USD') ...[
-                const SizedBox(height: 6),
-                _label('USD金額（\$）'),
-                TextFormField(
-                  controller: _usdAmountCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true),
-                  decoration: _inputDecoration(),
-                  style: const TextStyle(
-                      fontFamily: 'monospace', fontSize: 16),
-                  validator: (v) {
-                    if (_currency != 'USD') return null;
-                    if (v == null || v.trim().isEmpty) return '入力してください';
-                    if (double.tryParse(v.trim()) == null) return '数値で入力';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                _label('概算金額（円）— 集計に使われる値'),
-              ],
-              TextFormField(
-                controller: _amountCtrl,
-                focusNode: _amountFocus,
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  ThousandsSeparatorInputFormatter(),
-                ],
-                decoration: _inputDecoration(),
-                style: const TextStyle(
-                    fontFamily: 'monospace', fontSize: 16),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return '入力してください';
-                  if (parseAmount(v) == null) return '数字のみで入力';
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              _label('備考（任意）'),
-              TextFormField(
-                controller: _memoCtrl,
-                maxLines: 2,
-                decoration: _inputDecoration(),
-              ),
-              const SizedBox(height: 16),
-
-              _label('領収書リンク（任意）'),
-              TextFormField(
-                controller: _receiptUrlCtrl,
-                keyboardType: TextInputType.url,
-                decoration: _inputDecoration(hint: 'Drive等のURLを貼り付け')
-                    .copyWith(
-                  prefixIcon: const Icon(Icons.receipt_long_outlined),
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.only(left: 4, top: 2),
-                child: Text(
-                  '領収書はGoogleドライブ等に保存し、その共有リンクを貼り付けてください（後で開けます）。',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // 支払方法は最下部に配置（よく使う項目を上に、固定的な支払方法は下に）。
+              // 支払方法（金額・カテゴリの次に配置）。
               ..._paymentMethodSection(
                   paymentMethods, hasBalanceTracking, isCard),
-              const SizedBox(height: 32),
+              const SizedBox(height: 16),
+
+              // 任意項目は「詳細を追加 ▾」で畳む（店舗・備考・領収書）。
+              _detailsExpansion(),
+              const SizedBox(height: 28),
 
               FilledButton.icon(
                 onPressed: _saving ? null : _save,
@@ -1189,6 +1087,147 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         ),
       ],
     ];
+  }
+
+  /// 金額入力（ヒーロー）。画面上部に大きく表示。USD 切替もここで行う。
+  Widget _heroAmount() {
+    final isUsd = _currency == 'USD';
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Text(isUsd ? '概算金額（円）— 集計に使う値' : '金額（円）',
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF6B7280))),
+              const Spacer(),
+              InkWell(
+                onTap: () =>
+                    setState(() => _currency = isUsd ? 'JPY' : 'USD'),
+                borderRadius: BorderRadius.circular(4),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  child: Text(isUsd ? '← 円に戻す' : '\$ USD で記録',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF6B7280),
+                          decoration: TextDecoration.underline)),
+                ),
+              ),
+            ],
+          ),
+          if (isUsd) ...[
+            const SizedBox(height: 8),
+            _label('USD金額（\$）'),
+            TextFormField(
+              controller: _usdAmountCtrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: _inputDecoration(),
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 16),
+              validator: (v) {
+                if (_currency != 'USD') return null;
+                if (v == null || v.trim().isEmpty) return '入力してください';
+                if (double.tryParse(v.trim()) == null) return '数値で入力';
+                return null;
+              },
+            ),
+            const SizedBox(height: 10),
+          ] else
+            const SizedBox(height: 8),
+          TextFormField(
+            controller: _amountCtrl,
+            focusNode: _amountFocus,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.right,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              ThousandsSeparatorInputFormatter(),
+            ],
+            decoration: _inputDecoration().copyWith(
+              prefixText: '¥ ',
+              prefixStyle: const TextStyle(
+                  fontSize: 22, color: Color(0xFF9CA3AF)),
+            ),
+            style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 30,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF111827)),
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return '入力してください';
+              if (parseAmount(v) == null) return '数字のみで入力';
+              return null;
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 任意項目（店舗・備考・領収書リンク）を「詳細を追加 ▾」で畳む。
+  Widget _detailsExpansion() {
+    return Theme(
+      data: Theme.of(context)
+          .copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: const EdgeInsets.only(top: 4, bottom: 8),
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        title: const Text('詳細を追加（店舗・備考・領収書）',
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF374151))),
+        children: [
+          _label('店舗（任意）'),
+          TextFormField(
+            controller: _storeCtrl,
+            decoration: _inputDecoration(hint: '例: ファミリーマート').copyWith(
+              prefixIcon: const Icon(Icons.storefront_outlined, size: 18),
+            ),
+            onChanged: (_) {
+              if (!_categoryTouched) {
+                setState(() => _autoPredictCategory());
+              }
+            },
+          ),
+          const SizedBox(height: 16),
+          _label('備考（任意）'),
+          TextFormField(
+            controller: _memoCtrl,
+            maxLines: 2,
+            decoration: _inputDecoration(),
+          ),
+          const SizedBox(height: 16),
+          _label('領収書リンク（任意）'),
+          TextFormField(
+            controller: _receiptUrlCtrl,
+            keyboardType: TextInputType.url,
+            decoration: _inputDecoration(hint: 'Drive等のURLを貼り付け').copyWith(
+              prefixIcon: const Icon(Icons.receipt_long_outlined),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.only(left: 4, top: 2),
+            child: Text(
+              '領収書はGoogleドライブ等に保存し、その共有リンクを貼り付けてください（後で開けます）。',
+              style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _label(String text) => Padding(
