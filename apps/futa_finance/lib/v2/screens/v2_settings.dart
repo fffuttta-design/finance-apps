@@ -36,6 +36,24 @@ class V2SettingsScreen extends StatefulWidget {
 class _V2SettingsScreenState extends State<V2SettingsScreen> {
   String _currentId = 'display';
 
+  @override
+  void initState() {
+    super.initState();
+    // 事業/個人モードの切替を購読。設定パネルはモード別データを持つため、
+    // モードが変わったら再描画してパネルを作り直す（下の _buildPanel の key）。
+    AppModeManager.instance.addListener(_onModeChanged);
+  }
+
+  @override
+  void dispose() {
+    AppModeManager.instance.removeListener(_onModeChanged);
+    super.dispose();
+  }
+
+  void _onModeChanged() {
+    if (mounted) setState(() {});
+  }
+
   static const _menus = <_MenuGroup>[
     _MenuGroup(title: '表示・UI', items: [
       _MenuItem('display', '表示設定', Icons.tune),
@@ -133,6 +151,16 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
   }
 
   Widget _buildPanel() {
+    // モードをキーに含め、事業/個人を切り替えたらパネルを作り直して
+    // （initState/_load を再実行）現モードのデータを読み直させる。
+    final modeKey = AppModeManager.instance.current.name;
+    return KeyedSubtree(
+      key: ValueKey('$_currentId-$modeKey'),
+      child: _buildPanelInner(),
+    );
+  }
+
+  Widget _buildPanelInner() {
     switch (_currentId) {
       case 'display':
         return const _DisplayPanel();

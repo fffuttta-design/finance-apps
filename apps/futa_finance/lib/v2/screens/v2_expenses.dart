@@ -420,6 +420,11 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
             labelText: '実額（円）',
             // プレースホルダは前月実額（無ければ非表示）。¥プレフィックスは外して窮屈さ解消。
             hintText: prev > 0 ? '前月 ${formatYen(prev)}' : null,
+            // 下線だけだと“素のアンダーバー”に見えるので枠付きボックスにする。
+            border: const OutlineInputBorder(),
+            isDense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           ),
         ),
         actions: [
