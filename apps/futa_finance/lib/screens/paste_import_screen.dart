@@ -35,6 +35,9 @@ class _PasteImportScreenState extends State<PasteImportScreen> {
   bool _parsed = false;
   bool _importing = false;
 
+  /// 収入として取り込むか（false=支出）。
+  bool _income = false;
+
   double get _usdRate => double.tryParse(_rateCtrl.text.trim()) ?? 150;
 
   @override
@@ -78,14 +81,22 @@ class _PasteImportScreenState extends State<PasteImportScreen> {
       final payment = at(3);
       final amountStr = at(4);
 
-      // 日付
-      final dm = RegExp(r'^(\d{1,2})[/\-](\d{1,2})$').firstMatch(dateStr);
-      if (dm == null) {
+      // 日付（YYYY/MM/DD or MM/DD。後者は画面の年を使う）。
+      int year = _year, month, day;
+      final full =
+          RegExp(r'^(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})$').firstMatch(dateStr);
+      final md = RegExp(r'^(\d{1,2})[/\-.](\d{1,2})$').firstMatch(dateStr);
+      if (full != null) {
+        year = int.parse(full.group(1)!);
+        month = int.parse(full.group(2)!);
+        day = int.parse(full.group(3)!);
+      } else if (md != null) {
+        month = int.parse(md.group(1)!);
+        day = int.parse(md.group(2)!);
+      } else {
         out.add(_ParsedRow(raw: raw, error: '日付が不正: "$dateStr"'));
         continue;
       }
-      final month = int.parse(dm.group(1)!);
-      final day = int.parse(dm.group(2)!);
       if (month < 1 || month > 12 || day < 1 || day > 31) {
         out.add(_ParsedRow(raw: raw, error: '日付が不正: "$dateStr"'));
         continue;
@@ -123,8 +134,10 @@ class _PasteImportScreenState extends State<PasteImportScreen> {
 
       final tx = core.Transaction(
         id: '${DateTime.now().microsecondsSinceEpoch}-${seq++}',
-        date: DateTime(_year, month, day),
-        type: core.TransactionType.expense,
+        date: DateTime(year, month, day),
+        type: _income
+            ? core.TransactionType.income
+            : core.TransactionType.expense,
         category: core.Category(major: major, sub: sub),
         paymentMethod: payment,
         description: desc,
@@ -212,6 +225,33 @@ class _PasteImportScreenState extends State<PasteImportScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            // 種別（支出 / 収入）
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(
+                    value: false,
+                    icon: Icon(Icons.south_west, size: 16),
+                    label: Text('支出')),
+                ButtonSegment(
+                    value: true,
+                    icon: Icon(Icons.north_east, size: 16),
+                    label: Text('収入（売上）')),
+              ],
+              selected: {_income},
+              showSelectedIcon: false,
+              onSelectionChanged: (s) => setState(() => _income = s.first),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 4, left: 2),
+              child: Text(
+                _income
+                    ? '収入: 大カテゴリ=収入源/売上区分、支払方法=受取方法 として取り込みます。'
+                    : '支出として取り込みます。',
+                style: const TextStyle(
+                    fontSize: 11, color: Color(0xFF9CA3AF)),
               ),
             ),
             const SizedBox(height: 12),
@@ -400,12 +440,15 @@ class _PasteImportScreenState extends State<PasteImportScreen> {
                     ],
                   ),
                 ),
-                Text('-${formatYen(tx.amount)}',
-                    style: const TextStyle(
+                Text(
+                    '${tx.type == core.TransactionType.income ? '+' : '-'}${formatYen(tx.amount)}',
+                    style: TextStyle(
                         fontSize: 13,
                         fontFamily: 'monospace',
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFFDC2626))),
+                        color: tx.type == core.TransactionType.income
+                            ? const Color(0xFF059669)
+                            : const Color(0xFFDC2626))),
               ],
             ),
     );
