@@ -1,1 +1,9 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"takuharu-finance","appId":"1:806764261873:android:4ade56e19b98c0740d5450","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"takuharu-finance","configurations":{"android":"1:806764261873:android:4ade56e19b98c0740d5450"}}}}}}
+{
+  "hosting": {
+    "public": "build/web",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      { "source": "**", "destination": "/index.html" }
+    ]
+  }
+}
