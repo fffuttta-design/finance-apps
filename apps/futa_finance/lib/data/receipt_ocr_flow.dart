@@ -1,7 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../screens/expense_input_screen.dart';
+import '../screens/receipt_camera_screen.dart';
 import '../screens/receipt_split_screen.dart';
 import '../utils/formatters.dart';
 import '../utils/modal_input.dart';
@@ -24,26 +26,11 @@ Future<bool> runReceiptOcrFlow(BuildContext context) async {
     return false;
   }
 
-  // 取得元（カメラ/ギャラリー）を選択。画面下ではなく中央に出す（SimpleDialog）。
-  final source = await showDialog<ImageSource>(
-    context: context,
-    builder: (dctx) => SimpleDialog(
-      title: const Text('レシートの取得方法'),
-      children: [
-        ListTile(
-          leading: const Icon(Icons.photo_camera_outlined),
-          title: const Text('カメラで撮影'),
-          onTap: () => Navigator.pop(dctx, ImageSource.camera),
-        ),
-        ListTile(
-          leading: const Icon(Icons.photo_library_outlined),
-          title: const Text('ギャラリーから選択'),
-          onTap: () => Navigator.pop(dctx, ImageSource.gallery),
-        ),
-      ],
-    ),
+  // 自前カメラ画面を直接起動（中央下=シャッター / 右下=ギャラリー）。
+  final bytes = await Navigator.of(context).push<Uint8List>(
+    MaterialPageRoute(builder: (_) => const ReceiptCameraScreen()),
   );
-  if (source == null || !context.mounted) return false;
+  if (bytes == null || !context.mounted) return false;
 
   // カテゴリ自動予測用に、ユーザーの大→小カテゴリ一覧を用意（Geminiに渡す）。
   Map<String, List<String>>? catMenu;
@@ -79,7 +66,7 @@ Future<bool> runReceiptOcrFlow(BuildContext context) async {
   String? error;
   try {
     result = await ReceiptOcrCloud.instance
-        .captureAndRecognize(source: source, categories: catMenu);
+        .recognizeBytes(bytes, categories: catMenu);
   } catch (e) {
     error = '$e';
   }

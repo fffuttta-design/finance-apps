@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -51,7 +52,6 @@ $catSection
   Future<ReceiptOcrResult?> captureAndRecognize(
       {required ImageSource source,
       Map<String, List<String>>? categories}) async {
-    final prompt = _buildPrompt(categories);
     final picker = ImagePicker();
     // 高速化：解像度・画質をさらに抑えてアップロード/推論を軽くする
     // （レシートの文字は十分読める範囲）。モデルは精度優先で flash 据え置き。
@@ -63,11 +63,21 @@ $catSection
     if (xfile == null) return null;
 
     final bytes = await xfile.readAsBytes();
-    final b64 = base64Encode(bytes);
     final mime = xfile.mimeType ??
         (xfile.path.toLowerCase().endsWith('.png')
             ? 'image/png'
             : 'image/jpeg');
+    return recognizeBytes(bytes, mime: mime, categories: categories);
+  }
+
+  /// 既に取得済みの画像バイトを Gemini で解析する（自前カメラ画面から使用）。
+  Future<ReceiptOcrResult?> recognizeBytes(
+    Uint8List bytes, {
+    String mime = 'image/jpeg',
+    Map<String, List<String>>? categories,
+  }) async {
+    final prompt = _buildPrompt(categories);
+    final b64 = base64Encode(bytes);
 
     final uri = Uri.parse(
         'https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent?key=$_apiKey');
