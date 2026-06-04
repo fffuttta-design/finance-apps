@@ -767,13 +767,8 @@ class _CenterColumn extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: V2Spacing.sm),
-              // 月を横並びチップで切替（横スクロール）
-              _MonthChipsBar(
-                selected: state._selectedMonth,
-                accent: state.widget.accent,
-                onSelect: state.selectMonth,
-              ),
-              const SizedBox(height: V2Spacing.sm),
+              // 月切替は見出し横の ◁ ▷（矢印式）に一本化。
+              // 横並びの月ボックス（_MonthChipsBar）は廃止。
               _SummaryRow(
                   label: isBusiness ? '当月売上' : '当月収入',
                   value: formatYen(income, withSign: true),
@@ -1091,122 +1086,6 @@ class _ColumnResizeHandleState extends State<_ColumnResizeHandle> {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// 月を横並びチップで切り替えるバー（横スクロール）。
-/// 当社の決算年度（10月〜翌9月）の12ヶ月を左→右で昇順に並べ、
-/// 初期表示は当月（選択月）が見えるよう自動スクロールする。
-class _MonthChipsBar extends StatefulWidget {
-  final DateTime selected;
-  final Color accent;
-  final ValueChanged<DateTime> onSelect;
-  const _MonthChipsBar({
-    required this.selected,
-    required this.accent,
-    required this.onSelect,
-  });
-
-  @override
-  State<_MonthChipsBar> createState() => _MonthChipsBarState();
-}
-
-class _MonthChipsBarState extends State<_MonthChipsBar> {
-  final _controller = ScrollController();
-  static const _chipWidth = 54.0;
-  static const _gap = 8.0;
-
-  /// 決算年度（10月開始）の12ヶ月（Oct→翌Sep, 昇順）。
-  /// 選択月が範囲外なら追加して並べ替える。
-  List<DateTime> _buildMonths() {
-    final now = DateTime.now();
-    final fyStartYear = now.month >= 10 ? now.year : now.year - 1;
-    final months = <DateTime>[
-      for (int i = 0; i < 12; i++) DateTime(fyStartYear, 10 + i),
-    ];
-    if (!months.any((m) =>
-        m.year == widget.selected.year &&
-        m.month == widget.selected.month)) {
-      months.add(DateTime(widget.selected.year, widget.selected.month));
-      months.sort((a, b) => a.compareTo(b));
-    }
-    return months;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => _scrollToSelected());
-  }
-
-  @override
-  void didUpdateWidget(covariant _MonthChipsBar old) {
-    super.didUpdateWidget(old);
-    if (old.selected != widget.selected) {
-      WidgetsBinding.instance
-          .addPostFrameCallback((_) => _scrollToSelected());
-    }
-  }
-
-  void _scrollToSelected() {
-    if (!_controller.hasClients) return;
-    final months = _buildMonths();
-    final idx = months.indexWhere((m) =>
-        m.year == widget.selected.year &&
-        m.month == widget.selected.month);
-    if (idx < 0) return;
-    final target = idx * (_chipWidth + _gap);
-    _controller.jumpTo(
-        target.clamp(0.0, _controller.position.maxScrollExtent));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final months = _buildMonths();
-    return SizedBox(
-      height: 52,
-      child: ListView.separated(
-        controller: _controller,
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.zero,
-        itemCount: months.length,
-        separatorBuilder: (_, _) => const SizedBox(width: _gap),
-        itemBuilder: (context, i) {
-          final m = months[i];
-          final isSel = m.year == widget.selected.year &&
-              m.month == widget.selected.month;
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => widget.onSelect(m),
-            child: Container(
-              width: _chipWidth,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: isSel ? widget.accent : V2Colors.surfaceMuted,
-                borderRadius: BorderRadius.circular(V2Spacing.radiusSm),
-                border: Border.all(
-                    color: isSel ? widget.accent : V2Colors.border),
-              ),
-              child: Center(
-                child: Text('${m.month}月',
-                    style: V2Typography.bodyStrong.copyWith(
-                        color: isSel
-                            ? Colors.white
-                            : V2Colors.textPrimary,
-                        fontWeight: FontWeight.w700)),
-              ),
-            ),
-          );
-        },
       ),
     );
   }
