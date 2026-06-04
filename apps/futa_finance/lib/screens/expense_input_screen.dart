@@ -2,8 +2,11 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
+import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../data/app_mode.dart';
+import '../data/drive_receipt_service.dart';
 import '../data/receipt_ocr.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
@@ -1251,13 +1254,20 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
             ),
           ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: _openReceiptLink,
-              icon: const Icon(Icons.open_in_new, size: 16),
-              label: const Text('レシートを開く'),
-            ),
+          Wrap(
+            spacing: 8,
+            children: [
+              TextButton.icon(
+                onPressed: _attachReceiptImage,
+                icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
+                label: const Text('ギャラリー/カメラから追加'),
+              ),
+              TextButton.icon(
+                onPressed: _openReceiptLink,
+                icon: const Icon(Icons.open_in_new, size: 16),
+                label: const Text('レシートを開く'),
+              ),
+            ],
           ),
         ],
       ),
@@ -1277,6 +1287,69 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     final uri = Uri.tryParse(url);
     if (uri == null) return;
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  /// ギャラリー/カメラから領収書画像を選び、Driveに保存してリンクを設定する。
+  /// レシートOCRを通さず、既存・手入力の支出にも後から画像を添付できる。
+  Future<void> _attachReceiptImage() async {
+    final source = await showDialog<ImageSource>(
+      context: context,
+      builder: (dctx) => SimpleDialog(
+        title: const Text('領収書画像の取得方法'),
+        children: [
+          ListTile(
+            leading: const Icon(Icons.photo_camera_outlined),
+            title: const Text('カメラで撮影'),
+            onTap: () => Navigator.pop(dctx, ImageSource.camera),
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library_outlined),
+            title: const Text('ギャラリーから選択'),
+            onTap: () => Navigator.pop(dctx, ImageSource.gallery),
+          ),
+        ],
+      ),
+    );
+    if (source == null || !mounted) return;
+    final xfile = await ImagePicker()
+        .pickImage(source: source, imageQuality: 60, maxWidth: 1280);
+    if (xfile == null || !mounted) return;
+    final bytes = await xfile.readAsBytes();
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const AlertDialog(
+        content: Row(children: [
+          SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2.5)),
+          SizedBox(width: 16),
+          Text('Driveに保存中...'),
+        ]),
+      ),
+    );
+    final link = await DriveReceiptService.instance.uploadReceiptImage(
+      bytes: bytes,
+      date: _date,
+      isBusiness: AppModeManager.instance.current == AppMode.business,
+      store: _storeCtrl.text.trim().isEmpty ? null : _storeCtrl.text.trim(),
+      amount: parseAmount(_amountCtrl.text),
+    );
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop();
+    if (link != null) {
+      setState(() => _receiptUrlCtrl.text = link);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('レシート画像をDriveに保存しました')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Drive保存に失敗しました（初回はGoogleの許可が必要・リンク手動貼付も可）')),
+      );
+    }
   }
 
   Widget _label(String text) => Padding(
