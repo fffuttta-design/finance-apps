@@ -51,6 +51,15 @@ service cloud.firestore {
         allow read, write: if isSignedIn()
             && request.auth.uid in parentMembers();
       }
+
+      // 世帯配下のプランニング項目（やりたいこと/行きたい場所/お店）
+      match /plan_items/{itemId} {
+        function parentMembers() {
+          return get(/databases/$(database)/documents/households/$(hid)).data.members;
+        }
+        allow read, write: if isSignedIn()
+            && request.auth.uid in parentMembers();
+      }
     }
   }
 }

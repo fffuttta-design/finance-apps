@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'data/auth_service.dart';
 import 'data/household_service.dart';
 import 'firebase_options.dart';
-import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/main_shell.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
@@ -106,7 +106,7 @@ class _HouseholdGateState extends State<_HouseholdGate> {
             ),
           );
         }
-        return const HomeScreen();
+        return const MainShell();
       },
     );
   }
