@@ -145,9 +145,14 @@ Future<bool> _showOcrResult(BuildContext context, ReceiptOcrResult r) async {
     if (context.mounted) {
       Navigator.of(context, rootNavigator: true).pop();
       if (receiptUrl == null) {
+        final reason = DriveReceiptService.instance.lastError;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('レシート画像のDrive保存はスキップしました（記録は続行）')),
+          SnackBar(
+            duration: const Duration(seconds: 8),
+            content: Text(reason == null
+                ? 'レシート画像のDrive保存をスキップ（記録は続行）'
+                : 'Drive保存に失敗（記録は続行）: $reason'),
+          ),
         );
       }
     }

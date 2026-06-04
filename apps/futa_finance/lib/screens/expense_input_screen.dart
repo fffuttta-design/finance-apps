@@ -1345,9 +1345,14 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         const SnackBar(content: Text('レシート画像をDriveに保存しました')),
       );
     } else {
+      final reason = DriveReceiptService.instance.lastError;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Drive保存に失敗しました（初回はGoogleの許可が必要・リンク手動貼付も可）')),
+        SnackBar(
+          duration: const Duration(seconds: 8),
+          content: Text(reason == null
+              ? 'Drive保存に失敗（初回はGoogleの許可が必要・リンク手動貼付も可）'
+              : 'Drive保存に失敗: $reason'),
+        ),
       );
     }
   }

@@ -23,7 +23,10 @@ class DriveReceiptService {
   /// セッション中のアクセストークン簡易キャッシュ（Web の再ポップアップ抑制）。
   String? _tokenCache;
 
-  /// レシート画像をアップロードして閲覧リンクを返す。失敗時は null。
+  /// 直近の失敗理由（UI 表示・原因切り分け用）。成功時は null。
+  String? lastError;
+
+  /// レシート画像をアップロードして閲覧リンクを返す。失敗時は null（lastError に理由）。
   Future<String?> uploadReceiptImage({
     required Uint8List bytes,
     required DateTime date,
@@ -31,13 +34,18 @@ class DriveReceiptService {
     String? store,
     int? amount,
   }) async {
+    lastError = null;
     try {
       final token = await _accessToken();
-      if (token == null) return null;
+      if (token == null) {
+        lastError = 'アクセストークンを取得できませんでした';
+        return null;
+      }
       final monthId = await _ensureMonthFolder(token, isBusiness, date);
       final name = _fileName(date, store, amount);
       return await _uploadMultipart(token, name, monthId, bytes);
     } catch (e) {
+      lastError = e.toString();
       if (kDebugMode) debugPrint('Drive upload error: $e');
       return null;
     }
@@ -137,8 +145,13 @@ class DriveReceiptService {
         'parents': [parentId],
       }),
     );
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw 'フォルダ作成失敗 (${res.statusCode}) ${_short(res.body)}';
+    }
     return jsonDecode(res.body)['id'] as String;
   }
+
+  String _short(String s) => s.length > 300 ? s.substring(0, 300) : s;
 
   Future<bool> _folderExists(String token, String id) async {
     final res = await http.get(
@@ -179,7 +192,7 @@ class DriveReceiptService {
       if (kDebugMode) {
         debugPrint('Drive upload failed: ${res.statusCode} ${res.body}');
       }
-      return null;
+      throw 'アップロード失敗 (${res.statusCode}) ${_short(res.body)}';
     }
     final j = jsonDecode(res.body) as Map<String, dynamic>;
     return (j['webViewLink'] as String?) ??
