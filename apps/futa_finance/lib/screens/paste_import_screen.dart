@@ -29,14 +29,18 @@ class _ParsedRow {
 
 class _PasteImportScreenState extends State<PasteImportScreen> {
   final _textCtrl = TextEditingController();
+  final _rateCtrl = TextEditingController(text: '150');
   int _year = DateTime.now().year;
   List<_ParsedRow> _rows = [];
   bool _parsed = false;
   bool _importing = false;
 
+  double get _usdRate => double.tryParse(_rateCtrl.text.trim()) ?? 150;
+
   @override
   void dispose() {
     _textCtrl.dispose();
+    _rateCtrl.dispose();
     super.dispose();
   }
 
@@ -56,8 +60,11 @@ class _PasteImportScreenState extends State<PasteImportScreen> {
       }
       var i = 0;
       final dateStr = parts[i++];
-      // 曜日列は任意。
-      if (i < parts.length && _weekday.hasMatch(parts[i])) i++;
+      // 曜日列は任意（曜日文字、または7列以上なら空でもスキップ）。
+      if (i < parts.length &&
+          (_weekday.hasMatch(parts[i]) || parts.length >= 7)) {
+        i++;
+      }
       String at(int o) => (i + o) < parts.length ? parts[i + o] : '';
       final major = at(0);
       final sub = at(1);
@@ -78,13 +85,28 @@ class _PasteImportScreenState extends State<PasteImportScreen> {
         continue;
       }
 
-      // 金額
-      final cleaned =
-          amountStr.replaceAll(RegExp(r'[¥,円\s]'), '');
-      final amount = cleaned.isEmpty ? 0 : int.tryParse(cleaned);
-      if (amount == null) {
-        out.add(_ParsedRow(raw: raw, error: '金額が不正: "$amountStr"'));
-        continue;
+      // 金額（円 or USD。＄/$ を含めば USD として円換算）。
+      final isUsd = RegExp(r'[\$＄]').hasMatch(amountStr);
+      final numStr = amountStr.replaceAll(RegExp(r'[¥￥,円\s\$＄]'), '');
+      int amount;
+      String? originalCurrency;
+      double? originalAmount;
+      if (isUsd) {
+        final usd = double.tryParse(numStr);
+        if (usd == null) {
+          out.add(_ParsedRow(raw: raw, error: '金額が不正: "$amountStr"'));
+          continue;
+        }
+        originalCurrency = 'USD';
+        originalAmount = usd;
+        amount = (usd * _usdRate).round();
+      } else {
+        final yen = numStr.isEmpty ? 0 : int.tryParse(numStr);
+        if (yen == null) {
+          out.add(_ParsedRow(raw: raw, error: '金額が不正: "$amountStr"'));
+          continue;
+        }
+        amount = yen;
       }
 
       if (major.isEmpty || desc.isEmpty) {
@@ -101,6 +123,8 @@ class _PasteImportScreenState extends State<PasteImportScreen> {
         paymentMethod: payment,
         description: desc,
         amount: amount,
+        originalCurrency: originalCurrency,
+        originalAmount: originalAmount,
       );
       out.add(_ParsedRow(
         raw: raw,
@@ -202,10 +226,30 @@ class _PasteImportScreenState extends State<PasteImportScreen> {
                   onPressed: () => setState(() => _year++),
                 ),
                 const Spacer(),
-                const Text('（日付に年が無いため指定）',
-                    style:
-                        TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
+                const Text('USD→円 ',
+                    style: TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w600)),
+                SizedBox(
+                  width: 64,
+                  child: TextField(
+                    controller: _rateCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true),
+                    textAlign: TextAlign.center,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      prefixText: '¥',
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                    ),
+                  ),
+                ),
               ],
+            ),
+            const Padding(
+              padding: EdgeInsets.only(left: 4, top: 4),
+              child: Text('（日付に年が無いため指定。＄/\$表記は上のレートで円換算）',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
             ),
             const SizedBox(height: 8),
             TextField(
@@ -338,6 +382,10 @@ class _PasteImportScreenState extends State<PasteImportScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      if (tx.originalCurrency == 'USD')
+                        Text('\$${tx.originalAmount} → 円換算',
+                            style: const TextStyle(
+                                fontSize: 10, color: Color(0xFF1A237E))),
                       if (warn)
                         Text(r.warn!,
                             style: const TextStyle(
