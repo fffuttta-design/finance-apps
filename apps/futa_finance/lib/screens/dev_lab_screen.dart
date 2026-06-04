@@ -21,6 +21,7 @@ import '../data/subscription_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
+import 'paste_import_screen.dart';
 
 /// 🧪 開発中ラボ（事業モード専用）
 ///
@@ -34,7 +35,7 @@ class DevLabScreen extends StatefulWidget {
   State<DevLabScreen> createState() => _DevLabScreenState();
 }
 
-enum _LabView { pl, bs, cashflow, budget, plan }
+enum _LabView { pl, bs, cashflow, budget, plan, import }
 
 class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
   @override
@@ -132,6 +133,10 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
               SizedBox(
                   width: 88,
                   child: _seg(_LabView.plan, '計画', Icons.flag_outlined)),
+              SizedBox(
+                  width: 80,
+                  child: _seg(_LabView.import, '取込',
+                      Icons.upload_file_outlined)),
             ],
           ),
         ),
@@ -191,7 +196,50 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
       _LabView.cashflow => _cashflowView(),
       _LabView.budget => _budgetView(),
       _LabView.plan => _planView(),
+      _LabView.import => _importView(),
     };
+  }
+
+  /// データ貼り付け取り込みへの導線。
+  Widget _importView() {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const Icon(Icons.upload_file_outlined,
+            size: 48, color: Color(0xFF1A237E)),
+        const SizedBox(height: 12),
+        const Text('データ貼り付け取り込み',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                fontSize: 16, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        const Text(
+          '表計算（スプレッドシート等）からコピーした明細を貼り付けて、'
+          '取引をまとめて追加できます。\n\n'
+          '形式（タブ区切り・1行1取引）:\n'
+          '日付  [曜日]  大カテゴリ  小カテゴリ  内容  支払方法  金額\n\n'
+          '※ 現在のモード（事業/個人）に「追加」されます（既存データは消えません）。',
+          style: TextStyle(fontSize: 12, color: Color(0xFF6B7280), height: 1.6),
+        ),
+        const SizedBox(height: 20),
+        FilledButton.icon(
+          onPressed: () async {
+            final added = await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const PasteImportScreen()),
+            );
+            if (added == true && mounted) await _load();
+          },
+          icon: const Icon(Icons.content_paste, size: 18),
+          label: const Text('貼り付け取り込みを開く'),
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFF1A237E),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+          ),
+        ),
+      ],
+    );
   }
 
   // ═══════════════════════════════════════════════
