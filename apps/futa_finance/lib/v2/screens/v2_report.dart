@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../../data/app_mode.dart';
+import '../../data/monthly_snapshot_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
 import '../../screens/report_screen.dart';
@@ -106,6 +107,10 @@ class _V2ReportScreenState extends State<V2ReportScreen>
   List<core.Transaction> _transactions = [];
   // 会計科目(plMajor)を割り当てたサブスク（固定費/変動費）を PL に合算する。
   List<core.Subscription> _subs = [];
+  // 家庭用の「貯金（月初残高）の推移」で使う月初残高スナップショット。
+  core.MonthlySnapshotConfig _snapshots = core.MonthlySnapshotConfig.empty();
+  // 家庭用グラフの表示年（暦年）。
+  int _personalYear = DateTime.now().year;
   bool _loading = true;
 
   /// 表示モード。false=詳細（フルPL月次表）/ true=簡易（サマリー＋簡易月次表）。
@@ -154,10 +159,12 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     final txns = await _txRepo.loadAll();
     final subs =
         (await SubscriptionRepository.instance.load()).subscriptions;
+    final snaps = await MonthlySnapshotRepository.instance.load();
     if (!mounted) return;
     setState(() {
       _transactions = txns;
       _subs = subs;
+      _snapshots = snaps;
       _loading = false;
     });
   }
@@ -353,6 +360,11 @@ class _V2ReportScreenState extends State<V2ReportScreen>
       );
     }
 
+    // 家庭用は PL/BS ではなく「貯金の推移」「月別収支」を見せる。
+    if (AppModeManager.instance.current != AppMode.business) {
+      return _personalReport();
+    }
+
     final months = _displayMonths;
     // 期末（期首の前月）。期首が1月のときだけ同年内で完結する。
     final fyEndMonth = _fyStartMonth == 1 ? 12 : _fyStartMonth - 1;
@@ -431,6 +443,126 @@ class _V2ReportScreenState extends State<V2ReportScreen>
             const SizedBox(height: V2Spacing.lg),
             _categoryNoteCard(),
           ],
+        ],
+      ),
+    );
+  }
+
+  // ── 家庭用：貯金の推移＋月別収支（暦年・棒グラフ）──────────────
+  Widget _personalReport() {
+    final year = _personalYear;
+    final nets = <int>[];
+    final balances = <int?>[];
+    final labels = <String>[];
+    var yearNet = 0;
+    var hasAnyTx = false;
+    for (int m = 1; m <= 12; m++) {
+      var inc = 0, exp = 0;
+      for (final t in _transactions) {
+        if (t.date.year != year || t.date.month != m) continue;
+        hasAnyTx = true;
+        if (t.type == core.TransactionType.income) {
+          inc += t.amount;
+        } else if (t.type == core.TransactionType.expense) {
+          exp += t.amount;
+        }
+      }
+      final net = inc - exp;
+      nets.add(net);
+      yearNet += net;
+      balances.add(_snapshots.forMonth(year, m)?.initialBalance);
+      labels.add('$m');
+    }
+    final hasAnyBalance = balances.any((b) => b != null);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(vertical: V2Spacing.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 年ナビ（暦年）
+          Padding(
+            padding: const EdgeInsets.only(bottom: V2Spacing.md),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left),
+                  onPressed: () => setState(() => _personalYear--),
+                  tooltip: '前の年',
+                ),
+                Text('$year年',
+                    style: V2Typography.h2
+                        .copyWith(color: V2Colors.textPrimary)),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right),
+                  onPressed: () => setState(() => _personalYear++),
+                  tooltip: '次の年',
+                ),
+              ],
+            ),
+          ),
+          _chartCard(
+            title: '月別の収支（収入 − 支出）',
+            trailing: '年間 ${formatYen(yearNet, withSign: true)}',
+            trailingColor:
+                yearNet >= 0 ? V2Colors.positive : V2Colors.negative,
+            empty: !hasAnyTx,
+            emptyText: '$year年の記録がまだありません',
+            child: _MiniBarChart(values: nets, labels: labels, signed: true),
+          ),
+          const SizedBox(height: V2Spacing.lg),
+          _chartCard(
+            title: '貯金（月初残高）の推移',
+            empty: !hasAnyBalance,
+            emptyText: '月初残高がまだ記録されていません'
+                '（ホームの総資産カードで月初残高を入れると推移が出ます）',
+            child: _MiniBarChart(
+                values: balances, labels: labels, signed: false),
+          ),
+          const SizedBox(height: V2Spacing.lg),
+        ],
+      ),
+    );
+  }
+
+  Widget _chartCard({
+    required String title,
+    required bool empty,
+    required String emptyText,
+    required Widget child,
+    String? trailing,
+    Color? trailingColor,
+  }) {
+    return V2Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(title,
+                    style: V2Typography.h2
+                        .copyWith(color: V2Colors.textPrimary)),
+              ),
+              if (trailing != null)
+                Text(trailing,
+                    style: V2Typography.bodyStrong.copyWith(
+                        color: trailingColor ?? V2Colors.textPrimary,
+                        fontFeatures: V2Typography.tabularNums)),
+            ],
+          ),
+          const SizedBox(height: V2Spacing.md),
+          if (empty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 28),
+              child: Text(emptyText,
+                  textAlign: TextAlign.center,
+                  style: V2Typography.caption
+                      .copyWith(color: V2Colors.textSecondary)),
+            )
+          else
+            child,
         ],
       ),
     );
@@ -1020,6 +1152,122 @@ class _BodyRow extends StatelessWidget {
                         : (isDetail ? 11 : 13),
                     fontWeight: FontWeight.w800),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 家庭用レポートの簡易棒グラフ（依存ライブラリ無し・自前描画）。
+/// signed=true: 中央基線で +緑/−赤。signed=false: 下基線で上のみ（藍）。
+class _MiniBarChart extends StatelessWidget {
+  final List<int?> values;
+  final List<String> labels;
+  final bool signed;
+  const _MiniBarChart({
+    required this.values,
+    required this.labels,
+    this.signed = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final nonNull = values.whereType<int>().toList();
+    final maxAbs = nonNull.isEmpty
+        ? 1
+        : nonNull
+            .map((v) => v.abs())
+            .fold<int>(1, (a, b) => a > b ? a : b);
+    const h = 150.0;
+    return Column(
+      children: [
+        SizedBox(
+          height: h,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (int i = 0; i < values.length; i++)
+                Expanded(child: _bar(values[i], maxAbs)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            for (final l in labels)
+              Expanded(
+                child: Text(l,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 10, color: Color(0xFF9CA3AF))),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _bar(int? v, int maxAbs) {
+    if (v == null) return const SizedBox();
+    final frac = (v.abs() / maxAbs).clamp(0.0, 1.0);
+    if (!signed) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 3),
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: FractionallySizedBox(
+            heightFactor: frac == 0 ? 0.01 : frac,
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Color(0xFF6366F1),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(3)),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    final color =
+        v < 0 ? const Color(0xFFDC2626) : const Color(0xFF16A34A);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 3),
+      child: Column(
+        children: [
+          Expanded(
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: v > 0
+                  ? FractionallySizedBox(
+                      heightFactor: frac,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: color,
+                          borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(3)),
+                        ),
+                      ),
+                    )
+                  : const SizedBox(),
+            ),
+          ),
+          Container(height: 1, color: const Color(0xFFE5E7EB)),
+          Expanded(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: v < 0
+                  ? FractionallySizedBox(
+                      heightFactor: frac,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: color,
+                          borderRadius: const BorderRadius.vertical(
+                              bottom: Radius.circular(3)),
+                        ),
+                      ),
+                    )
+                  : const SizedBox(),
             ),
           ),
         ],

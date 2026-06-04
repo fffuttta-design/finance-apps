@@ -822,6 +822,18 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               // 金額をヒーローとして最上部に大きく表示。
               _heroAmount(),
               const SizedBox(height: 20),
+              // レシート画像（Drive）がある取引は、上部に開くボタンを出す。
+              if (_receiptUrlCtrl.text.trim().isNotEmpty) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.tonalIcon(
+                    onPressed: _openReceiptLink,
+                    icon: const Icon(Icons.receipt_long, size: 18),
+                    label: const Text('レシートを見る'),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               _label('日付'),
               InkWell(
                 onTap: _pickDate,
