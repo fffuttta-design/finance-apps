@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../data/app_mode.dart';
+import '../../data/auth_service.dart';
 import '../../data/ui_preferences.dart';
 import '../../data/update_flow.dart';
 import '../../screens/account_editor_screen.dart';
@@ -73,6 +74,10 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
     ]),
     _MenuGroup(title: 'アプリ情報', items: [
       _MenuItem('about', 'バージョン・更新確認', Icons.info_outline),
+    ]),
+    _MenuGroup(title: 'アカウント', items: [
+      _MenuItem('account', 'アカウント / サインアウト',
+          Icons.account_circle_outlined),
     ]),
   ];
 
@@ -192,6 +197,8 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
         return const V2BackupPanel();
       case 'about':
         return const _AboutPanel();
+      case 'account':
+        return const _AccountPanel();
       default:
         return const _DisplayPanel();
     }
@@ -800,6 +807,106 @@ class _ModeIndicator extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// アカウント情報＋サインアウト。
+class _AccountPanel extends StatefulWidget {
+  const _AccountPanel();
+  @override
+  State<_AccountPanel> createState() => _AccountPanelState();
+}
+
+class _AccountPanelState extends State<_AccountPanel> {
+  bool _busy = false;
+
+  Future<void> _signOut() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: const Text('サインアウト'),
+        content: const Text(
+            'サインアウトすると、サインインするまでアプリが使えなくなります。\n'
+            '別アカウント（例: contact@…）でログインし直す時に使います。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dctx, true),
+              child: const Text('サインアウト')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _busy = true);
+    try {
+      await AuthService.instance.signOut();
+      // authStateChanges によりログイン画面へ自動遷移する。
+    } catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('サインアウトに失敗: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = AuthService.instance.currentUser;
+    final email = user?.email ?? '(未ログイン)';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _PanelHeaderWithIcon(
+          title: 'アカウント',
+          note: 'ログイン中のGoogleアカウント。別アカウントに切り替えるにはサインアウトします。',
+          icon: Icons.account_circle_outlined,
+          iconColor: V2Colors.accent,
+        ),
+        const SizedBox(height: V2Spacing.sm),
+        V2Card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.email_outlined,
+                      size: 18, color: V2Colors.textSecondary),
+                  const SizedBox(width: V2Spacing.sm),
+                  Expanded(
+                    child: Text(email,
+                        style: V2Typography.bodyStrong
+                            .copyWith(color: V2Colors.textPrimary)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: V2Spacing.lg),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _busy ? null : _signOut,
+                  icon: const Icon(Icons.logout, size: 18),
+                  label: Text(_busy ? '処理中…' : 'サインアウト'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFDC2626),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                  ),
+                ),
+              ),
+              const SizedBox(height: V2Spacing.sm),
+              Text(
+                'アカウント移行の手順: ①このアカウントでバックアップを書き出す → '
+                '②サインアウト → ③移行先アカウントでログイン → ④取り込み。',
+                style: V2Typography.caption
+                    .copyWith(color: V2Colors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
