@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../data/auth_service.dart';
 import '../data/categories.dart';
 import '../data/household_service.dart';
 import '../data/tx_repository.dart';
@@ -19,6 +23,114 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+
+  // ── 相手の登録の「未読まとめ通知」用 ───────────────────────
+  StreamSubscription<List<core.Transaction>>? _notifySub;
+  Set<String> _seenIds = {};
+  bool _seenLoaded = false;
+  bool _primeOnFirstEmit = false; // 初回(既読データ無し)は通知せず既読化
+
+  String get _myUid => AuthService.instance.currentUser?.uid ?? '';
+
+  @override
+  void initState() {
+    super.initState();
+    _initPartnerNotify();
+  }
+
+  @override
+  void dispose() {
+    _notifySub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initPartnerNotify() async {
+    final hid = HouseholdService.instance.householdId;
+    if (hid == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'takuharu.seen_tx.$hid';
+    final saved = prefs.getStringList(key);
+    _primeOnFirstEmit = saved == null; // まだ一度も記録してない＝初回
+    _seenIds = (saved ?? const <String>[]).toSet();
+    _seenLoaded = true;
+    _notifySub = TxRepository.instance.watch(hid).listen(_onTxnsForNotify);
+  }
+
+  Future<void> _persistSeen(String hid) async {
+    final prefs = await SharedPreferences.getInstance();
+    // 肥大化防止: 直近1000件だけ保持。
+    final ids = _seenIds.toList();
+    final trimmed =
+        ids.length > 1000 ? ids.sublist(ids.length - 1000) : ids;
+    await prefs.setStringList('takuharu.seen_tx.$hid', trimmed);
+  }
+
+  Future<void> _onTxnsForNotify(List<core.Transaction> txns) async {
+    if (!_seenLoaded || !mounted) return;
+    final hid = HouseholdService.instance.householdId;
+    if (hid == null) return;
+    // 初回(既読データ無し)は、今あるものを全部「既読」にして通知しない。
+    if (_primeOnFirstEmit) {
+      _primeOnFirstEmit = false;
+      _seenIds = txns.map((t) => t.id).toSet();
+      await _persistSeen(hid);
+      return;
+    }
+    final mine = _myUid;
+    final unseen = txns
+        .where((t) =>
+            t.recordedBy != null &&
+            t.recordedBy != mine &&
+            !_seenIds.contains(t.id))
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+    if (unseen.isEmpty) return;
+    _seenIds.addAll(unseen.map((t) => t.id));
+    await _persistSeen(hid);
+    if (mounted) _showPartnerDialog(unseen);
+  }
+
+  void _showPartnerDialog(List<core.Transaction> items) {
+    final names = HouseholdService.instance.memberNames;
+    showDialog<void>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: Text('🛒 あいてのあたらしい記録（${items.length}件）'),
+        content: SizedBox(
+          width: 320,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final t in items.take(20))
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Text(
+                    '・${names[t.recordedBy] ?? 'パートナー'}：'
+                    '${t.description.isEmpty ? '（無題）' : t.description} '
+                    '${t.type == core.TransactionType.income ? '+' : '-'}'
+                    '¥${t.amount}',
+                    style: const TextStyle(fontSize: 14, color: AppColors.text),
+                  ),
+                ),
+              if (items.length > 20)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text('…ほか',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSub)),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(dctx),
+            child: const Text('OK ♡'),
+          ),
+        ],
+      ),
+    );
+  }
 
   void _shift(int d) =>
       setState(() => _month = DateTime(_month.year, _month.month + d));

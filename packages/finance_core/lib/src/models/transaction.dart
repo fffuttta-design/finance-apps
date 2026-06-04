@@ -74,6 +74,10 @@ class Transaction {
   /// デフォルトは false（=確定）。既存データは false で読まれる。
   final bool isPending;
 
+  /// この取引を登録したユーザーの uid（世帯共有アプリで使用・任意）。
+  /// 「相手が登録したら通知」等に使う。単独利用のアプリでは null。
+  final String? recordedBy;
+
   const Transaction({
     required this.id,
     required this.date,
@@ -92,6 +96,7 @@ class Transaction {
     this.transferFromAccount,
     this.transferToAccount,
     this.isPending = false,
+    this.recordedBy,
   });
 
   Map<String, dynamic> toJson() => {
@@ -113,6 +118,7 @@ class Transaction {
         'transferFromAccount': transferFromAccount,
         'transferToAccount': transferToAccount,
         'isPending': isPending,
+        'recordedBy': recordedBy,
       };
 
   factory Transaction.fromJson(Map<String, dynamic> j) => Transaction(
@@ -139,6 +145,7 @@ class Transaction {
         transferFromAccount: j['transferFromAccount'] as String?,
         transferToAccount: j['transferToAccount'] as String?,
         isPending: j['isPending'] as bool? ?? false,
+        recordedBy: j['recordedBy'] as String?,
       );
 
   Transaction copyWith({
@@ -158,6 +165,7 @@ class Transaction {
     String? transferFromAccount,
     String? transferToAccount,
     bool? isPending,
+    String? recordedBy,
   }) =>
       Transaction(
         id: id,
@@ -177,5 +185,6 @@ class Transaction {
         transferFromAccount: transferFromAccount ?? this.transferFromAccount,
         transferToAccount: transferToAccount ?? this.transferToAccount,
         isPending: isPending ?? this.isPending,
+        recordedBy: recordedBy ?? this.recordedBy,
       );
 }
