@@ -75,13 +75,23 @@ class _Row {
   final TextEditingController name;
   final TextEditingController amount;
 
+  /// 個数・単価（OCR由来。表示用）。
+  final int? quantity;
+  final int? unitPrice;
+
   /// 品目ごとのカテゴリ上書き（null なら共通カテゴリを継承）。
   String? catMajor;
   String? catSub;
 
-  _Row(this.include, this.name, this.amount);
+  _Row(this.include, this.name, this.amount, this.quantity, this.unitPrice);
 
   bool get hasOverride => catMajor != null && catSub != null;
+
+  /// 「¥単価 × 個数」表記（個数2以上かつ単価ありのとき）。
+  String? get unitBreakdown =>
+      (unitPrice != null && quantity != null && quantity! > 1)
+          ? '¥$unitPrice × $quantity'
+          : null;
 }
 
 class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
@@ -102,8 +112,12 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
       TextEditingController(text: widget.storeName ?? '');
 
   late final List<_Row> _rows = widget.items
-      .map((it) => _Row(true, TextEditingController(text: it.name),
-          TextEditingController(text: formatAmount(it.price))))
+      .map((it) => _Row(
+          true,
+          TextEditingController(text: it.name),
+          TextEditingController(text: formatAmount(it.price)),
+          it.quantity,
+          it.unitPrice))
       .toList();
 
   @override
@@ -564,12 +578,20 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                 ),
               ],
             ),
-            // カテゴリ行（共通継承 or 品目別上書き）。
+            // カテゴリ行（共通継承 or 品目別上書き）＋単価×個数。
             Padding(
               padding: const EdgeInsets.only(left: 40, top: 2),
               child: Row(
                 children: [
                   Expanded(child: _itemCategoryChip(r)),
+                  if (r.unitBreakdown != null) ...[
+                    Text(r.unitBreakdown!,
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF6B7280),
+                            fontFamily: 'monospace')),
+                    const SizedBox(width: 8),
+                  ],
                   if (r.hasOverride)
                     InkWell(
                       onTap: () => setState(() {

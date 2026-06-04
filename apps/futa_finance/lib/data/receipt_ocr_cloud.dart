@@ -41,9 +41,9 @@ class ReceiptOcrCloud {
   "date": 日付("YYYY-MM-DD"形式, 不明ならnull),
   "total": 税込みの合計金額(整数・円, "合計/お会計"の値。値引後の実支払額。不明ならnull),
 $catSection
-  "items": 購入品目の配列([{"name": 品名, "price": 金額(整数・円)}], レジ袋等も含む。無ければ[])
+  "items": 購入品目の配列([{"name": 品名, "price": 小計(個数×単価の行合計,整数円), "quantity": 個数(整数,不明なら1), "unitPrice": 単価(整数円,不明ならnull)}], レジ袋等も含む。無ければ[])
 }
-合計は登録番号・電話番号・店コードなどの数字と混同しないこと。categoryMajor/categorySubは必ず一覧の表記と完全一致させること。JSONのみを返すこと。''';
+合計は登録番号・電話番号・店コードなどの数字と混同しないこと。同一商品が「単価×個数」表記なら price=単価×個数 とし quantity と unitPrice も入れること。categoryMajor/categorySubは必ず一覧の表記と完全一致させること。JSONのみを返すこと。''';
   }
 
   /// 画像を選択（カメラ/ギャラリー）→ Gemini で解析。
@@ -146,9 +146,17 @@ $catSection
         if (it is Map) {
           final n = (it['name'] as String?)?.trim() ?? '';
           final p = (it['price'] as num?)?.toInt();
+          final q = (it['quantity'] as num?)?.toInt();
+          final u = (it['unitPrice'] as num?)?.toInt();
           if (n.isEmpty) continue;
-          lines.add(p != null ? '$n ¥$p' : n);
-          if (p != null) structured.add(ReceiptItem(name: n, price: p));
+          // 表示行：単価×個数が分かれば併記。
+          final breakdown =
+              (u != null && q != null && q > 1) ? '（¥$u×$q）' : '';
+          lines.add(p != null ? '$n ¥$p$breakdown' : n);
+          if (p != null) {
+            structured.add(ReceiptItem(
+                name: n, price: p, quantity: q, unitPrice: u));
+          }
         }
       }
       if (lines.isNotEmpty) itemsMemo = lines.join('\n');

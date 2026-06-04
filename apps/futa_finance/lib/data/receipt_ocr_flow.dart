@@ -101,7 +101,14 @@ Future<bool> runReceiptOcrFlow(BuildContext context) async {
 String? _itemsMemo(ReceiptOcrResult r) {
   final items = r.items;
   if (items != null && items.isNotEmpty) {
-    return items.map((it) => '・${it.name} ${formatYen(it.price)}').join('\n');
+    return items.map((it) {
+      final bd = (it.unitPrice != null &&
+              it.quantity != null &&
+              it.quantity! > 1)
+          ? '（¥${it.unitPrice}×${it.quantity}）'
+          : '';
+      return '・${it.name} ${formatYen(it.price)}$bd';
+    }).join('\n');
   }
   return r.memo;
 }

@@ -5,8 +5,22 @@ const String kReceiptSwitchMode = '__switch_record_mode__';
 /// レシートの1品目（内訳）。
 class ReceiptItem {
   final String name;
+
+  /// 小計（個数×単価の行合計・税込）。
   final int price;
-  const ReceiptItem({required this.name, required this.price});
+
+  /// 個数（不明なら null。表示・確認用）。
+  final int? quantity;
+
+  /// 単価（円。不明なら null）。
+  final int? unitPrice;
+
+  const ReceiptItem({
+    required this.name,
+    required this.price,
+    this.quantity,
+    this.unitPrice,
+  });
 }
 
 /// レシートOCRの解析結果。
