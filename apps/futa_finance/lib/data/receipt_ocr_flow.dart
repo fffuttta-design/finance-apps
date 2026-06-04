@@ -22,25 +22,23 @@ Future<bool> runReceiptOcrFlow(BuildContext context) async {
     return false;
   }
 
-  // 取得元（カメラ/ギャラリー）を選択。
-  final source = await showModalBottomSheet<ImageSource>(
+  // 取得元（カメラ/ギャラリー）を選択。画面下ではなく中央に出す（SimpleDialog）。
+  final source = await showDialog<ImageSource>(
     context: context,
-    builder: (sheet) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            leading: const Icon(Icons.photo_camera_outlined),
-            title: const Text('カメラで撮影'),
-            onTap: () => Navigator.pop(sheet, ImageSource.camera),
-          ),
-          ListTile(
-            leading: const Icon(Icons.photo_library_outlined),
-            title: const Text('ギャラリーから選択'),
-            onTap: () => Navigator.pop(sheet, ImageSource.gallery),
-          ),
-        ],
-      ),
+    builder: (dctx) => SimpleDialog(
+      title: const Text('レシートの取得方法'),
+      children: [
+        ListTile(
+          leading: const Icon(Icons.photo_camera_outlined),
+          title: const Text('カメラで撮影'),
+          onTap: () => Navigator.pop(dctx, ImageSource.camera),
+        ),
+        ListTile(
+          leading: const Icon(Icons.photo_library_outlined),
+          title: const Text('ギャラリーから選択'),
+          onTap: () => Navigator.pop(dctx, ImageSource.gallery),
+        ),
+      ],
     ),
   );
   if (source == null || !context.mounted) return false;
