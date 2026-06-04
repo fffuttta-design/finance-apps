@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -57,6 +54,15 @@ class DefaultFirebaseOptions {
     appId: '1:806764261873:android:4ade56e19b98c0740d5450',
     messagingSenderId: '806764261873',
     projectId: 'takuharu-finance',
+    storageBucket: 'takuharu-finance.firebasestorage.app',
+  );
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyDI8HBu46fXJu6o4pI-5mlJfQlCxxTKXbE',
+    appId: '1:806764261873:web:5fe4ef0a430566640d5450',
+    messagingSenderId: '806764261873',
+    projectId: 'takuharu-finance',
+    authDomain: 'takuharu-finance.firebaseapp.com',
     storageBucket: 'takuharu-finance.firebasestorage.app',
   );
 }
