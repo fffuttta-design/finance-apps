@@ -64,7 +64,15 @@ class ReceiptSplitScreen extends StatefulWidget {
     this.showModeToggle = false,
     this.initialCategoryMajor,
     this.initialCategorySub,
+    this.receiptId,
+    this.receiptUrl,
   });
+
+  /// 親レシートのグループID（全品目に同じIDを付与）。任意。
+  final String? receiptId;
+
+  /// Drive保存したレシート画像の閲覧リンク（全品目に付与）。任意。
+  final String? receiptUrl;
 
   @override
   State<ReceiptSplitScreen> createState() => _ReceiptSplitScreenState();
@@ -271,6 +279,9 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
         description: name.isEmpty ? (store.isEmpty ? '品目' : store) : name,
         amount: amt,
         store: store.isEmpty ? null : store,
+        // 同じレシートの品目は同じ receiptId で束ね、receiptUrl で画像を開ける。
+        receiptId: widget.receiptId,
+        receiptUrl: widget.receiptUrl,
       ));
     }
     if (toSave.isEmpty) {

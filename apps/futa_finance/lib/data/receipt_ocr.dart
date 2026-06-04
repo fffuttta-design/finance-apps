@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 /// レシート記録ポップアップの「まとめて1件 / 品目ごと」切替時に
 /// Navigator.pop へ渡すセンチネル値。フロー側がこれを受けてもう片方を開く。
 const String kReceiptSwitchMode = '__switch_record_mode__';
@@ -48,6 +50,9 @@ class ReceiptOcrResult {
   /// 同・小カテゴリ（例: "機材"）。
   final String? categorySub;
 
+  /// 撮影した（圧縮済み）レシート画像のバイト列。Drive保存に使う。
+  final Uint8List? imageBytes;
+
   const ReceiptOcrResult({
     required this.rawText,
     this.amount,
@@ -58,5 +63,6 @@ class ReceiptOcrResult {
     this.categoryGuess,
     this.categoryMajor,
     this.categorySub,
+    this.imageBytes,
   });
 }

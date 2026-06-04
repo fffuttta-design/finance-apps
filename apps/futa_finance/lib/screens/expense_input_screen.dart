@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../data/receipt_ocr.dart';
 import '../data/settings_repository.dart';
@@ -85,6 +86,8 @@ class ExpenseInputScreen extends StatefulWidget {
     this.initialCategorySub,
     this.editing,
     this.receiptItems,
+    this.receiptId,
+    this.initialReceiptUrl,
   });
 
   /// 起動時に支払方法をプリセット（口座詳細画面から呼ばれた時など）。
@@ -109,6 +112,12 @@ class ExpenseInputScreen extends StatefulWidget {
   /// レシートOCRで読み取った品目（2件以上なら上部に記録方法トグルを表示）。
   /// トグルで「品目ごと」を選ぶと [kReceiptSwitchMode] を返して閉じる。
   final List<ReceiptItem>? receiptItems;
+
+  /// 親レシートのグループID（OCR保存時に付与・任意）。
+  final String? receiptId;
+
+  /// Drive保存したレシート画像の閲覧リンク（OCR時にプリフィル・任意）。
+  final String? initialReceiptUrl;
 
   @override
   State<ExpenseInputScreen> createState() => _ExpenseInputScreenState();
@@ -213,6 +222,10 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       if (widget.initialStore != null &&
           widget.initialStore!.trim().isNotEmpty) {
         _storeCtrl.text = widget.initialStore!.trim();
+      }
+      if (widget.initialReceiptUrl != null &&
+          widget.initialReceiptUrl!.trim().isNotEmpty) {
+        _receiptUrlCtrl.text = widget.initialReceiptUrl!.trim();
       }
     }
     _load();
@@ -719,6 +732,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       receiptUrl: _receiptUrlCtrl.text.trim().isEmpty
           ? null
           : _receiptUrlCtrl.text.trim(),
+      receiptId: widget.receiptId ?? editing?.receiptId,
       originalCurrency: _currency == 'USD' ? 'USD' : null,
       originalAmount: usdAmount,
       isPending: editing?.isPending ?? false,
@@ -1225,9 +1239,32 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
             ),
           ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _openReceiptLink,
+              icon: const Icon(Icons.open_in_new, size: 16),
+              label: const Text('レシートを開く'),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  /// 領収書リンク（Drive等）を外部で開く。
+  Future<void> _openReceiptLink() async {
+    final url = _receiptUrlCtrl.text.trim();
+    if (url.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('レシートのリンクがありません')),
+      );
+      return;
+    }
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   Widget _label(String text) => Padding(

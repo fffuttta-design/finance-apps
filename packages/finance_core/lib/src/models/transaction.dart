@@ -39,6 +39,11 @@ class Transaction {
   /// 領収書画像 URL（Firebase Storage パス or 外部リンク）。
   final String? receiptUrl;
 
+  /// 親レシート（Receipt）への参照ID。任意・後方互換。
+  /// まとめ1件でも品目ごとでも、同じレシートから作られた取引は同じ
+  /// receiptId を持つ（単品登録でも親レシートに辿れる）。
+  final String? receiptId;
+
   /// 備考。
   final String? memo;
 
@@ -78,6 +83,7 @@ class Transaction {
     required this.description,
     required this.amount,
     this.receiptUrl,
+    this.receiptId,
     this.memo,
     this.store,
     this.incomeSourceId,
@@ -98,6 +104,7 @@ class Transaction {
         'description': description,
         'amount': amount,
         'receiptUrl': receiptUrl,
+        'receiptId': receiptId,
         'memo': memo,
         'store': store,
         'incomeSourceId': incomeSourceId,
@@ -123,6 +130,7 @@ class Transaction {
         description: j['description'] as String,
         amount: j['amount'] as int,
         receiptUrl: j['receiptUrl'] as String?,
+        receiptId: j['receiptId'] as String?,
         memo: j['memo'] as String?,
         store: j['store'] as String?,
         incomeSourceId: j['incomeSourceId'] as String?,
@@ -141,6 +149,7 @@ class Transaction {
     String? description,
     int? amount,
     String? receiptUrl,
+    String? receiptId,
     String? memo,
     String? store,
     String? incomeSourceId,
@@ -159,6 +168,7 @@ class Transaction {
         description: description ?? this.description,
         amount: amount ?? this.amount,
         receiptUrl: receiptUrl ?? this.receiptUrl,
+        receiptId: receiptId ?? this.receiptId,
         memo: memo ?? this.memo,
         store: store ?? this.store,
         incomeSourceId: incomeSourceId ?? this.incomeSourceId,

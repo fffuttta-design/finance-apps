@@ -118,7 +118,7 @@ $catSection
       // 念のため JSON 部分だけ抜き出して再試行。
       final m = RegExp(r'\{[\s\S]*\}').firstMatch(text);
       if (m == null) {
-        return ReceiptOcrResult(rawText: text);
+        return ReceiptOcrResult(rawText: text, imageBytes: bytes);
       }
       parsed = jsonDecode(m.group(0)!) as Map<String, dynamic>;
     }
@@ -185,6 +185,7 @@ $catSection
       categoryMajor: majorOut,
       categorySub: subOut,
       categoryGuess: (category != null && category.isNotEmpty) ? category : null,
+      imageBytes: bytes,
     );
   }
 }
