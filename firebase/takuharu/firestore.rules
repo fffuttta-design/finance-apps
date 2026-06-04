@@ -3,11 +3,13 @@ rules_version = '2';
 // たくはるファイナンス Firestore Security Rules
 //
 // 設計方針:
-//   - users/{uid} … 本人のみ read/write（自分の householdId を保持）
-//   - households/{hid} … メンバー（members 配列に uid が含まれる）のみ read/write
-//   - households/{hid}/transactions/** … 同じくメンバーのみ read/write
-//   - 世帯への参加は、コードを知っている認証済みユーザーが members に自分を追加できる
+//   - 許可された uid（allowedUsers）のみ全データにアクセス可能
+//     （= 指定の2人＋検証用 だけが使える）
+//   - データ共有は households の members（世帯コードで参加）で行う
+//   - users/{uid} … 本人のみ / households/** … メンバーのみ
 //   - その他は全拒否（デフォルト deny）
+//
+// アカウントを追加/削除したい場合は allowedUsers の uid を編集すること。
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -16,39 +18,48 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // 許可された uid 一覧（この人たちだけアクセス可能）
+    function allowedUsers() {
+      return [
+        'yfTtT5N1DTNPgtm7PXM2l1mTkY92',  // fffuttta@gmail.com
+        'TdIx6DB8PpVdPH7wo3QhavmP1ia2',  // noel.31128@gmail.com
+        'vnoNjaHvhvew2HYhfSY7DlqLyC72'   // takuharumika@gmail.com (検証用)
+      ];
+    }
+
+    function isAllowed() {
+      return isSignedIn() && request.auth.uid in allowedUsers();
+    }
+
     // 自分のユーザードキュメント
     match /users/{uid} {
-      allow read, write: if isSignedIn() && request.auth.uid == uid;
+      allow read, write: if isAllowed() && request.auth.uid == uid;
     }
 
     // 世帯ドキュメント
     match /households/{hid} {
-      // 既存メンバーは読み書き可
       function isMember() {
         return isSignedIn()
             && resource.data.members is list
             && request.auth.uid in resource.data.members;
       }
-      // 新規作成: 作成者本人が members に含まれていること
-      allow create: if isSignedIn()
+      allow create: if isAllowed()
           && request.resource.data.members is list
           && request.auth.uid in request.resource.data.members;
-      // 読み取り: メンバーのみ。ただし未参加でもコードで参加できるよう
-      //          認証済みなら get は許可（join 時の存在確認用）。
-      allow get: if isSignedIn();
-      allow list: if isMember();
-      // 更新: 既存メンバー、または「自分を members に追加するだけ」の参加操作
-      allow update: if isMember()
-          || (isSignedIn()
-              && request.auth.uid in request.resource.data.members);
-      allow delete: if isMember();
+      // join 時の存在確認のため、許可ユーザーなら get は許可。
+      allow get: if isAllowed();
+      allow list: if isAllowed() && isMember();
+      allow update: if isAllowed()
+          && (isMember()
+              || request.auth.uid in request.resource.data.members);
+      allow delete: if isAllowed() && isMember();
 
       // 世帯配下の取引
       match /transactions/{txId} {
         function parentMembers() {
           return get(/databases/$(database)/documents/households/$(hid)).data.members;
         }
-        allow read, write: if isSignedIn()
+        allow read, write: if isAllowed()
             && request.auth.uid in parentMembers();
       }
 
@@ -57,7 +68,7 @@ service cloud.firestore {
         function parentMembers() {
           return get(/databases/$(database)/documents/households/$(hid)).data.members;
         }
-        allow read, write: if isSignedIn()
+        allow read, write: if isAllowed()
             && request.auth.uid in parentMembers();
       }
     }
