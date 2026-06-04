@@ -19,6 +19,7 @@ import '../../data/settings_repository.dart';
 import '../../data/transaction_repository.dart';
 import '../../screens/account_detail_screen.dart';
 import '../../screens/card_detail_screen.dart';
+import '../../screens/expense_list_screen.dart';
 import '../../utils/formatters.dart';
 import '../../utils/thousands_separator_input_formatter.dart';
 import '../../widgets/brand_logo.dart';
@@ -722,8 +723,8 @@ class _CenterColumn extends StatelessWidget {
         : projected;
     final diff = actual - projected;
 
-    // 最新の入出金: 日付降順で最新 5 件
-    final recent = [...state._transactions]
+    // 最新の入出金: 選択中の月のみ・日付降順で最新 5 件
+    final recent = [...monthTxns]
       ..sort((a, b) => b.date.compareTo(a.date));
     final recentTop = recent.take(5).toList();
 
@@ -989,17 +990,43 @@ class _CenterColumn extends StatelessWidget {
           ),
         ),
         const SizedBox(height: V2Spacing.lg),
-        // ── 最新の入出金 ──────────────────
+        // ── 最新の入出金（選択中の月）──────────────────
         V2Card(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Text('最新の入出金',
-                      style: V2Typography.h2
-                          .copyWith(color: V2Colors.textPrimary)),
-                ],
+              // タップでその月の支出明細一覧へ遷移。
+              InkWell(
+                borderRadius: BorderRadius.circular(6),
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ExpenseListScreen(
+                        title: isBusiness ? '経費明細一覧' : '支出明細一覧',
+                        month: state._selectedMonth,
+                      ),
+                    ),
+                  );
+                  await state._load();
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    children: [
+                      Text(
+                          '${state._selectedMonth.month}月の入出金',
+                          style: V2Typography.h2
+                              .copyWith(color: V2Colors.textPrimary)),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.chevron_right,
+                          size: 18, color: V2Colors.textMuted),
+                      const Text('明細',
+                          style: TextStyle(
+                              fontSize: 11, color: V2Colors.textMuted)),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: V2Spacing.md),
               if (recentTop.isEmpty)

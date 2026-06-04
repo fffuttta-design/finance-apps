@@ -139,7 +139,8 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
       context,
       MaterialPageRoute(
         builder: (_) => ExpenseListScreen(
-            title: isBusiness ? '経費明細一覧' : '支出明細一覧'),
+            title: isBusiness ? '経費明細一覧' : '支出明細一覧',
+            month: _focused),
       ),
     );
     if (mounted) await _load();

@@ -37,7 +37,11 @@ extension _SortX on _Sort {
 class ExpenseListScreen extends StatefulWidget {
   /// 表示タイトル（事業=経費明細 / 個人=支出明細）。
   final String title;
-  const ExpenseListScreen({super.key, this.title = '経費明細一覧'});
+
+  /// 指定すると、その月（年・月）の明細だけに絞り込む。
+  /// null なら全期間（従来どおり）。画面内で前月/翌月に移動できる。
+  final DateTime? month;
+  const ExpenseListScreen({super.key, this.title = '経費明細一覧', this.month});
 
   @override
   State<ExpenseListScreen> createState() => _ExpenseListScreenState();
@@ -55,6 +59,16 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   _Sort _sort = _Sort.dateDesc;
   final _searchCtrl = TextEditingController();
   String _query = '';
+
+  /// 月絞り込み（null=全期間）。前月/翌月ボタンで移動。
+  late DateTime? _month =
+      widget.month == null ? null : DateTime(widget.month!.year, widget.month!.month);
+
+  void _shiftMonth(int delta) {
+    final m = _month;
+    if (m == null) return;
+    setState(() => _month = DateTime(m.year, m.month + delta));
+  }
 
   @override
   void initState() {
@@ -96,8 +110,11 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
 
   List<core.Transaction> get _filtered {
     final q = _query.trim().toLowerCase();
+    final m = _month;
     var list = _transactions
         .where((t) => t.type == core.TransactionType.expense)
+        .where((t) =>
+            m == null || (t.date.year == m.year && t.date.month == m.month))
         .where((t) {
       if (q.isEmpty) return true;
       return t.description.toLowerCase().contains(q) ||
@@ -166,6 +183,37 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
           : SafeArea(
               child: Column(
                 children: [
+                  // 月絞り込みバー（月指定で開いた場合のみ）。前月/翌月へ移動可。
+                  if (_month != null)
+                    Container(
+                      color: const Color(0xFFF8FAFC),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            iconSize: 22,
+                            icon: const Icon(Icons.chevron_left),
+                            onPressed: () => _shiftMonth(-1),
+                            tooltip: '前の月',
+                          ),
+                          Text('${_month!.year}年${_month!.month}月',
+                              style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF111827))),
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            iconSize: 22,
+                            icon: const Icon(Icons.chevron_right),
+                            onPressed: () => _shiftMonth(1),
+                            tooltip: '次の月',
+                          ),
+                        ],
+                      ),
+                    ),
                   // 検索
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
