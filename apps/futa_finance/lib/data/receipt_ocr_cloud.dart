@@ -71,30 +71,39 @@ $catSection
 
     final uri = Uri.parse(
         'https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent?key=$_apiKey');
-    final resp = await http
-        .post(
-          uri,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'contents': [
-              {
-                'parts': [
-                  {'text': prompt},
-                  {
-                    'inline_data': {'mime_type': mime, 'data': b64}
-                  },
-                ]
-              }
-            ],
-            'generationConfig': {
-              'responseMimeType': 'application/json',
-              // 高速化：2.5 Flash の思考(thinking)を無効化してレイテンシ削減。
-              'thinkingConfig': {'thinkingBudget': 0},
+    final reqBody = jsonEncode({
+      'contents': [
+        {
+          'parts': [
+            {'text': prompt},
+            {
+              'inline_data': {'mime_type': mime, 'data': b64}
             },
-          }),
-        )
-        .timeout(const Duration(seconds: 30));
+          ]
+        }
+      ],
+      'generationConfig': {
+        'responseMimeType': 'application/json',
+        // 高速化：2.5 Flash の思考(thinking)を無効化してレイテンシ削減。
+        'thinkingConfig': {'thinkingBudget': 0},
+      },
+    });
 
+    // 429(混雑/レート上限)は短い待機を挟んで自動リトライ（最大3回）。
+    late http.Response resp;
+    for (var attempt = 0;; attempt++) {
+      resp = await http
+          .post(uri,
+              headers: {'Content-Type': 'application/json'}, body: reqBody)
+          .timeout(const Duration(seconds: 30));
+      if (resp.statusCode != 429 || attempt >= 2) break;
+      await Future.delayed(Duration(seconds: 2 * (attempt + 1)));
+    }
+
+    if (resp.statusCode == 429) {
+      throw 'Geminiが混雑/利用上限(429)です。少し時間をおいて再試行してください'
+          '（無料枠の1分/1日あたりの上限の可能性）';
+    }
     if (resp.statusCode != 200) {
       throw 'Gemini APIエラー (${resp.statusCode})';
     }
