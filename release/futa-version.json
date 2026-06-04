@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.171",
-    "buildNumber":  "172",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.171/futa-finance-v1.0.171.apk",
-    "releaseNotes":  "v1.0.171 レシート読取のカテゴリ予測を自分のカテゴリ一覧から選ぶ方式に修正(大小とも自動入力)"
+    "version":  "1.0.172",
+    "buildNumber":  "173",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.172/futa-finance-v1.0.172.apk",
+    "releaseNotes":  "v1.0.172 レシート読取で個数×単価を取得・表示"
 }
