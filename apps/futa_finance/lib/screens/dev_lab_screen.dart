@@ -39,7 +39,15 @@ enum _LabView { pl, bs, cashflow, budget, plan, import }
 
 class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
   @override
-  void onModeChanged() => _load();
+  void onModeChanged() {
+    // 個人モードでは PL/BS など事業専用ビューを使わせず、取込に固定する。
+    if (!_isBusiness) _view = _LabView.import;
+    _load();
+  }
+
+  /// 現在が事業モードかどうか。個人モードでは取込のみ表示する。
+  bool get _isBusiness =>
+      AppModeManager.instance.current == AppMode.business;
 
   final _settings = SettingsRepository();
   StreamSubscription<List<core.Transaction>>? _sub;
@@ -51,6 +59,8 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
   @override
   void initState() {
     super.initState();
+    // 個人モードは取込タブのみ。初期表示も取込にする。
+    if (!_isBusiness) _view = _LabView.import;
     _load();
     _sub = TransactionRepository.instance.stream.listen((list) {
       if (!mounted) return;
@@ -85,11 +95,11 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
     return Scaffold(
       appBar: AppBar(
         title: Row(
-          children: const [
-            Text('🧪', style: TextStyle(fontSize: 20)),
-            SizedBox(width: 6),
-            Text('開発中（事業）',
-                style: TextStyle(
+          children: [
+            const Text('🧪', style: TextStyle(fontSize: 20)),
+            const SizedBox(width: 6),
+            Text(_isBusiness ? '開発中（事業）' : 'データ取込（個人）',
+                style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF111827))),
@@ -108,6 +118,8 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
   }
 
   Widget _viewToggle() {
+    // 個人モードは取込のみ。切替バーは不要なので非表示。
+    if (!_isBusiness) return const SizedBox.shrink();
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       color: Colors.white,

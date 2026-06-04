@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/app_mode.dart';
 import '../../screens/dev_lab_screen.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
@@ -15,6 +16,12 @@ class V2DevLabScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isBusiness =
+        AppModeManager.instance.current == AppMode.business;
+    final bannerTitle = isBusiness ? '🧪 開発中ラボ' : '📥 データ取込（個人）';
+    final bannerBody = isBusiness
+        ? 'PL / BS / 予算管理の試作機能。事業モード専用、データは v1 と完全共有。'
+        : 'コピーした明細を貼り付けて、取引をまとめて追加できます。現在の個人モードに追加されます。';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -26,18 +33,22 @@ class V2DevLabScreen extends StatelessWidget {
             borderColor: V2Colors.warning.withValues(alpha: 0.4),
             child: Row(
               children: [
-                const Icon(Icons.science_outlined,
-                    size: 18, color: V2Colors.warning),
+                Icon(
+                    isBusiness
+                        ? Icons.science_outlined
+                        : Icons.upload_file_outlined,
+                    size: 18,
+                    color: V2Colors.warning),
                 const SizedBox(width: V2Spacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('🧪 開発中ラボ',
+                      Text(bannerTitle,
                           style: V2Typography.bodyStrong.copyWith(
                               color: V2Colors.textPrimary)),
                       Text(
-                        'PL / BS / 予算管理の試作機能。事業モード専用、データは v1 と完全共有。',
+                        bannerBody,
                         style: V2Typography.caption.copyWith(
                             color: V2Colors.textSecondary),
                       ),

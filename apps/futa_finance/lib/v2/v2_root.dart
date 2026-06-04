@@ -78,9 +78,13 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
           id: 'report', label: '業績', icon: Icons.bar_chart_outlined),
       'settings': const V2NavItem(
           id: 'settings', label: '設定', icon: Icons.settings_outlined),
-      if (isBusiness)
-        'devLab': const V2NavItem(
-            id: 'devLab', label: '開発中', icon: Icons.science_outlined),
+      // 事業モード=「開発中」ラボ（PL/BS/予算/取込）。
+      // 個人モードでも取込を使えるよう「取込」ラベルで常時表示する。
+      'devLab': isBusiness
+          ? const V2NavItem(
+              id: 'devLab', label: '開発中', icon: Icons.science_outlined)
+          : const V2NavItem(
+              id: 'devLab', label: '取込', icon: Icons.upload_file_outlined),
     };
     final result = <V2NavItem>[];
     for (final id in UiPreferences.instance.sidebarOrder) {
