@@ -231,27 +231,56 @@ class BackupRepository {
   // ───────────────────────────────────────────────────────────────
 
   /// 全データを JSON 文字列としてエクスポートする。
+  ///
+  /// ★重要: 端末ローカル(SharedPreferences)ではなく、現在アクティブな
+  /// リポジトリ（ログイン中は Firestore / 未ログインは Local）から読む。
+  /// これでログイン状態でも「画面に出ているデータ」を正しく書き出す。
+  /// 事業/個人の両モードを順に読むため、一時的にモードを切り替える。
   Future<String> exportAll() async {
-    final prefs = await SharedPreferences.getInstance();
     final info = await PackageInfo.fromPlatform();
+    final originalMode = AppModeManager.instance.current;
 
     final data = <String, Map<String, dynamic>>{};
     for (final entry in _modes.entries) {
-      final modePrefix = entry.key;
       final modeLabel = entry.value;
-      final modeData = <String, dynamic>{};
-      for (final key in _targetKeys) {
-        final raw = prefs.getString(_fullKey(modePrefix, key));
-        if (raw == null) continue;
-        // 各値は既に JSON 文字列で保存されている → ネスト JSON として埋め込む
-        try {
-          modeData[key] = jsonDecode(raw);
-        } catch (_) {
-          // 万が一壊れていたら文字列のまま保存（救済策）
-          modeData[key] = raw;
-        }
+      final mode = entry.key == 'b' ? AppMode.business : AppMode.personal;
+      if (AppModeManager.instance.current != mode) {
+        await AppModeManager.instance.setMode(mode);
       }
+
+      final modeData = <String, dynamic>{};
+      try {
+        final txns = await TransactionRepository.instance.loadAll();
+        modeData['transactions'] = txns.map((t) => t.toJson()).toList();
+      } catch (_) {}
+
+      Future<void> addConfig(
+          String key, Future<String> Function() readJsonString) async {
+        try {
+          modeData[key] = jsonDecode(await readJsonString());
+        } catch (_) {}
+      }
+
+      await addConfig('categories',
+          () async => (await SettingsRepository.instance.loadCategories()).toJsonString());
+      await addConfig('payments',
+          () async => (await SettingsRepository.instance.loadPayments()).toJsonString());
+      await addConfig('subscriptions',
+          () async => (await SubscriptionRepository.instance.load()).toJsonString());
+      await addConfig('income_sources',
+          () async => (await IncomeSourceRepository.instance.load()).toJsonString());
+      await addConfig('monthly_snapshots',
+          () async => (await MonthlySnapshotRepository.instance.load()).toJsonString());
+      await addConfig('month_closing',
+          () async => (await MonthClosingRepository.instance.load()).toJsonString());
+      await addConfig('checklist',
+          () async => (await ChecklistRepository.instance.load()).toJsonString());
+
       data[modeLabel] = modeData;
+    }
+
+    if (AppModeManager.instance.current != originalMode) {
+      await AppModeManager.instance.setMode(originalMode);
     }
 
     final payload = <String, dynamic>{
