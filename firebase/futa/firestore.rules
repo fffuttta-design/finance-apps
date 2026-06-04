@@ -17,8 +17,8 @@ service cloud.firestore {
     // 許可されたオーナー UID 一覧
     function allowedOwners() {
       return [
-        '01tjdHPVTiMV7TX3HryNWBEN8wq2',  // fffuttta@gmail.com (Futa)
-        'ri9JCJskU3T6nyUlrMUso77A3ij1'   // contact@run-strategy.jp (業務アカ)
+        'ri9JCJskU3T6nyUlrMUso77A3ij1'   // contact@run-strategy.jp (業務アカ・本番)
+        // fffuttta@gmail.com (01tjdHPV…) は移行完了につき削除(2026-06-04)。
       ];
     }
 
