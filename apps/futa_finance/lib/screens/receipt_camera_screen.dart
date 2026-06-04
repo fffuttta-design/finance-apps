@@ -121,51 +121,55 @@ class _ReceiptCameraScreenState extends State<ReceiptCameraScreen> {
               ),
             ),
           ),
-          // 下部コントロール（中央=シャッター / 右下=ギャラリー）
+          // 下部コントロール（左スペーサー｜中央=シャッター｜右=ギャラリー）。
+          // ※Stack+Positionedだと中央寄せで幅が縮み重なるため Row で配置。
           SafeArea(
             child: Align(
               alignment: Alignment.bottomCenter,
               child: Container(
                 height: 120,
                 width: double.infinity,
-                alignment: Alignment.center,
-                child: Stack(
-                  alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: Row(
                   children: [
-                    GestureDetector(
-                      onTap: _shoot,
-                      child: Container(
-                        width: 74,
-                        height: 74,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white,
-                          border:
-                              Border.all(color: Colors.white70, width: 4),
+                    // 左スペーサー（右のギャラリーと同幅でシャッターを真ん中に）
+                    const SizedBox(width: 54),
+                    Expanded(
+                      child: Center(
+                        child: GestureDetector(
+                          onTap: _shoot,
+                          child: Container(
+                            width: 74,
+                            height: 74,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white,
+                              border: Border.all(
+                                  color: Colors.white70, width: 4),
+                            ),
+                            child: _busy
+                                ? const Padding(
+                                    padding: EdgeInsets.all(22),
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 3,
+                                        color: Colors.black54))
+                                : null,
+                          ),
                         ),
-                        child: _busy
-                            ? const Padding(
-                                padding: EdgeInsets.all(22),
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 3, color: Colors.black54))
-                            : null,
                       ),
                     ),
-                    Positioned(
-                      right: 28,
-                      child: GestureDetector(
-                        onTap: _gallery,
-                        child: Container(
-                          width: 54,
-                          height: 54,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            color: Colors.white24,
-                            border: Border.all(color: Colors.white54),
-                          ),
-                          child: const Icon(Icons.photo_library_rounded,
-                              color: Colors.white, size: 26),
+                    GestureDetector(
+                      onTap: _gallery,
+                      child: Container(
+                        width: 54,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.white24,
+                          border: Border.all(color: Colors.white54),
                         ),
+                        child: const Icon(Icons.photo_library_rounded,
+                            color: Colors.white, size: 26),
                       ),
                     ),
                   ],
