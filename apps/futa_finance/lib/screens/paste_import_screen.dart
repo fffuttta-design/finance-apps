@@ -47,6 +47,12 @@ class _PasteImportScreenState extends State<PasteImportScreen> {
   static final _weekday = RegExp(r'^[月火水木金土日]$');
 
   void _parse() {
+    if (_textCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('データを貼り付けてください')),
+      );
+      return;
+    }
     final lines = _textCtrl.text.split('\n');
     final out = <_ParsedRow>[];
     var seq = 0;
@@ -256,6 +262,7 @@ class _PasteImportScreenState extends State<PasteImportScreen> {
               controller: _textCtrl,
               maxLines: 10,
               minLines: 6,
+              onChanged: (_) => setState(() {}),
               style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
               decoration: InputDecoration(
                 hintText:
@@ -270,7 +277,7 @@ class _PasteImportScreenState extends State<PasteImportScreen> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: _textCtrl.text.trim().isEmpty ? null : _parse,
+                onPressed: _parse,
                 icon: const Icon(Icons.search, size: 18),
                 label: const Text('解析してプレビュー'),
               ),
