@@ -27,7 +27,10 @@ class AuthService {
     if (!_initialized) await init();
     try {
       if (kIsWeb) {
-        final provider = GoogleAuthProvider();
+        final provider = GoogleAuthProvider()
+          // 毎回アカウント選択画面を出す（ブラウザに1アカウントだけだと
+          // 即サインインしてしまい、別アカウントを選べない問題を回避）。
+          ..setCustomParameters({'prompt': 'select_account'});
         final cred = await _auth.signInWithPopup(provider);
         return cred.user;
       }
