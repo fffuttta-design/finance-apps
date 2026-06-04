@@ -28,6 +28,12 @@ class ReceiptOcrResult {
   /// 会計科目の推定（素の名前。例: "消耗品費"）。カテゴリ自動選択に使う。
   final String? categoryGuess;
 
+  /// ユーザーのカテゴリ一覧から選ばれた大カテゴリ（表示名そのまま。例: "2.消耗品費"）。
+  final String? categoryMajor;
+
+  /// 同・小カテゴリ（例: "機材"）。
+  final String? categorySub;
+
   const ReceiptOcrResult({
     required this.rawText,
     this.amount,
@@ -36,5 +42,7 @@ class ReceiptOcrResult {
     this.memo,
     this.items,
     this.categoryGuess,
+    this.categoryMajor,
+    this.categorySub,
   });
 }

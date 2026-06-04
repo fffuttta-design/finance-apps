@@ -7,6 +7,7 @@ import '../utils/formatters.dart';
 import '../utils/modal_input.dart';
 import 'receipt_ocr.dart';
 import 'receipt_ocr_cloud.dart';
+import 'settings_repository.dart';
 
 /// レシートOCRの一連の流れ（撮影/選択 → クラウド解析 → 記録方法選択 → 入力）。
 ///
@@ -44,6 +45,20 @@ Future<bool> runReceiptOcrFlow(BuildContext context) async {
   );
   if (source == null || !context.mounted) return false;
 
+  // カテゴリ自動予測用に、ユーザーの大→小カテゴリ一覧を用意（Geminiに渡す）。
+  Map<String, List<String>>? catMenu;
+  try {
+    final cfg = await SettingsRepository().loadCategories();
+    final m = <String, List<String>>{};
+    for (var i = 0; i < cfg.majors.length; i++) {
+      final mj = cfg.majors[i];
+      if (mj.inactive) continue;
+      m[mj.displayName(i)] = mj.subs;
+    }
+    if (m.isNotEmpty) catMenu = m;
+  } catch (_) {}
+  if (!context.mounted) return false;
+
   // 読取中インジケータ。
   showDialog<void>(
     context: context,
@@ -63,8 +78,8 @@ Future<bool> runReceiptOcrFlow(BuildContext context) async {
   ReceiptOcrResult? result;
   String? error;
   try {
-    result =
-        await ReceiptOcrCloud.instance.captureAndRecognize(source: source);
+    result = await ReceiptOcrCloud.instance
+        .captureAndRecognize(source: source, categories: catMenu);
   } catch (e) {
     error = '$e';
   }
@@ -117,7 +132,8 @@ Future<bool> _showOcrResult(BuildContext context, ReceiptOcrResult r) async {
           items: r.items!,
           date: r.date,
           storeName: r.storeName,
-          initialCategoryMajor: r.categoryGuess,
+          initialCategoryMajor: r.categoryMajor ?? r.categoryGuess,
+          initialCategorySub: r.categorySub,
           showModeToggle: true,
         ),
       );
@@ -129,7 +145,8 @@ Future<bool> _showOcrResult(BuildContext context, ReceiptOcrResult r) async {
           initialDate: r.date,
           initialDescription: r.storeName,
           initialStore: r.storeName,
-          initialCategoryMajor: r.categoryGuess,
+          initialCategoryMajor: r.categoryMajor ?? r.categoryGuess,
+          initialCategorySub: r.categorySub,
           initialMemo: _itemsMemo(r),
           // 品目が2件以上ある時だけトグルを出す。
           receiptItems: hasItems ? r.items : null,

@@ -20,20 +20,38 @@ class ReceiptOcrCloud {
   /// クラウド読取が使えるか（キーが注入されているか）。
   static bool get available => _apiKey.isNotEmpty;
 
-  static const _prompt = '''
+  /// カテゴリ一覧（大→小）を渡さない場合のプロンプト。
+  static String _buildPrompt(Map<String, List<String>>? categories) {
+    final catSection = (categories == null || categories.isEmpty)
+        ? '  "categoryMajor": 経費の会計科目の推定(消耗品費/会議費/交際費/旅費交通費/通信費/雑費 等から1つ。不明ならnull),\n'
+            '  "categorySub": null,'
+        : () {
+            final lines = categories.entries
+                .map((e) =>
+                    '    - 「${e.key}」: [${e.value.join(", ")}]')
+                .join('\n');
+            return '  "categoryMajor": この経費に最も合う大カテゴリ名(下の一覧の「」内の名前を**そのまま**1つ。不明ならnull),\n'
+                '  "categorySub": その大カテゴリ内の小カテゴリ名(同じく一覧からそのまま1つ。不明ならnull),\n'
+                '  // カテゴリ一覧(大カテゴリ: [小カテゴリ...]):\n$lines';
+          }();
+    return '''
 あなたは日本のレシート読み取りアシスタントです。画像のレシートから以下をJSONで返してください。
 {
   "store": 店名(文字列, 不明ならnull),
   "date": 日付("YYYY-MM-DD"形式, 不明ならnull),
   "total": 税込みの合計金額(整数・円, "合計/お会計"の値。値引後の実支払額。不明ならnull),
-  "category": 経費の会計科目の推定(次から1つ: 消耗品費,会議費,会食,交際費,旅費交通費,通信費,水道光熱費,新聞図書費,支払手数料,外注費,仕入,雑費。不明ならnull),
+$catSection
   "items": 購入品目の配列([{"name": 品名, "price": 金額(整数・円)}], レジ袋等も含む。無ければ[])
 }
-合計は登録番号・電話番号・店コードなどの数字と混同しないこと。JSONのみを返すこと。''';
+合計は登録番号・電話番号・店コードなどの数字と混同しないこと。categoryMajor/categorySubは必ず一覧の表記と完全一致させること。JSONのみを返すこと。''';
+  }
 
   /// 画像を選択（カメラ/ギャラリー）→ Gemini で解析。
+  /// [categories] に大→小カテゴリ一覧を渡すと、その中から大/小を選んで返す。
   Future<ReceiptOcrResult?> captureAndRecognize(
-      {required ImageSource source}) async {
+      {required ImageSource source,
+      Map<String, List<String>>? categories}) async {
+    final prompt = _buildPrompt(categories);
     final picker = ImagePicker();
     // 高速化：解像度・画質をさらに抑えてアップロード/推論を軽くする
     // （レシートの文字は十分読める範囲）。モデルは精度優先で flash 据え置き。
@@ -61,7 +79,7 @@ class ReceiptOcrCloud {
             'contents': [
               {
                 'parts': [
-                  {'text': _prompt},
+                  {'text': prompt},
                   {
                     'inline_data': {'mime_type': mime, 'data': b64}
                   },
@@ -108,6 +126,8 @@ class ReceiptOcrCloud {
     final store = (parsed['store'] as String?)?.trim();
     final total = (parsed['total'] as num?)?.toInt();
     final category = (parsed['category'] as String?)?.trim();
+    final catMajor = (parsed['categoryMajor'] as String?)?.trim();
+    final catSub = (parsed['categorySub'] as String?)?.trim();
     DateTime? date;
     final ds = parsed['date'] as String?;
     if (ds != null) {
@@ -134,11 +154,16 @@ class ReceiptOcrCloud {
       if (lines.isNotEmpty) itemsMemo = lines.join('\n');
     }
 
+    final majorOut =
+        (catMajor != null && catMajor.isNotEmpty) ? catMajor : null;
+    final subOut = (catSub != null && catSub.isNotEmpty) ? catSub : null;
+
     final rawSummary = [
       if (store != null) '店名: $store',
       if (date != null) '日付: ${date.year}/${date.month}/${date.day}',
       if (total != null) '合計: ¥$total',
-      if (category != null && category.isNotEmpty) '科目候補: $category',
+      if (majorOut != null)
+        '科目候補: $majorOut${subOut != null ? ' › $subOut' : ''}',
       if (itemsMemo != null) '内訳:\n$itemsMemo',
     ].join('\n');
 
@@ -149,6 +174,8 @@ class ReceiptOcrCloud {
       storeName: store,
       memo: itemsMemo,
       items: structured.isEmpty ? null : structured,
+      categoryMajor: majorOut,
+      categorySub: subOut,
       categoryGuess: (category != null && category.isNotEmpty) ? category : null,
     );
   }

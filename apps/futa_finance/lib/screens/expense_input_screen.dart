@@ -82,6 +82,7 @@ class ExpenseInputScreen extends StatefulWidget {
     this.initialMemo,
     this.initialStore,
     this.initialCategoryMajor,
+    this.initialCategorySub,
     this.editing,
     this.receiptItems,
   });
@@ -96,8 +97,11 @@ class ExpenseInputScreen extends StatefulWidget {
   final String? initialMemo;
   final String? initialStore;
 
-  /// OCRが推定した会計科目（素の名前）。大カテゴリの初期候補に使う。
+  /// OCRが推定した会計科目（大カテゴリ名）。大カテゴリの初期候補に使う。
   final String? initialCategoryMajor;
+
+  /// OCRが推定した小カテゴリ名。
+  final String? initialCategorySub;
 
   /// 既存取引の編集（指定すると編集モード：全項目プリフィル＋更新/削除）。
   final core.Transaction? editing;
@@ -276,17 +280,24 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     final cfg = _categories;
     if (cfg == null) return;
 
-    String bare(String s) => s.replaceFirst(RegExp(r'^\d+\.'), '');
+    String norm(String s) =>
+        s.replaceFirst(RegExp(r'^\d+\.'), '').trim();
 
-    // ① OCR科目候補（初回のみ）。
+    // ① OCRが選んだ大/小カテゴリ（初回のみ）。一覧から選ばせているので基本一致する。
     if (initial) {
       final guess = widget.initialCategoryMajor?.trim();
       if (guess != null && guess.isNotEmpty) {
         for (var i = 0; i < cfg.majors.length; i++) {
-          if (bare(cfg.majors[i].displayName(i)) == guess) {
-            _majorCategory = cfg.majors[i].displayName(i);
+          final dn = cfg.majors[i].displayName(i);
+          if (dn == guess || norm(dn) == norm(guess)) {
+            _majorCategory = dn;
             final subs = cfg.majors[i].subs;
-            _subCategory = subs.isNotEmpty ? subs.first : null;
+            final guessSub = widget.initialCategorySub?.trim();
+            if (guessSub != null && subs.contains(guessSub)) {
+              _subCategory = guessSub;
+            } else {
+              _subCategory = subs.isNotEmpty ? subs.first : null;
+            }
             _categoryPredicted = true;
             return;
           }

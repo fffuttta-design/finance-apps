@@ -50,8 +50,11 @@ class ReceiptSplitScreen extends StatefulWidget {
   /// 「まとめて1件」を選ぶと [kReceiptSwitchMode] を返して閉じる。
   final bool showModeToggle;
 
-  /// OCRが推定した会計科目（素の名前）。共通大カテゴリの初期値に使う。
+  /// OCRが推定した会計科目（大カテゴリ名）。共通大カテゴリの初期値に使う。
   final String? initialCategoryMajor;
+
+  /// OCRが推定した小カテゴリ名。
+  final String? initialCategorySub;
 
   const ReceiptSplitScreen({
     super.key,
@@ -60,6 +63,7 @@ class ReceiptSplitScreen extends StatefulWidget {
     this.storeName,
     this.showModeToggle = false,
     this.initialCategoryMajor,
+    this.initialCategorySub,
   });
 
   @override
@@ -132,16 +136,22 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
     });
   }
 
-  /// OCR推定科目（素の名前）を共通大カテゴリに反映。小カテゴリは先頭を仮選択。
+  /// OCR推定カテゴリを共通大/小カテゴリに反映。
   void _applyCategoryGuess() {
     final guess = widget.initialCategoryMajor?.trim();
     if (guess == null || guess.isEmpty || _major != null) return;
-    String bare(String s) => s.replaceFirst(RegExp(r'^\d+\.'), '');
+    String norm(String s) =>
+        s.replaceFirst(RegExp(r'^\d+\.'), '').trim();
     for (final name in _majorNames) {
-      if (bare(name) == guess) {
+      if (name == guess || norm(name) == norm(guess)) {
         _major = name;
         final subs = _subsForMajor(name);
-        if (subs.isNotEmpty) _sub = subs.first;
+        final guessSub = widget.initialCategorySub?.trim();
+        if (guessSub != null && subs.contains(guessSub)) {
+          _sub = guessSub;
+        } else if (subs.isNotEmpty) {
+          _sub = subs.first;
+        }
         break;
       }
     }
