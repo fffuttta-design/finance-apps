@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.169",
-    "buildNumber":  "170",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.169/futa-finance-v1.0.169.apk",
-    "releaseNotes":  "v1.0.169 貼り付け取り込みがドル金額(円換算)と空曜日列に対応"
+    "version":  "1.0.170",
+    "buildNumber":  "171",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.170/futa-finance-v1.0.170.apk",
+    "releaseNotes":  "v1.0.170 貼り付け取り込みの解析ボタンが押せない不具合を修正"
 }
