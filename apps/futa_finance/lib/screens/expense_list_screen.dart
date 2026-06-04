@@ -3,11 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
-import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 import '../utils/modal_input.dart';
-import '../widgets/brand_logo.dart';
 import 'expense_input_screen.dart';
 
 /// 並び替えモード。
@@ -49,11 +47,9 @@ class ExpenseListScreen extends StatefulWidget {
 
 class _ExpenseListScreenState extends State<ExpenseListScreen> {
   final _txRepo = TransactionRepository.instance;
-  final _settings = SettingsRepository();
 
   StreamSubscription<List<core.Transaction>>? _sub;
   List<core.Transaction> _transactions = [];
-  core.PaymentMethodsConfig _payments = core.PaymentMethodsConfig.empty();
   bool _loading = true;
 
   _Sort _sort = _Sort.dateDesc;
@@ -89,23 +85,11 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
 
   Future<void> _load() async {
     final txns = await _txRepo.loadAll();
-    final payments = await _settings.loadPayments();
     if (!mounted) return;
     setState(() {
       _transactions = txns;
-      _payments = payments;
       _loading = false;
     });
-  }
-
-  String? _iconUrlFor(String name) {
-    for (final b in _payments.bankAccounts) {
-      if (b.name == name) return b.iconUrl;
-    }
-    for (final c in _payments.creditCards) {
-      if (c.name == name) return c.iconUrl;
-    }
-    return null;
   }
 
   List<core.Transaction> get _filtered {
@@ -315,67 +299,54 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF3F4F6),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: Text(cat,
-                            style: const TextStyle(
-                                fontSize: 10, color: Color(0xFF374151))),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          t.description.isEmpty ? '—' : t.description,
-                          style: const TextStyle(
-                              fontSize: 14, color: Color(0xFF111827)),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                  // カテゴリバッジ（大きめ）
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEEF2FF),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Text(cat,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF4338CA))),
                   ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      if (t.store != null && t.store!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  // タイトル（取引内容）を大きく
+                  Text(
+                    t.description.isEmpty ? '—' : t.description,
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF111827)),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  // 店舗だけ控えめに（支払方法は詳細を開いた時に表示）
+                  if (t.store != null && t.store!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
                         const Icon(Icons.storefront_outlined,
                             size: 11, color: Color(0xFF9CA3AF)),
                         const SizedBox(width: 3),
                         Flexible(
                           child: Text(t.store!.trim(),
                               style: const TextStyle(
-                                  fontSize: 10, color: Color(0xFF6B7280)),
+                                  fontSize: 11, color: Color(0xFF9CA3AF)),
                               overflow: TextOverflow.ellipsis),
                         ),
-                        const SizedBox(width: 6),
                       ],
-                      BrandLogo(
-                        iconUrl: _iconUrlFor(t.paymentMethod),
-                        fallbackIcon: Icons.account_balance,
-                        size: 13,
-                        borderRadius: 3,
-                      ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(t.paymentMethod,
-                            style: const TextStyle(
-                                fontSize: 10, color: Color(0xFF9CA3AF)),
-                            overflow: TextOverflow.ellipsis),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ],
               ),
             ),
             const SizedBox(width: 8),
             Text('-${formatYen(t.amount)}',
                 style: const TextStyle(
-                    fontSize: 15,
+                    fontSize: 16,
                     fontFamily: 'monospace',
                     fontWeight: FontWeight.w700,
                     color: Color(0xFFDC2626))),
