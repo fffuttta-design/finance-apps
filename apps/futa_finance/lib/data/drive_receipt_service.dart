@@ -26,6 +26,13 @@ class DriveReceiptService {
   /// 直近の失敗理由（UI 表示・原因切り分け用）。成功時は null。
   String? lastError;
 
+  /// フォルダIDのメモリキャッシュ。毎回の探索/作成API往復を省いて高速化。
+  /// key: "親ID|フォルダ名" → フォルダID。
+  final Map<String, String> _folderCache = {};
+
+  /// 月フォルダIDのキャッシュ。key: "事業/個人-YYYY-MM" → 月フォルダID。
+  final Map<String, String> _monthPathCache = {};
+
   /// レシート画像をアップロードして閲覧リンクを返す。失敗時は null（lastError に理由）。
   Future<String?> uploadReceiptImage({
     required Uint8List bytes,
@@ -87,12 +94,18 @@ class DriveReceiptService {
   // ── フォルダ階層を用意して月フォルダIDを返す ─────────────────
   Future<String> _ensureMonthFolder(
       String token, bool isBusiness, DateTime d) async {
+    // 同じ「モード×年×月」は2回目以降キャッシュで即返す（API往復ゼロ）。
+    final mk =
+        '${isBusiness ? 'b' : 'p'}-${d.year}-${d.month.toString().padLeft(2, '0')}';
+    final cached = _monthPathCache[mk];
+    if (cached != null) return cached;
     final rootId = await _ensureRoot(token);
     final modeId = await _findOrCreateFolder(
         token, isBusiness ? '事業用' : '個人用', rootId);
     final yearId = await _findOrCreateFolder(token, '${d.year}年', modeId);
     final monthId = await _findOrCreateFolder(
         token, '${d.month.toString().padLeft(2, '0')}月', yearId);
+    _monthPathCache[mk] = monthId;
     return monthId;
   }
 
@@ -111,9 +124,13 @@ class DriveReceiptService {
 
   Future<String> _findOrCreateFolder(
       String token, String name, String parentId) async {
+    final ck = '$parentId|$name';
+    final hit = _folderCache[ck];
+    if (hit != null) return hit;
     final found = await _findFolder(token, name, parentId);
-    if (found != null) return found;
-    return _createFolder(token, name, parentId);
+    final id = found ?? await _createFolder(token, name, parentId);
+    _folderCache[ck] = id;
+    return id;
   }
 
   Future<String?> _findFolder(

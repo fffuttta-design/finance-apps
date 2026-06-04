@@ -32,6 +32,13 @@ Future<bool> runReceiptOcrFlow(BuildContext context) async {
   );
   if (bytes == null || !context.mounted) return false;
 
+  // ★ Drive保存を“即”開始して OCR と並行で走らせる（待ち時間短縮）。
+  //   フォルダ作成日は撮影日時、ファイル名は最小（store/amountは付けない）。
+  final isBusiness = AppModeManager.instance.current == AppMode.business;
+  final receiptId = DateTime.now().microsecondsSinceEpoch.toString();
+  final uploadFuture = DriveReceiptService.instance
+      .uploadReceiptImage(bytes: bytes, date: DateTime.now(), isBusiness: isBusiness);
+
   // カテゴリ自動予測用に、ユーザーの大→小カテゴリ一覧を用意（Geminiに渡す）。
   Map<String, List<String>>? catMenu;
   try {
@@ -46,7 +53,7 @@ Future<bool> runReceiptOcrFlow(BuildContext context) async {
   } catch (_) {}
   if (!context.mounted) return false;
 
-  // 読取中インジケータ。
+  // 処理中インジケータ（OCR＋Drive保存を待つ）。
   showDialog<void>(
     context: context,
     barrierDismissible: false,
@@ -57,7 +64,7 @@ Future<bool> runReceiptOcrFlow(BuildContext context) async {
             height: 22,
             child: CircularProgressIndicator(strokeWidth: 2.5)),
         SizedBox(width: 16),
-        Text('レシートを読み取り中...'),
+        Text('レシートを処理中...'),
       ]),
     ),
   );
@@ -70,6 +77,8 @@ Future<bool> runReceiptOcrFlow(BuildContext context) async {
   } catch (e) {
     error = '$e';
   }
+  // OCRと並行で進めていた Drive保存の完了を待つ（多くは既に完了）。
+  final receiptUrl = await uploadFuture;
   if (!context.mounted) return false;
   Navigator.of(context, rootNavigator: true).pop(); // インジケータを閉じる
 
@@ -81,7 +90,20 @@ Future<bool> runReceiptOcrFlow(BuildContext context) async {
   }
   if (result == null) return false; // キャンセル
 
-  return _showOcrResult(context, result);
+  if (receiptUrl == null) {
+    final reason = DriveReceiptService.instance.lastError;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 8),
+        content: Text(reason == null
+            ? 'レシート画像のDrive保存をスキップ（記録は続行）'
+            : 'Drive保存に失敗（記録は続行）: $reason'),
+      ),
+    );
+  }
+
+  return _showOcrResult(context, result,
+      receiptId: receiptId, receiptUrl: receiptUrl);
 }
 
 /// 単発記録時に備考へ入れる明細テキスト（・品名 ¥金額）。
@@ -102,7 +124,8 @@ String? _itemsMemo(ReceiptOcrResult r) {
 
 /// 読み取り後、確認ダイアログを挟まず直接 入力ポップアップへ。
 /// ポップアップ上部のトグル（まとめて1件 / 品目ごと）でその場で切替できる。
-Future<bool> _showOcrResult(BuildContext context, ReceiptOcrResult r) async {
+Future<bool> _showOcrResult(BuildContext context, ReceiptOcrResult r,
+    {required String receiptId, String? receiptUrl}) async {
   final nothing = r.amount == null &&
       (r.storeName == null || r.storeName!.trim().isEmpty);
   if (nothing) {
@@ -116,47 +139,7 @@ Future<bool> _showOcrResult(BuildContext context, ReceiptOcrResult r) async {
   // 品目が2件以上あれば既定で「品目ごと」を開く（無ければ単発）。
   var perItem = hasItems;
 
-  // 撮影画像を Google Drive に保存（親レシート）。まとめ1件でも品目ごとでも
-  // 同じ receiptId で束ね、receiptUrl から後で画像を開ける。失敗しても続行。
-  final receiptId = DateTime.now().microsecondsSinceEpoch.toString();
-  String? receiptUrl;
-  if (r.imageBytes != null) {
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const AlertDialog(
-        content: Row(children: [
-          SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(strokeWidth: 2.5)),
-          SizedBox(width: 16),
-          Text('レシート画像を保存中...'),
-        ]),
-      ),
-    );
-    receiptUrl = await DriveReceiptService.instance.uploadReceiptImage(
-      bytes: r.imageBytes!,
-      date: r.date ?? DateTime.now(),
-      isBusiness: AppModeManager.instance.current == AppMode.business,
-      store: r.storeName,
-      amount: r.amount,
-    );
-    if (context.mounted) {
-      Navigator.of(context, rootNavigator: true).pop();
-      if (receiptUrl == null) {
-        final reason = DriveReceiptService.instance.lastError;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            duration: const Duration(seconds: 8),
-            content: Text(reason == null
-                ? 'レシート画像のDrive保存をスキップ（記録は続行）'
-                : 'Drive保存に失敗（記録は続行）: $reason'),
-          ),
-        );
-      }
-    }
-  }
+  // Drive保存（receiptId/receiptUrl）は呼び出し側で OCR と並行実行済み。
 
   while (true) {
     if (!context.mounted) return false;
