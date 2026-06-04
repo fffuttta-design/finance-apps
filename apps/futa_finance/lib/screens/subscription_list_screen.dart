@@ -88,6 +88,35 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     ];
   }
 
+  /// 「＋ 新しいカテゴリ…」選択時に名前を入力させる小ダイアログ。
+  Future<String?> _promptNewCategory(BuildContext context) {
+    final ctrl = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: const Text('新しいカテゴリ'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'カテゴリ名',
+            hintText: '例: 住居系 / 娯楽系 / 通信',
+            border: OutlineInputBorder(),
+          ),
+          onSubmitted: (v) => Navigator.pop(dctx, v),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx, null),
+              child: const Text('キャンセル')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dctx, ctrl.text),
+              child: const Text('追加')),
+        ],
+      ),
+    );
+  }
+
   Future<Subscription?> _editDialog(
       BuildContext context, Subscription? initial) async {
     final nameCtrl = TextEditingController(text: initial?.name ?? '');
@@ -98,8 +127,18 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     final memoCtrl = TextEditingController(text: initial?.memo ?? '');
     final iconUrlCtrl =
         TextEditingController(text: initial?.iconUrl ?? '');
-    final categoryCtrl =
-        TextEditingController(text: initial?.category ?? '');
+    // カテゴリ（=セクション）。プルダウンで既存から選択。新規は「＋新規」で追加。
+    final cats = <String>[
+      for (final c in (_config?.categoriesInOrder ?? const <String>[]))
+        if (c.trim().isNotEmpty &&
+            c != SubscriptionConfig.uncategorizedKey)
+          c.trim(),
+    ];
+    String? categorySel =
+        (initial?.category?.trim().isEmpty ?? true) ? null : initial!.category!.trim();
+    if (categorySel != null && !cats.contains(categorySel)) {
+      cats.add(categorySel);
+    }
     SubscriptionCycle cycle = initial?.cycle ?? SubscriptionCycle.monthly;
     SubscriptionAmountType amountType =
         initial?.amountType ?? SubscriptionAmountType.fixed;
@@ -303,9 +342,10 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
             final iconUrl = iconUrlCtrl.text.trim().isEmpty
                 ? null
                 : iconUrlCtrl.text.trim();
-            final category = categoryCtrl.text.trim().isEmpty
-                ? null
-                : categoryCtrl.text.trim();
+            final category =
+                (categorySel == null || categorySel!.trim().isEmpty)
+                    ? null
+                    : categorySel!.trim();
             final result = Subscription(
               id: initial?.id ?? _genId(),
               name: name,
@@ -537,49 +577,45 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                                   setLocal(() => paymentMethod = v),
                             ),
                           const SizedBox(height: 16),
-                          // カテゴリ（自由入力 + 既存カテゴリのワンタップ補完）
-                          TextField(
-                            controller: categoryCtrl,
+                          // カテゴリ（=セクション）。既存から選択、新規は「＋新規」で追加。
+                          DropdownButtonFormField<String>(
+                            initialValue: categorySel,
+                            isExpanded: true,
                             decoration: const InputDecoration(
                               labelText: 'カテゴリ（任意）',
-                              hintText: '例: 住居系 / 娯楽系 / 通信',
                               floatingLabelBehavior:
                                   FloatingLabelBehavior.always,
                               helperText: '同じカテゴリ名でまとめてセクション表示されます',
                             ),
-                            onChanged: (_) => setLocal(() {}),
+                            hint: const Text('（未分類）'),
+                            items: [
+                              const DropdownMenuItem<String>(
+                                  value: null, child: Text('（未分類）')),
+                              for (final c in cats)
+                                DropdownMenuItem<String>(
+                                    value: c, child: Text(c)),
+                              const DropdownMenuItem<String>(
+                                  value: '__new__',
+                                  child: Text('＋ 新しいカテゴリ…',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w700))),
+                            ],
+                            onChanged: (v) async {
+                              if (v == '__new__') {
+                                final name = await _promptNewCategory(ctx);
+                                if (name == null || name.trim().isEmpty) {
+                                  return;
+                                }
+                                final n = name.trim();
+                                setLocal(() {
+                                  if (!cats.contains(n)) cats.add(n);
+                                  categorySel = n;
+                                });
+                              } else {
+                                setLocal(() => categorySel = v);
+                              }
+                            },
                           ),
-                          if (_config != null &&
-                              _config!.categoriesInOrder
-                                  .where((c) =>
-                                      c !=
-                                      SubscriptionConfig
-                                          .uncategorizedKey)
-                                  .isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: _config!.categoriesInOrder
-                                  .where((c) =>
-                                      c !=
-                                      SubscriptionConfig
-                                          .uncategorizedKey)
-                                  .map((c) => ActionChip(
-                                        label: Text(c,
-                                            style: const TextStyle(
-                                                fontSize: 11)),
-                                        visualDensity:
-                                            VisualDensity.compact,
-                                        materialTapTargetSize:
-                                            MaterialTapTargetSize
-                                                .shrinkWrap,
-                                        onPressed: () => setLocal(
-                                            () => categoryCtrl.text = c),
-                                      ))
-                                  .toList(),
-                            ),
-                          ],
                           if (accountingMajors.isNotEmpty) ...[
                             const SizedBox(height: 16),
                             DropdownButtonFormField<String>(
