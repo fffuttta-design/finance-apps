@@ -50,6 +50,16 @@ class _V2IncomeMasterPanelState extends State<V2IncomeMasterPanel>
     if (mounted) await _load();
   }
 
+  /// このパネル上で直接 1 件追加する（別ページに遷移しない）。
+  Future<void> _addInline() async {
+    final created = await _showAddSheet(context);
+    if (created == null) return;
+    final cfg = _config;
+    if (cfg == null) return;
+    await _repo.save(cfg.copyWith(sources: [...cfg.sources, created]));
+    if (mounted) await _load();
+  }
+
   String _cycleLabel(IncomeCycle c) {
     switch (c) {
       case IncomeCycle.oneTime:
@@ -121,11 +131,25 @@ class _V2IncomeMasterPanelState extends State<V2IncomeMasterPanel>
                 ),
               ),
               const SizedBox(width: V2Spacing.sm),
+              // その場で1件追加（別ページに遷移しない）。
               FilledButton.icon(
-                onPressed: _openEditor,
-                icon: const Icon(Icons.edit, size: 14),
-                label: const Text('編集 / 追加'),
+                onPressed: _config == null ? null : _addInline,
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('追加'),
                 style: FilledButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  minimumSize: const Size(0, 34),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12),
+                ),
+              ),
+              const SizedBox(width: V2Spacing.xs),
+              // 一覧での編集・削除・アーカイブは従来どおり管理ページで。
+              OutlinedButton.icon(
+                onPressed: _openEditor,
+                icon: const Icon(Icons.edit_outlined, size: 14),
+                label: const Text('編集'),
+                style: OutlinedButton.styleFrom(
                   visualDensity: VisualDensity.compact,
                   minimumSize: const Size(0, 34),
                   padding:
@@ -400,4 +424,154 @@ class _IncomeRowState extends State<_IncomeRow> {
       ),
     );
   }
+}
+
+/// 収入マスタを「その場で」1件追加する軽量シート。
+/// 名称（必須）・サイクル・入金日・備考のみ。返り値が null ならキャンセル。
+Future<IncomeSource?> _showAddSheet(BuildContext context) {
+  final nameCtrl = TextEditingController();
+  final dayCtrl = TextEditingController();
+  final memoCtrl = TextEditingController();
+  IncomeCycle cycle = IncomeCycle.monthly;
+
+  return showModalBottomSheet<IncomeSource?>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (sheetCtx) => StatefulBuilder(
+      builder: (ctx, setLocal) {
+        final isValid = nameCtrl.text.trim().isNotEmpty;
+        void onSave() {
+          final name = nameCtrl.text.trim();
+          if (name.isEmpty) {
+            Navigator.pop(ctx, null);
+            return;
+          }
+          Navigator.pop(
+            ctx,
+            IncomeSource(
+              id: DateTime.now().microsecondsSinceEpoch.toString(),
+              name: name,
+              cycle: cycle,
+              dayOfMonth: cycle == IncomeCycle.oneTime
+                  ? null
+                  : int.tryParse(dayCtrl.text.trim()),
+              memo: memoCtrl.text.trim().isEmpty
+                  ? null
+                  : memoCtrl.text.trim(),
+            ),
+          );
+        }
+
+        return Padding(
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 4),
+                const Text('収入マスタを追加',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111827))),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nameCtrl,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    labelText: '名称（必須）',
+                    border: OutlineInputBorder(),
+                    floatingLabelBehavior: FloatingLabelBehavior.always,
+                  ),
+                  onChanged: (_) => setLocal(() {}),
+                ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<IncomeCycle>(
+                  initialValue: cycle,
+                  decoration: const InputDecoration(
+                    labelText: '発生サイクル',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    floatingLabelBehavior: FloatingLabelBehavior.always,
+                  ),
+                  items: IncomeCycle.values
+                      .map((c) => DropdownMenuItem(
+                            value: c,
+                            child: Text(
+                                IncomeSource(id: '_', name: '_', cycle: c)
+                                    .cycleLabel),
+                          ))
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) setLocal(() => cycle = v);
+                  },
+                ),
+                if (cycle != IncomeCycle.oneTime) ...[
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: dayCtrl,
+                    keyboardType: TextInputType.number,
+                    maxLength: 2,
+                    decoration: const InputDecoration(
+                      labelText: '入金日（1〜31、任意）',
+                      counterText: '',
+                      border: OutlineInputBorder(),
+                      floatingLabelBehavior: FloatingLabelBehavior.always,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                TextField(
+                  controller: memoCtrl,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    labelText: '備考（任意）',
+                    border: OutlineInputBorder(),
+                    floatingLabelBehavior: FloatingLabelBehavior.always,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx, null),
+                        style: OutlinedButton.styleFrom(
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Text('キャンセル'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: FilledButton(
+                        onPressed: isValid ? onSave : null,
+                        style: FilledButton.styleFrom(
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Text('保存',
+                            style:
+                                TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
 }

@@ -181,6 +181,11 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : SafeArea(
+              // 広い画面でテーブルが横一杯に広がって見にくいので、中央 1 カラム
+              // （最大幅 760）に制約する。
+              child: Center(
+              child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
               child: Column(
                 children: [
                   // 月絞り込みバー（月指定で開いた場合のみ）。前月/翌月へ移動可。
@@ -279,6 +284,8 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                           ),
                   ),
                 ],
+              ),
+              ),
               ),
             ),
     );
