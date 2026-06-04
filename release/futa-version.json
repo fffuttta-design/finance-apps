@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.172",
-    "buildNumber":  "173",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.172/futa-finance-v1.0.172.apk",
-    "releaseNotes":  "v1.0.172 レシート読取で個数×単価を取得・表示"
+    "version":  "1.0.173",
+    "buildNumber":  "174",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.173/futa-finance-v1.0.173.apk",
+    "releaseNotes":  "v1.0.173 貼り付け取り込みが収入(売上)とYYYY/MM/DD完全日付に対応"
 }
