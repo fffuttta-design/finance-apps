@@ -18,11 +18,54 @@ class ExpensesScreen extends StatefulWidget {
   State<ExpensesScreen> createState() => _ExpensesScreenState();
 }
 
+enum _Sort { dateDesc, dateAsc, amountDesc, amountAsc }
+
+extension _SortLabel on _Sort {
+  String get label => switch (this) {
+        _Sort.dateDesc => '日付が新しい順',
+        _Sort.dateAsc => '日付が古い順',
+        _Sort.amountDesc => '金額が高い順',
+        _Sort.amountAsc => '金額が安い順',
+      };
+}
+
 class _ExpensesScreenState extends State<ExpensesScreen> {
   DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+  _Sort _sort = _Sort.dateDesc;
+  final Set<String> _expanded = {}; // 展開中のレシート(receiptId)
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
 
   void _shift(int d) =>
       setState(() => _month = DateTime(_month.year, _month.month + d));
+
+  /// 検索・並び替えを適用。
+  List<core.Transaction> _applySearchSort(List<core.Transaction> list) {
+    final q = _query.trim().toLowerCase();
+    var l = list.where((t) {
+      if (q.isEmpty) return true;
+      return t.description.toLowerCase().contains(q) ||
+          t.category.major.toLowerCase().contains(q) ||
+          t.paymentMethod.toLowerCase().contains(q);
+    }).toList();
+    switch (_sort) {
+      case _Sort.dateDesc:
+        l.sort((a, b) => b.date.compareTo(a.date));
+      case _Sort.dateAsc:
+        l.sort((a, b) => a.date.compareTo(b.date));
+      case _Sort.amountDesc:
+        l.sort((a, b) => b.amount.compareTo(a.amount));
+      case _Sort.amountAsc:
+        l.sort((a, b) => a.amount.compareTo(b.amount));
+    }
+    return l;
+  }
 
   bool _inMonth(core.Transaction t) =>
       t.date.year == _month.year && t.date.month == _month.month;
@@ -120,9 +163,139 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           ),
           const SizedBox(height: 16),
         ],
-        _sectionTitle('支出の記録'),
-        const SizedBox(height: 8),
-        if (month.isEmpty) _empty() else ...month.map(_tile),
+        Row(
+          children: [
+            _sectionTitle('支出の記録'),
+            const Spacer(),
+            PopupMenuButton<_Sort>(
+              tooltip: '並び替え',
+              icon: const Icon(Icons.sort_rounded,
+                  size: 20, color: AppColors.pinkDark),
+              initialValue: _sort,
+              onSelected: (v) => setState(() => _sort = v),
+              itemBuilder: (_) => _Sort.values
+                  .map((s) => PopupMenuItem(value: s, child: Text(s.label)))
+                  .toList(),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        TextField(
+          controller: _searchCtrl,
+          onChanged: (v) => setState(() => _query = v),
+          decoration: InputDecoration(
+            isDense: true,
+            hintText: '内容・カテゴリ・支払方法で検索',
+            prefixIcon: const Icon(Icons.search_rounded, size: 20),
+            suffixIcon: _query.isEmpty
+                ? null
+                : IconButton(
+                    icon: const Icon(Icons.clear_rounded, size: 18),
+                    onPressed: () {
+                      _searchCtrl.clear();
+                      setState(() => _query = '');
+                    },
+                  ),
+            border:
+                OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+        ),
+        const SizedBox(height: 10),
+        if (month.isEmpty) _empty() else ..._buildList(month),
+      ],
+    );
+  }
+
+  /// 検索・並び替え・レシートまとめを適用した行ウィジェット群。
+  List<Widget> _buildList(List<core.Transaction> month) {
+    final rows = _applySearchSort(month);
+    // receiptId が2件以上ある品目はまとめる
+    final counts = <String, int>{};
+    for (final t in rows) {
+      final rid = t.receiptId;
+      if (rid != null && rid.isNotEmpty) {
+        counts[rid] = (counts[rid] ?? 0) + 1;
+      }
+    }
+    final widgets = <Widget>[];
+    final seen = <String>{};
+    for (final t in rows) {
+      final rid = t.receiptId;
+      if (rid != null && rid.isNotEmpty && (counts[rid] ?? 0) >= 2) {
+        if (seen.add(rid)) {
+          final members =
+              rows.where((x) => x.receiptId == rid).toList();
+          widgets.add(_groupTile(rid, members));
+        }
+      } else {
+        widgets.add(_tile(t));
+      }
+    }
+    if (widgets.isEmpty) {
+      widgets.add(const Padding(
+        padding: EdgeInsets.symmetric(vertical: 30),
+        child: Center(
+            child: Text('該当する支出がありません',
+                style: TextStyle(color: AppColors.textSub, fontSize: 13))),
+      ));
+    }
+    return widgets;
+  }
+
+  Widget _groupTile(String rid, List<core.Transaction> members) {
+    final expanded = _expanded.contains(rid);
+    final first = members.first;
+    final total = members.fold<int>(0, (s, t) => s + t.amount);
+    final store = members
+        .map((t) => t.store?.trim() ?? '')
+        .firstWhere((s) => s.isNotEmpty, orElse: () => 'まとめ記録');
+    return Column(
+      children: [
+        Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(22)),
+            onTap: () => setState(() => expanded
+                ? _expanded.remove(rid)
+                : _expanded.add(rid)),
+            leading: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                  color: AppColors.pinkSoft,
+                  borderRadius: BorderRadius.circular(14)),
+              child: const Icon(Icons.receipt_long_rounded,
+                  color: AppColors.pinkDark),
+            ),
+            title: Text(store,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700, fontSize: 14)),
+            subtitle: Text('${first.date.month}/${first.date.day}　'
+                '🧾 ${members.length}件まとめ',
+                style: const TextStyle(
+                    fontSize: 11, color: AppColors.textSub)),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('-${formatYen(total)}',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        color: AppColors.expense)),
+                Icon(expanded
+                    ? Icons.expand_less_rounded
+                    : Icons.expand_more_rounded),
+              ],
+            ),
+          ),
+        ),
+        if (expanded)
+          for (final t in members)
+            Padding(
+              padding: const EdgeInsets.only(left: 20),
+              child: _tile(t),
+            ),
       ],
     );
   }
