@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.197",
-    "buildNumber":  "198",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.197/futa-finance-v1.0.197.apk",
-    "releaseNotes":  "v1.0.197 日付カットオフ（事業=2025/10・個人=2026/01以降のみ）"
+    "version":  "1.0.198",
+    "buildNumber":  "199",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.198/futa-finance-v1.0.198.apk",
+    "releaseNotes":  "v1.0.198 本文の左右スワイプで事業⇄個人を切替"
 }
