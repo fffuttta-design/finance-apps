@@ -43,58 +43,65 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 28),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Spacer(flex: 2),
-                Center(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(40),
-                    child: Image.asset(
-                      'assets/brand/logo.png',
-                      width: 300,
-                      height: 300,
-                    ),
+          child: Stack(
+            children: [
+              // ロゴは画面の中央に配置。
+              Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(40),
+                  child: Image.asset(
+                    'assets/brand/logo.png',
+                    width: 300,
+                    height: 300,
                   ),
                 ),
-                const Spacer(flex: 3),
-                if (_error != null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFE0E6),
-                      borderRadius: BorderRadius.circular(14),
+              ),
+              // サインインボタン等は画面下に固定。
+              Positioned(
+                left: 28,
+                right: 28,
+                bottom: 24,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_error != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFE0E6),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Text(_error!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                color: AppColors.pinkDark, fontSize: 13)),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    FilledButton.icon(
+                      onPressed: _signingIn ? null : _signIn,
+                      icon: _signingIn
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2.4, color: Colors.white),
+                            )
+                          : const Icon(Icons.login_rounded),
+                      label:
+                          Text(_signingIn ? 'サインイン中…' : 'Googleではじめる'),
                     ),
-                    child: Text(_error!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                            color: AppColors.pinkDark, fontSize: 13)),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                FilledButton.icon(
-                  onPressed: _signingIn ? null : _signIn,
-                  icon: _signingIn
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2.4, color: Colors.white),
-                        )
-                      : const Icon(Icons.login_rounded),
-                  label: Text(_signingIn ? 'サインイン中…' : 'Googleではじめる'),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'ふたりとも同じ画面・同じデータを見られます',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 11, color: AppColors.textSub),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'ふたりとも同じ画面・同じデータを見られます',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11, color: AppColors.textSub),
-                ),
-                const Spacer(),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
