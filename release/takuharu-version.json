@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.24",
-    "buildNumber":  "29",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.24/takuharu-finance-v0.2.24.apk",
-    "releaseNotes":  "v0.2.24 支出タブ検索/並び替え/レシートまとめ＋カスタムカテゴリ"
+    "version":  "0.2.26",
+    "buildNumber":  "31",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.26/takuharu-finance-v0.2.26.apk",
+    "releaseNotes":  "v0.2.26 明細ごとのチャット＋更新チェック強化"
 }
