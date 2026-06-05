@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.21",
-    "buildNumber":  "26",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.21/takuharu-finance-v0.2.21.apk",
-    "releaseNotes":  "v0.2.21 レシート品目内訳・固定費・支払方法・貼り付け取込"
+    "version":  "0.2.22",
+    "buildNumber":  "27",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.22/takuharu-finance-v0.2.22.apk",
+    "releaseNotes":  "v0.2.22 カレンダー表示＋変換マスタ"
 }
