@@ -16,7 +16,22 @@ class AddTransactionScreen extends StatefulWidget {
 
   /// 新規時の初期種別（支出/収入タブのFABから指定）。editing 時は無視。
   final core.TransactionType? initialType;
-  const AddTransactionScreen({super.key, this.editing, this.initialType});
+
+  /// レシート読み取り等からの初期値（新規時のみ）。
+  final int? initialAmount;
+  final DateTime? initialDate;
+  final String? initialCategory;
+  final String? initialDescription;
+
+  const AddTransactionScreen({
+    super.key,
+    this.editing,
+    this.initialType,
+    this.initialAmount,
+    this.initialDate,
+    this.initialCategory,
+    this.initialDescription,
+  });
 
   @override
   State<AddTransactionScreen> createState() => _AddTransactionScreenState();
@@ -52,7 +67,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _paidBy = e.paidBy ?? e.recordedBy ?? myUid;
     } else {
       _type = widget.initialType ?? core.TransactionType.expense;
-      _date = DateTime.now();
+      _date = widget.initialDate ?? DateTime.now();
+      _category = widget.initialCategory;
+      if (widget.initialAmount != null && widget.initialAmount! > 0) {
+        _amountCtrl.text = widget.initialAmount.toString();
+      }
+      if (widget.initialDescription != null &&
+          widget.initialDescription!.isNotEmpty) {
+        _memoCtrl.text = widget.initialDescription!;
+      }
       _paidBy = myUid;
     }
   }

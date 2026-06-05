@@ -72,3 +72,5 @@ coverage/
 # 開発用 (dev.ps1 関連、テスト終了後は丸ごと削除可能)
 dev-control.txt
 /.chrome-dev-profile/
+gemini.key
+**/gemini.key
