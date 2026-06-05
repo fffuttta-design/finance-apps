@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../utils/thousands_separator_input_formatter.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
+import '../data/app_mode.dart';
 import '../data/income_source_repository.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
@@ -172,7 +173,8 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
   }
 
   Future<void> _pickDate() async {
-    DateTime temp = _date;
+    final minDate = AppModeManager.instance.current.minDate;
+    DateTime temp = _date.isBefore(minDate) ? minDate : _date;
     final picked = await showModalBottomSheet<DateTime>(
       context: context,
       backgroundColor: Colors.white,
@@ -210,8 +212,8 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
               Expanded(
                 child: CupertinoDatePicker(
                   mode: CupertinoDatePickerMode.date,
-                  initialDateTime: _date,
-                  minimumDate: DateTime(2020),
+                  initialDateTime: temp,
+                  minimumDate: minDate,
                   maximumDate: DateTime(2030, 12, 31),
                   dateOrder: DatePickerDateOrder.ymd,
                   onDateTimeChanged: (d) => temp = d,

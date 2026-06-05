@@ -172,17 +172,24 @@ class FirestoreTransactionRepository implements TransactionRepository {
   Query<Map<String, dynamic>> get _query =>
       _coll.where('mode', isEqualTo: _modeKey);
 
+  /// このモードキーで表示する最小取引日（これより前は非表示）。
+  DateTime _minDate(String modeKey) =>
+      (modeKey == 'business' ? AppMode.business : AppMode.personal).minDate;
+
   void _attachListener() {
     _firestoreSub?.cancel();
     // リスナー購読時点のモードを固定（後でモードが変わっても正しいバケツへ）。
     final mk = _modeKey;
+    final minDate = _minDate(mk);
     _firestoreSub = _query.snapshots().listen((snap) {
       final list = <Transaction>[];
       for (final d in snap.docs) {
         try {
           // mode フィールドを除いた dict で Transaction を再構築
           final data = Map<String, dynamic>.from(d.data())..remove('mode');
-          list.add(Transaction.fromJson(data));
+          final tx = Transaction.fromJson(data);
+          if (tx.date.isBefore(minDate)) continue; // カットオフ前は除外
+          list.add(tx);
         } catch (_) {}
       }
       _cache[mk] = List<Transaction>.from(list);
@@ -212,11 +219,14 @@ class FirestoreTransactionRepository implements TransactionRepository {
     try {
       final snap =
           await _coll.where('mode', isEqualTo: modeKey).get();
+      final minDate = _minDate(modeKey);
       final list = <Transaction>[];
       for (final d in snap.docs) {
         try {
           final data = Map<String, dynamic>.from(d.data())..remove('mode');
-          list.add(Transaction.fromJson(data));
+          final tx = Transaction.fromJson(data);
+          if (tx.date.isBefore(minDate)) continue;
+          list.add(tx);
         } catch (_) {}
       }
       _cache[modeKey] = list;
@@ -230,11 +240,14 @@ class FirestoreTransactionRepository implements TransactionRepository {
     // キャッシュがあれば即返す（リスナーが裏で最新へ更新し続ける）。
     if (cached != null) return List<Transaction>.from(cached);
     final snap = await _query.get();
+    final minDate = _minDate(mk);
     final list = <Transaction>[];
     for (final d in snap.docs) {
       try {
         final data = Map<String, dynamic>.from(d.data())..remove('mode');
-        list.add(Transaction.fromJson(data));
+        final tx = Transaction.fromJson(data);
+        if (tx.date.isBefore(minDate)) continue;
+        list.add(tx);
       } catch (_) {}
     }
     _cache[mk] = List<Transaction>.from(list);

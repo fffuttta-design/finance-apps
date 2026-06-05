@@ -606,7 +606,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   }
 
   Future<void> _pickDate() async {
-    DateTime temp = _date;
+    // モード別カットオフ（事業=2025/10・個人=2026/01）より前は選べない。
+    final minDate = AppModeManager.instance.current.minDate;
+    DateTime temp = _date.isBefore(minDate) ? minDate : _date;
     final picked = await showModalBottomSheet<DateTime>(
       context: context,
       backgroundColor: Colors.white,
@@ -644,8 +646,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               Expanded(
                 child: CupertinoDatePicker(
                   mode: CupertinoDatePickerMode.date,
-                  initialDateTime: _date,
-                  minimumDate: DateTime(2020),
+                  initialDateTime: temp,
+                  minimumDate: minDate,
                   maximumDate: DateTime(2030, 12, 31),
                   dateOrder: DatePickerDateOrder.ymd,
                   onDateTimeChanged: (d) => temp = d,

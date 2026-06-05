@@ -132,9 +132,19 @@ class _PasteImportScreenState extends State<PasteImportScreen> {
         continue;
       }
 
+      // モード別カットオフより前は取り込まない（事業=2025/10・個人=2026/01）。
+      final txDate = DateTime(year, month, day);
+      final minDate = AppModeManager.instance.current.minDate;
+      if (txDate.isBefore(minDate)) {
+        out.add(_ParsedRow(
+            raw: raw,
+            error: '${minDate.year}年${minDate.month}月より前は取込対象外です'));
+        continue;
+      }
+
       final tx = core.Transaction(
         id: '${DateTime.now().microsecondsSinceEpoch}-${seq++}',
-        date: DateTime(year, month, day),
+        date: txDate,
         type: _income
             ? core.TransactionType.income
             : core.TransactionType.expense,

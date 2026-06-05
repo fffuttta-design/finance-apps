@@ -33,6 +33,12 @@ extension AppModeX on AppMode {
   /// shared_preferences キーのプレフィックス（短く分かりやすく）。
   String get keyPrefix => this == AppMode.business ? 'b' : 'p';
 
+  /// このモードで扱う最小の取引日（これより前は表示せず・入力もさせない）。
+  /// 事業用=2025年10月（決算年度の起点）／個人用=2026年1月。
+  DateTime get minDate => this == AppMode.business
+      ? DateTime(2025, 10, 1)
+      : DateTime(2026, 1, 1);
+
   IconData get icon =>
       this == AppMode.business ? Icons.business_center : Icons.person;
 }
