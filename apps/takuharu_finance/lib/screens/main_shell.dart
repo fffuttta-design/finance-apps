@@ -16,14 +16,30 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> with StartupUpdateMixin {
+class _MainShellState extends State<MainShell>
+    with StartupUpdateMixin, WidgetsBindingObserver {
   int _index = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // 起動少し後にアプリ更新を確認（Androidのみ・新版あればダイアログ）。
     scheduleStartupUpdateCheck();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // アプリ復帰時にも更新を確認（スロットルで連打抑制）。
+    if (state == AppLifecycleState.resumed) {
+      runUpdateCheck();
+    }
   }
 
   @override
