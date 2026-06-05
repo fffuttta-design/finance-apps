@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.16",
-    "buildNumber":  "21",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.16/takuharu-finance-v0.2.16.apk",
-    "releaseNotes":  "v0.2.16 アイコンのハート位置を視覚中央に補正"
+    "version":  "0.2.17",
+    "buildNumber":  "22",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.17/takuharu-finance-v0.2.17.apk",
+    "releaseNotes":  "v0.2.17 レシートで記録（写真から自動入力）"
 }
