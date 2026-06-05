@@ -5,6 +5,7 @@ import 'package:finance_core/finance_core.dart' as core;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/auth_service.dart';
+import '../data/budget_repository.dart';
 import '../data/categories.dart';
 import '../data/household_service.dart';
 import '../data/tx_repository.dart';
@@ -216,6 +217,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _monthBar(),
         const SizedBox(height: 12),
         _summaryCard(income, expense),
+        const SizedBox(height: 12),
+        _budgetCard(expense),
         if (_splitCard(month) case final w?) ...[
           const SizedBox(height: 12),
           w,
@@ -307,6 +310,129 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  /// 予算カード。未設定なら設定ボタン、設定済みなら進捗バー＋使いすぎ警告。
+  Widget _budgetCard(int expense) {
+    final hid = HouseholdService.instance.householdId;
+    if (hid == null) return const SizedBox.shrink();
+    return StreamBuilder<int?>(
+      stream: BudgetRepository.instance.watch(hid),
+      builder: (context, snap) {
+        final budget = snap.data;
+        if (budget == null || budget <= 0) {
+          return OutlinedButton.icon(
+            onPressed: () => _editBudget(hid, null),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.pinkDark,
+              side: const BorderSide(color: AppColors.pinkSoft, width: 1.4),
+              minimumSize: const Size.fromHeight(44),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+            ),
+            icon: const Icon(Icons.savings_rounded, size: 18),
+            label: const Text('今月の予算を決める'),
+          );
+        }
+        final ratio = budget == 0 ? 0.0 : (expense / budget).clamp(0.0, 1.0);
+        final over = expense > budget;
+        final remain = budget - expense;
+        final color = over
+            ? AppColors.expense
+            : (ratio > 0.8 ? Colors.orange : AppColors.pink);
+        return GestureDetector(
+          onTap: () => _editBudget(hid, budget),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                  color: over ? AppColors.expense : AppColors.pinkSoft,
+                  width: 1.4),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.savings_rounded, size: 18, color: color),
+                    const SizedBox(width: 6),
+                    const Text('今月の予算',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.text)),
+                    const Spacer(),
+                    Text('${formatYen(expense)} / ${formatYen(budget)}',
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.textSub)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: ratio,
+                    minHeight: 9,
+                    backgroundColor: AppColors.pinkSoft,
+                    valueColor: AlwaysStoppedAnimation(color),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  over
+                      ? '⚠️ 予算を ${formatYen(-remain)} オーバー！'
+                      : 'あと ${formatYen(remain)} 使えるよ',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: over ? AppColors.expense : AppColors.textSub,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _editBudget(String hid, int? current) async {
+    final ctrl = TextEditingController(
+        text: (current != null && current > 0) ? current.toString() : '');
+    final result = await showDialog<int?>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('今月の予算'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(prefixText: '¥ ', hintText: '例: 150000'),
+        ),
+        actions: [
+          if (current != null)
+            TextButton(
+              onPressed: () => Navigator.pop(dctx, 0), // 0 = 解除
+              child: const Text('解除', style: TextStyle(color: AppColors.textSub)),
+            ),
+          TextButton(
+              onPressed: () => Navigator.pop(dctx, null),
+              child: const Text('やめる')),
+          FilledButton(
+            onPressed: () {
+              final v = int.tryParse(ctrl.text.replaceAll(RegExp(r'[^0-9]'), ''));
+              Navigator.pop(dctx, v ?? -1);
+            },
+            child: const Text('決定'),
+          ),
+        ],
+      ),
+    );
+    if (result == null || result == -1) return; // キャンセル/不正
+    await BudgetRepository.instance.save(hid, result == 0 ? null : result);
   }
 
   /// わりかんカード（今月）。全支出を二人で折半する前提で精算額を出す。

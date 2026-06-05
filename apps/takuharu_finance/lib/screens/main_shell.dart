@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import 'analysis_screen.dart';
 import 'home_screen.dart';
 import 'planning_screen.dart';
 
@@ -22,6 +23,7 @@ class _MainShellState extends State<MainShell> {
         index: _index,
         children: const [
           HomeScreen(),
+          AnalysisScreen(),
           PlanningScreen(),
         ],
       ),
@@ -34,6 +36,12 @@ class _MainShellState extends State<MainShell> {
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home_rounded, color: AppColors.pinkDark),
             label: 'ホーム',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.bar_chart_outlined),
+            selectedIcon:
+                Icon(Icons.bar_chart_rounded, color: AppColors.pinkDark),
+            label: '分析',
           ),
           NavigationDestination(
             icon: Icon(Icons.star_outline_rounded),
