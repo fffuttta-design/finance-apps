@@ -1,4 +1,4 @@
-# たくはるファイナンス Android配信スクリプト (FutaFinanceと同方式)
+﻿# たくはるファイナンス Android配信スクリプト (FutaFinanceと同方式)
 #
 # フロー:
 # 1. pubspec.yaml からバージョン取得
