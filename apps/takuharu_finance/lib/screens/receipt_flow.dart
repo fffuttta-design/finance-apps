@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../data/receipt_ocr.dart';
 import '../theme/app_theme.dart';
 import 'add_transaction_screen.dart';
+import 'receipt_split_screen.dart';
 
 /// レシートで記録：画像選択 → Gemini読み取り → 入力画面をプリフィルして開く。
 /// 何か記録できたら true を返す。
@@ -102,6 +103,40 @@ Future<bool> runReceiptFlow(BuildContext context) async {
       const SnackBar(content: Text('うまく読み取れませんでした。手入力でお願いします')),
     );
     return false;
+  }
+
+  if (!context.mounted) return false;
+
+  // 品目が2件以上なら「まとめて1件」か「品目ごと」を選べる。
+  if (result.items.length >= 2) {
+    final mode = await showDialog<String>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('品目が${result!.items.length}件 見つかりました'),
+        content: const Text('どうやって記録しますか？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dctx, 'single'),
+            child: const Text('まとめて1件'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dctx, 'split'),
+            child: const Text('品目ごと'),
+          ),
+        ],
+      ),
+    );
+    if (mode == null || !context.mounted) return false;
+    if (mode == 'split') {
+      final changed = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ReceiptSplitScreen(result: result!),
+        ),
+      );
+      return changed == true;
+    }
   }
 
   if (!context.mounted) return false;

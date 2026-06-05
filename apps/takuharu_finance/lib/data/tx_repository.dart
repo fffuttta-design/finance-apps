@@ -35,6 +35,21 @@ class TxRepository {
     });
   }
 
+  /// 複数取引をまとめて追加（レシートの品目ごと記録など）。
+  Future<void> addAll(
+      String hid, List<core.Transaction> txns, String uid) async {
+    final batch = _db.batch();
+    final coll = _coll(hid);
+    for (final t in txns) {
+      batch.set(coll.doc(t.id), {
+        ...t.toJson(),
+        'recordedBy': uid,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
+  }
+
   Future<void> update(String hid, core.Transaction t, String uid) async {
     await _coll(hid).doc(t.id).set({
       ...t.toJson(),

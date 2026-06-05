@@ -5,13 +5,28 @@ import 'package:http/http.dart' as http;
 
 import 'categories.dart';
 
-/// レシートの読み取り結果（たくはる用・シンプル）。
+/// レシートの1品目。
+class ReceiptItem {
+  final String name;
+  final int price;
+  final String? category;
+  const ReceiptItem({required this.name, required this.price, this.category});
+}
+
+/// レシートの読み取り結果（たくはる用）。
 class ReceiptResult {
   final int? amount;
   final DateTime? date;
   final String? store;
   final String? category;
-  const ReceiptResult({this.amount, this.date, this.store, this.category});
+  final List<ReceiptItem> items;
+  const ReceiptResult({
+    this.amount,
+    this.date,
+    this.store,
+    this.category,
+    this.items = const [],
+  });
 }
 
 /// レシート画像を Gemini で読み取り、合計金額・日付・店名・カテゴリを返す。
@@ -35,9 +50,13 @@ class ReceiptOcr {
   "amount": 合計金額の整数（税込・最終支払額。円。数値のみ。読めなければ null）,
   "date": "YYYY-MM-DD（購入日。和暦や「2026年6月5日」も西暦に。読めなければ null）",
   "store": "店名（簡潔に。読めなければ空文字）",
-  "category": "次のいずれか1つ: $cats"
+  "category": "レシート全体の代表カテゴリ。次のいずれか1つ: $cats",
+  "items": [
+    {"name": "品目名（簡潔に）", "price": その品目の金額の整数（円・数量込み）, "category": "次のいずれか1つ: $cats"}
+  ]
 }
-カテゴリはレシートの内容から最も近いものを上の一覧から必ず選ぶこと。''';
+カテゴリは必ず上の一覧から最も近いものを選ぶこと。
+items は読み取れた商品ごとに1行（割引・小計・合計・税・釣りの行は除く）。読み取れなければ空配列。''';
   }
 
   Future<ReceiptResult?> recognize(Uint8List bytes,
@@ -112,11 +131,35 @@ class ReceiptOcr {
     final store = (parsed['store'] as String?)?.trim();
     final category = (parsed['category'] as String?)?.trim();
 
+    final items = <ReceiptItem>[];
+    final rawItems = parsed['items'];
+    if (rawItems is List) {
+      for (final it in rawItems) {
+        if (it is! Map) continue;
+        final name = (it['name'] as String?)?.trim() ?? '';
+        if (name.isEmpty) continue;
+        final p = it['price'];
+        int price = 0;
+        if (p is num) {
+          price = p.toInt();
+        } else if (p is String) {
+          price = int.tryParse(p.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+        }
+        final ic = (it['category'] as String?)?.trim();
+        items.add(ReceiptItem(
+          name: name,
+          price: price,
+          category: (ic == null || ic.isEmpty) ? null : ic,
+        ));
+      }
+    }
+
     return ReceiptResult(
       amount: amount,
       date: date,
       store: (store == null || store.isEmpty) ? null : store,
       category: (category == null || category.isEmpty) ? null : category,
+      items: items,
     );
   }
 }
