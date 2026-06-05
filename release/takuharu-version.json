@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.10",
-    "buildNumber":  "15",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.10/takuharu-finance-v0.2.10.apk",
-    "releaseNotes":  "v0.2.10 新ロゴ(ハート×帳簿)＋ログインにブランドロゴ"
+    "version":  "0.2.12",
+    "buildNumber":  "17",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.12/takuharu-finance-v0.2.12.apk",
+    "releaseNotes":  "v0.2.12 アプリアイコンのハートを縦中央に修正"
 }
