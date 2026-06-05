@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/auth_service.dart';
 import '../data/household_service.dart';
+import '../data/update_flow.dart';
 import '../theme/app_theme.dart';
 
 /// 設定：共有状態の表示、メンバー、サインアウト。
@@ -102,6 +103,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   color: AppColors.pinkDark),
               title: Text(myEmail.isEmpty ? 'ログイン中' : myEmail,
                   style: const TextStyle(fontSize: 13)),
+            ),
+          ),
+          const SizedBox(height: 20),
+          _sectionTitle('アプリ'),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.system_update_rounded,
+                  color: AppColors.pinkDark),
+              title: const Text('アプリの更新を確認',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => UpdateFlow.checkManually(context),
             ),
           ),
           const SizedBox(height: 32),

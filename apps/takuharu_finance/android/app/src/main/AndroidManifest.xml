@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- アプリ内アップデート（APK配信）用: 通信＋不明ソースからのインストール -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <application
         android:label="たくはるファイナンス"
         android:name="${applicationName}"

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../widgets/startup_update_mixin.dart';
 import 'analysis_screen.dart';
 import 'home_screen.dart';
 import 'planning_screen.dart';
@@ -13,8 +14,15 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends State<MainShell> with StartupUpdateMixin {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // 起動少し後にアプリ更新を確認（Androidのみ・新版あればダイアログ）。
+    scheduleStartupUpdateCheck();
+  }
 
   @override
   Widget build(BuildContext context) {
