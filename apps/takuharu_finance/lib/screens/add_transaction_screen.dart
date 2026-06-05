@@ -42,6 +42,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   late DateTime _date;
   String? _category;
   String? _paidBy; // だれが払ったか（uid）
+  String? _payment; // 支払方法（現金/クレカ等）
   final _amountCtrl = TextEditingController();
   final _memoCtrl = TextEditingController();
   bool _saving = false;
@@ -65,6 +66,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _amountCtrl.text = e.amount.toString();
       _memoCtrl.text = e.description;
       _paidBy = e.paidBy ?? e.recordedBy ?? myUid;
+      _payment = e.paymentMethod.isEmpty ? null : e.paymentMethod;
     } else {
       _type = widget.initialType ?? core.TransactionType.expense;
       _date = widget.initialDate ?? DateTime.now();
@@ -129,7 +131,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       date: _date,
       type: _type,
       category: core.Category(major: _category!, sub: ''),
-      paymentMethod: '',
+      paymentMethod: _payment ?? '',
       description: _memoCtrl.text.trim(),
       amount: amount,
       paidBy: _paidBy,
@@ -303,6 +305,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ),
               const SizedBox(height: 18),
             ],
+            // 支払方法（任意）
+            _section('支払方法（任意）'),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _payChip(null, 'なし'),
+                ...HouseholdService.instance.paymentMethods
+                    .map((m) => _payChip(m, m)),
+              ],
+            ),
+            const SizedBox(height: 18),
             // メモ
             _section('メモ（任意）'),
             TextField(
@@ -423,6 +437,30 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     color: AppColors.text)),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _payChip(String? value, String label) {
+    final selected = _payment == value;
+    return GestureDetector(
+      onTap: () => setState(() => _payment = value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.pink.withValues(alpha: 0.18) : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected ? AppColors.pink : AppColors.divider,
+            width: selected ? 1.6 : 1,
+          ),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: AppColors.text)),
       ),
     );
   }

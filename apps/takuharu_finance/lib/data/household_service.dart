@@ -32,6 +32,11 @@ class HouseholdService extends ChangeNotifier {
   /// {uid: アイコンキー（絵文字）}。未設定なら既定アイコン。
   Map<String, String> memberIcons = {};
 
+  /// 支払方法の一覧（現金/クレカ/PayPay 等。世帯共有）。
+  /// households/{hid}.paymentMethods（未設定なら既定セット）。
+  static const defaultPayments = ['現金', 'クレジットカード', '電子マネー', '銀行振込'];
+  List<String> paymentMethods = List.of(defaultPayments);
+
   CollectionReference<Map<String, dynamic>> get _users =>
       _db.collection('users');
   CollectionReference<Map<String, dynamic>> get _households =>
@@ -124,6 +129,26 @@ class HouseholdService extends ChangeNotifier {
     memberIcons = mi is Map
         ? mi.map((k, v) => MapEntry('$k', '$v'))
         : <String, String>{};
+    final pm = data?['paymentMethods'];
+    if (pm is List && pm.isNotEmpty) {
+      paymentMethods = pm.map((e) => '$e').toList();
+    } else {
+      paymentMethods = List.of(defaultPayments);
+    }
+  }
+
+  /// 支払方法の一覧を保存する。
+  Future<void> setPaymentMethods(List<String> methods) async {
+    final hid = _householdId;
+    if (hid == null) return;
+    final clean = methods
+        .map((m) => m.trim())
+        .where((m) => m.isNotEmpty)
+        .toList();
+    await _households.doc(hid).set(
+        {'paymentMethods': clean}, SetOptions(merge: true));
+    paymentMethods = clean;
+    notifyListeners();
   }
 
   /// メンバーの表示名を変更する。

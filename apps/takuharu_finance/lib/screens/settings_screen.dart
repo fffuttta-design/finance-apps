@@ -15,6 +15,42 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  Future<void> _addPayment() async {
+    final ctrl = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('支払方法を追加'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '例: 楽天カード / PayPay'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx),
+              child: const Text('やめる')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dctx, ctrl.text.trim()),
+              child: const Text('追加')),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return;
+    final list = List<String>.of(HouseholdService.instance.paymentMethods);
+    if (!list.contains(name)) list.add(name);
+    await HouseholdService.instance.setPaymentMethods(list);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _removePayment(String m) async {
+    final list = List<String>.of(HouseholdService.instance.paymentMethods)
+      ..remove(m);
+    await HouseholdService.instance.setPaymentMethods(list);
+    if (mounted) setState(() {});
+  }
+
   Future<void> _signOut() async {
     await AuthService.instance.signOut();
     HouseholdService.instance.reset();
@@ -266,6 +302,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           size: 18, color: AppColors.textSub),
                       onTap: () => _editMember(e.key, e.value),
                     ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          _sectionTitle('支払方法'),
+          const SizedBox(height: 8),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final m in HouseholdService.instance.paymentMethods)
+                        Chip(
+                          label: Text(m),
+                          onDeleted: () => _removePayment(m),
+                          backgroundColor: AppColors.pinkSoft,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: _addPayment,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('追加'),
+                    ),
+                  ),
                 ],
               ),
             ),
