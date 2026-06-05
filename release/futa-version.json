@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.194",
-    "buildNumber":  "195",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.194/futa-finance-v1.0.194.apk",
-    "releaseNotes":  "v1.0.194 支出明細をレシート単位でまとめ＋カテゴリ大\u003e小・色付き"
+    "version":  "1.0.195",
+    "buildNumber":  "196",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.195/futa-finance-v1.0.195.apk",
+    "releaseNotes":  "v1.0.195 変換マスタ（読み取り語の置き換え辞書）"
 }
