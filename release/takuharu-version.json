@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.7",
-    "buildNumber":  "12",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.7/takuharu-finance-v0.2.7.apk",
-    "releaseNotes":  "v0.2.7 アプリ内自動更新(OTA)対応"
+    "version":  "0.2.8",
+    "buildNumber":  "13",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.8/takuharu-finance-v0.2.8.apk",
+    "releaseNotes":  "v0.2.8 サインアウト修正＋メンバー編集(名前/アイコン/除外)"
 }
