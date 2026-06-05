@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../data/auth_service.dart';
 import '../theme/app_theme.dart';
@@ -51,41 +50,13 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 const Spacer(flex: 2),
                 Center(
-                  child: Container(
-                    width: 104,
-                    height: 104,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(32),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.pink.withValues(alpha: 0.25),
-                          blurRadius: 24,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(40),
+                    child: Image.asset(
+                      'assets/brand/logo.png',
+                      width: 300,
+                      height: 300,
                     ),
-                    child: const Icon(Icons.favorite_rounded,
-                        size: 56, color: AppColors.pink),
-                  ),
-                ),
-                const SizedBox(height: 22),
-                Text(
-                  'たくはるファイナンス',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.zenMaruGothic(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.text,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'ふたりの家計簿 ♡',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.zenMaruGothic(
-                    fontSize: 14,
-                    color: AppColors.textSub,
                   ),
                 ),
                 const Spacer(flex: 3),
