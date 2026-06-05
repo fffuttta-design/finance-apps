@@ -18,13 +18,182 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _signOut() async {
     await AuthService.instance.signOut();
     HouseholdService.instance.reset();
-    // AuthGate が自動でログイン画面へ。
+    if (!mounted) return;
+    // 設定画面は push されたルートなので、ルートまで戻して AuthGate を再表示
+    // （これをしないと認証が消えても設定画面が残り「サインアウトできない」状態に）。
+    Navigator.of(context).popUntil((r) => r.isFirst);
+  }
+
+  /// カップル向けの可愛い絵文字アイコン候補。
+  static const _iconChoices = [
+    '🐰', '🐻', '🐱', '🐶', '🐹', '🐧', '🦊', '🐢',
+    '🌸', '🌷', '⭐', '🍓', '🍰', '☕', '💗', '👑',
+  ];
+
+  Future<void> _editMember(String uid, String name) async {
+    final myUid = AuthService.instance.currentUser?.uid;
+    await showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.divider,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.edit_rounded, color: AppColors.pinkDark),
+              title: const Text('名前を変更'),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                _renameMember(uid, name);
+              },
+            ),
+            ListTile(
+              leading:
+                  const Icon(Icons.emoji_emotions_rounded, color: AppColors.pinkDark),
+              title: const Text('アイコンを変更'),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                _pickIcon(uid);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.person_remove_rounded,
+                  color: AppColors.pinkDark),
+              title: Text(uid == myUid
+                  ? '自分を世帯から外す'
+                  : '「$name」を世帯から外す'),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                _confirmRemove(uid, name, isSelf: uid == myUid);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _renameMember(String uid, String current) async {
+    final ctrl = TextEditingController(text: current);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('名前を変更'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '例: たく'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx),
+              child: const Text('やめる')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dctx, ctrl.text.trim()),
+              child: const Text('保存')),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return;
+    await HouseholdService.instance.setMemberName(uid, name);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _pickIcon(String uid) async {
+    final chosen = await showDialog<String>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('アイコンを選ぶ'),
+        content: SizedBox(
+          width: 300,
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final e in _iconChoices)
+                InkWell(
+                  onTap: () => Navigator.pop(dctx, e),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.pinkSoft,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(e, style: const TextStyle(fontSize: 24)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dctx, ''), // 既定に戻す
+            child: const Text('既定に戻す'),
+          ),
+        ],
+      ),
+    );
+    if (chosen == null) return;
+    await HouseholdService.instance.setMemberIcon(uid, chosen);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _confirmRemove(String uid, String name,
+      {required bool isSelf}) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('世帯から外す'),
+        content: Text(isSelf
+            ? '自分を世帯から外しますか？\n（このアプリからはサインアウトされ、再ログインすると再び参加します）'
+            : '「$name」を世帯から外しますか？'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx, false),
+              child: const Text('やめる')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.pinkDark),
+            onPressed: () => Navigator.pop(dctx, true),
+            child: const Text('外す'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await HouseholdService.instance.removeMember(uid);
+    if (!mounted) return;
+    if (isSelf) {
+      await _signOut();
+    } else {
+      setState(() {});
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final hs = HouseholdService.instance;
-    final names = hs.memberNames.values.toList();
+    final entries = hs.memberNames.entries.toList();
+    final myUid = AuthService.instance.currentUser?.uid;
     final myEmail = AuthService.instance.currentUser?.email ?? '';
     return Scaffold(
       appBar: AppBar(title: const Text('設定')),
@@ -73,22 +242,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Column(
                 children: [
-                  if (names.isEmpty)
+                  if (entries.isEmpty)
                     const ListTile(
                       title: Text('読み込み中…',
                           style: TextStyle(color: AppColors.textSub)),
                     ),
-                  for (final n in names)
+                  for (final e in entries)
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: const CircleAvatar(
+                      leading: CircleAvatar(
                         backgroundColor: AppColors.pinkSoft,
-                        child: Icon(Icons.person_rounded,
-                            color: AppColors.pinkDark),
+                        child: hs.memberIcons[e.key] != null &&
+                                hs.memberIcons[e.key]!.isNotEmpty
+                            ? Text(hs.memberIcons[e.key]!,
+                                style: const TextStyle(fontSize: 20))
+                            : const Icon(Icons.person_rounded,
+                                color: AppColors.pinkDark),
                       ),
-                      title: Text(n,
-                          style:
-                              const TextStyle(fontWeight: FontWeight.w600)),
+                      title: Text(
+                          e.key == myUid ? '${e.value}（じぶん）' : e.value,
+                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                      trailing: const Icon(Icons.edit_rounded,
+                          size: 18, color: AppColors.textSub),
+                      onTap: () => _editMember(e.key, e.value),
                     ),
                 ],
               ),

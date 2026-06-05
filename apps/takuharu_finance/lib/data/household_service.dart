@@ -29,6 +29,9 @@ class HouseholdService extends ChangeNotifier {
   /// {uid: 表示名}
   Map<String, String> memberNames = {};
 
+  /// {uid: アイコンキー（絵文字）}。未設定なら既定アイコン。
+  Map<String, String> memberIcons = {};
+
   CollectionReference<Map<String, dynamic>> get _users =>
       _db.collection('users');
   CollectionReference<Map<String, dynamic>> get _households =>
@@ -43,11 +46,19 @@ class HouseholdService extends ChangeNotifier {
     final uref = _users.doc(user.uid);
     final prev = (await uref.get()).data()?['householdId'];
 
+    // 既存のメンバー名（ユーザーが自由編集した名前を上書きしないため確認）。
+    final hsnap = await _households.doc(sharedHid).get();
+    final existingNames = (hsnap.data()?['memberNames'] as Map?) ?? const {};
+
     // 固定の共有世帯へ自分を登録（コード入力不要・必ず同期）。
-    await _households.doc(sharedHid).set({
+    final data = <String, dynamic>{
       'members': FieldValue.arrayUnion([user.uid]),
-      'memberNames': {user.uid: name},
-    }, SetOptions(merge: true));
+    };
+    // 名前は初回参加時だけ設定（以後は編集した名前を尊重し上書きしない）。
+    if (existingNames[user.uid] == null) {
+      data['memberNames'] = {user.uid: name};
+    }
+    await _households.doc(sharedHid).set(data, SetOptions(merge: true));
     await uref.set(
         {'householdId': sharedHid, 'name': name}, SetOptions(merge: true));
     _householdId = sharedHid;
@@ -104,10 +115,51 @@ class HouseholdService extends ChangeNotifier {
     final hid = _householdId;
     if (hid == null) return;
     final snap = await _households.doc(hid).get();
-    final mn = snap.data()?['memberNames'];
+    final data = snap.data();
+    final mn = data?['memberNames'];
     if (mn is Map) {
       memberNames = mn.map((k, v) => MapEntry('$k', '$v'));
     }
+    final mi = data?['memberIcons'];
+    memberIcons = mi is Map
+        ? mi.map((k, v) => MapEntry('$k', '$v'))
+        : <String, String>{};
+  }
+
+  /// メンバーの表示名を変更する。
+  Future<void> setMemberName(String uid, String name) async {
+    final hid = _householdId;
+    if (hid == null || name.trim().isEmpty) return;
+    await _households.doc(hid).set({
+      'memberNames': {uid: name.trim()},
+    }, SetOptions(merge: true));
+    memberNames[uid] = name.trim();
+    notifyListeners();
+  }
+
+  /// メンバーのアイコン（絵文字）を変更する。
+  Future<void> setMemberIcon(String uid, String iconKey) async {
+    final hid = _householdId;
+    if (hid == null) return;
+    await _households.doc(hid).set({
+      'memberIcons': {uid: iconKey},
+    }, SetOptions(merge: true));
+    memberIcons[uid] = iconKey;
+    notifyListeners();
+  }
+
+  /// メンバーを世帯から外す（members/名前/アイコンを削除）。
+  Future<void> removeMember(String uid) async {
+    final hid = _householdId;
+    if (hid == null) return;
+    await _households.doc(hid).update({
+      'members': FieldValue.arrayRemove([uid]),
+      'memberNames.$uid': FieldValue.delete(),
+      'memberIcons.$uid': FieldValue.delete(),
+    });
+    memberNames.remove(uid);
+    memberIcons.remove(uid);
+    notifyListeners();
   }
 
   void reset() {
