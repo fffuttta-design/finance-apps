@@ -82,6 +82,11 @@ class Transaction {
   /// 割り勘の精算に使う。null の場合は recordedBy を支払者とみなす。
   final String? paidBy;
 
+  /// この取引に付いたチャット（コメント）の件数。
+  /// 読み取り専用（toJson には含めない＝編集保存で上書きされないようにする）。
+  /// 値はチャット投稿時に別途インクリメントされる。
+  final int commentCount;
+
   const Transaction({
     required this.id,
     required this.date,
@@ -102,6 +107,7 @@ class Transaction {
     this.isPending = false,
     this.recordedBy,
     this.paidBy,
+    this.commentCount = 0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -153,6 +159,7 @@ class Transaction {
         isPending: j['isPending'] as bool? ?? false,
         recordedBy: j['recordedBy'] as String?,
         paidBy: j['paidBy'] as String?,
+        commentCount: (j['commentCount'] as num?)?.toInt() ?? 0,
       );
 
   Transaction copyWith({
@@ -195,5 +202,6 @@ class Transaction {
         isPending: isPending ?? this.isPending,
         recordedBy: recordedBy ?? this.recordedBy,
         paidBy: paidBy ?? this.paidBy,
+        commentCount: commentCount,
       );
 }

@@ -8,6 +8,7 @@ import '../data/household_service.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
+import 'transaction_chat_screen.dart';
 
 /// 収支を1件記録／編集する画面（可愛い系）。
 class AddTransactionScreen extends StatefulWidget {
@@ -197,6 +198,19 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       appBar: AppBar(
         title: Text(widget.editing != null ? '記録を編集' : 'きろくする'),
         actions: [
+          if (widget.editing != null)
+            IconButton(
+              icon: const Icon(Icons.chat_bubble_outline_rounded,
+                  color: AppColors.pinkDark),
+              tooltip: 'チャット',
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      TransactionChatScreen(transaction: widget.editing!),
+                ),
+              ),
+            ),
           if (widget.editing != null)
             IconButton(
               icon: const Icon(Icons.delete_outline_rounded,

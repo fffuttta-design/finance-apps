@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../utils/format.dart';
 import 'add_transaction_screen.dart';
 import 'receipt_flow.dart';
+import 'transaction_chat_screen.dart';
 
 /// 支出タブ：月切替＋支出合計＋カテゴリ内訳＋支出一覧（可愛い系）。
 class ExpensesScreen extends StatefulWidget {
@@ -420,11 +421,50 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             overflow: TextOverflow.ellipsis),
         subtitle: Text(sub,
             style: const TextStyle(fontSize: 11, color: AppColors.textSub)),
-        trailing: Text('-${formatYen(t.amount)}',
-            style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 15,
-                color: AppColors.expense)),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _chatBadge(t),
+            Text('-${formatYen(t.amount)}',
+                style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    color: AppColors.expense)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// コメントが付いている取引に💬バッジ（タップでチャット）。
+  Widget _chatBadge(core.Transaction t) {
+    if (t.commentCount <= 0) return const SizedBox.shrink();
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => TransactionChatScreen(transaction: t)),
+      ),
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          color: AppColors.pinkSoft,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.chat_bubble_rounded,
+                size: 12, color: AppColors.pinkDark),
+            const SizedBox(width: 3),
+            Text('${t.commentCount}',
+                style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.pinkDark)),
+          ],
+        ),
       ),
     );
   }

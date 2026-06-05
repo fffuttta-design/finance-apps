@@ -17,6 +17,7 @@ import 'add_transaction_screen.dart';
 import 'calendar_screen.dart';
 import 'settings_screen.dart';
 import 'subscriptions_screen.dart';
+import 'transaction_chat_screen.dart';
 
 /// ホーム：月次サマリー＋カテゴリ内訳＋取引一覧（可愛い系）。
 class HomeScreen extends StatefulWidget {
@@ -739,13 +740,48 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         subtitle: Text(sub,
             style: const TextStyle(fontSize: 11, color: AppColors.textSub)),
-        trailing: Text(
-          '${income ? '+' : '-'}${formatYen(t.amount)}',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 15,
-            color: income ? AppColors.income : AppColors.expense,
-          ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (t.commentCount > 0)
+              GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) =>
+                          TransactionChatScreen(transaction: t)),
+                ),
+                child: Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                      color: AppColors.pinkSoft,
+                      borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.chat_bubble_rounded,
+                          size: 12, color: AppColors.pinkDark),
+                      const SizedBox(width: 3),
+                      Text('${t.commentCount}',
+                          style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.pinkDark)),
+                    ],
+                  ),
+                ),
+              ),
+            Text(
+              '${income ? '+' : '-'}${formatYen(t.amount)}',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 15,
+                color: income ? AppColors.income : AppColors.expense,
+              ),
+            ),
+          ],
         ),
       ),
     );
