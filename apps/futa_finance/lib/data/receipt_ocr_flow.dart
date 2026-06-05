@@ -11,6 +11,7 @@ import 'app_mode.dart';
 import 'drive_receipt_service.dart';
 import 'receipt_ocr.dart';
 import 'receipt_ocr_cloud.dart';
+import 'replacement_repository.dart';
 import 'settings_repository.dart';
 
 /// レシートOCRの一連の流れ（撮影/選択 → クラウド解析 → 記録方法選択 → 入力）。
@@ -38,6 +39,12 @@ Future<bool> runReceiptOcrFlow(BuildContext context) async {
   final receiptId = DateTime.now().microsecondsSinceEpoch.toString();
   final uploadFuture = DriveReceiptService.instance
       .uploadReceiptImage(bytes: bytes, date: DateTime.now(), isBusiness: isBusiness);
+
+  // 変換マスタ（読みにくい語→登録名）を先読みしてキャッシュを温める。
+  // OCR結果の店名・品目名にこの後 同期で適用される。
+  try {
+    await ReplacementRepository.instance.load();
+  } catch (_) {}
 
   // カテゴリ自動予測用に、ユーザーの大→小カテゴリ一覧を用意（Geminiに渡す）。
   Map<String, List<String>>? catMenu;

@@ -12,6 +12,7 @@ import '../../screens/checklist_editor_screen.dart';
 import '../../screens/subscription_list_screen.dart';
 import 'panels/v2_backup_panel.dart';
 import 'panels/v2_income_master_panel.dart';
+import 'panels/v2_replacement_panel.dart';
 import 'panels/v2_sidebar_order_panel.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
@@ -66,6 +67,7 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
           Icons.account_balance_wallet_outlined),
       _MenuItem('incomeMaster', '収入マスタ', Icons.savings_outlined),
       _MenuItem('subscription', '固定費・サブスク', Icons.event_repeat),
+      _MenuItem('replacements', '変換マスタ', Icons.find_replace),
       _MenuItem('checklist', '月末締めチェックリスト', Icons.checklist),
     ]),
     _MenuGroup(title: 'データ管理', items: [
@@ -193,6 +195,8 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
             note: '月末締めの確認項目（2階層）を編集。動的リンクで銀行/クレカと自動紐付け。',
             icon: Icons.checklist,
             iconColor: V2Colors.info);
+      case 'replacements':
+        return const V2ReplacementPanel();
       case 'backup':
         return const V2BackupPanel();
       case 'about':

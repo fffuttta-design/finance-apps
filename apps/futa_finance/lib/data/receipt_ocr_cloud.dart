@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import 'receipt_ocr.dart';
+import 'replacement_repository.dart';
 
 /// クラウド（Gemini Vision）でレシートを高精度に読み取る版。
 ///
@@ -142,7 +143,11 @@ $catSection
       parsed = jsonDecode(m.group(0)!) as Map<String, dynamic>;
     }
 
-    final store = (parsed['store'] as String?)?.trim();
+    // 変換マスタ（読みにくい語→登録名）を店名・品目名に適用。
+    final storeRaw = ReplacementRepository.instance
+        .apply((parsed['store'] as String?)?.trim() ?? '')
+        .trim();
+    final store = storeRaw.isEmpty ? null : storeRaw;
     final total = (parsed['total'] as num?)?.toInt();
     final category = (parsed['category'] as String?)?.trim();
     final catMajor = (parsed['categoryMajor'] as String?)?.trim();
@@ -163,7 +168,9 @@ $catSection
       final lines = <String>[];
       for (final it in items) {
         if (it is Map) {
-          final n = (it['name'] as String?)?.trim() ?? '';
+          final n = ReplacementRepository.instance
+              .apply((it['name'] as String?)?.trim() ?? '')
+              .trim();
           final p = (it['price'] as num?)?.toInt();
           final q = (it['quantity'] as num?)?.toInt();
           final u = (it['unitPrice'] as num?)?.toInt();
