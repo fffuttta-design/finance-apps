@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.196",
-    "buildNumber":  "197",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.196/futa-finance-v1.0.196.apk",
-    "releaseNotes":  "v1.0.196 アプリロゴ刷新（コイン×F）"
+    "version":  "1.0.197",
+    "buildNumber":  "198",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.197/futa-finance-v1.0.197.apk",
+    "releaseNotes":  "v1.0.197 日付カットオフ（事業=2025/10・個人=2026/01以降のみ）"
 }
