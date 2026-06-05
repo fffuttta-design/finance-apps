@@ -4,6 +4,7 @@ import '../data/auth_service.dart';
 import '../data/household_service.dart';
 import '../data/update_flow.dart';
 import '../theme/app_theme.dart';
+import 'paste_import_screen.dart';
 
 /// 設定：共有状態の表示、メンバー、サインアウト。
 /// 二人専用アプリなので世帯コードの入力（参加）は不要（自動で共有）。
@@ -337,6 +338,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          _sectionTitle('データ'),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.content_paste_rounded,
+                  color: AppColors.pinkDark),
+              title: const Text('貼り付けで取り込み',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              subtitle: const Text('日付・カテゴリ・内容・金額を一括登録',
+                  style: TextStyle(fontSize: 11)),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PasteImportScreen()),
               ),
             ),
           ),
