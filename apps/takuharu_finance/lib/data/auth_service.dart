@@ -12,10 +12,17 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _initialized = false;
 
+  /// Web OAuth クライアントID（google-services.json の client_type=3）。
+  /// Android で Firebase 用の idToken を得るために serverClientId として渡す。
+  static const String _webClientId =
+      '806764261873-abarnv8pa0iljdpimo9v8irikvugis2d.apps.googleusercontent.com';
+
   Future<void> init() async {
     if (_initialized) return;
     if (!kIsWeb) {
-      await GoogleSignIn.instance.initialize();
+      // serverClientId を渡さないと、authenticate() の idToken の audience が
+      // Android クライアントになり Firebase が受け付けない（Androidログイン失敗）。
+      await GoogleSignIn.instance.initialize(serverClientId: _webClientId);
     }
     _initialized = true;
   }
