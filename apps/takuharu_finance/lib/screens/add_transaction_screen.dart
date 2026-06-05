@@ -23,15 +23,20 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   late core.TransactionType _type;
   late DateTime _date;
   String? _category;
+  String? _paidBy; // だれが払ったか（uid）
   final _amountCtrl = TextEditingController();
   final _memoCtrl = TextEditingController();
   bool _saving = false;
 
   bool get _isIncome => _type == core.TransactionType.income;
 
+  /// 世帯メンバー {uid: 名前}。2人いれば支払者を選べる。
+  Map<String, String> get _members => HouseholdService.instance.memberNames;
+
   @override
   void initState() {
     super.initState();
+    final myUid = AuthService.instance.currentUser?.uid;
     final e = widget.editing;
     if (e != null) {
       _type = e.type == core.TransactionType.income
@@ -41,9 +46,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _category = e.category.major;
       _amountCtrl.text = e.amount.toString();
       _memoCtrl.text = e.description;
+      _paidBy = e.paidBy ?? e.recordedBy ?? myUid;
     } else {
       _type = core.TransactionType.expense;
       _date = DateTime.now();
+      _paidBy = myUid;
     }
   }
 
@@ -99,6 +106,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       paymentMethod: '',
       description: _memoCtrl.text.trim(),
       amount: amount,
+      paidBy: _paidBy,
     );
     try {
       if (widget.editing != null) {
@@ -257,6 +265,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               children: _cats.map(_catChip).toList(),
             ),
             const SizedBox(height: 18),
+            // だれが払った？（支出のみ・2人いるとき）
+            if (!_isIncome && _members.length >= 2) ...[
+              _section('だれが払った？'),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: _members.entries
+                    .map((e) => _payerChip(e.key, e.value))
+                    .toList(),
+              ),
+              const SizedBox(height: 18),
+            ],
             // メモ
             _section('メモ（任意）'),
             TextField(
@@ -335,6 +355,42 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             Icon(c.icon, size: 18, color: c.color),
             const SizedBox(width: 6),
             Text(c.name,
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    color: AppColors.text)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _payerChip(String uid, String name) {
+    final selected = _paidBy == uid;
+    final me = uid == AuthService.instance.currentUser?.uid;
+    return GestureDetector(
+      onTap: () => setState(() => _paidBy = uid),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.pink.withValues(alpha: 0.18) : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected ? AppColors.pink : AppColors.divider,
+            width: selected ? 1.6 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              selected ? Icons.favorite_rounded : Icons.person_rounded,
+              size: 18,
+              color: selected ? AppColors.pink : AppColors.textSub,
+            ),
+            const SizedBox(width: 6),
+            Text(me ? '$name（じぶん）' : name,
                 style: TextStyle(
                     fontSize: 13,
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w500,

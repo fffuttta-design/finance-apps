@@ -388,6 +388,14 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _txTile(core.Transaction t) {
     final income = t.type == core.TransactionType.income;
     final c = categoryFor(t.category.major, income: income);
+    // 支払者（支出・2人世帯のときだけ表示）
+    final names = HouseholdService.instance.memberNames;
+    final payerUid = t.paidBy ?? t.recordedBy;
+    final payer = (!income && names.length >= 2 && payerUid != null)
+        ? names[payerUid]
+        : null;
+    final sub = '${t.date.month}/${t.date.day}　${t.category.major}'
+        '${payer != null ? '　💳 $payer' : ''}';
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
@@ -409,7 +417,7 @@ class _HomeScreenState extends State<HomeScreen> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        subtitle: Text('${t.date.month}/${t.date.day}　${t.category.major}',
+        subtitle: Text(sub,
             style: const TextStyle(fontSize: 11, color: AppColors.textSub)),
         trailing: Text(
           '${income ? '+' : '-'}${formatYen(t.amount)}',
