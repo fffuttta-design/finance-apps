@@ -37,12 +37,24 @@ const incomeCategories = <TxCategory>[
   TxCategory('その他', Icons.more_horiz_rounded, Color(0xFFA7D9CB)),
 ];
 
-/// カテゴリ名 → 表示用（アイコン/色）。未知名はその他で代替。
+/// カテゴリ名 → 表示用（アイコン/色）。
+/// 既定カテゴリに無い名前（ユーザー追加のカスタム）は、名前から安定したパステル色を付ける。
 TxCategory categoryFor(String name, {required bool income}) {
   final list = income ? incomeCategories : expenseCategories;
   for (final c in list) {
     if (c.name == name) return c;
   }
-  return TxCategory(
-      name.isEmpty ? 'その他' : name, Icons.more_horiz_rounded, AppColors.textSub);
+  if (name.isEmpty) {
+    return const TxCategory('その他', Icons.more_horiz_rounded, AppColors.textSub);
+  }
+  return TxCategory(name, Icons.label_rounded, _hashColor(name));
+}
+
+/// カテゴリ名から安定したパステル色を作る（カスタムカテゴリ用）。
+Color _hashColor(String s) {
+  var h = 0;
+  for (final c in s.codeUnits) {
+    h = (h * 31 + c) & 0x7fffffff;
+  }
+  return HSLColor.fromAHSL(1, (h % 360).toDouble(), 0.5, 0.72).toColor();
 }

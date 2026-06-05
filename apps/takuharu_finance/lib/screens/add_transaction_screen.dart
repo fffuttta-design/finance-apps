@@ -89,8 +89,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     super.dispose();
   }
 
-  List<TxCategory> get _cats =>
-      _isIncome ? incomeCategories : expenseCategories;
+  List<TxCategory> get _cats {
+    final base = _isIncome ? incomeCategories : expenseCategories;
+    final custom = HouseholdService.instance.customCats(income: _isIncome);
+    return [
+      ...base,
+      for (final n in custom) categoryFor(n, income: _isIncome),
+    ];
+  }
 
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
@@ -290,7 +296,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             Wrap(
               spacing: 10,
               runSpacing: 10,
-              children: _cats.map(_catChip).toList(),
+              children: [
+                ..._cats.map(_catChip),
+                _addCatChip(),
+              ],
             ),
             const SizedBox(height: 18),
             // だれが払った？（支出のみ・2人いるとき）
@@ -439,6 +448,61 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         ),
       ),
     );
+  }
+
+  Widget _addCatChip() {
+    return GestureDetector(
+      onTap: _addCustomCategory,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+              color: AppColors.pink, width: 1, style: BorderStyle.solid),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.add_rounded, size: 18, color: AppColors.pinkDark),
+            SizedBox(width: 4),
+            Text('追加',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.pinkDark)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addCustomCategory() async {
+    final ctrl = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('カテゴリを追加'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '例: ペット / 車 / 推し活'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx),
+              child: const Text('やめる')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dctx, ctrl.text.trim()),
+              child: const Text('追加')),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return;
+    await HouseholdService.instance
+        .addCustomCategory(name, income: _isIncome);
+    if (mounted) setState(() => _category = name);
   }
 
   Widget _payChip(String? value, String label) {

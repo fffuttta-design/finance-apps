@@ -41,6 +41,38 @@ class HouseholdService extends ChangeNotifier {
   /// 各要素 {'from':..,'to':..}。レシートOCRの店名・品目名に適用。
   List<Map<String, String>> replacements = [];
 
+  /// ユーザー追加のカスタムカテゴリ（既定カテゴリに追加表示）。
+  List<String> customExpenseCats = [];
+  List<String> customIncomeCats = [];
+
+  List<String> customCats({required bool income}) =>
+      income ? customIncomeCats : customExpenseCats;
+
+  Future<void> addCustomCategory(String name, {required bool income}) async {
+    final hid = _householdId;
+    final n = name.trim();
+    if (hid == null || n.isEmpty) return;
+    final list = income ? customIncomeCats : customExpenseCats;
+    if (list.contains(n)) return;
+    list.add(n);
+    await _households.doc(hid).set({
+      income ? 'customIncomeCats' : 'customExpenseCats': list,
+    }, SetOptions(merge: true));
+    notifyListeners();
+  }
+
+  Future<void> removeCustomCategory(String name,
+      {required bool income}) async {
+    final hid = _householdId;
+    if (hid == null) return;
+    final list = income ? customIncomeCats : customExpenseCats;
+    list.remove(name);
+    await _households.doc(hid).set({
+      income ? 'customIncomeCats' : 'customExpenseCats': list,
+    }, SetOptions(merge: true));
+    notifyListeners();
+  }
+
   /// キャッシュ済みの変換ルールでテキストを置き換える（同期）。
   String applyReplacements(String text) {
     if (replacements.isEmpty || text.isEmpty) return text;
@@ -166,6 +198,12 @@ class HouseholdService extends ChangeNotifier {
     } else {
       paymentMethods = List.of(defaultPayments);
     }
+    customExpenseCats = (data?['customExpenseCats'] is List)
+        ? (data!['customExpenseCats'] as List).map((e) => '$e').toList()
+        : <String>[];
+    customIncomeCats = (data?['customIncomeCats'] is List)
+        ? (data!['customIncomeCats'] as List).map((e) => '$e').toList()
+        : <String>[];
     final rp = data?['replacements'];
     replacements = rp is List
         ? rp
