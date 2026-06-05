@@ -28,9 +28,42 @@ extension _SortX on _Sort {
   }
 }
 
+/// 一覧の表示単位。単品（single）か、同じレシートのまとめ（group）。
+class _Unit {
+  final core.Transaction? single;
+  final String? receiptId;
+  final List<core.Transaction>? members;
+  const _Unit.single(this.single)
+      : receiptId = null,
+        members = null;
+  const _Unit.group(this.receiptId, this.members) : single = null;
+  bool get isGroup => members != null;
+  int get total => single != null
+      ? single!.amount
+      : members!.fold<int>(0, (s, t) => s + t.amount);
+}
+
+/// カテゴリ名から安定した色を作る（同じカテゴリは常に同じ色）。
+Color _catColor(String name) {
+  if (name.trim().isEmpty) return const Color(0xFF9CA3AF);
+  var h = 0;
+  for (final c in name.codeUnits) {
+    h = (h * 31 + c) & 0x7fffffff;
+  }
+  final hue = (h % 360).toDouble();
+  return HSLColor.fromAHSL(1, hue, 0.52, 0.50).toColor();
+}
+
+/// バッジ文字色（同じ色相で暗め）。
+Color _catTextColor(String name) {
+  if (name.trim().isEmpty) return const Color(0xFF6B7280);
+  return HSLColor.fromColor(_catColor(name)).withLightness(0.34).toColor();
+}
+
 /// 経費明細（支出取引）の全件一覧画面。
 /// - 並び替え（日付/金額/カテゴリ）
 /// - 検索（内容・カテゴリ・支払方法・備考）
+/// - 同じレシートの複数品目は親1行にまとめ、タップで内訳を展開
 /// - 行タップで編集
 class ExpenseListScreen extends StatefulWidget {
   /// 表示タイトル（事業=経費明細 / 個人=支出明細）。
@@ -55,6 +88,37 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   _Sort _sort = _Sort.dateDesc;
   final _searchCtrl = TextEditingController();
   String _query = '';
+
+  /// 展開中のレシート（receiptId）。タップで内訳を開閉。
+  final Set<String> _expanded = {};
+
+  /// 絞り込み済みの取引を、レシート単位でまとめた表示単位に変換する。
+  /// 同じ receiptId が 2 件以上 → まとめ（group）、それ以外 → 単品（single）。
+  /// 並び順は _filtered の順（＝親はその最初の品目の位置）を保つ。
+  List<_Unit> get _units {
+    final rows = _filtered;
+    final counts = <String, int>{};
+    for (final t in rows) {
+      final rid = t.receiptId;
+      if (rid != null && rid.isNotEmpty) {
+        counts[rid] = (counts[rid] ?? 0) + 1;
+      }
+    }
+    final units = <_Unit>[];
+    final seen = <String>{};
+    for (final t in rows) {
+      final rid = t.receiptId;
+      if (rid != null && rid.isNotEmpty && (counts[rid] ?? 0) >= 2) {
+        if (seen.add(rid)) {
+          units.add(_Unit.group(
+              rid, rows.where((x) => x.receiptId == rid).toList()));
+        }
+      } else {
+        units.add(_Unit.single(t));
+      }
+    }
+    return units;
+  }
 
   /// 月絞り込み（null=全期間）。前月/翌月ボタンで移動。
   late DateTime? _month =
@@ -257,15 +321,20 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                             child: Text('該当する支出がありません',
                                 style: TextStyle(
                                     color: Color(0xFF9CA3AF), fontSize: 13)))
-                        : ListView.separated(
-                            itemCount: rows.length,
-                            separatorBuilder: (_, _) =>
-                                const Divider(height: 1),
-                            itemBuilder: (_, i) {
-                              final t = rows[i];
-                              return _row(t);
-                            },
-                          ),
+                        : Builder(builder: (_) {
+                            final units = _units;
+                            return ListView.separated(
+                              itemCount: units.length,
+                              separatorBuilder: (_, _) =>
+                                  const Divider(height: 1),
+                              itemBuilder: (_, i) {
+                                final u = units[i];
+                                return u.isGroup
+                                    ? _groupRow(u)
+                                    : _singleRow(u.single!);
+                              },
+                            );
+                          }),
                   ),
                 ],
               ),
@@ -275,10 +344,57 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     );
   }
 
-  Widget _row(core.Transaction t) {
-    final cat = t.category.sub.trim().isNotEmpty
-        ? t.category.sub.trim()
-        : (t.category.major.trim().isEmpty ? '未分類' : t.category.major.trim());
+  /// カテゴリバッジ（大カテゴリ ＞ 小カテゴリ・カテゴリ色付き）。
+  Widget _catBadge(core.Category category) {
+    final major = category.major.trim();
+    final sub = category.sub.trim();
+    final label = major.isEmpty
+        ? (sub.isEmpty ? '未分類' : sub)
+        : (sub.isEmpty ? major : '$major ＞ $sub');
+    final key = major.isEmpty ? sub : major;
+    final color = _catColor(key);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Text(label,
+          style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: _catTextColor(key))),
+    );
+  }
+
+  Widget _storeLine(String? store) {
+    if (store == null || store.trim().isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Row(
+        children: [
+          const Icon(Icons.storefront_outlined,
+              size: 11, color: Color(0xFF9CA3AF)),
+          const SizedBox(width: 3),
+          Flexible(
+            child: Text(store.trim(),
+                style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+                overflow: TextOverflow.ellipsis),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _amountText(int amount) => Text('-${formatYen(amount)}',
+      style: const TextStyle(
+          fontSize: 16,
+          fontFamily: 'monospace',
+          fontWeight: FontWeight.w700,
+          color: Color(0xFFDC2626)));
+
+  /// 単品行（1取引）。
+  Widget _singleRow(core.Transaction t) {
     return InkWell(
       onTap: () => _editRow(t),
       child: Padding(
@@ -299,22 +415,10 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // カテゴリバッジ（大きめ）
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEEF2FF),
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    child: Text(cat,
-                        style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF4338CA))),
-                  ),
+                  Align(
+                      alignment: Alignment.centerLeft,
+                      child: _catBadge(t.category)),
                   const SizedBox(height: 4),
-                  // タイトル（取引内容）を大きく
                   Text(
                     t.description.isEmpty ? '—' : t.description,
                     style: const TextStyle(
@@ -323,30 +427,132 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                         color: Color(0xFF111827)),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  // 店舗だけ控えめに（支払方法は詳細を開いた時に表示）
-                  if (t.store != null && t.store!.trim().isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        const Icon(Icons.storefront_outlined,
-                            size: 11, color: Color(0xFF9CA3AF)),
-                        const SizedBox(width: 3),
-                        Flexible(
-                          child: Text(t.store!.trim(),
-                              style: const TextStyle(
-                                  fontSize: 11, color: Color(0xFF9CA3AF)),
-                              overflow: TextOverflow.ellipsis),
+                  _storeLine(t.store),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            _amountText(t.amount),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// レシートまとめの親行（タップで内訳を開閉）＋ 展開時は内訳の子行。
+  Widget _groupRow(_Unit u) {
+    final m = u.members!;
+    final rid = u.receiptId!;
+    final expanded = _expanded.contains(rid);
+    final first = m.first;
+    final store = m
+        .map((t) => t.store?.trim() ?? '')
+        .firstWhere((s) => s.isNotEmpty, orElse: () => '');
+    final title = store.isNotEmpty ? store : 'まとめ記録';
+    return Column(
+      children: [
+        InkWell(
+          onTap: () => setState(() {
+            if (expanded) {
+              _expanded.remove(rid);
+            } else {
+              _expanded.add(rid);
+            }
+          }),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 42,
+                  child: Text('${first.date.month}/${first.date.day}',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontFamily: 'monospace',
+                          color: Color(0xFF6B7280))),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.receipt_long_rounded,
+                    size: 20, color: Color(0xFF6366F1)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEEF2FF),
+                          borderRadius: BorderRadius.circular(5),
                         ),
-                      ],
-                    ),
-                  ],
+                        child: Text('🧾 ${m.length}件まとめ',
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF4338CA))),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(title,
+                          style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF111827)),
+                          overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _amountText(u.total),
+                Icon(expanded ? Icons.expand_less : Icons.expand_more,
+                    color: const Color(0xFF9CA3AF)),
+              ],
+            ),
+          ),
+        ),
+        if (expanded)
+          for (final t in m) _childRow(t),
+      ],
+    );
+  }
+
+  /// レシート内訳の子行（インデント表示・タップで編集）。
+  Widget _childRow(core.Transaction t) {
+    return InkWell(
+      onTap: () => _editRow(t),
+      child: Container(
+        color: const Color(0xFFFAFAFC),
+        padding: const EdgeInsets.fromLTRB(46, 7, 14, 7),
+        child: Row(
+          children: [
+            const Icon(Icons.subdirectory_arrow_right_rounded,
+                size: 15, color: Color(0xFFC7CCD6)),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Align(
+                      alignment: Alignment.centerLeft,
+                      child: _catBadge(t.category)),
+                  const SizedBox(height: 3),
+                  Text(
+                    t.description.isEmpty ? '—' : t.description,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF374151)),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
               ),
             ),
             const SizedBox(width: 8),
             Text('-${formatYen(t.amount)}',
                 style: const TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     fontFamily: 'monospace',
                     fontWeight: FontWeight.w700,
                     color: Color(0xFFDC2626))),
