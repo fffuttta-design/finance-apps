@@ -14,6 +14,7 @@ import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 import 'add_transaction_screen.dart';
+import 'calendar_screen.dart';
 import 'settings_screen.dart';
 import 'subscriptions_screen.dart';
 
@@ -162,6 +163,14 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Icon(Icons.favorite_rounded, color: AppColors.pink),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_month_rounded),
+            tooltip: 'カレンダー',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CalendarScreen()),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.settings_rounded),
             onPressed: () async {

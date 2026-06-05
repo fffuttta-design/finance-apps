@@ -37,6 +37,37 @@ class HouseholdService extends ChangeNotifier {
   static const defaultPayments = ['現金', 'クレジットカード', '電子マネー', '銀行振込'];
   List<String> paymentMethods = List.of(defaultPayments);
 
+  /// 変換マスタ（読み取り表記ゆれ辞書）。households/{hid}.replacements。
+  /// 各要素 {'from':..,'to':..}。レシートOCRの店名・品目名に適用。
+  List<Map<String, String>> replacements = [];
+
+  /// キャッシュ済みの変換ルールでテキストを置き換える（同期）。
+  String applyReplacements(String text) {
+    if (replacements.isEmpty || text.isEmpty) return text;
+    var out = text;
+    for (final r in replacements) {
+      final f = r['from'] ?? '';
+      if (f.isNotEmpty) out = out.replaceAll(f, r['to'] ?? '');
+    }
+    return out;
+  }
+
+  /// 変換ルールを保存する。
+  Future<void> setReplacements(List<Map<String, String>> rules) async {
+    final hid = _householdId;
+    if (hid == null) return;
+    final clean = rules
+        .where((r) => (r['from'] ?? '').trim().isNotEmpty)
+        .map((r) =>
+            {'from': (r['from'] ?? '').trim(), 'to': (r['to'] ?? '').trim()})
+        .toList();
+    await _households
+        .doc(hid)
+        .set({'replacements': clean}, SetOptions(merge: true));
+    replacements = clean;
+    notifyListeners();
+  }
+
   CollectionReference<Map<String, dynamic>> get _users =>
       _db.collection('users');
   CollectionReference<Map<String, dynamic>> get _households =>
@@ -135,6 +166,16 @@ class HouseholdService extends ChangeNotifier {
     } else {
       paymentMethods = List.of(defaultPayments);
     }
+    final rp = data?['replacements'];
+    replacements = rp is List
+        ? rp
+            .whereType<Map>()
+            .map((m) => {
+                  'from': '${m['from'] ?? ''}',
+                  'to': '${m['to'] ?? ''}',
+                })
+            .toList()
+        : <Map<String, String>>[];
   }
 
   /// 支払方法の一覧を保存する。

@@ -5,6 +5,7 @@ import '../data/household_service.dart';
 import '../data/update_flow.dart';
 import '../theme/app_theme.dart';
 import 'paste_import_screen.dart';
+import 'replacements_screen.dart';
 
 /// 設定：共有状態の表示、メンバー、サインアウト。
 /// 二人専用アプリなので世帯コードの入力（参加）は不要（自動で共有）。
@@ -356,6 +357,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const PasteImportScreen()),
+              ),
+            ),
+          ),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.find_replace_rounded,
+                  color: AppColors.pinkDark),
+              title: const Text('変換マスタ',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              subtitle: const Text('レシートの表記ゆれを置き換え',
+                  style: TextStyle(fontSize: 11)),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ReplacementsScreen()),
               ),
             ),
           ),
