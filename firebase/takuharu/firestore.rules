@@ -71,6 +71,15 @@ service cloud.firestore {
         allow read, write: if isAllowed()
             && request.auth.uid in parentMembers();
       }
+
+      // 世帯配下の固定費・サブスク
+      match /subscriptions/{subId} {
+        function parentMembers() {
+          return get(/databases/$(database)/documents/households/$(hid)).data.members;
+        }
+        allow read, write: if isAllowed()
+            && request.auth.uid in parentMembers();
+      }
     }
   }
 }

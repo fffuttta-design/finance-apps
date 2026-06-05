@@ -61,4 +61,22 @@ class TxRepository {
   Future<void> delete(String hid, String id) async {
     await _coll(hid).doc(id).delete();
   }
+
+  /// 指定の receiptId 群のうち、既に存在するものを返す（固定費の二重記録防止）。
+  Future<Set<String>> existingReceiptIds(
+      String hid, List<String> ids) async {
+    final result = <String>{};
+    final coll = _coll(hid);
+    for (var i = 0; i < ids.length; i += 30) {
+      final end = (i + 30 < ids.length) ? i + 30 : ids.length;
+      final chunk = ids.sublist(i, end);
+      if (chunk.isEmpty) continue;
+      final snap = await coll.where('receiptId', whereIn: chunk).get();
+      for (final d in snap.docs) {
+        final rid = d.data()['receiptId'];
+        if (rid is String) result.add(rid);
+      }
+    }
+    return result;
+  }
 }
