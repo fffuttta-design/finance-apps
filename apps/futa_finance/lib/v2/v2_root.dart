@@ -155,8 +155,31 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
         // Shell の maxContentWidth と揃える（マネフォ ME 寄りに 1040px）
         maxWidth: 1040,
       ),
-      content: _bodyFor(_currentId, accent: accent),
+      // 本文を左右スワイプで 事業⇄個人 を切り替え。
+      // スイッチャーの並び[事業｜個人]に合わせ、左スワイプ=個人 / 右スワイプ=事業。
+      content: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragEnd: _onModeSwipe,
+        child: _bodyFor(_currentId, accent: accent),
+      ),
     );
+  }
+
+  void _onModeSwipe(DragEndDetails d) {
+    final v = d.primaryVelocity ?? 0;
+    if (v.abs() < 320) return; // 軽い動き・縦寄りのドラッグは無視
+    final target = v < 0 ? AppMode.personal : AppMode.business; // 左=個人/右=事業
+    if (AppModeManager.instance.current == target) return;
+    AppModeManager.instance.setMode(target);
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(
+          duration: const Duration(milliseconds: 900),
+          content:
+              Text('${target == AppMode.business ? '事業' : '個人'}モードに切り替えました'),
+        ));
+    }
   }
 
   /// 記録メニュー: レシート読取 / 支出 / 収入 / 振替を選んで対応する入力を開く。
