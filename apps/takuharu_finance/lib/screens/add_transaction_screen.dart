@@ -13,7 +13,10 @@ import '../utils/format.dart';
 class AddTransactionScreen extends StatefulWidget {
   /// 編集対象（null なら新規）。
   final core.Transaction? editing;
-  const AddTransactionScreen({super.key, this.editing});
+
+  /// 新規時の初期種別（支出/収入タブのFABから指定）。editing 時は無視。
+  final core.TransactionType? initialType;
+  const AddTransactionScreen({super.key, this.editing, this.initialType});
 
   @override
   State<AddTransactionScreen> createState() => _AddTransactionScreenState();
@@ -48,7 +51,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _memoCtrl.text = e.description;
       _paidBy = e.paidBy ?? e.recordedBy ?? myUid;
     } else {
-      _type = core.TransactionType.expense;
+      _type = widget.initialType ?? core.TransactionType.expense;
       _date = DateTime.now();
       _paidBy = myUid;
     }

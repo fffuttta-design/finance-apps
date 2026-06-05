@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/startup_update_mixin.dart';
 import 'analysis_screen.dart';
+import 'expenses_screen.dart';
 import 'home_screen.dart';
+import 'income_screen.dart';
 import 'planning_screen.dart';
 
 /// ホームとプランニングを下部ナビで切り替えるメインシェル。
@@ -31,6 +33,8 @@ class _MainShellState extends State<MainShell> with StartupUpdateMixin {
         index: _index,
         children: const [
           HomeScreen(),
+          ExpensesScreen(),
+          IncomeScreen(),
           AnalysisScreen(),
           PlanningScreen(),
         ],
@@ -46,6 +50,18 @@ class _MainShellState extends State<MainShell> with StartupUpdateMixin {
             label: 'ホーム',
           ),
           NavigationDestination(
+            icon: Icon(Icons.shopping_bag_outlined),
+            selectedIcon:
+                Icon(Icons.shopping_bag_rounded, color: AppColors.pinkDark),
+            label: '支出',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.savings_outlined),
+            selectedIcon:
+                Icon(Icons.savings_rounded, color: AppColors.pinkDark),
+            label: '収入',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.bar_chart_outlined),
             selectedIcon:
                 Icon(Icons.bar_chart_rounded, color: AppColors.pinkDark),
@@ -54,7 +70,7 @@ class _MainShellState extends State<MainShell> with StartupUpdateMixin {
           NavigationDestination(
             icon: Icon(Icons.star_outline_rounded),
             selectedIcon: Icon(Icons.star_rounded, color: AppColors.pinkDark),
-            label: 'プランニング',
+            label: 'プラン',
           ),
         ],
       ),
