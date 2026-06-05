@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.15",
-    "buildNumber":  "20",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.15/takuharu-finance-v0.2.15.apk",
-    "releaseNotes":  "v0.2.15 支出タブ・収入タブ追加＋アプリアイコン拡大"
+    "version":  "0.2.16",
+    "buildNumber":  "21",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.16/takuharu-finance-v0.2.16.apk",
+    "releaseNotes":  "v0.2.16 アイコンのハート位置を視覚中央に補正"
 }
