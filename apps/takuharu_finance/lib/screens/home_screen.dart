@@ -14,6 +14,7 @@ import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 import 'add_transaction_screen.dart';
+import 'receipt_flow.dart';
 import 'calendar_screen.dart';
 import 'settings_screen.dart';
 import 'subscriptions_screen.dart';
@@ -153,6 +154,73 @@ class _HomeScreenState extends State<HomeScreen> {
     if (changed == true) setState(() {});
   }
 
+  /// 「きろく」ボタン：記録方法を選ぶ（手入力 / レシート読み取り）。
+  Future<void> _openRecordMenu() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.pinkSoft,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 8, 20, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('どうやって記録する？ ♡',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.text)),
+              ),
+            ),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: AppColors.pinkSoft,
+                child: Icon(Icons.edit_rounded, color: AppColors.pink),
+              ),
+              title: const Text('手で入力',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: const Text('支出・収入をその場で入力'),
+              onTap: () => Navigator.pop(ctx, 'manual'),
+            ),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: AppColors.pinkSoft,
+                child: Icon(Icons.receipt_long_rounded, color: AppColors.pink),
+              ),
+              title: const Text('レシートで記録',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: const Text('写真を撮って自動で読み取り'),
+              onTap: () => Navigator.pop(ctx, 'receipt'),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 'manual') {
+      await _openAdd();
+    } else if (choice == 'receipt') {
+      final changed = await runReceiptFlow(context);
+      if (changed && mounted) setState(() {});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final hid = HouseholdService.instance.householdId;
@@ -185,7 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openAdd(),
+        onPressed: () => _openRecordMenu(),
         icon: const Icon(Icons.add_rounded),
         label: const Text('きろく',
             style: TextStyle(fontWeight: FontWeight.w700)),
@@ -234,10 +302,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _budgetCard(expense),
         const SizedBox(height: 12),
         _subscriptionCard(),
-        if (_splitCard(month) case final w?) ...[
-          const SizedBox(height: 12),
-          w,
-        ],
         const SizedBox(height: 16),
         if (catEntries.isNotEmpty) ...[
           _sectionTitle('支出の内訳'),
@@ -498,131 +562,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       },
-    );
-  }
-
-  /// わりかんカード（今月）。全支出を二人で折半する前提で精算額を出す。
-  /// 2人世帯で、今月の支出があるときだけ表示。
-  Widget? _splitCard(List<core.Transaction> month) {
-    final names = HouseholdService.instance.memberNames;
-    if (names.length != 2) return null;
-    final uids = names.keys.toList();
-    final a = uids[0], b = uids[1];
-    int paidA = 0, paidB = 0;
-    for (final t in month) {
-      if (t.type != core.TransactionType.expense) continue;
-      final payer = t.paidBy ?? t.recordedBy;
-      if (payer == a) {
-        paidA += t.amount;
-      } else if (payer == b) {
-        paidB += t.amount;
-      } else {
-        // 支払者不明（古い記録）は折半して残高がズレないようにする
-        paidA += t.amount ~/ 2;
-        paidB += t.amount - t.amount ~/ 2;
-      }
-    }
-    final total = paidA + paidB;
-    if (total == 0) return null;
-    final diff = paidA - paidB; // >0: a が多く払った
-    final settle = diff.abs() ~/ 2;
-
-    final Widget conclusion;
-    if (settle == 0) {
-      conclusion = const Text('💗 ちょうど均等だよ！',
-          style: TextStyle(
-              fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.pinkDark));
-    } else {
-      final ower = diff > 0 ? b : a; // 払いが少ない人 → 渡す側
-      final owee = diff > 0 ? a : b;
-      conclusion = RichText(
-        text: TextSpan(
-          style: const TextStyle(fontSize: 14, color: AppColors.text),
-          children: [
-            const TextSpan(text: '💗 '),
-            TextSpan(
-                text: names[ower],
-                style: const TextStyle(fontWeight: FontWeight.w800)),
-            const TextSpan(text: ' が '),
-            TextSpan(
-                text: names[owee],
-                style: const TextStyle(fontWeight: FontWeight.w800)),
-            const TextSpan(text: ' に '),
-            TextSpan(
-                text: formatYen(settle),
-                style: const TextStyle(
-                    fontWeight: FontWeight.w900, color: AppColors.pinkDark)),
-            const TextSpan(text: ' わたすと精算 ♡'),
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.pinkSoft, width: 1.4),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.volunteer_activism_rounded,
-                  size: 18, color: AppColors.pink),
-              const SizedBox(width: 6),
-              const Text('わりかん（今月）',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.text)),
-              const Spacer(),
-              Text('支出 ${formatYen(total)}',
-                  style: const TextStyle(
-                      fontSize: 11, color: AppColors.textSub)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          _paidRow(names[a] ?? 'A', paidA, total),
-          const SizedBox(height: 6),
-          _paidRow(names[b] ?? 'B', paidB, total),
-          const Divider(height: 18),
-          conclusion,
-        ],
-      ),
-    );
-  }
-
-  Widget _paidRow(String name, int paid, int total) {
-    final ratio = total == 0 ? 0.0 : paid / total;
-    return Row(
-      children: [
-        SizedBox(
-          width: 64,
-          child: Text(name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w700)),
-        ),
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: ratio,
-              minHeight: 7,
-              backgroundColor: AppColors.pinkSoft,
-              valueColor: const AlwaysStoppedAnimation(AppColors.pink),
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Text(formatYen(paid),
-            style: const TextStyle(
-                fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.text)),
-      ],
     );
   }
 

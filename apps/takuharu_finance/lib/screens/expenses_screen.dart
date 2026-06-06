@@ -395,13 +395,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
   Widget _tile(core.Transaction t) {
     final c = categoryFor(t.category.major, income: false);
-    final names = HouseholdService.instance.memberNames;
-    final payerUid = t.paidBy ?? t.recordedBy;
-    final payer = (names.length >= 2 && payerUid != null)
-        ? names[payerUid]
-        : null;
-    final sub = '${t.date.month}/${t.date.day}　${t.category.major}'
-        '${payer != null ? '　💳 $payer' : ''}';
+    final sub = '${t.date.month}/${t.date.day}　${t.category.major}';
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
