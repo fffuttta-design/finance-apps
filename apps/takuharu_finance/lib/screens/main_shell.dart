@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/push_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/startup_update_mixin.dart';
 import 'analysis_screen.dart';
@@ -26,6 +27,8 @@ class _MainShellState extends State<MainShell>
     WidgetsBinding.instance.addObserver(this);
     // 起動少し後にアプリ更新を確認（Androidのみ・新版あればダイアログ）。
     scheduleStartupUpdateCheck();
+    // プッシュ通知（相手の記録/コメント）の登録。許可ダイアログ→トークン保存。
+    PushService.instance.register();
   }
 
   @override
