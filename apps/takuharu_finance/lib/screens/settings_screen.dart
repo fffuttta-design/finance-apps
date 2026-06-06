@@ -4,6 +4,7 @@ import '../data/auth_service.dart';
 import '../data/household_service.dart';
 import '../data/update_flow.dart';
 import '../theme/app_theme.dart';
+import '../utils/format.dart';
 import 'accounts_screen.dart';
 import 'paste_import_screen.dart';
 import 'replacements_screen.dart';
@@ -196,6 +197,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _editPersonalFoodBudget(
+      String uid, String name, int current) async {
+    final ctrl = TextEditingController(text: current.toString());
+    final result = await showDialog<int>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('$name の個人食費わく'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          decoration:
+              const InputDecoration(prefixText: '¥ ', hintText: '例: 8000'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx),
+              child: const Text('やめる')),
+          FilledButton(
+            onPressed: () {
+              final v =
+                  int.tryParse(ctrl.text.replaceAll(RegExp(r'[^0-9]'), ''));
+              Navigator.pop(dctx, v ?? -1);
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (result == null || result < 0) return;
+    await HouseholdService.instance.setPersonalFoodBudget(uid, result);
+    if (mounted) setState(() {});
+  }
+
   Future<void> _confirmRemove(String uid, String name,
       {required bool isSelf}) async {
     final ok = await showDialog<bool>(
@@ -304,6 +340,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       trailing: const Icon(Icons.edit_rounded,
                           size: 18, color: AppColors.textSub),
                       onTap: () => _editMember(e.key, e.value),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          _sectionTitle('個人の食費わく'),
+          const SizedBox(height: 8),
+          Card(
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(0, 10, 0, 4),
+                    child: Text(
+                      '個人用の食費を共用財布から使ってよい月の上限。記録で「個人の食費わく」をONにすると、ここから引かれます。',
+                      style: TextStyle(fontSize: 11, color: AppColors.textSub),
+                    ),
+                  ),
+                  if (entries.isEmpty)
+                    const ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('読み込み中…',
+                          style: TextStyle(color: AppColors.textSub)),
+                    ),
+                  for (final e in entries)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: CircleAvatar(
+                        backgroundColor: AppColors.pinkSoft,
+                        child: hs.memberIcons[e.key] != null &&
+                                hs.memberIcons[e.key]!.isNotEmpty
+                            ? Text(hs.memberIcons[e.key]!,
+                                style: const TextStyle(fontSize: 20))
+                            : const Icon(Icons.lunch_dining_rounded,
+                                color: AppColors.pinkDark),
+                      ),
+                      title: Text(e.value,
+                          style:
+                              const TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: Text(
+                          '月 ${formatYen(hs.personalFoodBudgetFor(e.key))}',
+                          style: const TextStyle(fontSize: 12)),
+                      trailing: const Icon(Icons.edit_rounded,
+                          size: 18, color: AppColors.textSub),
+                      onTap: () => _editPersonalFoodBudget(
+                          e.key, e.value, hs.personalFoodBudgetFor(e.key)),
                     ),
                 ],
               ),

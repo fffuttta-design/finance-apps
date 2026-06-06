@@ -37,6 +37,26 @@ class HouseholdService extends ChangeNotifier {
   static const defaultPayments = ['現金', 'クレジットカード', '電子マネー', '銀行振込'];
   List<String> paymentMethods = List.of(defaultPayments);
 
+  /// 個人食費わくの月上限（{uid: 円}）。households/{hid}.personalFoodBudgets。
+  /// 「個人用の食費は月◯円まで共用財布から使ってよい」枠。未設定なら既定値。
+  static const int defaultPersonalFoodBudget = 8000;
+  Map<String, int> personalFoodBudgets = {};
+
+  /// 指定ユーザーの個人食費わく月上限（未設定なら既定 8,000 円）。
+  int personalFoodBudgetFor(String uid) =>
+      personalFoodBudgets[uid] ?? defaultPersonalFoodBudget;
+
+  /// 個人食費わくの月上限を保存する。
+  Future<void> setPersonalFoodBudget(String uid, int amount) async {
+    final hid = _householdId;
+    if (hid == null) return;
+    await _households.doc(hid).set({
+      'personalFoodBudgets': {uid: amount},
+    }, SetOptions(merge: true));
+    personalFoodBudgets[uid] = amount;
+    notifyListeners();
+  }
+
   /// 変換マスタ（読み取り表記ゆれ辞書）。households/{hid}.replacements。
   /// 各要素 {'from':..,'to':..}。レシートOCRの店名・品目名に適用。
   List<Map<String, String>> replacements = [];
@@ -204,6 +224,10 @@ class HouseholdService extends ChangeNotifier {
     customIncomeCats = (data?['customIncomeCats'] is List)
         ? (data!['customIncomeCats'] as List).map((e) => '$e').toList()
         : <String>[];
+    final pfb = data?['personalFoodBudgets'];
+    personalFoodBudgets = pfb is Map
+        ? pfb.map((k, v) => MapEntry('$k', (v as num?)?.toInt() ?? 0))
+        : <String, int>{};
     final rp = data?['replacements'];
     replacements = rp is List
         ? rp

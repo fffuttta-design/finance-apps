@@ -46,11 +46,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   String? _paidBy; // だれが払ったか（uid）
   String? _payment; // 支払元（登録した口座/クレカの名前）
   List<Account> _accounts = []; // 登録済みの口座/クレカ
+  bool _personalFood = false; // この食費を個人わく（だれの分）から引くか
   final _amountCtrl = TextEditingController();
   final _memoCtrl = TextEditingController();
   bool _saving = false;
 
   bool get _isIncome => _type == core.TransactionType.income;
+
+  /// 個人食費わくの対象にできるカテゴリ（今は「食費」だけ）。
+  static const _personalFoodCategory = '食費';
+  bool get _canPersonalFood => !_isIncome && _category == _personalFoodCategory;
 
 
   @override
@@ -68,6 +73,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _memoCtrl.text = e.description;
       _paidBy = e.paidBy ?? e.recordedBy ?? myUid;
       _payment = e.paymentMethod.isEmpty ? null : e.paymentMethod;
+      _personalFood = e.personalFor != null;
     } else {
       _type = widget.initialType ?? core.TransactionType.expense;
       _date = widget.initialDate ?? DateTime.now();
@@ -149,6 +155,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       description: _memoCtrl.text.trim(),
       amount: amount,
       paidBy: _paidBy,
+      // 「食費」で個人わくONのときだけ、だれの個人わくから引くか記録。
+      personalFor: (_canPersonalFood && _personalFood) ? _paidBy : null,
     );
     try {
       if (widget.editing != null) {
@@ -337,7 +345,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   _personChip(e.key, e.value),
               ],
             ),
-            const SizedBox(height: 18),
+            // 個人の食費わく（カテゴリが「食費」のときだけ表示）
+            if (_canPersonalFood) ...[
+              _personalFoodToggle(),
+              const SizedBox(height: 18),
+            ],
             // メモ
             _section('メモ（任意）'),
             TextField(
@@ -536,6 +548,51 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     color: AppColors.text)),
           ],
         ),
+      ),
+    );
+  }
+
+  /// 「この食費を個人わくから引く」トグル。ONなら「だれ」の人の月8,000円わくから引く。
+  Widget _personalFoodToggle() {
+    final names = HouseholdService.instance.memberNames;
+    final whoName = (_paidBy != null ? names[_paidBy] : null) ?? '本人';
+    final limit = _paidBy != null
+        ? HouseholdService.instance.personalFoodBudgetFor(_paidBy!)
+        : HouseholdService.defaultPersonalFoodBudget;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: _personalFood ? AppColors.pink.withValues(alpha: 0.10) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _personalFood ? AppColors.pink : AppColors.divider,
+          width: _personalFood ? 1.6 : 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.lunch_dining_rounded,
+              size: 20, color: AppColors.pinkDark),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('個人の食費わくから',
+                    style: TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w700)),
+                Text('$whoName の月${formatYen(limit)}わくから引きます',
+                    style: const TextStyle(
+                        fontSize: 11, color: AppColors.textSub)),
+              ],
+            ),
+          ),
+          Switch(
+            value: _personalFood,
+            activeThumbColor: AppColors.pink,
+            onChanged: (v) => setState(() => _personalFood = v),
+          ),
+        ],
       ),
     );
   }

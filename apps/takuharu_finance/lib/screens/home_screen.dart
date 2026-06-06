@@ -226,6 +226,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _summaryCard(income, expense),
         const SizedBox(height: 12),
         _budgetCard(expense),
+        const SizedBox(height: 12),
+        _personalFoodCard(month),
         const SizedBox(height: 16),
         if (catEntries.isNotEmpty) ...[
           _sectionTitle('支出の内訳'),
@@ -398,6 +400,112 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       },
+    );
+  }
+
+  /// 個人の食費わくカード。たく・はる それぞれの「使った / 月上限」を表示。
+  /// 上限を超えたら赤く警告する（共用財布から出るので支出合計には含めたまま）。
+  Widget _personalFoodCard(List<core.Transaction> month) {
+    final hs = HouseholdService.instance;
+    final names = hs.memberNames;
+    if (names.isEmpty) return const SizedBox.shrink();
+    // 個人わく対象（personalFor）の支出を人ごとに集計。
+    final used = <String, int>{};
+    for (final t in month) {
+      final uid = t.personalFor;
+      if (uid == null || t.type != core.TransactionType.expense) continue;
+      used[uid] = (used[uid] ?? 0) + t.amount;
+    }
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.pinkSoft, width: 1.4),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.lunch_dining_rounded,
+                  size: 18, color: AppColors.pinkDark),
+              SizedBox(width: 6),
+              Text('個人の食費わく',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.text)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          for (final e in names.entries) ...[
+            _personalFoodRow(
+              e.key,
+              e.value,
+              used[e.key] ?? 0,
+              hs.personalFoodBudgetFor(e.key),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _personalFoodRow(String uid, String name, int used, int limit) {
+    final icon = HouseholdService.instance.memberIcons[uid];
+    final over = used > limit;
+    final ratio = limit <= 0 ? 0.0 : (used / limit).clamp(0.0, 1.0);
+    final remain = limit - used;
+    final color = over
+        ? AppColors.expense
+        : (ratio > 0.8 ? Colors.orange : AppColors.pink);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              if (icon != null && icon.isNotEmpty) ...[
+                Text(icon, style: const TextStyle(fontSize: 15)),
+                const SizedBox(width: 6),
+              ],
+              Expanded(
+                child: Text(name,
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w700)),
+              ),
+              Text('${formatYen(used)} / ${formatYen(limit)}',
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSub)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: ratio,
+              minHeight: 7,
+              backgroundColor: AppColors.pinkSoft,
+              valueColor: AlwaysStoppedAnimation(color),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              over
+                  ? '⚠️ ${formatYen(-remain)} オーバー！'
+                  : 'あと ${formatYen(remain)}',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: over ? AppColors.expense : AppColors.textSub,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

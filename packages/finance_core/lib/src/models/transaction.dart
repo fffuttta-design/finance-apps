@@ -82,6 +82,12 @@ class Transaction {
   /// 割り勘の精算に使う。null の場合は recordedBy を支払者とみなす。
   final String? paidBy;
 
+  /// 「個人わく」対象のユーザー uid（世帯共有アプリで使用・任意）。
+  /// 非nullなら、この支出はそのユーザーの個人わく（例: 個人食費 月8,000円）から
+  /// 引かれるものとして集計する。共用財布から出る前提なので通常の支出合計にも含める。
+  /// null なら通常の共用支出。
+  final String? personalFor;
+
   /// この取引に付いたチャット（コメント）の件数。
   /// 読み取り専用（toJson には含めない＝編集保存で上書きされないようにする）。
   /// 値はチャット投稿時に別途インクリメントされる。
@@ -107,6 +113,7 @@ class Transaction {
     this.isPending = false,
     this.recordedBy,
     this.paidBy,
+    this.personalFor,
     this.commentCount = 0,
   });
 
@@ -131,6 +138,7 @@ class Transaction {
         'isPending': isPending,
         'recordedBy': recordedBy,
         'paidBy': paidBy,
+        'personalFor': personalFor,
       };
 
   factory Transaction.fromJson(Map<String, dynamic> j) => Transaction(
@@ -159,6 +167,7 @@ class Transaction {
         isPending: j['isPending'] as bool? ?? false,
         recordedBy: j['recordedBy'] as String?,
         paidBy: j['paidBy'] as String?,
+        personalFor: j['personalFor'] as String?,
         commentCount: (j['commentCount'] as num?)?.toInt() ?? 0,
       );
 
@@ -181,6 +190,7 @@ class Transaction {
     bool? isPending,
     String? recordedBy,
     String? paidBy,
+    String? personalFor,
   }) =>
       Transaction(
         id: id,
@@ -202,6 +212,7 @@ class Transaction {
         isPending: isPending ?? this.isPending,
         recordedBy: recordedBy ?? this.recordedBy,
         paidBy: paidBy ?? this.paidBy,
+        personalFor: personalFor ?? this.personalFor,
         commentCount: commentCount,
       );
 }
