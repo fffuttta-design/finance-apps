@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.40",
-    "buildNumber":  "45",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.40/takuharu-finance-v0.2.40.apk",
-    "releaseNotes":  "個人の食費わく(月8,000円/人)を追加。だれ編集・編集画面の整理(チャットボタン/支出収入トグル削除)・明細詳細のスクロール追従も。"
+    "version":  "0.2.41",
+    "buildNumber":  "46",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.41/takuharu-finance-v0.2.41.apk",
+    "releaseNotes":  "記録画面を いつ→なにを買った→カテゴリ の順に整理(品名を主役に)。支払元の既定をワンバンクに。分析タブに円グラフ・エンゲル係数を追加。カテゴリをタップで1年の推移が見られるように。"
 }
