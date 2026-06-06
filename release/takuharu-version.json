@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.41",
-    "buildNumber":  "46",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.41/takuharu-finance-v0.2.41.apk",
-    "releaseNotes":  "記録画面を いつ→なにを買った→カテゴリ の順に整理(品名を主役に)。支払元の既定をワンバンクに。分析タブに円グラフ・エンゲル係数を追加。カテゴリをタップで1年の推移が見られるように。"
+    "version":  "0.2.43",
+    "buildNumber":  "48",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.43/takuharu-finance-v0.2.43.apk",
+    "releaseNotes":  "レシート画像をDrive(たくはるファイナンス/レシート)に集約保存、明細を見られるように。入出金明細の並びを登録順(新しいものが上)に。"
 }
