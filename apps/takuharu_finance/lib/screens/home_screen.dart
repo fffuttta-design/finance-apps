@@ -194,7 +194,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 final all = snap.data ?? const <core.Transaction>[];
-                final month = all.where(_inMonth).toList();
+                // 並び順は「登録順（新しい登録が一番上）」。
+                // 取引IDは登録時刻(microsecondsSinceEpoch)ベースなのでID降順＝登録順。
+                final month = all.where(_inMonth).toList()
+                  ..sort((a, b) => b.id.compareTo(a.id));
                 return _body(month);
               },
             ),

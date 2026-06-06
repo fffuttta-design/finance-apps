@@ -4,24 +4,27 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 
-/// レシート画像を Google Drive に保存するサービス（最小権限 drive.file）。
-/// FutaFinance と同方式。たくはるは事業/個人モードが無いので
-/// フォルダ構成は [ルート]/YYYY年/MM月/ とする。
+/// レシート画像を Google Drive に保存するサービス。
 ///
-/// ルートフォルダID は prefs に保存し、ユーザーがフォルダを別の場所へ
-/// 移動しても ID で追従する。
+/// 【方式】共有アカウント takuharumika@gmail.com のドライブに作った
+///   「ツール開発 / たくはるファイナンス / レシート」フォルダ（[_receiptFolderId]）を
+///   親にして、その下に YYYY年/MM月 を作って画像を入れる。
+///   このフォルダは たく・はる 両方のGmailに「編集」権限で共有してあるので、
+///   どちらが記録しても同じ場所に集約され、2人＋takuharumika 全員が閲覧できる。
 ///
-/// ※ drive.file スコープは「このアプリが作ったファイル」だけにアクセスできる権限。
-///   そのため画像は撮影/記録した本人の Drive に保存され、リンクも本人のみ開ける。
+/// 【権限】他人(共有アカウント)が作った親フォルダの中へ書き込むため、
+///   最小権限 drive.file ではなくフル drive スコープを使う。
+///   （初回は「確認されていないアプリ」警告が出るが、2人だけの利用なので続行でOK）
 class DriveReceiptService {
   DriveReceiptService._();
   static final DriveReceiptService instance = DriveReceiptService._();
 
-  static const _scope = 'https://www.googleapis.com/auth/drive.file';
-  static const _rootName = 'たくはるファイナンスレシート';
-  static const _rootIdKey = 'takuharu.drive.receipt_root_id';
+  static const _scope = 'https://www.googleapis.com/auth/drive';
+
+  /// takuharumika の「ツール開発 / たくはるファイナンス / レシート」フォルダID。
+  /// ここを親にして年月フォルダを作る。両アカウントに編集共有済み。
+  static const _receiptFolderId = '1oKNY3j3wDWAXVzsjqS_AhOCZVsKDFDmD';
 
   /// セッション中のアクセストークン簡易キャッシュ（Web の再ポップアップ抑制）。
   String? _tokenCache;
@@ -88,29 +91,17 @@ class DriveReceiptService {
     }
   }
 
-  // ── フォルダ階層を用意して月フォルダIDを返す ─────────────────
+  // ── 共有フォルダ配下に年月フォルダを用意して月フォルダIDを返す ──────
   Future<String> _ensureMonthFolder(String token, DateTime d) async {
     final mk = '${d.year}-${d.month.toString().padLeft(2, '0')}';
     final cached = _monthPathCache[mk];
     if (cached != null) return cached;
-    final rootId = await _ensureRoot(token);
-    final yearId = await _findOrCreateFolder(token, '${d.year}年', rootId);
+    final yearId =
+        await _findOrCreateFolder(token, '${d.year}年', _receiptFolderId);
     final monthId = await _findOrCreateFolder(
         token, '${d.month.toString().padLeft(2, '0')}月', yearId);
     _monthPathCache[mk] = monthId;
     return monthId;
-  }
-
-  Future<String> _ensureRoot(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString(_rootIdKey);
-    if (saved != null && await _folderExists(token, saved)) {
-      return saved;
-    }
-    var id = await _findFolder(token, _rootName, 'root');
-    id ??= await _createFolder(token, _rootName, 'root');
-    await prefs.setString(_rootIdKey, id);
-    return id;
   }
 
   Future<String> _findOrCreateFolder(
@@ -160,16 +151,6 @@ class DriveReceiptService {
   }
 
   String _short(String s) => s.length > 300 ? s.substring(0, 300) : s;
-
-  Future<bool> _folderExists(String token, String id) async {
-    final res = await http.get(
-      Uri.parse(
-          'https://www.googleapis.com/drive/v3/files/$id?fields=id,trashed'),
-      headers: {'Authorization': 'Bearer $token'},
-    );
-    if (res.statusCode != 200) return false;
-    return (jsonDecode(res.body)['trashed'] as bool? ?? false) == false;
-  }
 
   Future<String?> _uploadMultipart(
       String token, String name, String parentId, Uint8List bytes) async {
