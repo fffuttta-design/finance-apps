@@ -5,8 +5,7 @@ import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
-import '../utils/modal_input.dart';
-import 'expense_input_screen.dart';
+import 'transaction_detail_screen.dart';
 
 /// 並び替えモード。
 enum _Sort { dateDesc, dateAsc, amountDesc, amountAsc, categoryAsc }
@@ -197,9 +196,13 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     return list;
   }
 
+  /// 行タップ：まず詳細画面を表示（そこから編集/削除）。
   Future<void> _editRow(core.Transaction t) async {
-    final changed =
-        await showInputSheet<bool>(context, ExpenseInputScreen(editing: t));
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+          builder: (_) => TransactionDetailScreen(transaction: t)),
+    );
     if (changed == true && mounted) await _load();
   }
 
