@@ -27,6 +27,17 @@ class TxRepository {
     });
   }
 
+  /// txId 単体を取得（通知タップからチャットを開く用）。
+  Future<core.Transaction?> getById(String hid, String txId) async {
+    try {
+      final d = await _coll(hid).doc(txId).get();
+      if (!d.exists || d.data() == null) return null;
+      return core.Transaction.fromJson(Map<String, dynamic>.from(d.data()!));
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> add(String hid, core.Transaction t, String uid) async {
     await _coll(hid).doc(t.id).set({
       ...t.toJson(),

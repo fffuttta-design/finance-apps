@@ -1,7 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/material.dart';
 
+import '../main.dart';
+import '../screens/transaction_chat_screen.dart';
 import 'auth_service.dart';
+import 'household_service.dart';
+import 'tx_repository.dart';
 
 /// プッシュ通知（FCM）の登録。
 ///
@@ -15,7 +20,7 @@ class PushService {
   final _fm = FirebaseMessaging.instance;
   bool _started = false;
 
-  /// ログイン後に1度呼ぶ。許可取得→トークン保存→更新監視。
+  /// ログイン後に1度呼ぶ。許可取得→トークン保存→更新監視→タップ遷移の設定。
   Future<void> register() async {
     if (_started) return;
     _started = true;
@@ -26,9 +31,39 @@ class PushService {
         await _saveToken(token);
       }
       _fm.onTokenRefresh.listen(_saveToken);
+      _setupTapHandlers();
     } catch (_) {
       // 失敗しても致命的ではない。次回起動で再試行できるよう解除。
       _started = false;
+    }
+  }
+
+  /// 通知タップ時の遷移を設定。
+  /// - バックグラウンドから復帰: onMessageOpenedApp
+  /// - 終了状態から起動: getInitialMessage
+  void _setupTapHandlers() {
+    FirebaseMessaging.onMessageOpenedApp.listen((m) => _handleTap(m.data));
+    _fm.getInitialMessage().then((m) {
+      if (m != null) _handleTap(m.data);
+    });
+  }
+
+  /// 通知データの txId から、その取引のチャット画面へ遷移する。
+  Future<void> _handleTap(Map<String, dynamic> data) async {
+    final txId = data['txId'];
+    if (txId is! String || txId.isEmpty) return;
+    final hid = HouseholdService.instance.householdId;
+    if (hid == null) return;
+    // 起動直後はデータ未準備のことがあるので軽くリトライ。
+    for (var i = 0; i < 3; i++) {
+      final t = await TxRepository.instance.getById(hid, txId);
+      final nav = appNavigatorKey.currentState;
+      if (t != null && nav != null) {
+        nav.push(MaterialPageRoute(
+            builder: (_) => TransactionChatScreen(transaction: t)));
+        return;
+      }
+      await Future.delayed(const Duration(milliseconds: 800));
     }
   }
 

@@ -9,6 +9,9 @@ import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
 import 'theme/app_theme.dart';
 
+/// 通知タップからの画面遷移などで使うグローバル Navigator。
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
@@ -26,6 +29,7 @@ class TakuharuFinanceApp extends StatelessWidget {
     return MaterialApp(
       title: 'たくはるファイナンス',
       debugShowCheckedModeBanner: false,
+      navigatorKey: appNavigatorKey,
       theme: buildTakuharuTheme(),
       home: const _AuthGate(),
     );

@@ -188,7 +188,7 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => _send(),
                 decoration: InputDecoration(
-                  hintText: 'メッセージを入力…',
+                  hintText: 'コメントを入力',
                   isDense: true,
                   filled: true,
                   fillColor: AppColors.pinkSoft.withValues(alpha: 0.4),
