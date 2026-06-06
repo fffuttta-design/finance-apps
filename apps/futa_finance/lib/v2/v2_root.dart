@@ -31,7 +31,8 @@ class V2Root extends StatefulWidget {
   State<V2Root> createState() => _V2RootState();
 }
 
-class _V2RootState extends State<V2Root> with StartupUpdateMixin {
+class _V2RootState extends State<V2Root>
+    with StartupUpdateMixin, WidgetsBindingObserver {
   String _currentId = 'home';
   // スワイプ開始の「本文エリア内」ローカルY と 本文の高さ。
   // 上1/3=モード切替 / 下2/3=タブ送り の判定に使う（画面ではなく本文基準）。
@@ -43,6 +44,7 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     AppModeManager.instance.addListener(_onChange);
     UiPreferences.instance.addListener(_onChange);
     // 起動時にアプリ内アップデート（APK配信）をチェックして通知（v1と共通）。
@@ -57,9 +59,18 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     AppModeManager.instance.removeListener(_onChange);
     UiPreferences.instance.removeListener(_onChange);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // アプリ復帰時にも新バージョンを確認（スロットルで連打抑制）。
+    if (state == AppLifecycleState.resumed) {
+      runUpdateCheckThrottled();
+    }
   }
 
   void _onChange() {

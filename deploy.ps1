@@ -136,28 +136,11 @@ if ($SkipRelease) {
   exit 0
 }
 
-# === 5. git commit & push ===
+# === 5. GitHub Release作成（version.json公開より先に資産を用意：404窓を無くす）===
+# version.json を先に push すると、その間にアプリが新 version.json を取得して
+# 「まだ無いAPK」をDLしようとし 404 になる。Release作成→push の順に固定する。
 Write-Host ""
-Write-Host "[4/5] git commit and push..." -ForegroundColor Yellow
-git add release/futa-version.json
-$gitStatus = git status --porcelain release/futa-version.json
-if ($gitStatus) {
-  git commit -m "release(futa): v$fullVersion - $ReleaseNotes"
-  if ($LASTEXITCODE -ne 0) {
-    Write-Error "git commit 失敗"
-    exit 1
-  }
-}
-git push origin main
-if ($LASTEXITCODE -ne 0) {
-  Write-Error "git push 失敗"
-  exit 1
-}
-Write-Host "  OK push完了" -ForegroundColor Green
-
-# === 6. GitHub Release作成 ===
-Write-Host ""
-Write-Host "[5/5] GitHub Release 作成 (tag: $tag)..." -ForegroundColor Yellow
+Write-Host "[4/5] GitHub Release 作成 (tag: $tag)..." -ForegroundColor Yellow
 
 # 既存タグがあれば削除（同じバージョンで再リリースする場合の事故防止）
 gh release view $tag --repo $repo 2>$null | Out-Null
@@ -180,6 +163,25 @@ if ($LASTEXITCODE -ne 0) {
   exit 1
 }
 Write-Host "  OK Release作成完了 (asset: $assetName)" -ForegroundColor Green
+
+# === 6. git commit & push（資産が出来てから version.json を公開）===
+Write-Host ""
+Write-Host "[5/5] git commit and push..." -ForegroundColor Yellow
+git add release/futa-version.json
+$gitStatus = git status --porcelain release/futa-version.json
+if ($gitStatus) {
+  git commit -m "release(futa): v$fullVersion - $ReleaseNotes"
+  if ($LASTEXITCODE -ne 0) {
+    Write-Error "git commit 失敗"
+    exit 1
+  }
+}
+git push origin main
+if ($LASTEXITCODE -ne 0) {
+  Write-Error "git push 失敗"
+  exit 1
+}
+Write-Host "  OK push完了" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "===============================================" -ForegroundColor Green

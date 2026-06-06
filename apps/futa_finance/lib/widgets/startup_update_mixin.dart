@@ -16,11 +16,28 @@ import '../data/update_flow.dart';
 ///
 /// Web では APK 更新は無意味なので何もしない。
 mixin StartupUpdateMixin<T extends StatefulWidget> on State<T> {
+  DateTime? _lastUpdateCheck;
+
   /// 起動時に呼ぶ。起動直後の初期化と競合しないよう少し遅延させてチェックする。
   void scheduleStartupUpdateCheck() {
     // Web ではアプリ内アップデート確認（APK配信）は無意味なのでスキップ。
     if (kIsWeb) return;
-    Future.delayed(const Duration(seconds: 2), _checkForUpdateAtStartup);
+    Future.delayed(const Duration(seconds: 2), () {
+      _lastUpdateCheck = DateTime.now();
+      _checkForUpdateAtStartup();
+    });
+  }
+
+  /// アプリ復帰時などに呼ぶ。連打を避けるため60秒スロットル。
+  Future<void> runUpdateCheckThrottled() async {
+    if (kIsWeb) return;
+    final now = DateTime.now();
+    if (_lastUpdateCheck != null &&
+        now.difference(_lastUpdateCheck!).inSeconds < 60) {
+      return;
+    }
+    _lastUpdateCheck = now;
+    await _checkForUpdateAtStartup();
   }
 
   Future<void> _checkForUpdateAtStartup() async {

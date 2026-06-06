@@ -68,9 +68,17 @@ class UpdateChecker {
   Future<UpdateCheckResult> check() async {
     final current = await getCurrent();
     try {
-      final response = await http
-          .get(Uri.parse(versionUrl))
-          .timeout(const Duration(seconds: 5));
+      // キャッシュバスター＋no-cache で GitHub raw のCDNキャッシュを回避し、
+      // 公開直後の新バージョンを即検知できるようにする。
+      final url = '$versionUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+      final response = await http.get(
+        Uri.parse(url),
+        headers: const {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      ).timeout(const Duration(seconds: 5));
       if (response.statusCode != 200) {
         return UpdateCheckResult(
           currentVersion: current.version,
