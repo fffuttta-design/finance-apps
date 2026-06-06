@@ -14,6 +14,63 @@ import '../utils/format.dart';
 /// 「一緒に（折半）」を表す paidBy のセンチネル値。
 const String kPaidByBoth = 'both';
 
+/// 固定費・サブスクの「今月合計」サマリーカード（支出タブから使う）。
+/// タップで固定費・サブスク管理画面へ。
+class SubscriptionSummaryCard extends StatelessWidget {
+  const SubscriptionSummaryCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final hid = HouseholdService.instance.householdId;
+    if (hid == null) return const SizedBox.shrink();
+    final now = DateTime.now();
+    return StreamBuilder<List<Subscription>>(
+      stream: SubscriptionRepository.instance.watch(hid),
+      builder: (context, snap) {
+        final subs = snap.data ?? const <Subscription>[];
+        final total = subs
+            .where((s) => s.appliesTo(now.year, now.month))
+            .fold<int>(0, (t, s) => t + s.amountForMonth(now.year, now.month));
+        return InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SubscriptionsScreen()),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.pinkSoft, width: 1.4),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.event_repeat_rounded,
+                    size: 20, color: AppColors.pink),
+                const SizedBox(width: 8),
+                const Text('固定費・サブスク',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.text)),
+                const Spacer(),
+                Text(subs.isEmpty ? '登録する' : '今月 ${formatYen(total)}',
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.pinkDark)),
+                const Icon(Icons.chevron_right_rounded,
+                    color: AppColors.textSub),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// 固定費・サブスク管理（毎月/毎年の決まった支出）。
 class SubscriptionsScreen extends StatefulWidget {
   const SubscriptionsScreen({super.key});
@@ -177,6 +234,8 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                         0,
                         (t, s) =>
                             t + s.amountForMonth(_now.year, _now.month));
+                final fixed = subs.where((s) => !s.variable).toList();
+                final variable = subs.where((s) => s.variable).toList();
                 return ListView(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
                   children: [
@@ -184,14 +243,39 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                     const SizedBox(height: 16),
                     if (subs.isEmpty)
                       _empty()
-                    else
-                      ...subs.map(_tile),
+                    else ...[
+                      if (fixed.isNotEmpty) ...[
+                        _sectionLabel('金額固定', Icons.lock_outline_rounded),
+                        ...fixed.map(_tile),
+                        const SizedBox(height: 8),
+                      ],
+                      if (variable.isNotEmpty) ...[
+                        _sectionLabel(
+                            '変動費（毎月入力）', Icons.show_chart_rounded),
+                        ...variable.map(_tile),
+                      ],
+                    ],
                   ],
                 );
               },
             ),
     );
   }
+
+  Widget _sectionLabel(String text, IconData icon) => Padding(
+        padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+        child: Row(
+          children: [
+            Icon(icon, size: 16, color: AppColors.pinkDark),
+            const SizedBox(width: 6),
+            Text(text,
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.text)),
+          ],
+        ),
+      );
 
   Widget _header(int monthly, List<Subscription> subs) => Container(
         padding: const EdgeInsets.all(20),

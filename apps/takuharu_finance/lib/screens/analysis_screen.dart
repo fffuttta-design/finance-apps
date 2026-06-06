@@ -6,6 +6,7 @@ import '../data/household_service.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
+import '../widgets/settings_button.dart';
 
 /// 分析：月別の収支推移（6ヶ月）と今月のカテゴリ内訳（自前描画・依存なし）。
 class AnalysisScreen extends StatelessWidget {
@@ -15,7 +16,8 @@ class AnalysisScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final hid = HouseholdService.instance.householdId;
     return Scaffold(
-      appBar: AppBar(title: const Text('分析')),
+      appBar: AppBar(
+          title: const Text('分析'), actions: const [SettingsButton()]),
       body: hid == null
           ? const Center(child: CircularProgressIndicator())
           : StreamBuilder<List<core.Transaction>>(

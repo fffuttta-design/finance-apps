@@ -5,6 +5,7 @@ import '../data/household_service.dart';
 import '../data/plan_item.dart';
 import '../data/plan_repository.dart';
 import '../theme/app_theme.dart';
+import '../widgets/settings_button.dart';
 
 /// プランニング：やりたいこと／行きたい場所／行きたいお店（世帯共有）。
 class PlanningScreen extends StatelessWidget {
@@ -20,6 +21,7 @@ class PlanningScreen extends StatelessWidget {
           padding: EdgeInsets.only(left: 12),
           child: Icon(Icons.star_rounded, color: AppColors.pink),
         ),
+        actions: const [SettingsButton()],
       ),
       body: hid == null
           ? const Center(child: CircularProgressIndicator())

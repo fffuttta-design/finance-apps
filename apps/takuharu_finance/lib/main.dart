@@ -135,32 +135,48 @@ class _Splash extends StatefulWidget {
 
 class _SplashState extends State<_Splash>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
+  // 入場のふわっとフェード＋スケールイン（やわらかめ）。
+  late final AnimationController _intro = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1100),
+    duration: const Duration(milliseconds: 700),
+  )..forward();
+  // ゆっくり控えめな呼吸（ゴツくならないよう振れ幅は小さく）。
+  late final AnimationController _breathe = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1900),
   )..repeat(reverse: true);
 
   @override
   void dispose() {
-    _c.dispose();
+    _intro.dispose();
+    _breathe.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final scale = Tween<double>(begin: 0.92, end: 1.06).animate(
-      CurvedAnimation(parent: _c, curve: Curves.easeInOut),
-    );
+    final introFade =
+        CurvedAnimation(parent: _intro, curve: Curves.easeOut);
+    final introScale = Tween<double>(begin: 0.86, end: 1.0)
+        .animate(CurvedAnimation(parent: _intro, curve: Curves.easeOutCubic));
+    final breathe = Tween<double>(begin: 0.985, end: 1.025)
+        .animate(CurvedAnimation(parent: _breathe, curve: Curves.easeInOut));
     return Scaffold(
       backgroundColor: const Color(0xFFFFF1F4),
       body: Center(
-        child: ScaleTransition(
-          scale: scale,
-          child: Image.asset(
-            'assets/brand/logo.png',
-            width: 150,
-            errorBuilder: (_, _, _) => const Icon(Icons.favorite_rounded,
-                size: 72, color: AppColors.pink),
+        child: FadeTransition(
+          opacity: introFade,
+          child: ScaleTransition(
+            scale: introScale,
+            child: ScaleTransition(
+              scale: breathe,
+              child: Image.asset(
+                'assets/brand/logo.png',
+                width: 148,
+                errorBuilder: (_, _, _) => const Icon(Icons.favorite_rounded,
+                    size: 72, color: AppColors.pink),
+              ),
+            ),
           ),
         ),
       ),

@@ -5,6 +5,7 @@ import '../data/categories.dart';
 import '../data/household_service.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
+import '../widgets/settings_button.dart';
 import '../utils/format.dart';
 import 'add_transaction_screen.dart';
 
@@ -48,6 +49,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
           padding: EdgeInsets.only(left: 12),
           child: Icon(Icons.savings_rounded, color: AppColors.income),
         ),
+        actions: const [SettingsButton()],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openAdd(),

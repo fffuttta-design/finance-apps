@@ -8,15 +8,12 @@ import '../data/auth_service.dart';
 import '../data/budget_repository.dart';
 import '../data/categories.dart';
 import '../data/household_service.dart';
-import '../data/subscription.dart';
-import '../data/subscription_repository.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 import 'record_menu.dart';
 import 'calendar_screen.dart';
 import 'settings_screen.dart';
-import 'subscriptions_screen.dart';
 import 'transaction_chat_screen.dart';
 
 /// ホーム：月次サマリー＋カテゴリ内訳＋取引一覧（可愛い系）。
@@ -229,8 +226,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _summaryCard(income, expense),
         const SizedBox(height: 12),
         _budgetCard(expense),
-        const SizedBox(height: 12),
-        _subscriptionCard(),
         const SizedBox(height: 16),
         if (catEntries.isNotEmpty) ...[
           _sectionTitle('支出の内訳'),
@@ -444,56 +439,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// 固定費カード。今月の固定費合計を表示し、タップで管理画面へ。
-  Widget _subscriptionCard() {
-    final hid = HouseholdService.instance.householdId;
-    if (hid == null) return const SizedBox.shrink();
-    final now = DateTime.now();
-    return StreamBuilder<List<Subscription>>(
-      stream: SubscriptionRepository.instance.watch(hid),
-      builder: (context, snap) {
-        final subs = snap.data ?? const <Subscription>[];
-        final total = subs
-            .where((s) => s.appliesTo(now.year, now.month))
-            .fold<int>(0, (t, s) => t + s.amountForMonth(now.year, now.month));
-        return InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const SubscriptionsScreen()),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.pinkSoft, width: 1.4),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.event_repeat_rounded,
-                    size: 20, color: AppColors.pink),
-                const SizedBox(width: 8),
-                const Text('固定費・サブスク',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.text)),
-                const Spacer(),
-                Text(subs.isEmpty ? '登録する' : '今月 ${formatYen(total)}',
-                    style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.pinkDark)),
-                const Icon(Icons.chevron_right_rounded,
-                    color: AppColors.textSub),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   Widget _miniStat(String label, int value, IconData icon) {
     return Column(
       children: [

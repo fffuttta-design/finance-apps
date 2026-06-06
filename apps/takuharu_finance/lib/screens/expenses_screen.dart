@@ -6,7 +6,9 @@ import '../data/household_service.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
+import '../widgets/settings_button.dart';
 import 'record_menu.dart';
+import 'subscriptions_screen.dart';
 import 'transaction_chat_screen.dart';
 
 /// 支出タブ：月切替＋支出合計＋カテゴリ内訳＋支出一覧（可愛い系）。
@@ -79,6 +81,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           padding: EdgeInsets.only(left: 12),
           child: Icon(Icons.shopping_bag_rounded, color: AppColors.expense),
         ),
+        actions: const [SettingsButton()],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
@@ -126,6 +129,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         _monthBar(),
         const SizedBox(height: 12),
         _totalCard(total, month.length),
+        const SizedBox(height: 12),
+        const SubscriptionSummaryCard(),
         const SizedBox(height: 16),
         if (cats.isNotEmpty) ...[
           _sectionTitle('カテゴリ内訳'),
