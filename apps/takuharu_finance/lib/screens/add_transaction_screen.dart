@@ -25,6 +25,10 @@ class AddTransactionScreen extends StatefulWidget {
   final String? initialCategory;
   final String? initialDescription;
 
+  /// レシート画像をDrive保存したときの参照（新規時のみ）。
+  final String? initialReceiptId;
+  final String? initialReceiptUrl;
+
   const AddTransactionScreen({
     super.key,
     this.editing,
@@ -33,6 +37,8 @@ class AddTransactionScreen extends StatefulWidget {
     this.initialDate,
     this.initialCategory,
     this.initialDescription,
+    this.initialReceiptId,
+    this.initialReceiptUrl,
   });
 
   @override
@@ -162,6 +168,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       paidBy: _paidBy,
       // 「食費」で個人わくONのときだけ、だれの個人わくから引くか記録。
       personalFor: (_canPersonalFood && _personalFood) ? _paidBy : null,
+      // レシート画像の参照（編集時は既存値を維持、新規はレシート読取からの値）。
+      receiptId: widget.editing?.receiptId ?? widget.initialReceiptId,
+      receiptUrl: widget.editing?.receiptUrl ?? widget.initialReceiptUrl,
     );
     try {
       if (widget.editing != null) {

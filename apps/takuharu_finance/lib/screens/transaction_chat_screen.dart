@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../data/auth_service.dart';
 import '../data/comment_repository.dart';
@@ -210,6 +211,33 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
           if (t.paymentMethod.isNotEmpty) _infoRow('支払元', t.paymentMethod),
           if (t.memo != null && t.memo!.trim().isNotEmpty)
             _infoRow('メモ', t.memo!.trim()),
+          if (t.receiptUrl != null && t.receiptUrl!.trim().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final uri = Uri.tryParse(t.receiptUrl!.trim());
+                  if (uri == null) return;
+                  if (!await launchUrl(uri,
+                      mode: LaunchMode.externalApplication)) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('レシート画像を開けませんでした')),
+                      );
+                    }
+                  }
+                },
+                icon: const Icon(Icons.receipt_long_rounded, size: 18),
+                label: const Text('レシート画像を見る'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.pinkDark,
+                  side: const BorderSide(color: AppColors.pinkSoft, width: 1.4),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
           Row(
             children: [

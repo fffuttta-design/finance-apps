@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
+import '../data/drive_receipt_service.dart';
 import '../data/receipt_ocr.dart';
 import 'add_transaction_screen.dart';
 import 'receipt_camera_screen.dart';
@@ -25,6 +26,12 @@ Future<bool> runReceiptFlow(BuildContext context) async {
   );
   if (bytes == null || !context.mounted) return false;
   const mime = 'image/jpeg';
+
+  // ★ Drive保存を“即”開始して OCR と並行で走らせる（待ち時間短縮）。
+  //   FutaFinanceと同方式：撮影画像を本人のDrive(たくはるファイナンスレシート)へ保存。
+  final receiptId = DateTime.now().microsecondsSinceEpoch.toString();
+  final uploadFuture = DriveReceiptService.instance
+      .uploadReceiptImage(bytes: bytes, date: DateTime.now());
 
   // 読み取り中インジケータ
   showDialog<void>(
@@ -49,8 +56,23 @@ Future<bool> runReceiptFlow(BuildContext context) async {
   } catch (e) {
     error = '$e';
   }
+  // OCRと並行で進めていた Drive保存の完了を待つ（多くは既に完了）。
+  final receiptUrl = await uploadFuture;
   if (!context.mounted) return false;
   Navigator.of(context, rootNavigator: true).pop(); // インジケータを閉じる
+
+  // Drive保存に失敗しても記録は続行（リンク無しで保存）。
+  if (receiptUrl == null && error == null) {
+    final reason = DriveReceiptService.instance.lastError;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 6),
+        content: Text(reason == null
+            ? 'レシート画像のDrive保存をスキップ（記録は続行）'
+            : 'Drive保存に失敗（記録は続行）: $reason'),
+      ),
+    );
+  }
 
   if (error != null) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -92,7 +114,11 @@ Future<bool> runReceiptFlow(BuildContext context) async {
       final changed = await Navigator.push<bool>(
         context,
         MaterialPageRoute(
-          builder: (_) => ReceiptSplitScreen(result: result!),
+          builder: (_) => ReceiptSplitScreen(
+            result: result!,
+            receiptId: receiptId,
+            receiptUrl: receiptUrl,
+          ),
         ),
       );
       return changed == true;
@@ -109,6 +135,8 @@ Future<bool> runReceiptFlow(BuildContext context) async {
         initialDate: result.date,
         initialCategory: result.category,
         initialDescription: result.store,
+        initialReceiptId: receiptId,
+        initialReceiptUrl: receiptUrl,
       ),
     ),
   );

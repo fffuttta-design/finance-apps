@@ -13,7 +13,16 @@ import '../utils/format.dart';
 /// レシートを品目ごとに1件ずつ記録する画面。
 class ReceiptSplitScreen extends StatefulWidget {
   final ReceiptResult result;
-  const ReceiptSplitScreen({super.key, required this.result});
+
+  /// レシート画像をDrive保存したときの参照（同じレシートの品目で共有）。
+  final String? receiptId;
+  final String? receiptUrl;
+  const ReceiptSplitScreen({
+    super.key,
+    required this.result,
+    this.receiptId,
+    this.receiptUrl,
+  });
 
   @override
   State<ReceiptSplitScreen> createState() => _ReceiptSplitScreenState();
@@ -125,7 +134,8 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
     final hid = HouseholdService.instance.householdId;
     final uid = AuthService.instance.currentUser?.uid;
     if (hid == null || uid == null) return;
-    final receiptId = DateTime.now().microsecondsSinceEpoch.toString();
+    final receiptId =
+        widget.receiptId ?? DateTime.now().microsecondsSinceEpoch.toString();
     final store = widget.result.store;
     final txns = <core.Transaction>[];
     for (final i in _items) {
@@ -142,6 +152,7 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
         amount: price,
         store: store,
         receiptId: receiptId,
+        receiptUrl: widget.receiptUrl,
         paidBy: _payer,
       ));
     }
