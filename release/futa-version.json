@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.207",
-    "buildNumber":  "208",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.207/futa-finance-v1.0.207.apk",
-    "releaseNotes":  "v1.0.207+208 リリース"
+    "version":  "1.0.208",
+    "buildNumber":  "209",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.208/futa-finance-v1.0.208.apk",
+    "releaseNotes":  "支出明細を1レシート制に(同じレシートの品目を1行にまとめ、タップで内訳を展開)。品目は別取引のままなのでカテゴリ別分析はそのまま。"
 }
