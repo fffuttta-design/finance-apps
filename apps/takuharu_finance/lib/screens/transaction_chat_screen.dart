@@ -110,7 +110,24 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
       body: Column(
         children: [
           _detailHeader(t, income),
-          const Divider(height: 1),
+          // コメント欄の見出し（ここから下がチャット）
+          Container(
+            width: double.infinity,
+            color: const Color(0xFFFFF1F4),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: const Row(
+              children: [
+                Icon(Icons.chat_bubble_outline_rounded,
+                    size: 14, color: AppColors.pinkDark),
+                SizedBox(width: 6),
+                Text('コメント',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.pinkDark)),
+              ],
+            ),
+          ),
           Expanded(
             child: hid == null
                 ? const SizedBox()
@@ -158,47 +175,36 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
     final catLabel = t.category.sub.isNotEmpty
         ? '${t.category.major}＞${t.category.sub}'
         : t.category.major;
+    final wd = ['月', '火', '水', '木', '金', '土', '日'][(t.date.weekday - 1) % 7];
     return Container(
       width: double.infinity,
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Text(
-                    t.description.isEmpty ? catLabel : t.description,
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w800)),
-              ),
-              const SizedBox(width: 8),
-              Text('${income ? '+' : '-'}${formatYen(t.amount)}',
-                  style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: amountColor)),
-            ],
+          // 商品名（買ったもの）を大きく
+          Text(
+            t.description.isEmpty ? catLabel : t.description,
+            style: const TextStyle(
+                fontSize: 19, fontWeight: FontWeight.w800),
           ),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 12,
-            runSpacing: 4,
-            children: [
-              _meta('${t.date.year}/${t.date.month}/${t.date.day}'),
-              _meta(catLabel),
-              if (t.paymentMethod.isNotEmpty) _meta(t.paymentMethod),
-            ],
-          ),
-          if (t.memo != null && t.memo!.trim().isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(t.memo!.trim(),
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSub)),
-          ],
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          // 金額を大きく
+          Text('${income ? '+' : '-'}${formatYen(t.amount)}',
+              style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w900,
+                  color: amountColor)),
+          const SizedBox(height: 14),
+          Container(height: 1, color: const Color(0xFFF3E1E7)),
+          const SizedBox(height: 8),
+          _infoRow('日付', '${t.date.year}/${t.date.month}/${t.date.day}（$wd）'),
+          _infoRow('カテゴリ', catLabel),
+          if (t.paymentMethod.isNotEmpty) _infoRow('支払元', t.paymentMethod),
+          if (t.memo != null && t.memo!.trim().isNotEmpty)
+            _infoRow('メモ', t.memo!.trim()),
+          const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
@@ -225,8 +231,25 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
     );
   }
 
-  Widget _meta(String s) => Text(s,
-      style: const TextStyle(fontSize: 12, color: AppColors.textSub));
+  Widget _infoRow(String label, String value) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 64,
+              child: Text(label,
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSub)),
+            ),
+            Expanded(
+              child: Text(value,
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      );
 
   Widget _bubble(TxComment m) {
     final mine = m.uid == _myUid;
