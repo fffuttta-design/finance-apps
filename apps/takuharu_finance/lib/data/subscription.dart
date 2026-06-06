@@ -21,6 +21,13 @@ class Subscription {
   /// 有効フラグ（false なら集計対象外・休止）。
   final bool active;
 
+  /// 変動費フラグ（true なら水道光熱費など月で金額が変わる費目）。
+  /// この場合 amount は「目安額」、実額は monthlyActuals に月ごとに入れる。
+  final bool variable;
+
+  /// 月別の実額（キー "YYYY-MM" → 円）。変動費のときに使う。
+  final Map<String, int> monthlyActuals;
+
   const Subscription({
     required this.id,
     required this.name,
@@ -31,7 +38,12 @@ class Subscription {
     this.payDay,
     this.paidBy,
     this.active = true,
+    this.variable = false,
+    this.monthlyActuals = const {},
   });
+
+  static String ymKey(int year, int month) =>
+      '$year-${month.toString().padLeft(2, '0')}';
 
   /// 指定の年月に計上されるか。
   bool appliesTo(int year, int month) {
@@ -39,6 +51,16 @@ class Subscription {
     if (frequency == SubFrequency.monthly) return true;
     return yearlyMonth == month;
   }
+
+  /// 指定月に計上する金額。変動費は実額（無ければ目安の amount）。
+  int amountForMonth(int year, int month) {
+    if (!variable) return amount;
+    return monthlyActuals[ymKey(year, month)] ?? amount;
+  }
+
+  /// 指定月の実額が入力済みか（変動費の未入力ハイライト用）。
+  bool hasActualFor(int year, int month) =>
+      !variable || monthlyActuals.containsKey(ymKey(year, month));
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -50,6 +72,8 @@ class Subscription {
         'payDay': payDay,
         'paidBy': paidBy,
         'active': active,
+        'variable': variable,
+        'monthlyActuals': monthlyActuals,
       };
 
   factory Subscription.fromJson(Map<String, dynamic> j) => Subscription(
@@ -65,6 +89,9 @@ class Subscription {
         payDay: (j['payDay'] as num?)?.toInt(),
         paidBy: j['paidBy'] as String?,
         active: j['active'] as bool? ?? true,
+        variable: j['variable'] as bool? ?? false,
+        monthlyActuals: ((j['monthlyActuals'] as Map?) ?? const {})
+            .map((k, v) => MapEntry(k as String, (v as num).toInt())),
       );
 
   Subscription copyWith({
@@ -76,6 +103,8 @@ class Subscription {
     int? payDay,
     String? paidBy,
     bool? active,
+    bool? variable,
+    Map<String, int>? monthlyActuals,
   }) =>
       Subscription(
         id: id,
@@ -87,5 +116,7 @@ class Subscription {
         payDay: payDay ?? this.payDay,
         paidBy: paidBy ?? this.paidBy,
         active: active ?? this.active,
+        variable: variable ?? this.variable,
+        monthlyActuals: monthlyActuals ?? this.monthlyActuals,
       );
 }

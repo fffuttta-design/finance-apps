@@ -79,7 +79,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
         category: core.Category(major: s.category, sub: ''),
         paymentMethod: '',
         description: s.name,
-        amount: s.amount,
+        amount: s.amountForMonth(_now.year, _now.month),
         receiptId: rid,
         paidBy: s.paidBy,
         memo: '固定費',
@@ -100,6 +100,48 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   void _toast(String m) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
 
+  /// 変動費の「今月の実額」を入力して保存する。
+  Future<void> _inputActual(Subscription s) async {
+    final hid = HouseholdService.instance.householdId;
+    if (hid == null) return;
+    final ym = Subscription.ymKey(_now.year, _now.month);
+    final ctrl =
+        TextEditingController(text: s.monthlyActuals[ym]?.toString() ?? '');
+    final v = await showDialog<int>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('${_now.month}月の「${s.name}」'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: InputDecoration(
+            labelText: '今月の実額（円）',
+            hintText: '目安 ${formatYen(s.amount)}',
+            suffixText: '円',
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx),
+              child: const Text('やめる')),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(dctx, int.tryParse(ctrl.text.trim())),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (v == null || v < 0) return;
+    final next = Map<String, int>.from(s.monthlyActuals)..[ym] = v;
+    await SubscriptionRepository.instance
+        .save(hid, s.copyWith(monthlyActuals: next));
+    if (mounted) _toast('${_now.month}月の実額を保存しました');
+  }
+
   @override
   Widget build(BuildContext context) {
     final hid = HouseholdService.instance.householdId;
@@ -118,7 +160,10 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                 final subs = snap.data ?? const <Subscription>[];
                 final monthly = subs
                     .where((s) => s.appliesTo(_now.year, _now.month))
-                    .fold<int>(0, (t, s) => t + s.amount);
+                    .fold<int>(
+                        0,
+                        (t, s) =>
+                            t + s.amountForMonth(_now.year, _now.month));
                 return ListView(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
                   children: [
@@ -202,15 +247,47 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
               style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
           subtitle: Text(
               '$freq　${s.category}'
+              '${s.variable ? '　変動' : ''}'
               '${s.payDay != null ? '　${s.payDay}日' : ''}'
               '${payer != null ? '　💳 $payer' : ''}'
               '${s.active ? '' : '　（休止中）'}',
               style: const TextStyle(fontSize: 11, color: AppColors.textSub)),
-          trailing: Text(formatYen(s.amount),
-              style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 15,
-                  color: AppColors.expense)),
+          trailing: s.variable
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                        formatYen(
+                            s.amountForMonth(_now.year, _now.month)),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                            color: AppColors.expense)),
+                    InkWell(
+                      onTap: () => _inputActual(s),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 2),
+                        child: Text(
+                          s.hasActualFor(_now.year, _now.month)
+                              ? '実額 ✎'
+                              : '目安・入力 ✎',
+                          style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.pinkDark),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : Text(formatYen(s.amount),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      color: AppColors.expense)),
         ),
       ),
     );
@@ -251,6 +328,7 @@ class _SubEditSheetState extends State<_SubEditSheet> {
   int _yearlyMonth = 1;
   String? _payer;
   bool _active = true;
+  bool _variable = false;
 
   Map<String, String> get _members => HouseholdService.instance.memberNames;
 
@@ -268,6 +346,7 @@ class _SubEditSheetState extends State<_SubEditSheet> {
     // デフォルトは「一緒に」。旧データの未指定(null)も一緒に扱い。
     _payer = e?.paidBy ?? kPaidByBoth;
     _active = e?.active ?? true;
+    _variable = e?.variable ?? false;
   }
 
   @override
@@ -282,7 +361,10 @@ class _SubEditSheetState extends State<_SubEditSheet> {
     final amount = int.tryParse(_amount.text) ?? 0;
     if (_name.text.trim().isEmpty || amount <= 0 || _category == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('名前・金額・カテゴリを入力してね')),
+        SnackBar(
+            content: Text(_variable
+                ? '名前・目安額・カテゴリを入力してね'
+                : '名前・金額・カテゴリを入力してね')),
       );
       return;
     }
@@ -300,6 +382,9 @@ class _SubEditSheetState extends State<_SubEditSheet> {
         payDay: int.tryParse(_payDay.text),
         paidBy: _payer,
         active: _active,
+        variable: _variable,
+        // 既存の月別実額は引き継ぐ。
+        monthlyActuals: widget.editing?.monthlyActuals ?? const {},
       ),
     );
   }
@@ -355,10 +440,24 @@ class _SubEditSheetState extends State<_SubEditSheet> {
               controller: _amount,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration:
-                  const InputDecoration(labelText: '金額', prefixText: '¥ '),
+              decoration: InputDecoration(
+                  labelText: _variable ? '目安額' : '金額',
+                  prefixText: '¥ ',
+                  helperText: _variable ? '実額は毎月リストから入力できます' : null),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 4),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: const Text('変動費（毎月金額が変わる）',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              subtitle: const Text('水道光熱費など。ONにすると月ごとに実額を入れられます',
+                  style: TextStyle(fontSize: 11)),
+              activeThumbColor: AppColors.pink,
+              value: _variable,
+              onChanged: (v) => setState(() => _variable = v),
+            ),
+            const SizedBox(height: 12),
             const Text('カテゴリ',
                 style: TextStyle(fontSize: 12, color: AppColors.textSub)),
             const SizedBox(height: 6),

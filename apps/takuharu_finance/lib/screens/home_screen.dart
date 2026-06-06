@@ -454,7 +454,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final subs = snap.data ?? const <Subscription>[];
         final total = subs
             .where((s) => s.appliesTo(now.year, now.month))
-            .fold<int>(0, (t, s) => t + s.amount);
+            .fold<int>(0, (t, s) => t + s.amountForMonth(now.year, now.month));
         return InkWell(
           borderRadius: BorderRadius.circular(20),
           onTap: () => Navigator.push(
