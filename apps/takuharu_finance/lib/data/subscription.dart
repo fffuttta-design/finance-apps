@@ -52,10 +52,24 @@ class Subscription {
     return yearlyMonth == month;
   }
 
-  /// 指定月に計上する金額。変動費は実額（無ければ目安の amount）。
+  /// 指定月に計上する金額。
+  /// 変動費は「その月の実額」。未入力なら直近に入力済みの月（＝前月など）の額、
+  /// それも無ければ 0。
   int amountForMonth(int year, int month) {
     if (!variable) return amount;
-    return monthlyActuals[ymKey(year, month)] ?? amount;
+    return monthlyActuals[ymKey(year, month)] ??
+        previousActual(year, month) ??
+        0;
+  }
+
+  /// 指定月より前で、直近に入力済みの実額（無ければ null）。
+  int? previousActual(int year, int month) {
+    if (monthlyActuals.isEmpty) return null;
+    final cur = ymKey(year, month);
+    final past = monthlyActuals.keys.where((k) => k.compareTo(cur) < 0).toList()
+      ..sort();
+    if (past.isEmpty) return null;
+    return monthlyActuals[past.last];
   }
 
   /// 指定月の実額が入力済みか（変動費の未入力ハイライト用）。

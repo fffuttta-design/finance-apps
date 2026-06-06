@@ -112,16 +112,29 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
       builder: (dctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text('${_now.month}月の「${s.name}」'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          decoration: InputDecoration(
-            labelText: '今月の実額（円）',
-            hintText: '目安 ${formatYen(s.amount)}',
-            suffixText: '円',
-          ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (s.previousActual(_now.year, _now.month) != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                    '前月: ${formatYen(s.previousActual(_now.year, _now.month)!)}',
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textSub)),
+              ),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                labelText: '今月の実額（円）',
+                suffixText: '円',
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -273,7 +286,10 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                         child: Text(
                           s.hasActualFor(_now.year, _now.month)
                               ? '実額 ✎'
-                              : '目安・入力 ✎',
+                              : (s.previousActual(_now.year, _now.month) !=
+                                      null
+                                  ? '前月 ✎'
+                                  : '入力 ✎'),
                           style: const TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
@@ -359,11 +375,14 @@ class _SubEditSheetState extends State<_SubEditSheet> {
 
   void _submit() {
     final amount = int.tryParse(_amount.text) ?? 0;
-    if (_name.text.trim().isEmpty || amount <= 0 || _category == null) {
+    // 変動費は金額不要（月ごとに実額入力）。固定費は金額必須。
+    if (_name.text.trim().isEmpty ||
+        _category == null ||
+        (!_variable && amount <= 0)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text(_variable
-                ? '名前・目安額・カテゴリを入力してね'
+                ? '名前・カテゴリを入力してね'
                 : '名前・金額・カテゴリを入力してね')),
       );
       return;
@@ -375,7 +394,7 @@ class _SubEditSheetState extends State<_SubEditSheet> {
       Subscription(
         id: id,
         name: _name.text.trim(),
-        amount: amount,
+        amount: _variable ? 0 : amount,
         category: _category!,
         frequency: _freq,
         yearlyMonth: _freq == SubFrequency.yearly ? _yearlyMonth : null,
@@ -436,27 +455,27 @@ class _SubEditSheetState extends State<_SubEditSheet> {
                   labelText: '名前', hintText: '例: 家賃 / Netflix'),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _amount,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: InputDecoration(
-                  labelText: _variable ? '目安額' : '金額',
-                  prefixText: '¥ ',
-                  helperText: _variable ? '実額は毎月リストから入力できます' : null),
-            ),
-            const SizedBox(height: 4),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               dense: true,
               title: const Text('変動費（毎月金額が変わる）',
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-              subtitle: const Text('水道光熱費など。ONにすると月ごとに実額を入れられます',
+              subtitle: const Text('水道光熱費など。ONにすると金額は毎月リストから入力します',
                   style: TextStyle(fontSize: 11)),
               activeThumbColor: AppColors.pink,
               value: _variable,
               onChanged: (v) => setState(() => _variable = v),
             ),
+            if (!_variable) ...[
+              const SizedBox(height: 4),
+              TextField(
+                controller: _amount,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration:
+                    const InputDecoration(labelText: '金額', prefixText: '¥ '),
+              ),
+            ],
             const SizedBox(height: 12),
             const Text('カテゴリ',
                 style: TextStyle(fontSize: 12, color: AppColors.textSub)),

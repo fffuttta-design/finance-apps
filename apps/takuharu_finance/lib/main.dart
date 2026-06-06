@@ -69,10 +69,18 @@ class _HouseholdGate extends StatefulWidget {
 class _HouseholdGateState extends State<_HouseholdGate> {
   late Future<void> _future;
 
+  /// 世帯確保＋スプラッシュの最低表示時間（ロゴアニメを少しだけ見せる）。
+  Future<void> _ensure() async {
+    await Future.wait([
+      HouseholdService.instance.ensureHousehold(widget.user),
+      Future<void>.delayed(const Duration(milliseconds: 1100)),
+    ]);
+  }
+
   @override
   void initState() {
     super.initState();
-    _future = HouseholdService.instance.ensureHousehold(widget.user);
+    _future = _ensure();
   }
 
   @override
@@ -99,8 +107,7 @@ class _HouseholdGateState extends State<_HouseholdGate> {
                     const SizedBox(height: 12),
                     FilledButton(
                       onPressed: () => setState(() {
-                        _future = HouseholdService.instance
-                            .ensureHousehold(widget.user);
+                        _future = _ensure();
                       }),
                       child: const Text('もう一度'),
                     ),
