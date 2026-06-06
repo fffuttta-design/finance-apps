@@ -13,7 +13,6 @@ import '../data/subscription_repository.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
-import 'add_transaction_screen.dart';
 import 'record_menu.dart';
 import 'calendar_screen.dart';
 import 'settings_screen.dart';
@@ -144,15 +143,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _inMonth(core.Transaction t) =>
       t.date.year == _month.year && t.date.month == _month.month;
-
-  Future<void> _openAdd([core.Transaction? editing]) async {
-    final changed = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-          builder: (_) => AddTransactionScreen(editing: editing)),
-    );
-    if (changed == true) setState(() {});
-  }
 
   /// 「きろく」ボタン：共通メニュー（手入力 / レシート）を開く。
   Future<void> _openRecordMenu() async {
@@ -600,7 +590,14 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListTile(
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        onTap: () => _openAdd(t),
+        onTap: () async {
+          final changed = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(
+                builder: (_) => TransactionChatScreen(transaction: t)),
+          );
+          if (changed == true && mounted) setState(() {});
+        },
         leading: Container(
           width: 42,
           height: 42,

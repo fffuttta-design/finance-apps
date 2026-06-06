@@ -4,8 +4,10 @@ import 'package:finance_core/finance_core.dart' as core;
 import '../data/auth_service.dart';
 import '../data/comment_repository.dart';
 import '../data/household_service.dart';
+import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
+import 'add_transaction_screen.dart';
 
 /// 取引ごとのチャット（たく＆はるの会話）。
 class TransactionChatScreen extends StatefulWidget {
@@ -21,7 +23,56 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
   final _scroll = ScrollController();
   bool _sending = false;
 
+  // 編集で内容が変わったら差し替えるため可変で持つ。
+  late core.Transaction _t = widget.transaction;
+  // 一覧側に「変更あり」を返すためのフラグ。
+  bool _changed = false;
+
   String get _myUid => AuthService.instance.currentUser?.uid ?? '';
+
+  Future<void> _editTx() async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+          builder: (_) => AddTransactionScreen(editing: _t)),
+    );
+    if (changed != true) return;
+    _changed = true;
+    // 最新の内容を取り直してヘッダーを更新。
+    final hid = HouseholdService.instance.householdId;
+    if (hid != null) {
+      final fresh = await TxRepository.instance.getById(hid, _t.id);
+      if (fresh != null && mounted) setState(() => _t = fresh);
+    }
+  }
+
+  Future<void> _deleteTx() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('この記録を削除しますか？'),
+        content: Text(
+            '「${_t.description.isEmpty ? _t.category.major : _t.description}」を削除します。\nこの操作は取り消せません。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx, false),
+              child: const Text('やめる')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.expense),
+            onPressed: () => Navigator.pop(dctx, true),
+            child: const Text('削除する'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final hid = HouseholdService.instance.householdId;
+    if (hid == null) return;
+    await TxRepository.instance.delete(hid, _t.id);
+    if (mounted) Navigator.pop(context, true);
+  }
 
   @override
   void dispose() {
@@ -38,8 +89,7 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
     setState(() => _sending = true);
     _ctrl.clear();
     try {
-      await CommentRepository.instance
-          .add(hid, widget.transaction.id, _myUid, text);
+      await CommentRepository.instance.add(hid, _t.id, _myUid, text);
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -47,26 +97,20 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = widget.transaction;
+    final t = _t;
     final hid = HouseholdService.instance.householdId;
     final income = t.type == core.TransactionType.income;
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(t.description.isEmpty ? t.category.major : t.description,
-                style: const TextStyle(fontSize: 15)),
-            Text(
-                '${t.date.month}/${t.date.day} ・ '
-                '${income ? '+' : '-'}${formatYen(t.amount)}',
-                style: const TextStyle(
-                    fontSize: 11, color: AppColors.textSub)),
-          ],
-        ),
-      ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && mounted) Navigator.pop(context, _changed);
+      },
+      child: Scaffold(
+      appBar: AppBar(title: const Text('明細')),
       body: Column(
         children: [
+          _detailHeader(t, income),
+          const Divider(height: 1),
           Expanded(
             child: hid == null
                 ? const SizedBox()
@@ -103,8 +147,86 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
           _inputBar(),
         ],
       ),
+      ),
     );
   }
+
+  /// 明細の詳細ヘッダー（金額・日付・カテゴリ・支払方法・メモ）＋編集/削除。
+  Widget _detailHeader(core.Transaction t, bool income) {
+    final amountColor =
+        income ? const Color(0xFF2E9E6B) : AppColors.expense;
+    final catLabel = t.category.sub.isNotEmpty
+        ? '${t.category.major}＞${t.category.sub}'
+        : t.category.major;
+    return Container(
+      width: double.infinity,
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Text(
+                    t.description.isEmpty ? catLabel : t.description,
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w800)),
+              ),
+              const SizedBox(width: 8),
+              Text('${income ? '+' : '-'}${formatYen(t.amount)}',
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: amountColor)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
+            children: [
+              _meta('${t.date.year}/${t.date.month}/${t.date.day}'),
+              _meta(catLabel),
+              if (t.paymentMethod.isNotEmpty) _meta(t.paymentMethod),
+            ],
+          ),
+          if (t.memo != null && t.memo!.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(t.memo!.trim(),
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textSub)),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _editTx,
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('編集'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _deleteTx,
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  label: const Text('削除'),
+                  style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.expense),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _meta(String s) => Text(s,
+      style: const TextStyle(fontSize: 12, color: AppColors.textSub));
 
   Widget _bubble(TxComment m) {
     final mine = m.uid == _myUid;

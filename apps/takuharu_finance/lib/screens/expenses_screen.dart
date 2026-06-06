@@ -6,7 +6,6 @@ import '../data/household_service.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
-import 'add_transaction_screen.dart';
 import 'record_menu.dart';
 import 'transaction_chat_screen.dart';
 
@@ -69,19 +68,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
   bool _inMonth(core.Transaction t) =>
       t.date.year == _month.year && t.date.month == _month.month;
-
-  Future<void> _openAdd([core.Transaction? editing]) async {
-    final changed = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AddTransactionScreen(
-          editing: editing,
-          initialType: core.TransactionType.expense,
-        ),
-      ),
-    );
-    if (changed == true) setState(() {});
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -390,7 +376,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        onTap: () => _openAdd(t),
+        onTap: () async {
+          final changed = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(
+                builder: (_) => TransactionChatScreen(transaction: t)),
+          );
+          if (changed == true && mounted) setState(() {});
+        },
         leading: Container(
           width: 42,
           height: 42,

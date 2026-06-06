@@ -116,14 +116,46 @@ class _HouseholdGateState extends State<_HouseholdGate> {
   }
 }
 
-class _Splash extends StatelessWidget {
+/// 起動スプラッシュ。淡いピンク背景＋ブランドロゴが「ふわっと呼吸」する
+/// 短いアニメ。auth待ち/世帯確保待ちの両方で同じ見た目なので、
+/// 連続して表示されても“2回出た”感が出ないようループ脈動にしている。
+class _Splash extends StatefulWidget {
   const _Splash();
 
   @override
+  State<_Splash> createState() => _SplashState();
+}
+
+class _SplashState extends State<_Splash>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    final scale = Tween<double>(begin: 0.92, end: 1.06).animate(
+      CurvedAnimation(parent: _c, curve: Curves.easeInOut),
+    );
+    return Scaffold(
+      backgroundColor: const Color(0xFFFFF1F4),
       body: Center(
-        child: Icon(Icons.favorite_rounded, size: 64, color: AppColors.pink),
+        child: ScaleTransition(
+          scale: scale,
+          child: Image.asset(
+            'assets/brand/logo.png',
+            width: 150,
+            errorBuilder: (_, _, _) => const Icon(Icons.favorite_rounded,
+                size: 72, color: AppColors.pink),
+          ),
+        ),
       ),
     );
   }
