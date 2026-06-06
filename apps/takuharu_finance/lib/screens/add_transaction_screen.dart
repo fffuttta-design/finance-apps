@@ -10,7 +10,6 @@ import '../data/household_service.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
-import 'transaction_chat_screen.dart';
 
 /// 収支を1件記録／編集する画面（可愛い系）。
 class AddTransactionScreen extends StatefulWidget {
@@ -208,19 +207,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         actions: [
           if (widget.editing != null)
             IconButton(
-              icon: const Icon(Icons.chat_bubble_outline_rounded,
-                  color: AppColors.pinkDark),
-              tooltip: 'チャット',
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      TransactionChatScreen(transaction: widget.editing!),
-                ),
-              ),
-            ),
-          if (widget.editing != null)
-            IconButton(
               icon: const Icon(Icons.delete_outline_rounded,
                   color: AppColors.pinkDark),
               onPressed: _saving ? null : _delete,
@@ -231,23 +217,25 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
           children: [
-            // 支出/収入トグル
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: AppColors.pinkSoft,
-                borderRadius: BorderRadius.circular(20),
+            // 支出/収入トグル（新規記録時のみ。編集では種別は変えない）
+            if (widget.editing == null) ...[
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppColors.pinkSoft,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    _typeTab('支出', core.TransactionType.expense,
+                        AppColors.expense),
+                    _typeTab('収入', core.TransactionType.income,
+                        AppColors.income),
+                  ],
+                ),
               ),
-              child: Row(
-                children: [
-                  _typeTab('支出', core.TransactionType.expense,
-                      AppColors.expense),
-                  _typeTab('収入', core.TransactionType.income,
-                      AppColors.income),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
+            ],
             // 金額
             Center(
               child: Column(
@@ -336,6 +324,17 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 else
                   ...HouseholdService.instance.paymentMethods
                       .map((m) => _payChip(m, m)),
+              ],
+            ),
+            const SizedBox(height: 18),
+            // だれ（記録者／支払者。相手が登録したものでも変更できる）
+            _section('だれ'),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final e in HouseholdService.instance.memberNames.entries)
+                  _personChip(e.key, e.value),
               ],
             ),
             const SizedBox(height: 18),
@@ -502,6 +501,41 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 fontSize: 13,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 color: AppColors.text)),
+      ),
+    );
+  }
+
+  Widget _personChip(String uid, String name) {
+    final selected = _paidBy == uid;
+    final icon = HouseholdService.instance.memberIcons[uid];
+    return GestureDetector(
+      onTap: () => setState(() => _paidBy = uid),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color:
+              selected ? AppColors.pink.withValues(alpha: 0.18) : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected ? AppColors.pink : AppColors.divider,
+            width: selected ? 1.6 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null && icon.isNotEmpty) ...[
+              Text(icon, style: const TextStyle(fontSize: 16)),
+              const SizedBox(width: 6),
+            ],
+            Text(name,
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    color: AppColors.text)),
+          ],
+        ),
       ),
     );
   }

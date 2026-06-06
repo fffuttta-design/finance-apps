@@ -109,54 +109,41 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
       appBar: AppBar(title: const Text('明細')),
       body: Column(
         children: [
-          _detailHeader(t, income),
-          // コメント欄の見出し（ここから下がチャット）
-          Container(
-            width: double.infinity,
-            color: const Color(0xFFFFF1F4),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: const Row(
-              children: [
-                Icon(Icons.chat_bubble_outline_rounded,
-                    size: 14, color: AppColors.pinkDark),
-                SizedBox(width: 6),
-                Text('コメント',
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.pinkDark)),
-              ],
-            ),
-          ),
           Expanded(
             child: hid == null
-                ? const SizedBox()
+                ? ListView(
+                    controller: _scroll,
+                    children: [_detailHeader(t, income), _commentHeaderBar()],
+                  )
                 : StreamBuilder<List<TxComment>>(
                     stream: CommentRepository.instance.watch(hid, t.id),
                     builder: (context, snap) {
                       final msgs = snap.data ?? const <TxComment>[];
-                      if (msgs.isEmpty) {
-                        return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(40),
-                            child: Text(
-                                'この記録について話そう ♡\n「これ何に使った？」「立て替えありがと！」',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    color: AppColors.textSub, fontSize: 13)),
-                          ),
-                        );
-                      }
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (_scroll.hasClients) {
-                          _scroll.jumpTo(_scroll.position.maxScrollExtent);
-                        }
-                      });
-                      return ListView.builder(
+                      return ListView(
                         controller: _scroll,
-                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                        itemCount: msgs.length,
-                        itemBuilder: (_, i) => _bubble(msgs[i]),
+                        padding: const EdgeInsets.only(bottom: 12),
+                        children: [
+                          // 詳細ヘッダーとコメント見出しはスクロールで流れる
+                          _detailHeader(t, income),
+                          _commentHeaderBar(),
+                          if (msgs.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.all(40),
+                              child: Text(
+                                  'この記録について話そう ♡\n「これ何に使った？」「立て替えありがと！」',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                      color: AppColors.textSub, fontSize: 13)),
+                            )
+                          else ...[
+                            const SizedBox(height: 12),
+                            ...msgs.map((m) => Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12),
+                                  child: _bubble(m),
+                                )),
+                          ],
+                        ],
                       );
                     },
                   ),
@@ -167,6 +154,25 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
       ),
     );
   }
+
+  /// コメント欄の見出し（ここから下がチャット）。
+  Widget _commentHeaderBar() => Container(
+        width: double.infinity,
+        color: const Color(0xFFFFF1F4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: const Row(
+          children: [
+            Icon(Icons.chat_bubble_outline_rounded,
+                size: 14, color: AppColors.pinkDark),
+            SizedBox(width: 6),
+            Text('コメント',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.pinkDark)),
+          ],
+        ),
+      );
 
   /// 明細の詳細ヘッダー（金額・日付・カテゴリ・支払方法・メモ）＋編集/削除。
   Widget _detailHeader(core.Transaction t, bool income) {

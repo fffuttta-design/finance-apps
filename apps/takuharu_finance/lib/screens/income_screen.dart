@@ -210,7 +210,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
   Widget _tile(core.Transaction t) {
     final c = categoryFor(t.category.major, income: true);
     final names = HouseholdService.instance.memberNames;
-    final byUid = t.recordedBy;
+    final byUid = t.paidBy ?? t.recordedBy;
     final who =
         (names.length >= 2 && byUid != null) ? names[byUid] : null;
     final sub = '${t.date.month}/${t.date.day}　${t.category.major}'
