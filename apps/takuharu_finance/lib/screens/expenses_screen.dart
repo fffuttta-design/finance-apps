@@ -3,12 +3,11 @@ import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/categories.dart';
 import '../data/household_service.dart';
-import '../data/receipt_ocr.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 import 'add_transaction_screen.dart';
-import 'receipt_flow.dart';
+import 'record_menu.dart';
 import 'transaction_chat_screen.dart';
 
 /// 支出タブ：月切替＋支出合計＋カテゴリ内訳＋支出一覧（可愛い系）。
@@ -94,24 +93,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           padding: EdgeInsets.only(left: 12),
           child: Icon(Icons.shopping_bag_rounded, color: AppColors.expense),
         ),
-        actions: [
-          if (ReceiptOcr.available)
-            IconButton(
-              icon: const Icon(Icons.receipt_long_rounded,
-                  color: AppColors.pinkDark),
-              tooltip: 'レシートで記録',
-              onPressed: () async {
-                final changed = await runReceiptFlow(context);
-                if (changed && mounted) setState(() {});
-              },
-            ),
-        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openAdd(),
+        onPressed: () async {
+          final changed = await showRecordMenu(context);
+          if (changed && mounted) setState(() {});
+        },
         backgroundColor: AppColors.expense,
         icon: const Icon(Icons.add_rounded),
-        label: const Text('支出をきろく',
+        label: const Text('きろく',
             style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: hid == null

@@ -11,6 +11,9 @@ import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 
+/// 「一緒に（折半）」を表す paidBy のセンチネル値。
+const String kPaidByBoth = 'both';
+
 /// 固定費・サブスク管理（毎月/毎年の決まった支出）。
 class SubscriptionsScreen extends StatefulWidget {
   const SubscriptionsScreen({super.key});
@@ -176,7 +179,9 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
         ? '毎年${s.yearlyMonth ?? ''}月'
         : '毎月';
     final names = HouseholdService.instance.memberNames;
-    final payer = s.paidBy != null ? names[s.paidBy] : null;
+    final payer = (s.paidBy == null || s.paidBy == kPaidByBoth)
+        ? '一緒に'
+        : names[s.paidBy];
     return Opacity(
       opacity: s.active ? 1 : 0.5,
       child: Card(
@@ -260,7 +265,8 @@ class _SubEditSheetState extends State<_SubEditSheet> {
     _category = e?.category;
     _freq = e?.frequency ?? SubFrequency.monthly;
     _yearlyMonth = e?.yearlyMonth ?? 1;
-    _payer = e?.paidBy;
+    // デフォルトは「一緒に」。旧データの未指定(null)も一緒に扱い。
+    _payer = e?.paidBy ?? kPaidByBoth;
     _active = e?.active ?? true;
   }
 
@@ -414,16 +420,17 @@ class _SubEditSheetState extends State<_SubEditSheet> {
             ),
             if (_members.length >= 2) ...[
               const SizedBox(height: 16),
-              const Text('だれが払う？（任意）',
+              const Text('だれが払う？',
                   style: TextStyle(fontSize: 12, color: AppColors.textSub)),
               const SizedBox(height: 6),
               Wrap(
                 spacing: 8,
                 children: [
                   ChoiceChip(
-                    label: const Text('未指定'),
-                    selected: _payer == null,
-                    onSelected: (_) => setState(() => _payer = null),
+                    label: const Text('一緒に'),
+                    selected: _payer == kPaidByBoth,
+                    onSelected: (_) =>
+                        setState(() => _payer = kPaidByBoth),
                     selectedColor: AppColors.pinkSoft,
                   ),
                   for (final e in _members.entries)
