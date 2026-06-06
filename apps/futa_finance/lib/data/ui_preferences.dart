@@ -29,6 +29,7 @@ class UiPreferences extends ChangeNotifier {
     'expenses',
     'income',
     'report',
+    'assets',
     'settings',
     'devLab',
   ];

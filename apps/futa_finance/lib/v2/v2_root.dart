@@ -82,6 +82,10 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
           id: 'income', label: '収入', icon: Icons.savings_outlined),
       'report': const V2NavItem(
           id: 'report', label: '業績', icon: Icons.bar_chart_outlined),
+      'assets': const V2NavItem(
+          id: 'assets',
+          label: '資産',
+          icon: Icons.account_balance_wallet_outlined),
       'settings': const V2NavItem(
           id: 'settings', label: '設定', icon: Icons.settings_outlined),
       // 事業モード=「開発中」ラボ（PL/BS/予算/取込）。
@@ -116,6 +120,9 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
       // 集計: v2.1 ネイティブ実装（会計風 PL 月次表 + v1 集計画面へのリンク）
       case 'report':
         return V2ReportScreen(accent: accent);
+      // 資産: 総資産（口座/カード/月初残高）。ホームから移動。
+      case 'assets':
+        return V2HomeTopNavScreen(accent: accent, assetsOnly: true);
       // 設定: v2.1 ネイティブ（マスター/ディテール、左メニュー + 右パネル）
       case 'settings':
         return V2SettingsScreen(accent: accent);

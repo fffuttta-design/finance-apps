@@ -12,7 +12,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/app_mode.dart';
 import '../../data/backup_repository.dart';
 import '../../data/subscription_repository.dart';
-import '../../data/ui_preferences.dart';
 import '../../data/monthly_snapshot_repository.dart';
 import '../../data/payments_change_notifier.dart';
 import '../../data/settings_repository.dart';
@@ -37,7 +36,12 @@ class V2HomeTopNavScreen extends StatefulWidget {
   /// アクセント色（事業=青 / 個人=オレンジ）
   final Color accent;
 
-  const V2HomeTopNavScreen({super.key, required this.accent});
+  /// true のとき「資産」タブとして総資産のみを表示する。
+  /// false（既定）はホーム本来の表示（総資産は出さない）。
+  final bool assetsOnly;
+
+  const V2HomeTopNavScreen(
+      {super.key, required this.accent, this.assetsOnly = false});
 
   @override
   State<V2HomeTopNavScreen> createState() => _V2HomeTopNavScreenState();
@@ -64,9 +68,6 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
   /// 当月支出の口座別内訳展開
   bool _expenseBreakdownExpanded = false;
 
-  /// ホーム（広い画面）の総資産カラム幅。ドラッグで調整・永続化。
-  late double _assetWidth = UiPreferences.instance.homeAssetColumnWidth;
-
   @override
   void onModeChanged() => _load();
 
@@ -75,6 +76,8 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
     super.initState();
     _load().then((_) {
       if (!mounted) return;
+      // 資産タブ表示時はリマインダーを出さない（ホーム本体のみ）。
+      if (widget.assetsOnly) return;
       // 起動時に v1 と同じリマインダーを順に判定（同タイミングで2連発しない）
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         await _maybeShowSnapshotReminder();
@@ -377,41 +380,57 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
     // Shell の Expanded 内で content として展開されるため、
     // ホームの 3 カラム / 縦並びがコンテンツ高を超えた場合に
     // スクロールできるよう、最上位に SingleChildScrollView を置く。
+    // 「資産」タブ: 月切替 + 総資産のみを表示。
+    if (widget.assetsOnly) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(
+            vertical: V2Spacing.xl, horizontal: V2Spacing.md),
+        child: Column(
+          children: [
+            _AssetMonthBar(state: this),
+            const SizedBox(height: V2Spacing.md),
+            _LeftAssetSummary(state: this),
+          ],
+        ),
+      );
+    }
+    // Shell の Expanded 内で content として展開されるため、
+    // ホームの 3 カラム / 縦並びがコンテンツ高を超えた場合に
+    // スクロールできるよう、最上位に SingleChildScrollView を置く。
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(
           vertical: V2Spacing.xl, horizontal: V2Spacing.md),
       child: LayoutBuilder(builder: (ctx, c) {
-        final wide = c.maxWidth >= 1000;
-        if (wide) {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                  width: _assetWidth,
-                  child: _LeftAssetSummary(state: this)),
-              // ドラッグで総資産カラムの幅を調整（保存される）。
-              _ColumnResizeHandle(
-                onDrag: (dx) => setState(() {
-                  _assetWidth = (_assetWidth + dx).clamp(
-                      UiPreferences.homeAssetWidthMin,
-                      UiPreferences.homeAssetWidthMax);
-                }),
-                onDragEnd: () => UiPreferences.instance
-                    .setHomeAssetColumnWidth(_assetWidth),
-              ),
-              Expanded(child: _CenterColumn(state: this)),
-            ],
-          );
-        }
-        // モバイル並び順: ◯月の収支 / 最新の入出金（中央）→ 総資産（月初残高を統合）。
-        return Column(
-          children: [
-            _CenterColumn(state: this),
-            const SizedBox(height: V2Spacing.lg),
-            _LeftAssetSummary(state: this),
-          ],
-        );
+        // 総資産は「資産」タブへ移動したため、ホームでは中央カラムのみ。
+        return _CenterColumn(state: this);
       }),
+    );
+  }
+}
+
+/// 「資産」タブ用の月切替バー（< 2026年6月 >）。
+class _AssetMonthBar extends StatelessWidget {
+  final _V2HomeTopNavScreenState state;
+  const _AssetMonthBar({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final m = state._selectedMonth;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.chevron_left, color: V2Colors.textSecondary),
+          onPressed: () => state.shiftMonth(-1),
+        ),
+        Text('${m.year}年${m.month}月',
+            style: V2Typography.bodyStrong
+                .copyWith(color: V2Colors.textPrimary)),
+        IconButton(
+          icon: const Icon(Icons.chevron_right, color: V2Colors.textSecondary),
+          onPressed: () => state.shiftMonth(1),
+        ),
+      ],
     );
   }
 }
@@ -1038,56 +1057,6 @@ class _CenterColumn extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// 総資産カラムとメインカラムの間のドラッグ仕切り（幅調整・広い画面用）。
-class _ColumnResizeHandle extends StatefulWidget {
-  final ValueChanged<double> onDrag;
-  final VoidCallback onDragEnd;
-  const _ColumnResizeHandle(
-      {required this.onDrag, required this.onDragEnd});
-
-  @override
-  State<_ColumnResizeHandle> createState() => _ColumnResizeHandleState();
-}
-
-class _ColumnResizeHandleState extends State<_ColumnResizeHandle> {
-  bool _hover = false;
-  bool _drag = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final active = _hover || _drag;
-    return MouseRegion(
-      cursor: SystemMouseCursors.resizeLeftRight,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onHorizontalDragStart: (_) => setState(() => _drag = true),
-        onHorizontalDragUpdate: (d) => widget.onDrag(d.delta.dx),
-        onHorizontalDragEnd: (_) {
-          setState(() => _drag = false);
-          widget.onDragEnd();
-        },
-        child: SizedBox(
-          width: V2Spacing.lg,
-          child: Center(
-            child: Container(
-              width: 4,
-              height: 40,
-              decoration: BoxDecoration(
-                color: active
-                    ? V2Colors.accent
-                    : V2Colors.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
