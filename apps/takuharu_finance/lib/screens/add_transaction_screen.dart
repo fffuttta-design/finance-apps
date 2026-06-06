@@ -4,6 +4,8 @@ import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/auth_service.dart';
 import '../data/categories.dart';
+import '../data/account.dart';
+import '../data/account_repository.dart';
 import '../data/household_service.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
@@ -43,7 +45,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   late DateTime _date;
   String? _category;
   String? _paidBy; // だれが払ったか（uid）
-  String? _payment; // 支払方法（現金/クレカ等）
+  String? _payment; // 支払元（登録した口座/クレカの名前）
+  List<Account> _accounts = []; // 登録済みの口座/クレカ
   final _amountCtrl = TextEditingController();
   final _memoCtrl = TextEditingController();
   bool _saving = false;
@@ -78,6 +81,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         _memoCtrl.text = widget.initialDescription!;
       }
       _paidBy = myUid;
+    }
+    // 登録済みの口座/クレカを読み込む（支払元の選択肢）。
+    final hid = HouseholdService.instance.householdId;
+    if (hid != null) {
+      AccountRepository.instance.loadAll(hid).then((a) {
+        if (mounted) setState(() => _accounts = a);
+      });
     }
   }
 
@@ -314,15 +324,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ],
             ),
             const SizedBox(height: 18),
-            // 支払方法（任意）
-            _section('支払方法（任意）'),
+            // 支払元（登録した口座/クレカから選択。残高がそこから増減する）
+            _section('支払元（任意）'),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
                 _payChip(null, 'なし'),
-                ...HouseholdService.instance.paymentMethods
-                    .map((m) => _payChip(m, m)),
+                if (_accounts.isNotEmpty)
+                  ..._accounts.map((a) => _payChip(a.name, a.name))
+                else
+                  ...HouseholdService.instance.paymentMethods
+                      .map((m) => _payChip(m, m)),
               ],
             ),
             const SizedBox(height: 18),

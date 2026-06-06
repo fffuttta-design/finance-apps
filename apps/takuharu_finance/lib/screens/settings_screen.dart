@@ -4,6 +4,7 @@ import '../data/auth_service.dart';
 import '../data/household_service.dart';
 import '../data/update_flow.dart';
 import '../theme/app_theme.dart';
+import 'accounts_screen.dart';
 import 'paste_import_screen.dart';
 import 'replacements_screen.dart';
 
@@ -309,7 +310,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          _sectionTitle('支払方法'),
+          _sectionTitle('口座・クレカ'),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.account_balance_wallet_rounded,
+                  color: AppColors.pinkDark),
+              title: const Text('口座・残高の管理',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              subtitle: const Text('銀行・クレカ・現金を登録。記録の支払元＆残高になります',
+                  style: TextStyle(fontSize: 11)),
+              trailing: const Icon(Icons.chevron_right_rounded,
+                  color: AppColors.textSub),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AccountsScreen()),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          _sectionTitle('支払方法（口座未登録のとき用）'),
           const SizedBox(height: 8),
           Card(
             child: Padding(

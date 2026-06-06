@@ -55,7 +55,17 @@ if ([string]::IsNullOrWhiteSpace($ReleaseNotes)) {
 # === 2. APKビルド ===
 Write-Host "[1/5] APKビルド (release)..." -ForegroundColor Yellow
 Set-Location $appDir
-flutter build apk --release
+# Gemini APIキー(レシート読み取り)を gemini.key から読み dart-define で注入。
+$geminiKeyFile = Join-Path $appDir "gemini.key"
+$dartDefines = @()
+if (Test-Path $geminiKeyFile) {
+  $gk = (Get-Content $geminiKeyFile -Raw).Trim()
+  if (-not [string]::IsNullOrWhiteSpace($gk)) {
+    $dartDefines += "--dart-define=GEMINI_API_KEY=$gk"
+    Write-Host "  レシート用 GEMINI_API_KEY を注入" -ForegroundColor DarkGray
+  }
+}
+flutter build apk --release @dartDefines
 if ($LASTEXITCODE -ne 0) {
   Set-Location $root
   Write-Error "ビルド失敗"
@@ -94,19 +104,10 @@ if ($SkipRelease) {
   exit 0
 }
 
-# === 4. git commit & push ===
-Write-Host "[4/5] git commit and push..." -ForegroundColor Yellow
-git add release/takuharu-version.json
-$gitStatus = git status --porcelain release/takuharu-version.json
-if ($gitStatus) {
-  git commit -m "release(takuharu): v$fullVersion - $ReleaseNotes"
-}
-git push origin main
-if ($LASTEXITCODE -ne 0) { Write-Error "git push 失敗"; exit 1 }
-Write-Host "  OK push完了" -ForegroundColor Green
-
-# === 5. GitHub Release作成 ===
-Write-Host "[5/5] GitHub Release 作成 (tag: $tag)..." -ForegroundColor Yellow
+# === 4. GitHub Release作成（先に資産を用意：version.jsonより前に！）===
+# version.json を push した後に Release を作ると、その間にアプリが新 version.json を
+# 取得して「まだ無いAPK」をDLしようとし 404 になる。順序を Release→push に固定する。
+Write-Host "[4/5] GitHub Release 作成 (tag: $tag)..." -ForegroundColor Yellow
 gh release view $tag --repo $repo 2>$null | Out-Null
 if ($LASTEXITCODE -eq 0) {
   gh release delete $tag --repo $repo --yes --cleanup-tag
@@ -119,6 +120,17 @@ gh release create $tag $apkRenamed `
   --notes $ReleaseNotes
 if ($LASTEXITCODE -ne 0) { Write-Error "gh release create 失敗"; exit 1 }
 Write-Host "  OK Release作成完了 (asset: $assetName)" -ForegroundColor Green
+
+# === 5. git commit & push（資産が出来てから version.json を公開）===
+Write-Host "[5/5] git commit and push..." -ForegroundColor Yellow
+git add release/takuharu-version.json
+$gitStatus = git status --porcelain release/takuharu-version.json
+if ($gitStatus) {
+  git commit -m "release(takuharu): v$fullVersion - $ReleaseNotes"
+}
+git push origin main
+if ($LASTEXITCODE -ne 0) { Write-Error "git push 失敗"; exit 1 }
+Write-Host "  OK push完了" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "===============================================" -ForegroundColor Green

@@ -89,6 +89,15 @@ service cloud.firestore {
         allow read, write: if isAllowed()
             && request.auth.uid in parentMembers();
       }
+
+      // 世帯配下の口座・クレカ（残高管理）
+      match /accounts/{accountId} {
+        function parentMembers() {
+          return get(/databases/$(database)/documents/households/$(hid)).data.members;
+        }
+        allow read, write: if isAllowed()
+            && request.auth.uid in parentMembers();
+      }
     }
   }
 }
