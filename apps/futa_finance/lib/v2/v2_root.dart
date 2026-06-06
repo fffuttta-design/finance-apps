@@ -180,19 +180,13 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
               height: contentH.isFinite ? contentH : null,
               // モード/タブ切替時にサッと横スライド＋フェード（自然な範囲）。
               child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 240),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeIn,
-                transitionBuilder: (child, animation) {
-                  final slide = Tween<Offset>(
-                    begin: const Offset(0.06, 0),
-                    end: Offset.zero,
-                  ).animate(animation);
-                  return FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(position: slide, child: child),
-                  );
-                },
+                // スライドは残像/バウンド感の原因になるため廃止。
+                // 横移動なしの素早いフェードのみにする。
+                duration: const Duration(milliseconds: 160),
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeOut,
+                transitionBuilder: (child, animation) =>
+                    FadeTransition(opacity: animation, child: child),
                 layoutBuilder: (currentChild, previousChildren) => Stack(
                   alignment: Alignment.topCenter,
                   children: [
