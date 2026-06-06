@@ -7,6 +7,8 @@ import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 import '../widgets/settings_button.dart';
+import '../widgets/simple_pie_chart.dart';
+import 'category_trend_screen.dart';
 
 /// 分析：月別の収支推移（6ヶ月）と今月のカテゴリ内訳（自前描画・依存なし）。
 class AnalysisScreen extends StatelessWidget {
@@ -31,9 +33,15 @@ class AnalysisScreen extends StatelessWidget {
                     const SizedBox(height: 8),
                     _trendCard(all),
                     const SizedBox(height: 20),
-                    _sectionTitle('今月のカテゴリ内訳'),
+                    _sectionTitle('今月の支出内訳'),
                     const SizedBox(height: 8),
-                    _categoryCard(all),
+                    _pieCard(all),
+                    const SizedBox(height: 12),
+                    _engelCard(all),
+                    const SizedBox(height: 16),
+                    _sectionTitle('カテゴリ別（タップで1年の推移）'),
+                    const SizedBox(height: 8),
+                    _categoryCard(context, all),
                   ],
                 );
               },
@@ -146,28 +154,32 @@ class AnalysisScreen extends StatelessWidget {
     );
   }
 
-  Widget _categoryCard(List<core.Transaction> all) {
-    final now = DateTime.now();
-    final month = all.where((t) =>
-        t.date.year == now.year &&
-        t.date.month == now.month &&
-        t.type == core.TransactionType.expense);
-    final byCat = <String, int>{};
-    var total = 0;
-    for (final t in month) {
-      byCat[t.category.major] = (byCat[t.category.major] ?? 0) + t.amount;
-      total += t.amount;
-    }
-    final entries = byCat.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
+  /// 今月の支出カテゴリ内訳（円グラフ）。
+  Widget _pieCard(List<core.Transaction> all) {
+    final entries = _thisMonthByCat(all);
+    final total = entries.fold<int>(0, (s, e) => s + e.value);
     if (entries.isEmpty) {
       return Container(
         padding: const EdgeInsets.symmetric(vertical: 28),
         alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.pinkSoft, width: 1.2),
+        ),
         child: const Text('今月の支出はまだないよ',
             style: TextStyle(color: AppColors.textSub, fontSize: 12)),
       );
     }
+    // 上位6カテゴリ＋残りを「その他」にまとめてスライス化。
+    final top = entries.take(6).toList();
+    final restSum =
+        entries.skip(6).fold<int>(0, (s, e) => s + e.value);
+    final slices = <PieSlice>[
+      for (final e in top)
+        PieSlice(e.key, e.value, categoryFor(e.key, income: false).color),
+      if (restSum > 0) PieSlice('その他', restSum, AppColors.textSub),
+    ];
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -177,54 +189,176 @@ class AnalysisScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          for (final e in entries) _catRow(e.key, e.value, total),
+          SimplePieChart(
+            slices: slices,
+            size: 170,
+            centerTop: '支出合計',
+            centerBottom: formatYen(total),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 14,
+            runSpacing: 6,
+            alignment: WrapAlignment.center,
+            children: [
+              for (final s in slices)
+                _legend(s.color,
+                    '${s.label} ${((s.value / total) * 100).round()}%'),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _catRow(String name, int amount, int total) {
+  /// エンゲル係数カード（食料費 ÷ 支出合計）。
+  /// 食料費＝「食費」＋「外食」。
+  Widget _engelCard(List<core.Transaction> all) {
+    final now = DateTime.now();
+    var food = 0, total = 0;
+    for (final t in all) {
+      if (t.type != core.TransactionType.expense) continue;
+      if (t.date.year != now.year || t.date.month != now.month) continue;
+      total += t.amount;
+      if (t.category.major == '食費' || t.category.major == '外食') {
+        food += t.amount;
+      }
+    }
+    final pct = total == 0 ? 0.0 : (food / total * 100);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFE2EA), Color(0xFFFFF1F4)],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.pinkSoft, width: 1.2),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.restaurant_rounded,
+              size: 26, color: AppColors.pinkDark),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('エンゲル係数（今月）',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.text)),
+                Text('食費＋外食 ${formatYen(food)} / 支出 ${formatYen(total)}',
+                    style: const TextStyle(
+                        fontSize: 11, color: AppColors.textSub)),
+              ],
+            ),
+          ),
+          Text('${pct.toStringAsFixed(1)}%',
+              style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.pinkDark)),
+        ],
+      ),
+    );
+  }
+
+  /// 今月のカテゴリ別支出を金額の多い順で返す。
+  List<MapEntry<String, int>> _thisMonthByCat(List<core.Transaction> all) {
+    final now = DateTime.now();
+    final byCat = <String, int>{};
+    for (final t in all) {
+      if (t.type != core.TransactionType.expense) continue;
+      if (t.date.year != now.year || t.date.month != now.month) continue;
+      byCat[t.category.major] = (byCat[t.category.major] ?? 0) + t.amount;
+    }
+    return byCat.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+  }
+
+  Widget _categoryCard(BuildContext context, List<core.Transaction> all) {
+    final entries = _thisMonthByCat(all);
+    final total = entries.fold<int>(0, (s, e) => s + e.value);
+    if (entries.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 28),
+        alignment: Alignment.center,
+        child: const Text('今月の支出はまだないよ',
+            style: TextStyle(color: AppColors.textSub, fontSize: 12)),
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.pinkSoft, width: 1.2),
+      ),
+      child: Column(
+        children: [
+          for (final e in entries) _catRow(context, e.key, e.value, total),
+        ],
+      ),
+    );
+  }
+
+  Widget _catRow(
+      BuildContext context, String name, int amount, int total) {
     final c = categoryFor(name, income: false);
     final ratio = total == 0 ? 0.0 : amount / total;
     final pct = (ratio * 100).round();
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: c.color.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(9),
+    return InkWell(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => CategoryTrendScreen(category: name)),
+      ),
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: c.color.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(c.icon, size: 16, color: c.color),
                 ),
-                child: Icon(c.icon, size: 16, color: c.color),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: Text(name,
-                      style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600))),
-              Text('$pct%　${formatYen(amount)}',
-                  style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.text)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: ratio,
-              minHeight: 7,
-              backgroundColor: AppColors.pinkSoft,
-              valueColor: AlwaysStoppedAnimation(c.color),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: Text(name,
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600))),
+                Text('$pct%　${formatYen(amount)}',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.text)),
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right_rounded,
+                    size: 18, color: AppColors.textSub),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: ratio,
+                minHeight: 7,
+                backgroundColor: AppColors.pinkSoft,
+                valueColor: AlwaysStoppedAnimation(c.color),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

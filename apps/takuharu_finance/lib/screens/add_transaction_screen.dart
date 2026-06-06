@@ -53,6 +53,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
   bool get _isIncome => _type == core.TransactionType.income;
 
+  /// 新規記録の既定の支払元。
+  static const _defaultPayment = 'ワンバンク';
+
   /// 個人食費わくの対象にできるカテゴリ（今は「食費」だけ）。
   static const _personalFoodCategory = '食費';
   bool get _canPersonalFood => !_isIncome && _category == _personalFoodCategory;
@@ -86,6 +89,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         _memoCtrl.text = widget.initialDescription!;
       }
       _paidBy = myUid;
+      // 新規記録の支払元は「ワンバンク」を既定にする。
+      _payment = _defaultPayment;
     }
     // 登録済みの口座/クレカを読み込む（支払元の選択肢）。
     final hid = HouseholdService.instance.householdId;
@@ -309,6 +314,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ),
             ),
             const SizedBox(height: 18),
+            // なにを買った？（購入物の品名＝一番大事なので日付の次に置く）
+            _section('なにを買った？'),
+            TextField(
+              controller: _memoCtrl,
+              decoration:
+                  const InputDecoration(hintText: '例: たまご・牛乳 / ランチ'),
+            ),
+            const SizedBox(height: 18),
             // カテゴリ
             _section('カテゴリ'),
             Wrap(
@@ -321,12 +334,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             ),
             const SizedBox(height: 18),
             // 支払元（登録した口座/クレカから選択。残高がそこから増減する）
-            _section('支払元（任意）'),
+            _section('支払元'),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                _payChip(null, 'なし'),
                 if (_accounts.isNotEmpty)
                   ..._accounts.map((a) => _payChip(a.name, a.name))
                 else
@@ -347,15 +359,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             ),
             // 個人の食費わく（カテゴリが「食費」のときだけ表示）
             if (_canPersonalFood) ...[
-              _personalFoodToggle(),
               const SizedBox(height: 18),
+              _personalFoodToggle(),
             ],
-            // メモ
-            _section('メモ（任意）'),
-            TextField(
-              controller: _memoCtrl,
-              decoration: const InputDecoration(hintText: '例: スーパーで買い物'),
-            ),
             const SizedBox(height: 28),
             FilledButton(
               onPressed: _saving ? null : _save,
