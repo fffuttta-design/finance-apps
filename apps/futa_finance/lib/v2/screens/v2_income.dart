@@ -4,11 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../../data/app_mode.dart';
-import '../../data/settings_repository.dart';
 import '../../data/transaction_repository.dart';
 import '../../screens/income_input_screen.dart';
 import '../../utils/formatters.dart';
-import '../../widgets/brand_logo.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
@@ -30,12 +28,9 @@ class V2IncomeScreen extends StatefulWidget {
 class _V2IncomeScreenState extends State<V2IncomeScreen>
     with ModeAwareMixin {
   final _txRepo = TransactionRepository.instance;
-  final _settings = SettingsRepository();
 
   StreamSubscription<List<core.Transaction>>? _sub;
   List<core.Transaction> _transactions = [];
-  core.PaymentMethodsConfig _payments =
-      core.PaymentMethodsConfig.empty();
   bool _loading = true;
 
   late DateTime _focused =
@@ -62,11 +57,9 @@ class _V2IncomeScreenState extends State<V2IncomeScreen>
 
   Future<void> _load() async {
     final txns = await _txRepo.loadAll();
-    final payments = await _settings.loadPayments();
     if (!mounted) return;
     setState(() {
       _transactions = txns;
-      _payments = payments;
       _loading = false;
     });
   }
@@ -125,7 +118,8 @@ class _V2IncomeScreenState extends State<V2IncomeScreen>
     final total = confirmedTotal + pendingTotal;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(vertical: V2Spacing.xl),
+      padding: const EdgeInsets.symmetric(
+          vertical: V2Spacing.xl, horizontal: V2Spacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -241,7 +235,6 @@ class _V2IncomeScreenState extends State<V2IncomeScreen>
                 else
                   _IncomeTable(
                     rows: all,
-                    payments: _payments,
                     onTapRow: _showTxnSummary,
                   ),
               ],
@@ -259,29 +252,19 @@ class _V2IncomeScreenState extends State<V2IncomeScreen>
 
 class _IncomeTable extends StatelessWidget {
   final List<core.Transaction> rows;
-  final core.PaymentMethodsConfig payments;
   final void Function(core.Transaction t) onTapRow;
   const _IncomeTable({
     required this.rows,
-    required this.payments,
     required this.onTapRow,
   });
-
-  String? _iconUrlFor(String name) {
-    for (final b in payments.bankAccounts) {
-      if (b.name == name) return b.iconUrl;
-    }
-    return null;
-  }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // スマホで潰れないよう列ヘッダーは廃止し2段表示
+        // データ行（各行を枠付きカードで表示）
         for (final t in rows) _IncomeRow(
           t: t,
-          iconUrl: _iconUrlFor(t.paymentMethod),
           onTap: () => onTapRow(t),
         ),
       ],
@@ -291,11 +274,9 @@ class _IncomeTable extends StatelessWidget {
 
 class _IncomeRow extends StatefulWidget {
   final core.Transaction t;
-  final String? iconUrl;
   final VoidCallback onTap;
   const _IncomeRow({
     required this.t,
-    required this.iconUrl,
     required this.onTap,
   });
 
@@ -325,16 +306,19 @@ class _IncomeRowState extends State<_IncomeRow> {
         behavior: HitTestBehavior.opaque,
         onTap: widget.onTap,
         child: Container(
+          // たくはる風: 1 行 = 角丸枠付きの長方形カード（左右に余白）
+          margin: const EdgeInsets.fromLTRB(
+              V2Spacing.md, 0, V2Spacing.md, 8),
           padding: const EdgeInsets.symmetric(
-              horizontal: V2Spacing.lg, vertical: 8),
+              horizontal: V2Spacing.md, vertical: 10),
           decoration: BoxDecoration(
             color: _hover
                 ? V2Colors.hover
                 : (isPending
                     ? V2Colors.warningSoft.withValues(alpha: 0.3)
                     : V2Colors.surface),
-            border: const Border(
-                top: BorderSide(color: V2Colors.divider, width: 1)),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: V2Colors.border),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -346,71 +330,48 @@ class _IncomeRowState extends State<_IncomeRow> {
                     style: V2Typography.numericCell),
               ),
               const SizedBox(width: V2Spacing.sm),
+              // 中央: 状態バッジ＋カテゴリ＋内容（受取方法は非表示）
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        // 状態（見込み/確定）バッジ
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: isPending
-                                ? V2Colors.warningSoft
-                                : V2Colors.positiveSoft,
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                          child: Text(isPending ? '見込み' : '確定',
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  color: isPending
-                                      ? V2Colors.warning
-                                      : V2Colors.positive,
-                                  fontWeight: FontWeight.w700)),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: V2Colors.surfaceMuted,
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                          child: Text(_categoryLabel(),
-                              style: V2Typography.micro),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            widget.t.description.isEmpty
-                                ? '—'
-                                : widget.t.description,
-                            style: V2Typography.body,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
+                    // 状態（見込み/確定）バッジ
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: isPending
+                            ? V2Colors.warningSoft
+                            : V2Colors.positiveSoft,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: Text(isPending ? '見込み' : '確定',
+                          style: TextStyle(
+                              fontSize: 10,
+                              color: isPending
+                                  ? V2Colors.warning
+                                  : V2Colors.positive,
+                              fontWeight: FontWeight.w700)),
                     ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        BrandLogo(
-                          iconUrl: widget.iconUrl,
-                          fallbackIcon: Icons.account_balance,
-                          size: 13,
-                          borderRadius: 3,
-                        ),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(widget.t.paymentMethod,
-                              style: V2Typography.micro.copyWith(
-                                  color: V2Colors.textMuted),
-                              overflow: TextOverflow.ellipsis),
-                        ),
-                      ],
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: V2Colors.surfaceMuted,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: Text(_categoryLabel(),
+                          style: V2Typography.micro),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        widget.t.description.isEmpty
+                            ? '—'
+                            : widget.t.description,
+                        style: V2Typography.body,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),

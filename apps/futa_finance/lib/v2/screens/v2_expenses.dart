@@ -471,7 +471,8 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     final total = expenses.fold<int>(0, (s, t) => s + t.amount);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(vertical: V2Spacing.xl),
+      padding: const EdgeInsets.symmetric(
+          vertical: V2Spacing.xl, horizontal: V2Spacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -598,7 +599,6 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
                 else
                   _ExpensesTable(
                     rows: expenses,
-                    payments: _payments,
                     onTapRow: _showTxnSummary,
                   ),
               ],
@@ -1094,32 +1094,19 @@ class _ChargeRow extends StatelessWidget {
 
 class _ExpensesTable extends StatelessWidget {
   final List<core.Transaction> rows;
-  final core.PaymentMethodsConfig payments;
   final void Function(core.Transaction t) onTapRow;
   const _ExpensesTable({
     required this.rows,
-    required this.payments,
     required this.onTapRow,
   });
-
-  String? _iconUrlFor(String name) {
-    for (final b in payments.bankAccounts) {
-      if (b.name == name) return b.iconUrl;
-    }
-    for (final c in payments.creditCards) {
-      if (c.name == name) return c.iconUrl;
-    }
-    return null;
-  }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // データ行（スマホで潰れないよう、列ヘッダーは廃止し2段表示）
+        // データ行（各行を枠付きカードで表示）
         for (final t in rows) _ExpenseRow(
           t: t,
-          iconUrl: _iconUrlFor(t.paymentMethod),
           onTap: () => onTapRow(t),
         ),
       ],
@@ -1129,11 +1116,9 @@ class _ExpensesTable extends StatelessWidget {
 
 class _ExpenseRow extends StatefulWidget {
   final core.Transaction t;
-  final String? iconUrl;
   final VoidCallback onTap;
   const _ExpenseRow({
     required this.t,
-    required this.iconUrl,
     required this.onTap,
   });
 
@@ -1162,18 +1147,20 @@ class _ExpenseRowState extends State<_ExpenseRow> {
         behavior: HitTestBehavior.opaque,
         onTap: widget.onTap,
         child: Container(
-          color: _hover ? V2Colors.hover : V2Colors.surface,
+          // たくはる風: 1 行 = 角丸枠付きの長方形カード（左右に余白）
+          margin: const EdgeInsets.fromLTRB(
+              V2Spacing.md, 0, V2Spacing.md, 8),
           padding: const EdgeInsets.symmetric(
-              horizontal: V2Spacing.lg, vertical: 8),
+              horizontal: V2Spacing.md, vertical: 10),
           decoration: BoxDecoration(
             color: _hover ? V2Colors.hover : V2Colors.surface,
-            border: const Border(
-                top: BorderSide(color: V2Colors.divider, width: 1)),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: V2Colors.border),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 日付（M/D・2段）
+              // 日付（M/D）
               SizedBox(
                 width: 38,
                 child: Text(
@@ -1181,53 +1168,29 @@ class _ExpenseRowState extends State<_ExpenseRow> {
                     style: V2Typography.numericCell),
               ),
               const SizedBox(width: V2Spacing.sm),
-              // 中央: 1段目=カテゴリ＋内容、2段目=支払方法
+              // 中央: カテゴリバッジ＋内容（支払方法は非表示）
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: V2Colors.surfaceMuted,
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                          child: Text(_categoryLabel(),
-                              style: V2Typography.micro),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            widget.t.description.isEmpty
-                                ? '—'
-                                : widget.t.description,
-                            style: V2Typography.body,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: V2Colors.surfaceMuted,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: Text(_categoryLabel(),
+                          style: V2Typography.micro),
                     ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        BrandLogo(
-                          iconUrl: widget.iconUrl,
-                          fallbackIcon: Icons.account_balance,
-                          size: 13,
-                          borderRadius: 3,
-                        ),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(widget.t.paymentMethod,
-                              style: V2Typography.micro.copyWith(
-                                  color: V2Colors.textMuted),
-                              overflow: TextOverflow.ellipsis),
-                        ),
-                      ],
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        widget.t.description.isEmpty
+                            ? '—'
+                            : widget.t.description,
+                        style: V2Typography.body,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),

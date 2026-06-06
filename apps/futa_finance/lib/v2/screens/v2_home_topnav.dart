@@ -378,7 +378,8 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
     // ホームの 3 カラム / 縦並びがコンテンツ高を超えた場合に
     // スクロールできるよう、最上位に SingleChildScrollView を置く。
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(vertical: V2Spacing.xl),
+      padding: const EdgeInsets.symmetric(
+          vertical: V2Spacing.xl, horizontal: V2Spacing.md),
       child: LayoutBuilder(builder: (ctx, c) {
         final wide = c.maxWidth >= 1000;
         if (wide) {
@@ -1123,10 +1124,14 @@ class _TransactionRow extends StatelessWidget {
         : (isIncome ? V2Colors.positive : V2Colors.negative);
     final sign = isTransfer ? '' : (isIncome ? '+' : '-');
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: const BoxDecoration(
-        border: Border(
-            bottom: BorderSide(color: V2Colors.divider, width: 1)),
+      // たくはる風: 1 行 = 角丸枠付きの長方形カード
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(
+          horizontal: V2Spacing.md, vertical: 10),
+      decoration: BoxDecoration(
+        color: V2Colors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: V2Colors.border),
       ),
       child: Row(
         children: [

@@ -33,6 +33,12 @@ class V2Root extends StatefulWidget {
 
 class _V2RootState extends State<V2Root> with StartupUpdateMixin {
   String _currentId = 'home';
+  // スワイプ開始の「本文エリア内」ローカルY と 本文の高さ。
+  // 上1/3=モード切替 / 下2/3=タブ送り の判定に使う（画面ではなく本文基準）。
+  double? _dragStartLocalY;
+  double _dragContentH = 0;
+  // スワイプ中の横移動量の累積（速度が出ないゆっくりスワイプも拾うため）
+  double _dragDx = 0;
 
   @override
   void initState() {
@@ -155,31 +161,90 @@ class _V2RootState extends State<V2Root> with StartupUpdateMixin {
         // Shell の maxContentWidth と揃える（マネフォ ME 寄りに 1040px）
         maxWidth: 1040,
       ),
-      // 本文を左右スワイプで 事業⇄個人 を切り替え。
-      // スイッチャーの並び[事業｜個人]に合わせ、左スワイプ=個人 / 右スワイプ=事業。
-      content: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onHorizontalDragEnd: _onModeSwipe,
-        child: _bodyFor(_currentId, accent: accent),
+      // 本文を左右スワイプで切替（上1/3=事業⇄個人 / 下2/3=タブ送り）。
+      // 中身が短い画面でも検知できるよう、本文を常に画面いっぱいに広げる。
+      content: LayoutBuilder(
+        builder: (context, constraints) {
+          final contentH = constraints.maxHeight;
+          return GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onHorizontalDragStart: (d) {
+              _dragStartLocalY = d.localPosition.dy;
+              _dragContentH = contentH;
+              _dragDx = 0;
+            },
+            onHorizontalDragUpdate: (d) => _dragDx += d.delta.dx,
+            onHorizontalDragEnd: _onBodySwipe,
+            child: SizedBox(
+              // 中身が短くても本文エリア全体でスワイプを拾えるよう高さを満たす。
+              height: contentH.isFinite ? contentH : null,
+              // モード/タブ切替時にサッと横スライド＋フェード（自然な範囲）。
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 240),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeIn,
+                transitionBuilder: (child, animation) {
+                  final slide = Tween<Offset>(
+                    begin: const Offset(0.06, 0),
+                    end: Offset.zero,
+                  ).animate(animation);
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(position: slide, child: child),
+                  );
+                },
+                layoutBuilder: (currentChild, previousChildren) => Stack(
+                  alignment: Alignment.topCenter,
+                  children: [
+                    ...previousChildren,
+                    ?currentChild,
+                  ],
+                ),
+                child: KeyedSubtree(
+                  key: ValueKey(
+                      '${AppModeManager.instance.current}_$_currentId'),
+                  child: _bodyFor(_currentId, accent: accent),
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
-  void _onModeSwipe(DragEndDetails d) {
+  /// 本文の左右スワイプ。
+  /// 本文エリアを縦3分割し、上1/3＝事業⇄個人のモード切替、下2/3＝タブ送り。
+  void _onBodySwipe(DragEndDetails d) {
     final v = d.primaryVelocity ?? 0;
-    if (v.abs() < 320) return; // 軽い動き・縦寄りのドラッグは無視
-    final target = v < 0 ? AppMode.personal : AppMode.business; // 左=個人/右=事業
-    if (AppModeManager.instance.current == target) return;
-    AppModeManager.instance.setMode(target);
-    if (mounted) {
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(SnackBar(
-          duration: const Duration(milliseconds: 900),
-          content:
-              Text('${target == AppMode.business ? '事業' : '個人'}モードに切り替えました'),
-        ));
+    final dx = _dragDx;
+    // 距離(48px) か 速度(180) のどちらかを満たせば成立。
+    // ゆっくり/短いスワイプでも反応するよう緩めにする。
+    if (dx.abs() < 48 && v.abs() < 180) return;
+    // 方向は移動量を優先（速度ゼロでも距離で判定）。左方向=次。
+    final leftward = dx.abs() > 4 ? dx < 0 : v < 0;
+    // 「本文エリア内」のローカルY基準で上1/3判定（ヘッダー/タブの影響を受けない）。
+    final h = _dragContentH > 0 ? _dragContentH : 600.0;
+    final startedTop = (_dragStartLocalY ?? h) < h / 3;
+    if (startedTop) {
+      // 上1/3: モード切替。2モードなので方向に関係なくトグル（必ず反応）。
+      final cur = AppModeManager.instance.current;
+      AppModeManager.instance.setMode(
+          cur == AppMode.business ? AppMode.personal : AppMode.business);
+    } else {
+      // 下2/3: タブ送り（左スワイプ=次タブ / 右スワイプ=前タブ）
+      _shiftTab(leftward ? 1 : -1);
     }
+  }
+
+  /// タブを delta 個ぶん送る（範囲外は何もしない）。
+  void _shiftTab(int delta) {
+    final items = _navItems;
+    final idx = items.indexWhere((e) => e.id == _currentId);
+    if (idx < 0) return;
+    final next = idx + delta;
+    if (next < 0 || next >= items.length) return;
+    setState(() => _currentId = items[next].id);
   }
 
   /// 記録メニュー: レシート読取 / 支出 / 収入 / 振替を選んで対応する入力を開く。
