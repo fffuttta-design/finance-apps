@@ -1,10 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
-import 'package:image_picker/image_picker.dart';
 
 import '../data/receipt_ocr.dart';
-import '../theme/app_theme.dart';
 import 'add_transaction_screen.dart';
+import 'receipt_camera_screen.dart';
 import 'receipt_split_screen.dart';
 
 /// レシートで記録：画像選択 → Gemini読み取り → 入力画面をプリフィルして開く。
@@ -17,54 +18,13 @@ Future<bool> runReceiptFlow(BuildContext context) async {
     return false;
   }
 
-  // 撮影 / アルバム を選ぶ
-  final source = await showModalBottomSheet<ImageSource>(
-    context: context,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    builder: (sheet) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 14),
-          const Text('レシートで記録',
-              style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.text)),
-          const SizedBox(height: 8),
-          ListTile(
-            leading: const Icon(Icons.photo_camera_rounded,
-                color: AppColors.pinkDark),
-            title: const Text('カメラで撮る'),
-            onTap: () => Navigator.pop(sheet, ImageSource.camera),
-          ),
-          ListTile(
-            leading: const Icon(Icons.photo_library_rounded,
-                color: AppColors.pinkDark),
-            title: const Text('アルバムから選ぶ'),
-            onTap: () => Navigator.pop(sheet, ImageSource.gallery),
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    ),
+  // 自前カメラ画面（デフォ=カメラ起動 / 右下=ギャラリー）で撮影 or 選択。
+  final bytes = await Navigator.push<Uint8List>(
+    context,
+    MaterialPageRoute(builder: (_) => const ReceiptCameraScreen()),
   );
-  if (source == null || !context.mounted) return false;
-
-  final picker = ImagePicker();
-  final picked = await picker.pickImage(
-    source: source,
-    maxWidth: 1280,
-    imageQuality: 60,
-  );
-  if (picked == null || !context.mounted) return false;
-  final bytes = await picked.readAsBytes();
-  final mime = picked.name.toLowerCase().endsWith('.png')
-      ? 'image/png'
-      : 'image/jpeg';
-  if (!context.mounted) return false;
+  if (bytes == null || !context.mounted) return false;
+  const mime = 'image/jpeg';
 
   // 読み取り中インジケータ
   showDialog<void>(
