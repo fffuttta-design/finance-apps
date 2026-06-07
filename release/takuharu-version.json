@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.46",
-    "buildNumber":  "51",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.46/takuharu-finance-v0.2.46.apk",
-    "releaseNotes":  "メンバー編集メニューから「世帯から外す」を削除。"
+    "version":  "0.2.47",
+    "buildNumber":  "52",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.47/takuharu-finance-v0.2.47.apk",
+    "releaseNotes":  "記録一覧を購入日の新しい順に。明細コメント欄はEnterで改行(送信はボタン)。"
 }
