@@ -19,6 +19,7 @@ import '../../data/transaction_repository.dart';
 import '../../screens/account_detail_screen.dart';
 import '../../screens/card_detail_screen.dart';
 import '../../screens/expense_list_screen.dart';
+import '../../screens/transaction_detail_screen.dart';
 import '../../utils/formatters.dart';
 import '../../utils/thousands_separator_input_formatter.dart';
 import '../../widgets/brand_logo.dart';
@@ -1052,7 +1053,19 @@ class _CenterColumn extends StatelessWidget {
                           color: V2Colors.textSecondary)),
                 )
               else
-                for (final t in recentTop) _TransactionRow(t: t),
+                for (final t in recentTop)
+                  _TransactionRow(
+                    t: t,
+                    onTap: () async {
+                      final changed = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) =>
+                                TransactionDetailScreen(transaction: t)),
+                      );
+                      if (changed == true) await state._load();
+                    },
+                  ),
             ],
           ),
         ),
@@ -1063,7 +1076,8 @@ class _CenterColumn extends StatelessWidget {
 
 class _TransactionRow extends StatelessWidget {
   final Transaction t;
-  const _TransactionRow({required this.t});
+  final VoidCallback? onTap;
+  const _TransactionRow({required this.t, this.onTap});
 
   String _typeLabel() {
     switch (t.type) {
@@ -1092,7 +1106,7 @@ class _TransactionRow extends StatelessWidget {
         ? V2Colors.textBody
         : (isIncome ? V2Colors.positive : V2Colors.negative);
     final sign = isTransfer ? '' : (isIncome ? '+' : '-');
-    return Container(
+    final card = Container(
       // たくはる風: 1 行 = 角丸枠付きの長方形カード
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(
@@ -1136,6 +1150,13 @@ class _TransactionRow extends StatelessWidget {
                   fontFeatures: V2Typography.tabularNums)),
         ],
       ),
+    );
+    if (onTap == null) return card;
+    // 最近の入出金は編集しやすいよう、行タップで詳細画面を直接開く。
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: card,
     );
   }
 }
