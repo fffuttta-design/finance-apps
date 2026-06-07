@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.211",
-    "buildNumber":  "212",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.211/futa-finance-v1.0.211.apk",
-    "releaseNotes":  "ホームの最近の入出金の各行をタップすると、その明細の詳細画面を直接開けるように(編集しやすく)。"
+    "version":  "1.0.212",
+    "buildNumber":  "213",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.212/futa-finance-v1.0.212.apk",
+    "releaseNotes":  "支出タブの「ウォレット一覧」ボタンを削除。ホームの最近の入出金の表示を8件に増やしました。"
 }
