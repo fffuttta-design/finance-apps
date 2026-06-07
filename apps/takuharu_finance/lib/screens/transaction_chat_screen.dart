@@ -363,9 +363,10 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
               child: TextField(
                 controller: _ctrl,
                 minLines: 1,
-                maxLines: 4,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _send(),
+                maxLines: 5,
+                // Enterは改行。送信は右の送信ボタンで行う。
+                keyboardType: TextInputType.multiline,
+                textInputAction: TextInputAction.newline,
                 decoration: InputDecoration(
                   hintText: 'コメントを入力',
                   isDense: true,
