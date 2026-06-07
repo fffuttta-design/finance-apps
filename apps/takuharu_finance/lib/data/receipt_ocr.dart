@@ -84,7 +84,9 @@ class ReceiptOcr {
       ],
       'generationConfig': {
         'responseMimeType': 'application/json',
-        'thinkingConfig': {'thinkingBudget': 0},
+        // 多品目(30品+)の伝票を取りこぼさないよう、出力上限を大きめに。
+        // thinkingは無効化せず少し考えさせて完全性を上げる(長い納品書対策)。
+        'maxOutputTokens': 16384,
       },
     });
 

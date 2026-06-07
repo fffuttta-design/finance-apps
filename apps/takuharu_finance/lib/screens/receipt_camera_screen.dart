@@ -41,8 +41,9 @@ class _ReceiptCameraScreenState extends State<ReceiptCameraScreen> {
         (c) => c.lensDirection == CameraLensDirection.back,
         orElse: () => cams.first,
       );
+      // 長い納品書(多品目)の小さな文字も潰れないよう高解像度で撮影する。
       final ctrl =
-          CameraController(back, ResolutionPreset.high, enableAudio: false);
+          CameraController(back, ResolutionPreset.veryHigh, enableAudio: false);
       _controller = ctrl;
       await ctrl.initialize();
       if (mounted) setState(() {});
@@ -96,8 +97,9 @@ class _ReceiptCameraScreenState extends State<ReceiptCameraScreen> {
 
   Future<void> _gallery() async {
     if (_busy) return;
+    // 長い伝票でも文字が読めるよう、縮小を控えめ(幅2200・画質85)にする。
     final x = await ImagePicker().pickImage(
-        source: ImageSource.gallery, imageQuality: 60, maxWidth: 1280);
+        source: ImageSource.gallery, imageQuality: 85, maxWidth: 2200);
     if (x == null) return;
     final bytes = await x.readAsBytes();
     if (mounted) Navigator.pop<Uint8List>(context, bytes);
