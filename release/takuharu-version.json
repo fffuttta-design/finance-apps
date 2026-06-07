@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.44",
-    "buildNumber":  "49",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.44/takuharu-finance-v0.2.44.apk",
-    "releaseNotes":  "レシート読み取りをイオンネットスーパー等の納品書に強化(多品目・外税表記・数量込み金額に対応)。"
+    "version":  "0.2.45",
+    "buildNumber":  "50",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.45/takuharu-finance-v0.2.45.apk",
+    "releaseNotes":  "長い納品書の読み漏れ対策。撮影・取込の解像度アップ＋AI読み取りの完全性向上で、多品目の伝票を取りこぼしにくく。"
 }
