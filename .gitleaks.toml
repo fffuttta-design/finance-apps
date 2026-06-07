@@ -1,0 +1,11 @@
+title = "repo gitleaks config"
+[extend]
+useDefault = true
+[allowlist]
+description = "公開前提キー除外"
+paths = [
+  '''firebase_options\.dart''',
+  '''google-services\.json''',
+  '''GoogleService-Info\.plist''',
+  '''main\.dart\.js''',
+]
