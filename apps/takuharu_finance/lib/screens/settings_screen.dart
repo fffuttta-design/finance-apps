@@ -71,7 +71,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   ];
 
   Future<void> _editMember(String uid, String name) async {
-    final myUid = AuthService.instance.currentUser?.uid;
     await showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -106,17 +105,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () {
                 Navigator.pop(sheetCtx);
                 _pickIcon(uid);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.person_remove_rounded,
-                  color: AppColors.pinkDark),
-              title: Text(uid == myUid
-                  ? '自分を世帯から外す'
-                  : '「$name」を世帯から外す'),
-              onTap: () {
-                Navigator.pop(sheetCtx);
-                _confirmRemove(uid, name, isSelf: uid == myUid);
               },
             ),
             const SizedBox(height: 8),
@@ -230,38 +218,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (result == null || result < 0) return;
     await HouseholdService.instance.setPersonalFoodBudget(uid, result);
     if (mounted) setState(() {});
-  }
-
-  Future<void> _confirmRemove(String uid, String name,
-      {required bool isSelf}) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('世帯から外す'),
-        content: Text(isSelf
-            ? '自分を世帯から外しますか？\n（このアプリからはサインアウトされ、再ログインすると再び参加します）'
-            : '「$name」を世帯から外しますか？'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(dctx, false),
-              child: const Text('やめる')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.pinkDark),
-            onPressed: () => Navigator.pop(dctx, true),
-            child: const Text('外す'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    await HouseholdService.instance.removeMember(uid);
-    if (!mounted) return;
-    if (isSelf) {
-      await _signOut();
-    } else {
-      setState(() {});
-    }
   }
 
   @override
