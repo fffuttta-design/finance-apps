@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.45",
-    "buildNumber":  "50",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.45/takuharu-finance-v0.2.45.apk",
-    "releaseNotes":  "長い納品書の読み漏れ対策。撮影・取込の解像度アップ＋AI読み取りの完全性向上で、多品目の伝票を取りこぼしにくく。"
+    "version":  "0.2.46",
+    "buildNumber":  "51",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.46/takuharu-finance-v0.2.46.apk",
+    "releaseNotes":  "メンバー編集メニューから「世帯から外す」を削除。"
 }
