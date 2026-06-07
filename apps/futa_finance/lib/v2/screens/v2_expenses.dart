@@ -9,8 +9,6 @@ import '../../data/app_mode.dart';
 import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
-import '../../screens/account_detail_screen.dart';
-import '../../screens/card_detail_screen.dart';
 import '../../screens/expense_input_screen.dart';
 import '../../screens/expense_list_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
@@ -250,156 +248,6 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     if (mounted) await _load();
   }
 
-  /// ウォレット一覧シート（銀行/現金/電子マネー/クレカ）。
-  /// 各ウォレットの「当月の収支（フロー・振替込み）」を表示し、タップで詳細へ。
-  Future<void> _openWalletList() async {
-    final banks = _payments.bankAccounts;
-    final cards = _payments.creditCards;
-    if (banks.isEmpty && cards.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ウォレットが未登録です（設定 → ウォレット）')),
-      );
-      return;
-    }
-    bool inMonth(core.Transaction t) =>
-        t.date.year == _focused.year && t.date.month == _focused.month;
-    // 銀行/現金/電子マネーの当月フロー（収入+ / 支出- / 振替±）
-    int bankFlow(String name) {
-      int net = 0;
-      for (final t in _transactions) {
-        if (!inMonth(t)) continue;
-        if (t.type == core.TransactionType.transfer) {
-          if (t.transferFromAccount == name) net -= t.amount;
-          if (t.transferToAccount == name) net += t.amount;
-          continue;
-        }
-        if (t.paymentMethod != name) continue;
-        if (t.type == core.TransactionType.income) {
-          net += t.amount;
-        } else {
-          net -= t.amount;
-        }
-      }
-      return net;
-    }
-
-    int cardUsage(String name) {
-      int sum = 0;
-      for (final t in _transactions) {
-        if (!inMonth(t)) continue;
-        if (t.type != core.TransactionType.expense) continue;
-        if (t.paymentMethod == name) sum += t.amount;
-      }
-      return sum;
-    }
-
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.white,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (sheet) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.account_balance_wallet_outlined,
-                      size: 18, color: Color(0xFF1A237E)),
-                  const SizedBox(width: 8),
-                  const Text('ウォレット',
-                      style: TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w700)),
-                  const Spacer(),
-                  Text('${_focused.month}月の収支',
-                      style: V2Typography.micro
-                          .copyWith(color: V2Colors.textMuted)),
-                ],
-              ),
-            ),
-            Flexible(
-              child: ListView(
-                shrinkWrap: true,
-                children: [
-                  for (final b in banks)
-                    _walletTile(
-                      iconUrl: b.iconUrl,
-                      name: b.name,
-                      sub: b.accountType.shortLabel,
-                      flow: bankFlow(b.name),
-                      onTap: () {
-                        Navigator.pop(sheet);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) =>
-                                  AccountDetailScreen(account: b)),
-                        ).then((_) {
-                          if (mounted) _load();
-                        });
-                      },
-                    ),
-                  for (final c in cards)
-                    _walletTile(
-                      iconUrl: c.iconUrl,
-                      name: c.name,
-                      sub: 'クレカ',
-                      flow: -cardUsage(c.name),
-                      fallbackIcon: Icons.credit_card,
-                      onTap: () {
-                        Navigator.pop(sheet);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => CardDetailScreen(card: c)),
-                        ).then((_) {
-                          if (mounted) _load();
-                        });
-                      },
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _walletTile({
-    String? iconUrl,
-    required String name,
-    required String sub,
-    required int flow,
-    IconData fallbackIcon = Icons.account_balance,
-    required VoidCallback onTap,
-  }) {
-    final color = flow > 0
-        ? V2Colors.positive
-        : (flow < 0 ? V2Colors.negative : V2Colors.textMuted);
-    return ListTile(
-      leading: BrandLogo(
-          iconUrl: iconUrl,
-          fallbackIcon: fallbackIcon,
-          size: 28,
-          borderRadius: 4),
-      title: Text(name),
-      subtitle: Text(sub,
-          style: V2Typography.micro.copyWith(color: V2Colors.textMuted)),
-      trailing: Text(formatYen(flow, withSign: true),
-          style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w700,
-              fontFeatures: V2Typography.tabularNums)),
-      onTap: onTap,
-    );
-  }
-
   /// 変動費の「その月の実額」をその場で入力（未入力は0／月ごと独立）。
   Future<void> _inputVariableActual(core.Subscription s) async {
     final ym = _ymKey;
@@ -514,22 +362,6 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
                         color: V2Colors.negative,
                         fontFeatures: V2Typography.tabularNums)),
               ],
-            ),
-          ),
-          const SizedBox(height: V2Spacing.sm),
-          // ── ウォレット一覧ボタン（銀行/現金/電子/クレカ→各詳細） ──
-          Align(
-            alignment: Alignment.centerRight,
-            child: OutlinedButton.icon(
-              onPressed: _openWalletList,
-              icon: const Icon(
-                  Icons.account_balance_wallet_outlined, size: 16),
-              label: const Text('ウォレット一覧'),
-              style: OutlinedButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                minimumSize: const Size(0, 34),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-              ),
             ),
           ),
           const SizedBox(height: V2Spacing.sm),

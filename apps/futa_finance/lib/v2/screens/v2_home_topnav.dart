@@ -747,7 +747,7 @@ class _CenterColumn extends StatelessWidget {
     // 最新の入出金: 選択中の月のみ・日付降順で最新 5 件
     final recent = [...monthTxns]
       ..sort((a, b) => b.date.compareTo(a.date));
-    final recentTop = recent.take(5).toList();
+    final recentTop = recent.take(8).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
