@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.210",
-    "buildNumber":  "211",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.210/futa-finance-v1.0.210.apk",
-    "releaseNotes":  "モバイルでタブを下部に配置(たくはる風)。さらに「取込/開発中」タブを設定画面へ移設して下部タブをスッキリ。"
+    "version":  "1.0.211",
+    "buildNumber":  "212",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.211/futa-finance-v1.0.211.apk",
+    "releaseNotes":  "ホームの最近の入出金の各行をタップすると、その明細の詳細画面を直接開けるように(編集しやすく)。"
 }
