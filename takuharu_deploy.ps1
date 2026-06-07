@@ -6,7 +6,7 @@
 # 3. release/takuharu-version.json を更新
 # 4. git commit & push
 # 5. gh release create で GitHub Release 作成 + APK アセット添付
-# 6. I:\マイドライブ\TakuharuFinance\apks\ へAPKをコピー(最新1つだけ残す)
+# 6. I:\マイドライブ\ツール開発\TakuharuFinance\apks\ へAPKをコピー(最新1つだけ残す)
 #
 # 使い方: pubspec.yaml の version を +1 してから実行。
 # 引数: -ReleaseNotes "リリースノート" / -SkipRelease
@@ -24,7 +24,7 @@ $appDir = Join-Path $root "apps\takuharu_finance"
 $apkSrc = Join-Path $appDir "build\app\outputs\flutter-apk\app-release.apk"
 $versionJson = Join-Path $root "release\takuharu-version.json"
 $repo = "fffuttta-design/finance-apps"
-$driveApks = "I:\マイドライブ\TakuharuFinance\apks"
+$driveApks = "I:\マイドライブ\ツール開発\TakuharuFinance\apks"
 
 $env:Path = "$env:Path;$env:LOCALAPPDATA\Pub\Cache\bin;$env:LOCALAPPDATA\Android\Sdk\platform-tools"
 
