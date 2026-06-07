@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.43",
-    "buildNumber":  "48",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.43/takuharu-finance-v0.2.43.apk",
-    "releaseNotes":  "レシート画像をDrive(たくはるファイナンス/レシート)に集約保存、明細を見られるように。入出金明細の並びを登録順(新しいものが上)に。"
+    "version":  "0.2.44",
+    "buildNumber":  "49",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.44/takuharu-finance-v0.2.44.apk",
+    "releaseNotes":  "レシート読み取りをイオンネットスーパー等の納品書に強化(多品目・外税表記・数量込み金額に対応)。"
 }
