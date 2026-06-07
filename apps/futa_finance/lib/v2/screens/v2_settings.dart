@@ -10,6 +10,7 @@ import '../../screens/card_editor_screen.dart';
 import '../../screens/category_editor_screen.dart';
 import '../../screens/checklist_editor_screen.dart';
 import '../../screens/subscription_list_screen.dart';
+import 'v2_devlab.dart';
 import 'panels/v2_backup_panel.dart';
 import 'panels/v2_income_master_panel.dart';
 import 'panels/v2_replacement_panel.dart';
@@ -73,6 +74,8 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
     _MenuGroup(title: 'データ管理', items: [
       _MenuItem('backup', 'バックアップ / 取り込み',
           Icons.cloud_upload_outlined),
+      _MenuItem('devLab', '明細の貼り付け取込・開発ラボ',
+          Icons.upload_file_outlined),
     ]),
     _MenuGroup(title: 'アプリ情報', items: [
       _MenuItem('about', 'バージョン・更新確認', Icons.info_outline),
@@ -199,6 +202,9 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
         return const V2ReplacementPanel();
       case 'backup':
         return const V2BackupPanel();
+      // タブから移設した「取込（個人）／開発ラボ（事業）」。画面自身がバナー付き。
+      case 'devLab':
+        return V2DevLabScreen(accent: widget.accent);
       case 'about':
         return const _AboutPanel();
       case 'account':

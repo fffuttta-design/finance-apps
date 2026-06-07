@@ -83,8 +83,6 @@ class _V2RootState extends State<V2Root>
   /// 現在のモードに応じて表示するナビ一覧。
   /// 「設定→上タブの並び順」(UiPreferences.sidebarOrder)で並びを反映する。
   List<V2NavItem> get _navItems {
-    final isBusiness =
-        AppModeManager.instance.current == AppMode.business;
     final all = <String, V2NavItem>{
       'home': const V2NavItem(
           id: 'home', label: 'ホーム', icon: Icons.dashboard_outlined),
@@ -100,13 +98,7 @@ class _V2RootState extends State<V2Root>
           icon: Icons.account_balance_wallet_outlined),
       'settings': const V2NavItem(
           id: 'settings', label: '設定', icon: Icons.settings_outlined),
-      // 事業モード=「開発中」ラボ（PL/BS/予算/取込）。
-      // 個人モードでも取込を使えるよう「取込」ラベルで常時表示する。
-      'devLab': isBusiness
-          ? const V2NavItem(
-              id: 'devLab', label: '開発中', icon: Icons.science_outlined)
-          : const V2NavItem(
-              id: 'devLab', label: '取込', icon: Icons.upload_file_outlined),
+      // 「開発中/取込」タブは廃止し、設定画面（明細の貼り付け取込・開発ラボ）へ移設。
     };
     final result = <V2NavItem>[];
     for (final id in UiPreferences.instance.sidebarOrder) {
