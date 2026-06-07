@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.208",
-    "buildNumber":  "209",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.208/futa-finance-v1.0.208.apk",
-    "releaseNotes":  "支出明細を1レシート制に(同じレシートの品目を1行にまとめ、タップで内訳を展開)。品目は別取引のままなのでカテゴリ別分析はそのまま。"
+    "version":  "1.0.210",
+    "buildNumber":  "211",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.210/futa-finance-v1.0.210.apk",
+    "releaseNotes":  "モバイルでタブを下部に配置(たくはる風)。さらに「取込/開発中」タブを設定画面へ移設して下部タブをスッキリ。"
 }
