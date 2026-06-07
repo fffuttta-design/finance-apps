@@ -25,25 +25,38 @@ class V2TopNavShell extends StatelessWidget {
   /// 中央コンテンツの最大幅。マネフォ ME はだいたい 1040px 前後
   final double maxContentWidth;
 
+  /// モバイル（狭い画面）でナビを下部に置くときの下部ナビ。
+  /// [navAtBottom] が true のとき、上タブの代わりにこれを画面下に表示する。
+  final Widget? bottomNav;
+
+  /// true のとき、タブを上ではなく下（[bottomNav]）に配置する（たくはる風）。
+  final bool navAtBottom;
+
   const V2TopNavShell({
     super.key,
     required this.header,
     required this.topNav,
     required this.content,
     this.maxContentWidth = 1040,
+    this.bottomNav,
+    this.navAtBottom = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: V2Colors.bg,
+      // モバイルはタブを下部に（たくはる風）。
+      bottomNavigationBar: navAtBottom ? bottomNav : null,
       body: SafeArea(
+        // 下部ナビを出すときは下端の SafeArea を bottomNav 側に任せる。
+        bottom: !navAtBottom,
         child: Column(
           children: [
             header,
+            // 上配置のときだけ上タブを出す。
             // タブ列は V2TopNav 内部で maxWidth に対して中央寄せ + 端まで均等配置
-            // （ホームタブの左端 = 左カラムの左端、最終タブの右端 = 右カラムの右端）
-            topNav,
+            if (!navAtBottom) topNav,
             // スクロールは各画面側に任せる（v1 画面は ListView を持ち、
             // v2.1 ネイティブ画面は内部で SingleChildScrollView を持つ）。
             Expanded(

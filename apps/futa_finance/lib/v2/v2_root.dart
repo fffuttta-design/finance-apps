@@ -19,6 +19,7 @@ import 'screens/v2_report.dart';
 import 'screens/v2_settings.dart';
 import 'theme/mode_accent.dart';
 import '../widgets/startup_update_mixin.dart';
+import 'widgets/v2_bottom_nav.dart';
 import 'widgets/v2_mode_switcher.dart';
 import 'widgets/v2_top_header.dart';
 import 'widgets/v2_top_nav.dart';
@@ -157,7 +158,19 @@ class _V2RootState extends State<V2Root>
   Widget _buildTopNav(BuildContext context, Color accent) {
     final mode = AppModeManager.instance.current;
     final isBusiness = mode == AppMode.business;
+    // モバイル幅（スマホ）はタブを下部に置く（たくはる風）。広い画面は従来の上タブ。
+    final isNarrow = MediaQuery.sizeOf(context).width < 700;
+    void selectTab(String id) => setState(() => _currentId = id);
     return V2TopNavShell(
+      navAtBottom: isNarrow,
+      bottomNav: isNarrow
+          ? V2BottomNav(
+              items: _navItems,
+              currentId: _currentId,
+              onSelect: selectTab,
+              accent: accent,
+            )
+          : null,
       header: V2TopHeader(
         mode: mode,
         accent: accent,
@@ -174,7 +187,7 @@ class _V2RootState extends State<V2Root>
       topNav: V2TopNav(
         items: _navItems,
         currentId: _currentId,
-        onSelect: (id) => setState(() => _currentId = id),
+        onSelect: selectTab,
         accent: accent,
         // Shell の maxContentWidth と揃える（マネフォ ME 寄りに 1040px）
         maxWidth: 1040,
