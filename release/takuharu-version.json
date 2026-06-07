@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.47",
-    "buildNumber":  "52",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.47/takuharu-finance-v0.2.47.apk",
-    "releaseNotes":  "記録一覧を購入日の新しい順に。明細コメント欄はEnterで改行(送信はボタン)。"
+    "version":  "0.2.48",
+    "buildNumber":  "53",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.48/takuharu-finance-v0.2.48.apk",
+    "releaseNotes":  "専用リリース署名鍵に移行(更新時の署名競合を恒久対応)。"
 }
