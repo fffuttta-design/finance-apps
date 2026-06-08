@@ -55,11 +55,16 @@ class DriveReceiptService {
         lastError = 'アクセストークンを取得できませんでした';
         return null;
       }
-      final res = await http.get(
-        Uri.parse(
-            'https://www.googleapis.com/drive/v3/files/$fileId?alt=media'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
+      final uri = Uri.parse(
+          'https://www.googleapis.com/drive/v3/files/$fileId?alt=media');
+      var res = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+      // 401(トークン期限切れ)は一度だけ強制リフレッシュして再試行。
+      if (res.statusCode == 401) {
+        final fresh = await _accessToken(forceRefresh: true);
+        if (fresh != null) {
+          res = await http.get(uri, headers: {'Authorization': 'Bearer $fresh'});
+        }
+      }
       if (res.statusCode != 200) {
         lastError = '取得失敗 (${res.statusCode})';
         return null;
@@ -115,8 +120,10 @@ class DriveReceiptService {
   }
 
   // ── アクセストークン取得（Web / Android で経路が異なる）─────────
-  Future<String?> _accessToken() async {
-    if (_tokenCache != null) return _tokenCache;
+  /// [forceRefresh] true で、期限切れトークンを捨てて新しく取り直す（401対策）。
+  Future<String?> _accessToken({bool forceRefresh = false}) async {
+    if (!forceRefresh && _tokenCache != null) return _tokenCache;
+    if (forceRefresh) _tokenCache = null;
     if (kIsWeb) {
       // Web: Firebase Auth のポップアップに drive.file スコープを足して
       // OAuth アクセストークンを取得する。
@@ -129,7 +136,9 @@ class DriveReceiptService {
       // Android/iOS: google_sign_in 7.x の authorizationClient で
       // スコープを認可（初回は同意画面、以降はサイレント）。
       final client = GoogleSignIn.instance.authorizationClient;
-      var authz = await client.authorizationForScopes([_scope]);
+      // 強制リフレッシュ時はキャッシュ済み(=期限切れの可能性)を使わず取り直す。
+      var authz =
+          forceRefresh ? null : await client.authorizationForScopes([_scope]);
       authz ??= await client.authorizeScopes([_scope]);
       _tokenCache = authz.accessToken;
       return _tokenCache;
