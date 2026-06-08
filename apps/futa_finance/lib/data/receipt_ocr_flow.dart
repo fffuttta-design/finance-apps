@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -13,6 +14,7 @@ import 'receipt_ocr.dart';
 import 'receipt_ocr_cloud.dart';
 import 'replacement_repository.dart';
 import 'settings_repository.dart';
+import 'transaction_repository.dart';
 
 /// レシートOCRの一連の流れ（撮影/選択 → クラウド解析 → 記録方法選択 → 入力）。
 ///
@@ -33,12 +35,21 @@ Future<bool> runReceiptOcrFlow(BuildContext context) async {
   );
   if (bytes == null || !context.mounted) return false;
 
-  // ★ Drive保存を“即”開始して OCR と並行で走らせる（待ち時間短縮）。
-  //   フォルダ作成日は撮影日時、ファイル名は最小（store/amountは付けない）。
+  // ★ Drive保存は“完全に裏で”実行（ユーザーは待たない）。撮影直後に開始し、
+  //   完了したら その receiptId の取引へ画像URLを後付けする。
+  //   - 保存より先に完了 → urlForキャッシュ経由で保存時に付与
+  //   - 保存より後に完了 → attachReceiptUrl で後から付与
   final isBusiness = AppModeManager.instance.current == AppMode.business;
   final receiptId = DateTime.now().microsecondsSinceEpoch.toString();
-  final uploadFuture = DriveReceiptService.instance
-      .uploadReceiptImage(bytes: bytes, date: DateTime.now(), isBusiness: isBusiness);
+  unawaited(() async {
+    final url = await DriveReceiptService.instance.uploadReceiptImage(
+        bytes: bytes, date: DateTime.now(), isBusiness: isBusiness);
+    if (url == null) return;
+    DriveReceiptService.instance.rememberUrl(receiptId, url);
+    try {
+      await TransactionRepository.instance.attachReceiptUrl(receiptId, url);
+    } catch (_) {/* 後付け失敗は無視（画像リンクが付かないだけ） */}
+  }());
 
   // 変換マスタ（読みにくい語→登録名）を先読みしてキャッシュを温める。
   // OCR結果の店名・品目名にこの後 同期で適用される。
@@ -84,8 +95,7 @@ Future<bool> runReceiptOcrFlow(BuildContext context) async {
   } catch (e) {
     error = '$e';
   }
-  // OCRと並行で進めていた Drive保存の完了を待つ（多くは既に完了）。
-  final receiptUrl = await uploadFuture;
+  // Drive保存は裏で継続中（待たない）。OCRが終わり次第すぐ画面へ。
   if (!context.mounted) return false;
   Navigator.of(context, rootNavigator: true).pop(); // インジケータを閉じる
 
@@ -97,20 +107,9 @@ Future<bool> runReceiptOcrFlow(BuildContext context) async {
   }
   if (result == null) return false; // キャンセル
 
-  if (receiptUrl == null) {
-    final reason = DriveReceiptService.instance.lastError;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 8),
-        content: Text(reason == null
-            ? 'レシート画像のDrive保存をスキップ（記録は続行）'
-            : 'Drive保存に失敗（記録は続行）: $reason'),
-      ),
-    );
-  }
-
+  // receiptUrl は裏保存の完了後に後付けされるため、ここでは渡さない（null）。
   return _showOcrResult(context, result,
-      receiptId: receiptId, receiptUrl: receiptUrl);
+      receiptId: receiptId, receiptUrl: null);
 }
 
 /// 単発記録時に備考へ入れる明細テキスト（・品名 ¥金額）。

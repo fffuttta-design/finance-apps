@@ -52,6 +52,22 @@ abstract class TransactionRepository {
   Future<void> prefetch(String modeKey) async {}
 }
 
+/// 実装(Local/Firestore)共通の補助。
+extension ReceiptUrlAttach on TransactionRepository {
+  /// 指定 receiptId の取引（receiptUrl 未設定のもの）へ画像URLを後付けする。
+  /// 裏のDrive保存が、取引保存より後に完了したときの補完用。
+  Future<void> attachReceiptUrl(String receiptId, String url) async {
+    if (receiptId.isEmpty || url.isEmpty) return;
+    final list = await loadAll();
+    for (final t in list) {
+      if (t.receiptId == receiptId &&
+          (t.receiptUrl == null || t.receiptUrl!.isEmpty)) {
+        await update(t.copyWith(receiptUrl: url));
+      }
+    }
+  }
+}
+
 /// SharedPreferences ベースのローカル永続化実装。
 /// AppMode (事業/個人) ごとにキーが分離される。
 class LocalTransactionRepository implements TransactionRepository {

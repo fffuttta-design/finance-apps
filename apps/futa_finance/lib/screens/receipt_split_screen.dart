@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
+import '../data/drive_receipt_service.dart';
 import '../data/receipt_ocr.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
@@ -280,8 +281,12 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
         amount: amt,
         store: store.isEmpty ? null : store,
         // 同じレシートの品目は同じ receiptId で束ね、receiptUrl で画像を開ける。
+        // 裏のDrive保存が先に終わっていればキャッシュURLを付与。
         receiptId: widget.receiptId,
-        receiptUrl: widget.receiptUrl,
+        receiptUrl: widget.receiptUrl ??
+            (widget.receiptId != null
+                ? DriveReceiptService.instance.urlFor(widget.receiptId!)
+                : null),
       ));
     }
     if (toSave.isEmpty) {

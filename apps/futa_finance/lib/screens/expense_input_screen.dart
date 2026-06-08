@@ -734,9 +734,12 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       amount: amount,
       memo: _memoCtrl.text.trim().isEmpty ? null : _memoCtrl.text.trim(),
       store: _storeCtrl.text.trim().isEmpty ? null : _storeCtrl.text.trim(),
-      receiptUrl: _receiptUrlCtrl.text.trim().isEmpty
-          ? null
-          : _receiptUrlCtrl.text.trim(),
+      // 入力欄が空なら、裏のDrive保存が先に終わっていればキャッシュURLを付与。
+      receiptUrl: _receiptUrlCtrl.text.trim().isNotEmpty
+          ? _receiptUrlCtrl.text.trim()
+          : (widget.receiptId != null
+              ? DriveReceiptService.instance.urlFor(widget.receiptId!)
+              : null),
       receiptId: widget.receiptId ?? editing?.receiptId,
       originalCurrency: _currency == 'USD' ? 'USD' : null,
       originalAmount: usdAmount,
