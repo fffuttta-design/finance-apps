@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.216",
-    "buildNumber":  "217",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.216/futa-finance-v1.0.216.apk",
-    "releaseNotes":  "領収書をアプリ内で直接表示する方式に変更(ブラウザ・再ログイン不要で確実に開ける)。ピンチズーム対応。"
+    "version":  "1.0.217",
+    "buildNumber":  "218",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.217/futa-finance-v1.0.217.apk",
+    "releaseNotes":  "領収書画像が見られない不具合(401)を修正。トークン期限切れ時に取り直して再取得。"
 }
