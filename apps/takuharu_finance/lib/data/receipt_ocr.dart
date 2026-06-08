@@ -6,6 +6,10 @@ import 'package:http/http.dart' as http;
 import 'categories.dart';
 import 'household_service.dart';
 
+/// レシート記録画面のトグルで「まとめて1件 ⇄ 品目ごと」を切り替えるための
+/// センチネル値。画面が pop の戻り値にこれを返すと、フローが反対モードを開き直す。
+const String kReceiptSwitchMode = '__switch_record_mode__';
+
 /// レシートの1品目。
 class ReceiptItem {
   final String name;

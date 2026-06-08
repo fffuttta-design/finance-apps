@@ -7,6 +7,7 @@ import '../data/categories.dart';
 import '../data/account.dart';
 import '../data/account_repository.dart';
 import '../data/household_service.dart';
+import '../data/receipt_ocr.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
@@ -29,6 +30,10 @@ class AddTransactionScreen extends StatefulWidget {
   final String? initialReceiptId;
   final String? initialReceiptUrl;
 
+  /// レシートOCRの品目（2件以上あると上部に「まとめて1件 / 品目ごと」トグルを出す）。
+  /// 「品目ごと」を選ぶと [kReceiptSwitchMode] を返して閉じ、フローが品目ごと画面を開く。
+  final List<ReceiptItem>? receiptItems;
+
   const AddTransactionScreen({
     super.key,
     this.editing,
@@ -39,6 +44,7 @@ class AddTransactionScreen extends StatefulWidget {
     this.initialDescription,
     this.initialReceiptId,
     this.initialReceiptUrl,
+    this.receiptItems,
   });
 
   @override
@@ -239,6 +245,31 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
           children: [
+            // まとめて1件 / 品目ごと トグル（レシートから複数品目を受け取った時）
+            if ((widget.receiptItems?.length ?? 0) >= 2) ...[
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(
+                      value: false,
+                      icon: Icon(Icons.receipt_long_rounded, size: 16),
+                      label: Text('まとめて1件', style: TextStyle(fontSize: 12))),
+                  ButtonSegment(
+                      value: true,
+                      icon: Icon(Icons.list_alt_rounded, size: 16),
+                      label: Text('品目ごと', style: TextStyle(fontSize: 12))),
+                ],
+                selected: const {false},
+                showSelectedIcon: false,
+                onSelectionChanged: (s) {
+                  if (s.first == true) {
+                    Navigator.pop(context, kReceiptSwitchMode);
+                  }
+                },
+                style: const ButtonStyle(
+                    visualDensity: VisualDensity.compact),
+              ),
+              const SizedBox(height: 16),
+            ],
             // 支出/収入トグル（新規記録時のみ。編集では種別は変えない）
             if (widget.editing == null) ...[
               Container(

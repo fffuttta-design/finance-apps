@@ -17,11 +17,16 @@ class ReceiptSplitScreen extends StatefulWidget {
   /// レシート画像をDrive保存したときの参照（同じレシートの品目で共有）。
   final String? receiptId;
   final String? receiptUrl;
+
+  /// 上部に「まとめて1件 / 品目ごと」トグルを出すか（OCRフローから true）。
+  /// 「まとめて1件」を選ぶと [kReceiptSwitchMode] を返して閉じる。
+  final bool showModeToggle;
   const ReceiptSplitScreen({
     super.key,
     required this.result,
     this.receiptId,
     this.receiptUrl,
+    this.showModeToggle = false,
   });
 
   @override
@@ -185,6 +190,31 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
+            // まとめて1件 / 品目ごと トグル（OCRフローから開いたときだけ）
+            if (widget.showModeToggle) ...[
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(
+                      value: false,
+                      icon: Icon(Icons.receipt_long_rounded, size: 16),
+                      label: Text('まとめて1件', style: TextStyle(fontSize: 12))),
+                  ButtonSegment(
+                      value: true,
+                      icon: Icon(Icons.list_alt_rounded, size: 16),
+                      label: Text('品目ごと', style: TextStyle(fontSize: 12))),
+                ],
+                selected: const {true},
+                showSelectedIcon: false,
+                onSelectionChanged: (s) {
+                  if (s.first == false) {
+                    Navigator.pop(context, kReceiptSwitchMode);
+                  }
+                },
+                style: const ButtonStyle(
+                    visualDensity: VisualDensity.compact),
+              ),
+              const SizedBox(height: 12),
+            ],
             // 共通情報
             Card(
               child: Padding(

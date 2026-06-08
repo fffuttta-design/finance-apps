@@ -89,42 +89,52 @@ Future<bool> runReceiptFlow(BuildContext context) async {
 
   if (!context.mounted) return false;
 
-  // 品目が2件以上なら「まとめて1件」か「品目ごと」を選べる。
+  // 品目が2件以上 → ダイアログを挟まず、まず「品目ごと」を全部表示。
+  // 画面上部のトグルで「まとめて1件」に切り替えられる（FutaFinance方式）。
   if (result.items.length >= 2) {
-    final mode = await showDialog<String>(
-      context: context,
-      builder: (dctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('品目が${result!.items.length}件 見つかりました'),
-        content: const Text('どうやって記録しますか？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dctx, 'single'),
-            child: const Text('まとめて1件'),
+    var perItem = true; // 既定は品目ごと
+    while (true) {
+      if (!context.mounted) return false;
+      final Object? res;
+      if (perItem) {
+        res = await Navigator.push<Object>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ReceiptSplitScreen(
+              result: result!,
+              receiptId: receiptId,
+              receiptUrl: receiptUrl,
+              showModeToggle: true,
+            ),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dctx, 'split'),
-            child: const Text('品目ごと'),
+        );
+      } else {
+        res = await Navigator.push<Object>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AddTransactionScreen(
+              initialType: core.TransactionType.expense,
+              initialAmount: result!.amount,
+              initialDate: result.date,
+              initialCategory: result.category,
+              initialDescription: result.store,
+              initialReceiptId: receiptId,
+              initialReceiptUrl: receiptUrl,
+              receiptItems: result.items,
+            ),
           ),
-        ],
-      ),
-    );
-    if (mode == null || !context.mounted) return false;
-    if (mode == 'split') {
-      final changed = await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ReceiptSplitScreen(
-            result: result!,
-            receiptId: receiptId,
-            receiptUrl: receiptUrl,
-          ),
-        ),
-      );
-      return changed == true;
+        );
+      }
+      // トグルで反対モードへ → ループして開き直す。
+      if (res == kReceiptSwitchMode) {
+        perItem = !perItem;
+        continue;
+      }
+      return res == true;
     }
   }
 
+  // 品目0〜1件 → まとめて1件（トグルなし）。
   if (!context.mounted) return false;
   final changed = await Navigator.push<bool>(
     context,

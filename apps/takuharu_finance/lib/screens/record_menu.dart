@@ -31,22 +31,22 @@ Future<bool> showRecordMenu(BuildContext context) async {
             ListTile(
               leading: const CircleAvatar(
                 backgroundColor: AppColors.pinkSoft,
-                child: Icon(Icons.edit_rounded, color: AppColors.pink),
-              ),
-              title: const Text('手で入力',
-                  style: TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: const Text('支出・収入をその場で入力'),
-              onTap: () => Navigator.pop(ctx, 'manual'),
-            ),
-            ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: AppColors.pinkSoft,
                 child: Icon(Icons.receipt_long_rounded, color: AppColors.pink),
               ),
               title: const Text('レシートで記録',
                   style: TextStyle(fontWeight: FontWeight.w700)),
               subtitle: const Text('写真を撮って自動で読み取り'),
               onTap: () => Navigator.pop(ctx, 'receipt'),
+            ),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: AppColors.pinkSoft,
+                child: Icon(Icons.edit_rounded, color: AppColors.pink),
+              ),
+              title: const Text('手で入力',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: const Text('支出・収入をその場で入力'),
+              onTap: () => Navigator.pop(ctx, 'manual'),
             ),
           ],
         ),
