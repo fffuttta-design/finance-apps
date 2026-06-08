@@ -242,12 +242,22 @@ class _HomeScreenState extends State<HomeScreen> {
           _categoryCard(catEntries, expense),
           const SizedBox(height: 16),
         ],
-        _sectionTitle('記録'),
+        _sectionTitle('最近の入出金'),
         const SizedBox(height: 8),
         if (month.isEmpty)
           _empty()
-        else
-          ...month.map(_txTile),
+        else ...[
+          // 最新5件だけ表示（全部は支出・収入タブで見られる）。
+          ...month.take(5).map(_txTile),
+          if (month.length > 5)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text('ほか ${month.length - 5}件（支出・収入タブで全部見れるよ）',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 11, color: AppColors.textSub)),
+            ),
+        ],
       ],
     );
   }
