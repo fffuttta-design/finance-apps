@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.52",
-    "buildNumber":  "57",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.52/takuharu-finance-v0.2.52.apk",
-    "releaseNotes":  "明細の「レシートを見る」ボタン修正(ラベル変更＋Android11+でリンクが開けない不具合を解消)。"
+    "version":  "0.2.53",
+    "buildNumber":  "58",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.53/takuharu-finance-v0.2.53.apk",
+    "releaseNotes":  "レシート記録をまとめて1件に統一(品目ごとは廃止)。品目はメモにぶら下げて1レシート=1記録に紐づけ。1記録に個人の食費わくON/OFF(合計全額)。"
 }
