@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 
 import '../data/drive_receipt_service.dart';
 import '../data/household_service.dart';
@@ -30,6 +31,11 @@ Future<bool> runReceiptFlow(BuildContext context) async {
   if (bytes == null || !context.mounted) return false;
   const mime = 'image/jpeg';
 
+  // 撮影画像を一度だけ軽く圧縮（OCR送信・Drive保存・表示すべてを高速化）。
+  // 失敗時は元画像をそのまま使う。
+  final imgBytes = await _compressReceipt(bytes);
+  if (!context.mounted) return false;
+
   // ★ Drive保存は“完全に裏で”実行（ユーザーは一切待たない）。
   //   撮影直後に開始し、完了したら その receiptId の取引へ画像URLを後付けする。
   //   - 保存より先にアップロード完了 → urlForキャッシュ経由で保存時に付与
@@ -38,7 +44,7 @@ Future<bool> runReceiptFlow(BuildContext context) async {
   final hidForUpload = HouseholdService.instance.householdId;
   unawaited(() async {
     final url = await DriveReceiptService.instance
-        .uploadReceiptImage(bytes: bytes, date: DateTime.now());
+        .uploadReceiptImage(bytes: imgBytes, date: DateTime.now());
     if (url == null) return;
     DriveReceiptService.instance.rememberUrl(receiptId, url);
     if (hidForUpload != null) {
@@ -68,7 +74,7 @@ Future<bool> runReceiptFlow(BuildContext context) async {
   ReceiptResult? result;
   String? error;
   try {
-    result = await ReceiptOcr.instance.recognize(bytes, mime: mime);
+    result = await ReceiptOcr.instance.recognize(imgBytes, mime: mime);
   } catch (e) {
     error = '$e';
   }
@@ -112,6 +118,25 @@ Future<bool> runReceiptFlow(BuildContext context) async {
     ),
   );
   return changed == true;
+}
+
+/// レシート画像を軽く圧縮してバイト列を返す（品質70・長辺〜1920px）。
+/// レシートの文字が潰れない範囲でサイズを落とし、OCR送信/保存/表示を速くする。
+/// 圧縮に失敗、または逆に大きくなった場合は元の画像をそのまま返す。
+Future<Uint8List> _compressReceipt(Uint8List src) async {
+  try {
+    final out = await FlutterImageCompress.compressWithList(
+      src,
+      quality: 70,
+      minWidth: 1080,
+      minHeight: 1920,
+      format: CompressFormat.jpeg,
+    );
+    if (out.isNotEmpty && out.length < src.length) {
+      return Uint8List.fromList(out);
+    }
+  } catch (_) {/* 圧縮失敗時は元画像を使う */}
+  return src;
 }
 
 /// 品目リストをメモ用テキスト（・品名 ¥金額）にまとめる。空なら null。

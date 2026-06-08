@@ -49,10 +49,15 @@ class DriveReceiptService {
     return null;
   }
 
+  /// ダウンロード済み画像のメモリキャッシュ（同じレシートの再表示を一瞬に）。
+  final Map<String, Uint8List> _imageCache = {};
+
   /// 自分の権限トークンでDriveから画像バイトを取得（アプリ内表示用）。
   /// ブラウザ/ログイン不要で開ける（共有フォルダにアクセス権がある前提）。
   Future<Uint8List?> downloadFile(String fileId) async {
     lastError = null;
+    final cached = _imageCache[fileId];
+    if (cached != null) return cached; // 2回目以降は即返す
     try {
       final token = await _accessToken();
       if (token == null) {
@@ -73,7 +78,13 @@ class DriveReceiptService {
         lastError = '取得失敗 (${res.statusCode})';
         return null;
       }
-      return res.bodyBytes;
+      final bytes = res.bodyBytes;
+      // 肥大化防止: 直近20件だけ保持。
+      if (_imageCache.length >= 20) {
+        _imageCache.remove(_imageCache.keys.first);
+      }
+      _imageCache[fileId] = bytes;
+      return bytes;
     } catch (e) {
       lastError = e.toString();
       return null;

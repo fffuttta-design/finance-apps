@@ -17,7 +17,7 @@ resolution: workspace
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.2.58+63
+version: 0.2.59+64
 
 environment:
   sdk: ^3.11.4
@@ -57,6 +57,8 @@ dependencies:
 
   # レシート読み取り（画像選択）。
   image_picker: ^1.2.2
+  # レシート画像を軽く圧縮（OCR送信・Drive保存・表示を高速化）。
+  flutter_image_compress: ^2.3.0
 
   finance_core:
     path: ../../packages/finance_core
