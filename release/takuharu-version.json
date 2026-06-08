@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.53",
-    "buildNumber":  "58",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.53/takuharu-finance-v0.2.53.apk",
-    "releaseNotes":  "レシート記録をまとめて1件に統一(品目ごとは廃止)。品目はメモにぶら下げて1レシート=1記録に紐づけ。1記録に個人の食費わくON/OFF(合計全額)。"
+    "version":  "0.2.54",
+    "buildNumber":  "59",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.54/takuharu-finance-v0.2.54.apk",
+    "releaseNotes":  "ホームの「記録」を「最近の入出金」最新5件表示に変更。"
 }
