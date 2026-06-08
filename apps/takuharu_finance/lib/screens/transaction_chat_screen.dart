@@ -5,11 +5,13 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../data/auth_service.dart';
 import '../data/comment_repository.dart';
+import '../data/drive_receipt_service.dart';
 import '../data/household_service.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 import 'add_transaction_screen.dart';
+import 'receipt_image_screen.dart';
 
 /// 取引ごとのチャット（たく＆はるの会話）。
 class TransactionChatScreen extends StatefulWidget {
@@ -219,6 +221,18 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
               child: OutlinedButton.icon(
                 onPressed: () async {
                   final raw = t.receiptUrl!.trim();
+                  // まずアプリ内ビューアで開く（ブラウザ/ログイン不要で確実）。
+                  final fileId = DriveReceiptService.fileIdFromUrl(raw);
+                  if (fileId != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) =>
+                              ReceiptImageScreen(fileId: fileId)),
+                    );
+                    return;
+                  }
+                  // フォールバック: IDが取れないURLはブラウザ/コピー。
                   final uri = Uri.tryParse(raw);
                   var ok = false;
                   if (uri != null) {
