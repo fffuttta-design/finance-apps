@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.55",
-    "buildNumber":  "60",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.55/takuharu-finance-v0.2.55.apk",
-    "releaseNotes":  "レシートを見るボタンを無反応にしない改善(開けない場合はリンクをコピーしURLを表示)。"
+    "version":  "0.2.56",
+    "buildNumber":  "61",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.56/takuharu-finance-v0.2.56.apk",
+    "releaseNotes":  "レシートをアプリ内で直接表示する方式に変更(ブラウザ・再ログイン不要で確実に開ける)。ピンチズーム対応。"
 }
