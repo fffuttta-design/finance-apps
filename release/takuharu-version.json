@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.49",
-    "buildNumber":  "54",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.49/takuharu-finance-v0.2.49.apk",
-    "releaseNotes":  "記録メニューでレシートで記録を上に。レシート読取は確認ダイアログ無しで品目ごとを直表示し、上部トグルでまとめて1件に切替できるように。"
+    "version":  "0.2.50",
+    "buildNumber":  "55",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.50/takuharu-finance-v0.2.50.apk",
+    "releaseNotes":  "レシートの品目ごと記録で、食費の品目に「個人の食費わく」トグルを追加(ONでだれの8000円わくから引く)。"
 }
