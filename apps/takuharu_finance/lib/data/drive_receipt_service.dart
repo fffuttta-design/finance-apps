@@ -29,6 +29,13 @@ class DriveReceiptService {
   /// セッション中のアクセストークン簡易キャッシュ（Web の再ポップアップ抑制）。
   String? _tokenCache;
 
+  /// 裏で完了したアップロードの結果URL（receiptId → webViewLink）。
+  /// 「保存より先にアップロードが完了した」場合に、保存時へURLを渡すために使う。
+  final Map<String, String> _resultUrls = {};
+  void rememberUrl(String receiptId, String url) =>
+      _resultUrls[receiptId] = url;
+  String? urlFor(String receiptId) => _resultUrls[receiptId];
+
   /// 直近の失敗理由（UI 表示・原因切り分け用）。成功時は null。
   String? lastError;
 

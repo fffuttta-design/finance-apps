@@ -6,6 +6,7 @@ import '../data/auth_service.dart';
 import '../data/categories.dart';
 import '../data/account.dart';
 import '../data/account_repository.dart';
+import '../data/drive_receipt_service.dart';
 import '../data/household_service.dart';
 import '../data/receipt_ocr.dart';
 import '../data/tx_repository.dart';
@@ -175,8 +176,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       // 「食費」で個人わくONのときだけ、だれの個人わくから引くか記録。
       personalFor: (_canPersonalFood && _personalFood) ? _paidBy : null,
       // レシート画像の参照（編集時は既存値を維持、新規はレシート読取からの値）。
+      // 裏のDrive保存が先に終わっていればキャッシュURLを付与。
       receiptId: widget.editing?.receiptId ?? widget.initialReceiptId,
-      receiptUrl: widget.editing?.receiptUrl ?? widget.initialReceiptUrl,
+      receiptUrl: widget.editing?.receiptUrl ??
+          widget.initialReceiptUrl ??
+          (widget.initialReceiptId != null
+              ? DriveReceiptService.instance.urlFor(widget.initialReceiptId!)
+              : null),
     );
     try {
       if (widget.editing != null) {

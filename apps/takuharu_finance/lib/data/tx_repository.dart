@@ -73,6 +73,20 @@ class TxRepository {
     await _coll(hid).doc(id).delete();
   }
 
+  /// 指定 receiptId の取引すべてに receiptUrl を後付けする（裏のDrive保存完了後）。
+  /// 既に保存済みの品目へ、あとから画像リンクを紐付けるために使う。
+  Future<void> attachReceiptUrl(
+      String hid, String receiptId, String url) async {
+    final snap =
+        await _coll(hid).where('receiptId', isEqualTo: receiptId).get();
+    if (snap.docs.isEmpty) return;
+    final batch = _db.batch();
+    for (final d in snap.docs) {
+      batch.set(d.reference, {'receiptUrl': url}, SetOptions(merge: true));
+    }
+    await batch.commit();
+  }
+
   /// 指定の receiptId 群のうち、既に存在するものを返す（固定費の二重記録防止）。
   Future<Set<String>> existingReceiptIds(
       String hid, List<String> ids) async {

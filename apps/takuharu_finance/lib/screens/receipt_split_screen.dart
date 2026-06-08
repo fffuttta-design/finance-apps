@@ -4,6 +4,7 @@ import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/auth_service.dart';
 import '../data/categories.dart';
+import '../data/drive_receipt_service.dart';
 import '../data/household_service.dart';
 import '../data/receipt_ocr.dart';
 import '../data/tx_repository.dart';
@@ -159,7 +160,9 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
         amount: price,
         store: store,
         receiptId: receiptId,
-        receiptUrl: widget.receiptUrl,
+        // 裏のDrive保存が先に終わっていればキャッシュURLを付与（後付けでも補完）。
+        receiptUrl: widget.receiptUrl ??
+            DriveReceiptService.instance.urlFor(receiptId),
         paidBy: _payer,
         // 「食費」で個人わくONの品目は、払った人の個人食費わくから引く。
         personalFor: (cat == '食費' && i.personalFood) ? _payer : null,

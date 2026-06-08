@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/drive_receipt_service.dart';
+import '../data/household_service.dart';
 import '../data/receipt_ocr.dart';
+import '../data/tx_repository.dart';
 import 'add_transaction_screen.dart';
 import 'receipt_camera_screen.dart';
 import 'receipt_split_screen.dart';
@@ -27,11 +30,24 @@ Future<bool> runReceiptFlow(BuildContext context) async {
   if (bytes == null || !context.mounted) return false;
   const mime = 'image/jpeg';
 
-  // ★ Drive保存を“即”開始して OCR と並行で走らせる（待ち時間短縮）。
-  //   FutaFinanceと同方式：撮影画像を本人のDrive(たくはるファイナンスレシート)へ保存。
+  // ★ Drive保存は“完全に裏で”実行（ユーザーは一切待たない）。
+  //   撮影直後に開始し、完了したら その receiptId の取引へ画像URLを後付けする。
+  //   - 保存より先にアップロード完了 → urlForキャッシュ経由で保存時に付与
+  //   - アップロードより先に保存 → attachReceiptUrl で後から付与
   final receiptId = DateTime.now().microsecondsSinceEpoch.toString();
-  final uploadFuture = DriveReceiptService.instance
-      .uploadReceiptImage(bytes: bytes, date: DateTime.now());
+  final hidForUpload = HouseholdService.instance.householdId;
+  unawaited(() async {
+    final url = await DriveReceiptService.instance
+        .uploadReceiptImage(bytes: bytes, date: DateTime.now());
+    if (url == null) return;
+    DriveReceiptService.instance.rememberUrl(receiptId, url);
+    if (hidForUpload != null) {
+      try {
+        await TxRepository.instance
+            .attachReceiptUrl(hidForUpload, receiptId, url);
+      } catch (_) {/* 後付け失敗は無視（画像リンクが付かないだけ） */}
+    }
+  }());
 
   // 読み取り中インジケータ
   showDialog<void>(
@@ -56,23 +72,9 @@ Future<bool> runReceiptFlow(BuildContext context) async {
   } catch (e) {
     error = '$e';
   }
-  // OCRと並行で進めていた Drive保存の完了を待つ（多くは既に完了）。
-  final receiptUrl = await uploadFuture;
+  // Drive保存は裏で継続中（待たない）。OCRが終わり次第すぐ画面へ。
   if (!context.mounted) return false;
   Navigator.of(context, rootNavigator: true).pop(); // インジケータを閉じる
-
-  // Drive保存に失敗しても記録は続行（リンク無しで保存）。
-  if (receiptUrl == null && error == null) {
-    final reason = DriveReceiptService.instance.lastError;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 6),
-        content: Text(reason == null
-            ? 'レシート画像のDrive保存をスキップ（記録は続行）'
-            : 'Drive保存に失敗（記録は続行）: $reason'),
-      ),
-    );
-  }
 
   if (error != null) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -103,7 +105,6 @@ Future<bool> runReceiptFlow(BuildContext context) async {
             builder: (_) => ReceiptSplitScreen(
               result: result!,
               receiptId: receiptId,
-              receiptUrl: receiptUrl,
               showModeToggle: true,
             ),
           ),
@@ -119,7 +120,6 @@ Future<bool> runReceiptFlow(BuildContext context) async {
               initialCategory: result.category,
               initialDescription: result.store,
               initialReceiptId: receiptId,
-              initialReceiptUrl: receiptUrl,
               receiptItems: result.items,
             ),
           ),
@@ -146,7 +146,6 @@ Future<bool> runReceiptFlow(BuildContext context) async {
         initialCategory: result.category,
         initialDescription: result.store,
         initialReceiptId: receiptId,
-        initialReceiptUrl: receiptUrl,
       ),
     ),
   );
