@@ -8,7 +8,6 @@ import '../data/account.dart';
 import '../data/account_repository.dart';
 import '../data/drive_receipt_service.dart';
 import '../data/household_service.dart';
-import '../data/receipt_ocr.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
@@ -31,9 +30,9 @@ class AddTransactionScreen extends StatefulWidget {
   final String? initialReceiptId;
   final String? initialReceiptUrl;
 
-  /// レシートOCRの品目（2件以上あると上部に「まとめて1件 / 品目ごと」トグルを出す）。
-  /// 「品目ごと」を選ぶと [kReceiptSwitchMode] を返して閉じ、フローが品目ごと画面を開く。
-  final List<ReceiptItem>? receiptItems;
+  /// レシートの品目リストなどの備考（メモ）。新規時のみ。
+  /// まとめて1件記録のとき、品目を「・品名 ¥金額」でこの記録にぶら下げる。
+  final String? initialMemo;
 
   const AddTransactionScreen({
     super.key,
@@ -45,7 +44,7 @@ class AddTransactionScreen extends StatefulWidget {
     this.initialDescription,
     this.initialReceiptId,
     this.initialReceiptUrl,
-    this.receiptItems,
+    this.initialMemo,
   });
 
   @override
@@ -72,6 +71,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   /// 個人食費わくの対象にできるカテゴリ（今は「食費」だけ）。
   static const _personalFoodCategory = '食費';
   bool get _canPersonalFood => !_isIncome && _category == _personalFoodCategory;
+
+  /// レシートの品目メモ（まとめて1件にぶら下がる内訳）。新規=initialMemo、編集=既存メモ。
+  String? get _receiptMemo => widget.initialMemo ?? widget.editing?.memo;
 
 
   @override
@@ -173,6 +175,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       description: _memoCtrl.text.trim(),
       amount: amount,
       paidBy: _paidBy,
+      // 備考（レシートの品目リスト等）。編集時は既存を維持。
+      memo: widget.editing?.memo ?? widget.initialMemo,
       // 「食費」で個人わくONのときだけ、だれの個人わくから引くか記録。
       personalFor: (_canPersonalFood && _personalFood) ? _paidBy : null,
       // レシート画像の参照（編集時は既存値を維持、新規はレシート読取からの値）。
@@ -251,31 +255,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
           children: [
-            // まとめて1件 / 品目ごと トグル（レシートから複数品目を受け取った時）
-            if ((widget.receiptItems?.length ?? 0) >= 2) ...[
-              SegmentedButton<bool>(
-                segments: const [
-                  ButtonSegment(
-                      value: false,
-                      icon: Icon(Icons.receipt_long_rounded, size: 16),
-                      label: Text('まとめて1件', style: TextStyle(fontSize: 12))),
-                  ButtonSegment(
-                      value: true,
-                      icon: Icon(Icons.list_alt_rounded, size: 16),
-                      label: Text('品目ごと', style: TextStyle(fontSize: 12))),
-                ],
-                selected: const {false},
-                showSelectedIcon: false,
-                onSelectionChanged: (s) {
-                  if (s.first == true) {
-                    Navigator.pop(context, kReceiptSwitchMode);
-                  }
-                },
-                style: const ButtonStyle(
-                    visualDensity: VisualDensity.compact),
-              ),
-              const SizedBox(height: 16),
-            ],
             // 支出/収入トグル（新規記録時のみ。編集では種別は変えない）
             if (widget.editing == null) ...[
               Container(
@@ -367,6 +346,39 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               decoration:
                   const InputDecoration(hintText: '例: たまご・牛乳 / ランチ'),
             ),
+            // レシートの品目（メモ）プレビュー。まとめて1件にぶら下がる内訳。
+            if (_receiptMemo != null && _receiptMemo!.trim().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.pinkSoft.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.receipt_long_rounded,
+                            size: 15, color: AppColors.pinkDark),
+                        SizedBox(width: 5),
+                        Text('レシートの品目',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.pinkDark)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(_receiptMemo!.trim(),
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.text, height: 1.5)),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 18),
             // カテゴリ
             _section('カテゴリ'),

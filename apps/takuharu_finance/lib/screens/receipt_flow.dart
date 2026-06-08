@@ -8,9 +8,9 @@ import '../data/drive_receipt_service.dart';
 import '../data/household_service.dart';
 import '../data/receipt_ocr.dart';
 import '../data/tx_repository.dart';
+import '../utils/format.dart';
 import 'add_transaction_screen.dart';
 import 'receipt_camera_screen.dart';
-import 'receipt_split_screen.dart';
 
 /// レシートで記録：画像選択 → Gemini読み取り → 入力画面をプリフィルして開く。
 /// 何か記録できたら true を返す。
@@ -91,63 +91,31 @@ Future<bool> runReceiptFlow(BuildContext context) async {
 
   if (!context.mounted) return false;
 
-  // 品目が2件以上 → ダイアログを挟まず、まず「品目ごと」を全部表示。
-  // 画面上部のトグルで「まとめて1件」に切り替えられる（FutaFinance方式）。
-  if (result.items.length >= 2) {
-    var perItem = true; // 既定は品目ごと
-    while (true) {
-      if (!context.mounted) return false;
-      final Object? res;
-      if (perItem) {
-        res = await Navigator.push<Object>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ReceiptSplitScreen(
-              result: result!,
-              receiptId: receiptId,
-              showModeToggle: true,
-            ),
-          ),
-        );
-      } else {
-        res = await Navigator.push<Object>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => AddTransactionScreen(
-              initialType: core.TransactionType.expense,
-              initialAmount: result!.amount,
-              initialDate: result.date,
-              initialCategory: result.category,
-              initialDescription: result.store,
-              initialReceiptId: receiptId,
-              receiptItems: result.items,
-            ),
-          ),
-        );
-      }
-      // トグルで反対モードへ → ループして開き直す。
-      if (res == kReceiptSwitchMode) {
-        perItem = !perItem;
-        continue;
-      }
-      return res == true;
-    }
-  }
+  // 常に「まとめて1件」で記録。品目はメモ（備考）にぶら下げて1レシート=1記録に紐づける。
+  // 合計額が読めなければ品目の合計で代用。
+  final r = result; // ここまでで null チェック済み（非null確定）
+  final total = r.amount ?? r.items.fold<int>(0, (s, it) => s + it.price);
+  final memo = _itemsMemo(r.items);
 
-  // 品目0〜1件 → まとめて1件（トグルなし）。
-  if (!context.mounted) return false;
   final changed = await Navigator.push<bool>(
     context,
     MaterialPageRoute(
       builder: (_) => AddTransactionScreen(
         initialType: core.TransactionType.expense,
-        initialAmount: result!.amount,
-        initialDate: result.date,
-        initialCategory: result.category,
-        initialDescription: result.store,
+        initialAmount: total > 0 ? total : null,
+        initialDate: r.date,
+        initialCategory: r.category,
+        initialDescription: r.store,
         initialReceiptId: receiptId,
+        initialMemo: memo,
       ),
     ),
   );
   return changed == true;
+}
+
+/// 品目リストをメモ用テキスト（・品名 ¥金額）にまとめる。空なら null。
+String? _itemsMemo(List<ReceiptItem> items) {
+  if (items.isEmpty) return null;
+  return items.map((it) => '・${it.name} ${formatYen(it.price)}').join('\n');
 }
