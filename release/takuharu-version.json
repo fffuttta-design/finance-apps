@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.57",
-    "buildNumber":  "62",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.57/takuharu-finance-v0.2.57.apk",
-    "releaseNotes":  "明細チャットの吹き出し最大幅を制限(長文でも相手側に食い込みすぎないよう約72%で折り返し)。"
+    "version":  "0.2.58",
+    "buildNumber":  "63",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.58/takuharu-finance-v0.2.58.apk",
+    "releaseNotes":  "レシート画像が見られない不具合(401)を修正。トークン期限切れ時に取り直して再取得。"
 }
