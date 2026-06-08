@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.213",
-    "buildNumber":  "214",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.213/futa-finance-v1.0.213.apk",
-    "releaseNotes":  "収入マスタ一覧を最適化(サイクルのバッジを小さく/メモ・状態列を削除/日は維持)。"
+    "version":  "1.0.214",
+    "buildNumber":  "215",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.214/futa-finance-v1.0.214.apk",
+    "releaseNotes":  "レシート画像のDrive保存を完全に裏で実行。読み取り後すぐ入力画面に進めるよう待ち時間を解消。"
 }
