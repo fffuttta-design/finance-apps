@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.48",
-    "buildNumber":  "53",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.48/takuharu-finance-v0.2.48.apk",
-    "releaseNotes":  "専用リリース署名鍵に移行(更新時の署名競合を恒久対応)。"
+    "version":  "0.2.49",
+    "buildNumber":  "54",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.49/takuharu-finance-v0.2.49.apk",
+    "releaseNotes":  "記録メニューでレシートで記録を上に。レシート読取は確認ダイアログ無しで品目ごとを直表示し、上部トグルでまとめて1件に切替できるように。"
 }
