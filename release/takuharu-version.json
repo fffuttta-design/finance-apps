@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.54",
-    "buildNumber":  "59",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.54/takuharu-finance-v0.2.54.apk",
-    "releaseNotes":  "ホームの「記録」を「最近の入出金」最新5件表示に変更。"
+    "version":  "0.2.55",
+    "buildNumber":  "60",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.55/takuharu-finance-v0.2.55.apk",
+    "releaseNotes":  "レシートを見るボタンを無反応にしない改善(開けない場合はリンクをコピーしURLを表示)。"
 }
