@@ -320,6 +320,8 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
 
   Widget _bubble(TxComment m) {
     final mine = m.uid == _myUid;
+    // 吹き出しの最大幅。長文でも相手側に食い込みすぎないよう画面の約72%で頭打ち。
+    final maxBubbleWidth = MediaQuery.sizeOf(context).width * 0.72;
     final names = HouseholdService.instance.memberNames;
     final icons = HouseholdService.instance.memberIcons;
     final name = names[m.uid] ?? 'パートナー';
@@ -348,17 +350,21 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
                   style:
                       const TextStyle(fontSize: 11, color: AppColors.textSub)),
             ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: mine ? AppColors.pink : Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: mine ? null : Border.all(color: AppColors.divider),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxBubbleWidth),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: mine ? AppColors.pink : Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: mine ? null : Border.all(color: AppColors.divider),
+              ),
+              child: Text(m.text,
+                  style: TextStyle(
+                      fontSize: 14,
+                      color: mine ? Colors.white : AppColors.text)),
             ),
-            child: Text(m.text,
-                style: TextStyle(
-                    fontSize: 14,
-                    color: mine ? Colors.white : AppColors.text)),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
