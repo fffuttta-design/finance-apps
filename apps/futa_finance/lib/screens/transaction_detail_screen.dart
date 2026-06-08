@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../data/drive_receipt_service.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 import '../utils/modal_input.dart';
 import 'expense_input_screen.dart';
+import 'receipt_image_screen.dart';
 
 /// 取引の詳細画面（フル画面）。
 /// 明細をタップ → ここで内容を確認 → 「編集」「削除」を選べる。
@@ -169,14 +171,25 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () async {
-                  final uri = Uri.tryParse(t.receiptUrl!.trim());
+                  final raw = t.receiptUrl!.trim();
+                  final fileId = DriveReceiptService.fileIdFromUrl(raw);
+                  if (fileId != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) =>
+                              ReceiptImageScreen(fileId: fileId)),
+                    );
+                    return;
+                  }
+                  final uri = Uri.tryParse(raw);
                   if (uri != null) {
                     await launchUrl(uri,
                         mode: LaunchMode.externalApplication);
                   }
                 },
                 icon: const Icon(Icons.receipt_long, size: 18),
-                label: const Text('領収書を開く'),
+                label: const Text('領収書を見る'),
               ),
             ),
           ],

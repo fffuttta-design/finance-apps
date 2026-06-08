@@ -12,6 +12,7 @@ import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
+import 'receipt_image_screen.dart';
 
 /// 支払元のカテゴリ。UI 上はまずこれを選択 → 該当の項目プルダウンが切り替わる。
 /// 表示順 = クレカ・電子・現金・銀行（使用頻度の高い順）。
@@ -1279,13 +1280,22 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     );
   }
 
-  /// 領収書リンク（Drive等）を外部で開く。
+  /// 領収書を開く。Driveのファイルならアプリ内ビューアで表示（ブラウザ不要）。
   Future<void> _openReceiptLink() async {
     final url = _receiptUrlCtrl.text.trim();
     if (url.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('レシートのリンクがありません')),
+      );
+      return;
+    }
+    final fileId = DriveReceiptService.fileIdFromUrl(url);
+    if (fileId != null) {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ReceiptImageScreen(fileId: fileId)),
       );
       return;
     }

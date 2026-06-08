@@ -6,11 +6,13 @@ import 'package:finance_core/finance_core.dart' as core;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/app_mode.dart';
+import '../../data/drive_receipt_service.dart';
 import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
 import '../../screens/expense_input_screen.dart';
 import '../../screens/expense_list_screen.dart';
+import '../../screens/receipt_image_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
 import '../../utils/formatters.dart';
 import '../../utils/thousands_separator_input_formatter.dart';
@@ -194,14 +196,25 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
                   width: double.infinity,
                   child: FilledButton.icon(
                     onPressed: () async {
-                      final uri = Uri.tryParse(t.receiptUrl!.trim());
+                      final raw = t.receiptUrl!.trim();
+                      final fileId = DriveReceiptService.fileIdFromUrl(raw);
+                      if (fileId != null) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) =>
+                                  ReceiptImageScreen(fileId: fileId)),
+                        );
+                        return;
+                      }
+                      final uri = Uri.tryParse(raw);
                       if (uri != null) {
                         await launchUrl(uri,
                             mode: LaunchMode.externalApplication);
                       }
                     },
                     icon: const Icon(Icons.receipt_long, size: 18),
-                    label: const Text('領収書を開く'),
+                    label: const Text('領収書を見る'),
                   ),
                 )
               else

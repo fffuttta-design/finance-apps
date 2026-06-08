@@ -33,6 +33,44 @@ class DriveReceiptService {
   /// 直近の失敗理由（UI 表示・原因切り分け用）。成功時は null。
   String? lastError;
 
+  /// Drive のファイルURL/IDからファイルIDを取り出す。
+  /// 例: `https://drive.google.com/file/d/{ID}/view?usp=...` から `{ID}` を返す。
+  static String? fileIdFromUrl(String urlOrId) {
+    final s = urlOrId.trim();
+    if (s.isEmpty) return null;
+    final m = RegExp(r'/d/([A-Za-z0-9_-]+)').firstMatch(s) ??
+        RegExp(r'[?&]id=([A-Za-z0-9_-]+)').firstMatch(s);
+    if (m != null) return m.group(1);
+    if (!s.contains('/') && !s.contains(' ')) return s;
+    return null;
+  }
+
+  /// 自分の権限トークンでDriveから画像バイトを取得（アプリ内表示用）。
+  /// ブラウザ/再ログイン不要で開ける（drive.file=アプリ作成ファイルに有効）。
+  Future<Uint8List?> downloadFile(String fileId) async {
+    lastError = null;
+    try {
+      final token = await _accessToken();
+      if (token == null) {
+        lastError = 'アクセストークンを取得できませんでした';
+        return null;
+      }
+      final res = await http.get(
+        Uri.parse(
+            'https://www.googleapis.com/drive/v3/files/$fileId?alt=media'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (res.statusCode != 200) {
+        lastError = '取得失敗 (${res.statusCode})';
+        return null;
+      }
+      return res.bodyBytes;
+    } catch (e) {
+      lastError = e.toString();
+      return null;
+    }
+  }
+
   /// フォルダIDのメモリキャッシュ。毎回の探索/作成API往復を省いて高速化。
   /// key: "親ID|フォルダ名" → フォルダID。
   final Map<String, String> _folderCache = {};
