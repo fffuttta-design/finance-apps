@@ -37,6 +37,7 @@ class _Item {
   final TextEditingController name;
   final TextEditingController price;
   String? category;
+  bool personalFood = false; // この品目を個人の食費わくから引くか（食費のときのみ）
   _Item(String n, int p, this.category)
       : name = TextEditingController(text: n),
         price = TextEditingController(text: p > 0 ? p.toString() : '');
@@ -147,11 +148,12 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
       final price = int.tryParse(i.price.text) ?? 0;
       final name = i.name.text.trim();
       if (price <= 0 || name.isEmpty) continue;
+      final cat = i.category ?? 'その他';
       txns.add(core.Transaction(
         id: '${DateTime.now().microsecondsSinceEpoch}-${txns.length}',
         date: _date,
         type: core.TransactionType.expense,
-        category: core.Category(major: i.category ?? 'その他', sub: ''),
+        category: core.Category(major: cat, sub: ''),
         paymentMethod: '',
         description: name,
         amount: price,
@@ -159,6 +161,8 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
         receiptId: receiptId,
         receiptUrl: widget.receiptUrl,
         paidBy: _payer,
+        // 「食費」で個人わくONの品目は、払った人の個人食費わくから引く。
+        personalFor: (cat == '食費' && i.personalFood) ? _payer : null,
       ));
     }
     if (txns.isEmpty) {
@@ -348,30 +352,73 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
               ],
             ),
             const Divider(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: GestureDetector(
-                onTap: () => _pickCategory(i),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: cat.color.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(cat.icon, size: 15, color: cat.color),
-                      const SizedBox(width: 5),
-                      Text(item.category ?? 'カテゴリを選ぶ',
-                          style: const TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w600)),
-                      const Icon(Icons.expand_more_rounded, size: 16),
-                    ],
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                // カテゴリ選択チップ
+                GestureDetector(
+                  onTap: () => _pickCategory(i),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: cat.color.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(cat.icon, size: 15, color: cat.color),
+                        const SizedBox(width: 5),
+                        Text(item.category ?? 'カテゴリを選ぶ',
+                            style: const TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w600)),
+                        const Icon(Icons.expand_more_rounded, size: 16),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+                // 「食費」の品目だけ：個人の食費わくトグル
+                if (item.category == '食費')
+                  GestureDetector(
+                    onTap: () => setState(
+                        () => item.personalFood = !item.personalFood),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: item.personalFood
+                            ? AppColors.pink.withValues(alpha: 0.18)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: item.personalFood
+                              ? AppColors.pink
+                              : AppColors.divider,
+                          width: item.personalFood ? 1.4 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                              item.personalFood
+                                  ? Icons.check_circle_rounded
+                                  : Icons.lunch_dining_rounded,
+                              size: 15,
+                              color: AppColors.pinkDark),
+                          const SizedBox(width: 5),
+                          const Text('個人の食費わく',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),
