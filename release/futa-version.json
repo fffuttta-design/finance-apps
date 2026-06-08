@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.212",
-    "buildNumber":  "213",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.212/futa-finance-v1.0.212.apk",
-    "releaseNotes":  "支出タブの「ウォレット一覧」ボタンを削除。ホームの最近の入出金の表示を8件に増やしました。"
+    "version":  "1.0.213",
+    "buildNumber":  "214",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.213/futa-finance-v1.0.213.apk",
+    "releaseNotes":  "収入マスタ一覧を最適化(サイクルのバッジを小さく/メモ・状態列を削除/日は維持)。"
 }
