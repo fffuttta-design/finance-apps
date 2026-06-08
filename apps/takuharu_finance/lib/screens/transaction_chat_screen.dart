@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 import 'package:url_launcher/url_launcher.dart';
 
@@ -217,16 +218,34 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () async {
-                  final uri = Uri.tryParse(t.receiptUrl!.trim());
-                  if (uri == null) return;
-                  if (!await launchUrl(uri,
-                      mode: LaunchMode.externalApplication)) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('レシート画像を開けませんでした')),
-                      );
+                  final raw = t.receiptUrl!.trim();
+                  final uri = Uri.tryParse(raw);
+                  var ok = false;
+                  if (uri != null) {
+                    // 外部ブラウザ→ダメなら既定モードの順で開く。
+                    for (final m in const [
+                      LaunchMode.externalApplication,
+                      LaunchMode.platformDefault,
+                    ]) {
+                      try {
+                        ok = await launchUrl(uri, mode: m);
+                      } catch (_) {
+                        ok = false;
+                      }
+                      if (ok) break;
                     }
+                  }
+                  if (!ok && mounted) {
+                    // 開けないときはリンクをコピーしてURLを表示（無反応を防ぐ）。
+                    await Clipboard.setData(ClipboardData(text: raw));
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        duration: const Duration(seconds: 10),
+                        content: Text(
+                            '開けなかったのでリンクをコピーしました。ブラウザに貼って開いてね:\n$raw'),
+                      ),
+                    );
                   }
                 },
                 icon: const Icon(Icons.receipt_long_rounded, size: 18),
