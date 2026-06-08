@@ -230,7 +230,7 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
                   }
                 },
                 icon: const Icon(Icons.receipt_long_rounded, size: 18),
-                label: const Text('レシート画像を見る'),
+                label: const Text('レシートを見る'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.pinkDark,
                   side: const BorderSide(color: AppColors.pinkSoft, width: 1.4),
