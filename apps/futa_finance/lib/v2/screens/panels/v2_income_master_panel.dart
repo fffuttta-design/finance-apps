@@ -539,16 +539,23 @@ Future<_IncomeSheetResult?> _showSourceSheet(BuildContext context,
                 Row(
                   children: [
                     if (isEdit) ...[
-                      OutlinedButton.icon(
+                      OutlinedButton(
                         onPressed: onDelete,
-                        icon: const Icon(Icons.delete_outline,
-                            size: 18, color: Color(0xFFDC2626)),
-                        label: const Text('削除',
-                            style: TextStyle(color: Color(0xFFDC2626))),
                         style: OutlinedButton.styleFrom(
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 12),
+                          foregroundColor: const Color(0xFFDC2626),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
                           side: const BorderSide(color: Color(0xFFFCA5A5)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.delete_outline,
+                                size: 18, color: Color(0xFFDC2626)),
+                            SizedBox(width: 4),
+                            Text('削除',
+                                style: TextStyle(color: Color(0xFFDC2626))),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 12),
