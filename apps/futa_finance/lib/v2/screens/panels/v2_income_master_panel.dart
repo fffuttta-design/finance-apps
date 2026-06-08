@@ -225,33 +225,20 @@ class _V2IncomeMasterPanelState extends State<V2IncomeMasterPanel>
                             horizontal: V2Spacing.lg, vertical: 7),
                         child: Row(
                           children: [
-                            SizedBox(
-                                width: 140,
+                            Expanded(
                                 child: Text('名前',
                                     style: V2Typography
                                         .tableHeader)),
                             const SizedBox(width: V2Spacing.sm),
                             SizedBox(
-                                width: 80,
+                                width: 64,
                                 child: Text('サイクル',
                                     style: V2Typography
                                         .tableHeader)),
                             const SizedBox(width: V2Spacing.sm),
                             SizedBox(
-                                width: 60,
+                                width: 48,
                                 child: Text('日',
-                                    style: V2Typography
-                                        .tableHeader,
-                                    textAlign: TextAlign.right)),
-                            const SizedBox(width: V2Spacing.sm),
-                            Expanded(
-                                child: Text('メモ',
-                                    style: V2Typography
-                                        .tableHeader)),
-                            const SizedBox(width: V2Spacing.sm),
-                            SizedBox(
-                                width: 70,
-                                child: Text('状態',
                                     style: V2Typography
                                         .tableHeader,
                                     textAlign: TextAlign.right)),
@@ -322,38 +309,52 @@ class _IncomeRowState extends State<_IncomeRow> {
           ),
           child: Row(
             children: [
-              SizedBox(
-                width: 140,
-                child: Text(
-                  s.name,
-                  style: V2Typography.bodyStrong.copyWith(
-                      color: muted
-                          ? V2Colors.textMuted
-                          : V2Colors.textPrimary),
-                  overflow: TextOverflow.ellipsis,
+              // 名前（残り幅いっぱい）。アーカイブは行を薄く表示して区別。
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        s.name,
+                        style: V2Typography.bodyStrong.copyWith(
+                            color: muted
+                                ? V2Colors.textMuted
+                                : V2Colors.textPrimary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (muted) ...[
+                      const SizedBox(width: 6),
+                      Text('（アーカイブ）',
+                          style: V2Typography.micro
+                              .copyWith(color: V2Colors.textMuted)),
+                    ],
+                  ],
                 ),
               ),
               const SizedBox(width: V2Spacing.sm),
+              // サイクル（小さめのバッジ。文字幅にフィット）
               SizedBox(
-                width: 80,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: V2Colors.accentSoft,
-                    borderRadius: BorderRadius.circular(3),
+                width: 64,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: V2Colors.accentSoft,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(widget.cycleLabel,
+                        style: V2Typography.micro.copyWith(
+                            color: V2Colors.accent,
+                            fontWeight: FontWeight.w700)),
                   ),
-                  child: Text(widget.cycleLabel,
-                      style: V2Typography.micro.copyWith(
-                          color: V2Colors.accent,
-                          fontWeight: FontWeight.w700),
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center),
                 ),
               ),
               const SizedBox(width: V2Spacing.sm),
               SizedBox(
-                width: 60,
+                width: 48,
                 child: Text(
                   s.dayOfMonth != null ? '${s.dayOfMonth}日' : '—',
                   textAlign: TextAlign.right,
@@ -361,55 +362,6 @@ class _IncomeRowState extends State<_IncomeRow> {
                       color: muted
                           ? V2Colors.textMuted
                           : V2Colors.textBody),
-                ),
-              ),
-              const SizedBox(width: V2Spacing.sm),
-              Expanded(
-                child: Text(
-                  s.memo?.isEmpty ?? true ? '—' : s.memo!,
-                  style: V2Typography.caption.copyWith(
-                      color: muted
-                          ? V2Colors.textMuted
-                          : V2Colors.textSecondary),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: V2Spacing.sm),
-              SizedBox(
-                width: 70,
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: s.archived
-                      ? Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: V2Colors.surfaceMuted,
-                            borderRadius:
-                                BorderRadius.circular(3),
-                          ),
-                          child: Text('アーカイブ',
-                              style: V2Typography.micro
-                                  .copyWith(
-                                      color: V2Colors
-                                          .textMuted)),
-                        )
-                      : Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: V2Colors.positiveSoft,
-                            borderRadius:
-                                BorderRadius.circular(3),
-                          ),
-                          child: Text('アクティブ',
-                              style: V2Typography.micro
-                                  .copyWith(
-                                      color:
-                                          V2Colors.positive,
-                                      fontWeight:
-                                          FontWeight.w700)),
-                        ),
                 ),
               ),
             ],
