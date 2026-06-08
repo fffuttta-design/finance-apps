@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.51",
-    "buildNumber":  "56",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.51/takuharu-finance-v0.2.51.apk",
-    "releaseNotes":  "レシート画像のDrive保存を完全に裏で実行。読み取り後すぐ入力画面に進めるよう待ち時間を解消。"
+    "version":  "0.2.52",
+    "buildNumber":  "57",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.52/takuharu-finance-v0.2.52.apk",
+    "releaseNotes":  "明細の「レシートを見る」ボタン修正(ラベル変更＋Android11+でリンクが開けない不具合を解消)。"
 }
