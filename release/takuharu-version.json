@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.58",
-    "buildNumber":  "63",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.58/takuharu-finance-v0.2.58.apk",
-    "releaseNotes":  "レシート画像が見られない不具合(401)を修正。トークン期限切れ時に取り直して再取得。"
+    "version":  "0.2.59",
+    "buildNumber":  "64",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.59/takuharu-finance-v0.2.59.apk",
+    "releaseNotes":  "v0.2.59+64 リリース"
 }
