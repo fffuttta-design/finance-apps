@@ -52,12 +52,22 @@ class DriveReceiptService {
   /// ダウンロード済み画像のメモリキャッシュ（同じレシートの再表示を一瞬に）。
   final Map<String, Uint8List> _imageCache = {};
 
-  /// 自分の権限トークンでDriveから画像バイトを取得（アプリ内表示用）。
-  /// ブラウザ/ログイン不要で開ける（共有フォルダにアクセス権がある前提）。
+  /// Driveから画像バイトを取得（アプリ内表示用）。
+  /// ① まず「リンク公開」前提のトークン不要URLで取得を試みる（相手の権限に依存せず最強）。
+  /// ② ダメなら従来どおり自分の権限トークンで取得（401は1回リフレッシュ）。
   Future<Uint8List?> downloadFile(String fileId) async {
     lastError = null;
     final cached = _imageCache[fileId];
     if (cached != null) return cached; // 2回目以降は即返す
+
+    // ① トークン不要の公開URL（保存時に anyone-reader を付与済みなら成功）。
+    final pub = await _tryPublicDownload(fileId);
+    if (pub != null) {
+      _cachePut(fileId, pub);
+      return pub;
+    }
+
+    // ② フォールバック: 自分のトークンで取得。
     try {
       final token = await _accessToken();
       if (token == null) {
@@ -79,16 +89,38 @@ class DriveReceiptService {
         return null;
       }
       final bytes = res.bodyBytes;
-      // 肥大化防止: 直近20件だけ保持。
-      if (_imageCache.length >= 20) {
-        _imageCache.remove(_imageCache.keys.first);
-      }
-      _imageCache[fileId] = bytes;
+      _cachePut(fileId, bytes);
       return bytes;
     } catch (e) {
       lastError = e.toString();
       return null;
     }
+  }
+
+  /// 「リンクを知っている人は閲覧可」のファイルを、トークン無しで取得する。
+  /// 公開されていない/画像でない応答（ログイン要求HTML等）のときは null を返す。
+  Future<Uint8List?> _tryPublicDownload(String fileId) async {
+    try {
+      final uri = Uri.parse(
+          'https://drive.google.com/uc?export=download&id=$fileId');
+      final res = await http.get(uri);
+      if (res.statusCode != 200) return null;
+      final ct = (res.headers['content-type'] ?? '').toLowerCase();
+      // 画像が返れば成功。HTML（サインイン要求/確認ページ）は非公開とみなし失敗扱い。
+      if (ct.startsWith('image/')) return res.bodyBytes;
+      if (!ct.contains('text/html') && res.bodyBytes.length > 512) {
+        return res.bodyBytes;
+      }
+    } catch (_) {/* 公開取得に失敗 → トークン経路へ */}
+    return null;
+  }
+
+  /// 画像キャッシュへ格納（肥大化防止に直近20件だけ保持）。
+  void _cachePut(String fileId, Uint8List bytes) {
+    if (_imageCache.length >= 20) {
+      _imageCache.remove(_imageCache.keys.first);
+    }
+    _imageCache[fileId] = bytes;
   }
 
   /// 直近の失敗理由（UI 表示・原因切り分け用）。成功時は null。
@@ -250,7 +282,30 @@ class DriveReceiptService {
       throw 'アップロード失敗 (${res.statusCode}) ${_short(res.body)}';
     }
     final j = jsonDecode(res.body) as Map<String, dynamic>;
+    final id = j['id'] as String?;
+    // ★ 保存直後に「リンクを知っている人は閲覧可」権限を付与。
+    //   これで相手のドライブ権限/フォルダ共有の効き具合に依存せず、
+    //   必ず相手も画像を開ける（トークン無しの公開URLで読める）。
+    if (id != null) {
+      await _makeAnyoneReader(token, id);
+    }
     return (j['webViewLink'] as String?) ??
-        'https://drive.google.com/file/d/${j['id']}/view';
+        'https://drive.google.com/file/d/$id/view';
+  }
+
+  /// ファイルに「リンクを知っている人は閲覧可（reader）」を付与する。
+  /// 失敗しても致命ではない（従来どおりフォルダ共有＋自分のトークンで開ける）。
+  Future<void> _makeAnyoneReader(String token, String fileId) async {
+    try {
+      await http.post(
+        Uri.parse(
+            'https://www.googleapis.com/drive/v3/files/$fileId/permissions'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'role': 'reader', 'type': 'anyone'}),
+      );
+    } catch (_) {/* 権限付与失敗は無視 */}
   }
 }
