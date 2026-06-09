@@ -214,6 +214,11 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
           if (t.paymentMethod.isNotEmpty) _infoRow('支払元', t.paymentMethod),
           if (t.memo != null && t.memo!.trim().isNotEmpty)
             _infoRow('メモ', t.memo!.trim()),
+          // 個人の食費わくを使った記録は、その旨をはっきり表示。
+          if (t.personalFor != null) ...[
+            const SizedBox(height: 10),
+            _personalFoodTag(t.personalFor!),
+          ],
           if (t.receiptUrl != null && t.receiptUrl!.trim().isNotEmpty) ...[
             const SizedBox(height: 12),
             SizedBox(
@@ -283,15 +288,45 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: FilledButton.icon(
+                child: OutlinedButton.icon(
                   onPressed: _deleteTx,
                   icon: const Icon(Icons.delete_outline, size: 18),
                   label: const Text('削除'),
-                  style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.expense),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.expense,
+                    side: BorderSide(
+                        color: AppColors.expense.withValues(alpha: 0.5)),
+                  ),
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 「個人の食費わく」を使った記録に付ける目印タグ。
+  Widget _personalFoodTag(String uid) {
+    final name = HouseholdService.instance.memberNames[uid] ?? '個人';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.pink.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.pinkSoft, width: 1.2),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.lunch_dining_rounded,
+              size: 16, color: AppColors.pinkDark),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text('$name の個人の食費わくから',
+                style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.pinkDark)),
           ),
         ],
       ),

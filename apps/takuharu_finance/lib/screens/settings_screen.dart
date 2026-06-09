@@ -222,13 +222,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 4,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('設定'),
+          bottom: const TabBar(
+            isScrollable: true,
+            labelColor: AppColors.pinkDark,
+            unselectedLabelColor: AppColors.textSub,
+            indicatorColor: AppColors.pink,
+            labelStyle: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+            tabs: [
+              Tab(text: 'ふたり'),
+              Tab(text: 'お金'),
+              Tab(text: 'データ'),
+              Tab(text: 'アプリ'),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            _coupleTab(),
+            _moneyTab(),
+            _dataTab(),
+            _appTab(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// タブ①「ふたり」：共有状態・メンバー・個人の食費わく。
+  Widget _coupleTab() {
     final hs = HouseholdService.instance;
     final entries = hs.memberNames.entries.toList();
     final myUid = AuthService.instance.currentUser?.uid;
-    final myEmail = AuthService.instance.currentUser?.email ?? '';
-    return Scaffold(
-      appBar: AppBar(title: const Text('設定')),
-      body: ListView(
+    return ListView(
         padding: const EdgeInsets.all(20),
         children: [
           // 共有状態
@@ -351,7 +381,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 20),
+        ],
+    );
+  }
+
+  /// タブ②「お金」：口座・クレカ・支払方法。
+  Widget _moneyTab() {
+    return ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
           _sectionTitle('口座・クレカ'),
           const SizedBox(height: 8),
           Card(
@@ -404,7 +442,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 20),
+        ],
+    );
+  }
+
+  /// タブ③「データ」：貼り付け取り込み・変換マスタ。
+  Widget _dataTab() {
+    return ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
           _sectionTitle('データ'),
           const SizedBox(height: 8),
           Card(
@@ -437,7 +483,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 20),
+        ],
+    );
+  }
+
+  /// タブ④「アプリ」：アカウント・更新・サインアウト。
+  Widget _appTab() {
+    final myEmail = AuthService.instance.currentUser?.email ?? '';
+    return ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
           _sectionTitle('アカウント'),
           const SizedBox(height: 8),
           Card(
@@ -472,7 +527,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             label: const Text('サインアウト'),
           ),
         ],
-      ),
     );
   }
 

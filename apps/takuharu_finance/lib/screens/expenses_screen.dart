@@ -129,8 +129,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         _monthBar(),
         const SizedBox(height: 12),
         _totalCard(total, month.length),
-        const SizedBox(height: 12),
-        const SubscriptionSummaryCard(),
         const SizedBox(height: 16),
         if (cats.isNotEmpty) ...[
           _sectionTitle('カテゴリ内訳'),
@@ -145,6 +143,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           ),
           const SizedBox(height: 16),
         ],
+        // 固定費・サブスク（カテゴリ内訳と支出の記録の間に、見出し付きで配置）
+        _sectionTitle('固定費・サブスク'),
+        const SizedBox(height: 8),
+        const SubscriptionSummaryCard(),
+        const SizedBox(height: 16),
         Row(
           children: [
             _sectionTitle('支出の記録'),
