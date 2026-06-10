@@ -190,7 +190,9 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
 
   /// 大カテゴリをセクション（会計科目のまとまり）ごとに見出し付きで表示。
   /// 一律フラットだと数が多くて見づらいので、セクションで束ねる。
-  /// 並び順（=表示番号）は変更しない（過去取引の参照とズレないようにするため）。
+  /// 各セクション内はドラッグで並び替え可能。番号(0.1.2…)は並びに合わせて
+  /// 振り直すが、集計はカテゴリ名で行う（v2_report の _bareMajor が番号を無視）
+  /// ため、過去取引の金額集計はズレない。
   Widget _buildSectioned(CategoryConfig config) {
     // セクション → そのセクションに属する (グローバル index, 大カテゴリ) のリスト。
     // index は config.majors 上の位置（displayName / 編集操作で使う）。
@@ -209,13 +211,67 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
       children: [
         for (final section in sections) ...[
           _sectionHeader(section, bySection[section]?.length ?? 0),
-          for (final (index, major)
-              in bySection[section] ?? const <(int, MajorCategory)>[])
-            _majorCard(index, major),
+          _sectionReorderable(
+              section, bySection[section] ?? const <(int, MajorCategory)>[]),
           const SizedBox(height: 10),
         ],
       ],
     );
+  }
+
+  /// 1セクション分の大カテゴリを、ドラッグで並び替え可能なリストで表示。
+  Widget _sectionReorderable(
+      String section, List<(int, MajorCategory)> items) {
+    return ReorderableListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      buildDefaultDragHandles: false,
+      itemCount: items.length,
+      onReorder: (oldIndex, newIndex) =>
+          _reorderWithinSection(section, oldIndex, newIndex),
+      itemBuilder: (context, i) {
+        final (globalIndex, major) = items[i];
+        return _majorCard(
+          globalIndex,
+          major,
+          dragIndex: i,
+          key: ValueKey('major-$globalIndex-${major.name}'),
+        );
+      },
+    );
+  }
+
+  /// セクション内の並び替え。section に属する大カテゴリのスロット（config.majors
+  /// 上の位置）はそのままに、その中身だけを並べ替える（他セクションは不動）。
+  void _reorderWithinSection(String section, int oldIndex, int newIndex) {
+    if (newIndex > oldIndex) newIndex--;
+    final config = _config!;
+    // section に属する major の global index（config.majors 上の位置）順リスト。
+    final slots = <int>[];
+    for (var i = 0; i < config.majors.length; i++) {
+      final m = config.majors[i];
+      final key = (m.section == null || m.section!.isEmpty)
+          ? 'その他'
+          : m.section!;
+      if (key == section) slots.add(i);
+    }
+    if (oldIndex < 0 ||
+        oldIndex >= slots.length ||
+        newIndex < 0 ||
+        newIndex >= slots.length) {
+      return;
+    }
+    // セクション内の major を取り出して並べ替え。
+    final ordered = slots.map((gi) => config.majors[gi]).toList();
+    final moved = ordered.removeAt(oldIndex);
+    ordered.insert(newIndex, moved);
+    // 元の majors の「セクションのスロット」へ並べ替え後の major を流し込む。
+    final newMajors = [...config.majors];
+    for (var k = 0; k < slots.length; k++) {
+      newMajors[slots[k]] = ordered[k];
+    }
+    setState(() => _config = config.copyWith(majors: newMajors));
+    _save();
   }
 
   Widget _sectionHeader(String section, int count) {
@@ -250,8 +306,10 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
     );
   }
 
-  Widget _majorCard(int index, MajorCategory major) {
+  Widget _majorCard(int index, MajorCategory major,
+      {required int dragIndex, Key? key}) {
     return Container(
+      key: key,
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -272,6 +330,15 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           child: Row(
             children: [
+              // ドラッグして並び替え。
+              ReorderableDragStartListener(
+                index: dragIndex,
+                child: const Padding(
+                  padding: EdgeInsets.only(right: 2),
+                  child: Icon(Icons.drag_indicator,
+                      color: Color(0xFF9CA3AF)),
+                ),
+              ),
               // アイコン（タップで変更）
               InkWell(
                 onTap: () => _pickIcon(index),
