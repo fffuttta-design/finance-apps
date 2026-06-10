@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.217",
-    "buildNumber":  "218",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.217/futa-finance-v1.0.217.apk",
-    "releaseNotes":  "領収書画像が見られない不具合(401)を修正。トークン期限切れ時に取り直して再取得。"
+    "version":  "1.0.218",
+    "buildNumber":  "219",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.218/futa-finance-v1.0.218.apk",
+    "releaseNotes":  "v1.0.218+219 リリース"
 }
