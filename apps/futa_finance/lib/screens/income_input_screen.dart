@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../utils/thousands_separator_input_formatter.dart';
 import 'package:finance_core/finance_core.dart' as core;
@@ -413,7 +412,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                       focusNode: _amountFocus,
                       keyboardType: TextInputType.number,
                       inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
+                        HalfWidthDigitsFormatter(),
                         ThousandsSeparatorInputFormatter(),
                       ],
                       decoration: _inputDecoration(),
@@ -434,7 +433,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                         focusNode: _balanceFocus,
                         keyboardType: TextInputType.number,
                         inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
+                          HalfWidthDigitsFormatter(),
                           ThousandsSeparatorInputFormatter(),
                         ],
                         decoration: _inputDecoration().copyWith(

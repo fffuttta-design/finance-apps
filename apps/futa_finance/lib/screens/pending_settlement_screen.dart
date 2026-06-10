@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/payments_change_notifier.dart';
@@ -258,7 +257,7 @@ class _PendingSettlementScreenState extends State<PendingSettlementScreen> {
                   controller: amountCtrl,
                   keyboardType: TextInputType.number,
                   inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
+                    HalfWidthDigitsFormatter(),
                     ThousandsSeparatorInputFormatter(),
                   ],
                   textAlign: TextAlign.right,

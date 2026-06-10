@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart';
 
 import '../data/settings_repository.dart';
@@ -205,7 +204,7 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
                             controller: startingCtrl,
                             keyboardType: TextInputType.number,
                             inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
+                              HalfWidthDigitsFormatter(),
                               ThousandsSeparatorInputFormatter(),
                             ],
                             decoration: const InputDecoration(

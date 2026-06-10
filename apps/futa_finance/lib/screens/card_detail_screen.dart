@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/payments_change_notifier.dart';
@@ -724,7 +723,7 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                   controller: amountCtrl,
                   keyboardType: TextInputType.number,
                   inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
+                    HalfWidthDigitsFormatter(),
                     ThousandsSeparatorInputFormatter(),
                   ],
                   decoration: const InputDecoration(

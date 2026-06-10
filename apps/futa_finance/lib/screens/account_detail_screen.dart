@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/payments_change_notifier.dart';
@@ -656,7 +655,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
             controller: ctrl,
             keyboardType: TextInputType.number,
             inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
+              HalfWidthDigitsFormatter(),
               ThousandsSeparatorInputFormatter(),
             ],
             decoration: const InputDecoration(
@@ -971,7 +970,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                     controller: amountCtrl,
                     keyboardType: TextInputType.number,
                     inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
+                      HalfWidthDigitsFormatter(),
                       ThousandsSeparatorInputFormatter(),
                     ],
                     decoration: InputDecoration(

@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/settings_repository.dart';
@@ -269,7 +268,7 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
               controller: _amountCtrl,
               keyboardType: TextInputType.number,
               inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
+                HalfWidthDigitsFormatter(),
                 ThousandsSeparatorInputFormatter(),
               ],
               decoration: const InputDecoration(

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/drive_receipt_service.dart';
@@ -625,7 +624,7 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                     keyboardType: TextInputType.number,
                     textAlign: TextAlign.right,
                     inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
+                      HalfWidthDigitsFormatter(),
                       ThousandsSeparatorInputFormatter(),
                     ],
                     decoration: const InputDecoration(

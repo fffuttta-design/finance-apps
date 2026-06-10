@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -1072,7 +1071,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
           focusNode: _balanceFocus,
           keyboardType: TextInputType.number,
           inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
+            HalfWidthDigitsFormatter(),
             ThousandsSeparatorInputFormatter(),
           ],
           decoration: _inputDecoration().copyWith(
@@ -1151,7 +1150,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
             keyboardType: TextInputType.number,
             textAlign: TextAlign.right,
             inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
+              HalfWidthDigitsFormatter(),
               ThousandsSeparatorInputFormatter(),
             ],
             decoration: _inputDecoration().copyWith(

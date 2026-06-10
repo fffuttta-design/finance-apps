@@ -21,6 +21,36 @@ class NoComposingUnderlineController extends TextEditingController {
   }
 }
 
+/// 全角数字（０-９）を半角（0-9）へ自動変換しつつ、数字以外を取り除く
+/// TextInputFormatter。`FilteringTextInputFormatter.digitsOnly` の置き換え用。
+///
+/// digitsOnly は全角数字を「数字でない」と判定して消してしまうため、
+/// うっかり全角で入力すると何も入らない。これを使うと全角で打っても
+/// 自動的に半角数字になる。桁区切りと併用する場合は、必ずこのフォーマッタを
+/// 先に置く（`[HalfWidthDigitsFormatter(), ThousandsSeparatorInputFormatter()]`）。
+class HalfWidthDigitsFormatter extends TextInputFormatter {
+  const HalfWidthDigitsFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    final buf = StringBuffer();
+    for (final r in newValue.text.runes) {
+      if (r >= 0xFF10 && r <= 0xFF19) {
+        buf.writeCharCode(r - 0xFF10 + 0x30); // 全角0-9 → 半角0-9
+      } else if (r >= 0x30 && r <= 0x39) {
+        buf.writeCharCode(r); // 半角数字はそのまま
+      }
+      // それ以外（記号・空白・全角記号など）は除去
+    }
+    final text = buf.toString();
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+}
+
 /// 金額入力欄用の TextInputFormatter。
 /// 入力中にリアルタイムで 3桁区切りの `,` を自動挿入する。
 ///

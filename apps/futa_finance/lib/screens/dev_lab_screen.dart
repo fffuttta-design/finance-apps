@@ -5,7 +5,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/app_mode.dart';
@@ -1020,7 +1019,7 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
                   controller: balanceCtrl,
                   keyboardType: TextInputType.number,
                   inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
+                    HalfWidthDigitsFormatter(),
                     ThousandsSeparatorInputFormatter(),
                   ],
                   decoration: const InputDecoration(
@@ -1037,7 +1036,7 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
                   controller: repayCtrl,
                   keyboardType: TextInputType.number,
                   inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
+                    HalfWidthDigitsFormatter(),
                     ThousandsSeparatorInputFormatter(),
                   ],
                   decoration: const InputDecoration(
@@ -1498,7 +1497,7 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
             controller: c,
             keyboardType: TextInputType.number,
             inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
+              HalfWidthDigitsFormatter(),
               ThousandsSeparatorInputFormatter(),
             ],
             decoration:
@@ -2275,7 +2274,7 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
                 controller: amountCtrl,
                 keyboardType: TextInputType.number,
                 inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
+                  HalfWidthDigitsFormatter(),
                   ThousandsSeparatorInputFormatter(),
                 ],
                 decoration: const InputDecoration(

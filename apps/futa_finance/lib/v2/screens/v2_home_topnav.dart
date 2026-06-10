@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:finance_core/finance_core.dart';
 import 'package:path_provider/path_provider.dart';
@@ -273,7 +272,7 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
               controller: controller,
               keyboardType: TextInputType.number,
               inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
+                HalfWidthDigitsFormatter(),
                 ThousandsSeparatorInputFormatter(),
               ],
               autofocus: true,

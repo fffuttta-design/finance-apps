@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart';
 
 import '../utils/thousands_separator_input_formatter.dart';
@@ -339,7 +338,7 @@ Future<Subscription?> showSubscriptionEditSheet(
                           controller: amountCtrl,
                           keyboardType: TextInputType.number,
                           inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
+                            HalfWidthDigitsFormatter(),
                             ThousandsSeparatorInputFormatter(),
                           ],
                           decoration: InputDecoration(

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 import 'package:url_launcher/url_launcher.dart';
 
@@ -277,7 +276,7 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
           keyboardType: TextInputType.number,
           autofocus: true,
           inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
+            HalfWidthDigitsFormatter(),
             ThousandsSeparatorInputFormatter(),
           ],
           decoration: InputDecoration(
