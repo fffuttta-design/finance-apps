@@ -10,6 +10,7 @@ import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
 import '../../screens/expense_list_screen.dart';
+import '../../screens/receipt_group_detail_screen.dart';
 import '../../screens/receipt_image_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
 import '../../utils/formatters.dart';
@@ -134,6 +135,16 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
       ),
     );
     if (mounted) await _load();
+  }
+
+  /// まとめ（複数品目）行タップ：まとめ編集画面（内訳＋まとめ編集・削除）へ。
+  Future<void> _showGroupDetail(List<core.Transaction> members) async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+          builder: (_) => ReceiptGroupDetailScreen(members: members)),
+    );
+    if (changed == true && mounted) await _load();
   }
 
   /// 行タップ：経費はまず詳細画面を表示（そこから編集/削除）。それ以外は明細シート。
@@ -437,6 +448,7 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
                   _ExpensesTable(
                     rows: expenses,
                     onTapRow: _showTxnSummary,
+                    onTapGroup: _showGroupDetail,
                   ),
               ],
             ),
@@ -947,9 +959,12 @@ class _Unit {
 class _ExpensesTable extends StatefulWidget {
   final List<core.Transaction> rows;
   final void Function(core.Transaction t) onTapRow;
+  // まとめ（複数品目）行タップ → まとめ編集画面（内訳＋編集・削除）へ。
+  final void Function(List<core.Transaction> members) onTapGroup;
   const _ExpensesTable({
     required this.rows,
     required this.onTapRow,
+    required this.onTapGroup,
   });
 
   @override
@@ -957,9 +972,6 @@ class _ExpensesTable extends StatefulWidget {
 }
 
 class _ExpensesTableState extends State<_ExpensesTable> {
-  /// 展開中のレシート（receiptId）。タップで内訳を開閉。
-  final Set<String> _expanded = {};
-
   /// 同じ receiptId が2件以上 → まとめ（group）、それ以外 → 単品（single）。
   /// 並び順は元の rows の順（親はその最初の品目の位置）を保つ。
   List<_Unit> get _units {
@@ -996,13 +1008,7 @@ class _ExpensesTableState extends State<_ExpensesTable> {
             _ReceiptGroupRow(
               members: u.members!,
               total: u.total,
-              expanded: _expanded.contains(u.receiptId),
-              onToggle: () => setState(() {
-                if (!_expanded.remove(u.receiptId)) {
-                  _expanded.add(u.receiptId!);
-                }
-              }),
-              onTapChild: widget.onTapRow,
+              onTap: () => widget.onTapGroup(u.members!),
             )
           else
             _ExpenseRow(
@@ -1014,29 +1020,17 @@ class _ExpensesTableState extends State<_ExpensesTable> {
   }
 }
 
-/// レシートまとめの親行（枠付きカード・タップで内訳を開閉）。
+/// レシートまとめの親行（枠付きカード）。タップでまとめ編集画面（内訳＋編集・削除）へ。
 /// 品目ごとは別取引なので、分析・集計はカテゴリ別に正しく分かれる。
 class _ReceiptGroupRow extends StatelessWidget {
   final List<core.Transaction> members;
   final int total;
-  final bool expanded;
-  final VoidCallback onToggle;
-  final void Function(core.Transaction t) onTapChild;
+  final VoidCallback onTap;
   const _ReceiptGroupRow({
     required this.members,
     required this.total,
-    required this.expanded,
-    required this.onToggle,
-    required this.onTapChild,
+    required this.onTap,
   });
-
-  String _catLabel(core.Category c) {
-    final major = c.major.trim();
-    final sub = c.sub.trim();
-    if (major.isEmpty && sub.isEmpty) return '未分類';
-    if (sub.isEmpty) return major;
-    return sub;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1053,7 +1047,7 @@ class _ReceiptGroupRow extends StatelessWidget {
             : 'まとめ記録');
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onToggle,
+      onTap: onTap,
       child: Container(
         margin:
             const EdgeInsets.fromLTRB(V2Spacing.md, 0, V2Spacing.md, 8),
@@ -1064,90 +1058,42 @@ class _ReceiptGroupRow extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: V2Colors.border),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 38,
-                  child: Text('${first.date.month}/${first.date.day}',
-                      style: V2Typography.numericCell),
-                ),
-                const SizedBox(width: V2Spacing.sm),
-                Expanded(
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: V2Colors.surfaceMuted,
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: Text('🧾 ${members.length}件',
-                            style: V2Typography.micro),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(title,
-                            style: V2Typography.body,
-                            overflow: TextOverflow.ellipsis),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: V2Spacing.sm),
-                // トグルアイコンは出さない（金額位置を単品行と揃えるため）。
-                // 行タップで開閉する挙動はそのまま。
-                Text('-${formatYen(total)}',
-                    style: V2Typography.numericCell.copyWith(
-                        color: V2Colors.negative,
-                        fontWeight: FontWeight.w700)),
-              ],
+            SizedBox(
+              width: 38,
+              child: Text('${first.date.month}/${first.date.day}',
+                  style: V2Typography.numericCell),
             ),
-            if (expanded) ...[
-              const SizedBox(height: 6),
-              const Divider(height: 1),
-              for (final t in members)
-                InkWell(
-                  onTap: () => onTapChild(t),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 8, 0, 2),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.subdirectory_arrow_right_rounded,
-                            size: 15, color: Color(0xFFC7CCD6)),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: V2Colors.surfaceMuted,
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                          child: Text(_catLabel(t.category),
-                              style: V2Typography.micro),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            t.description.isEmpty ? '—' : t.description,
-                            style: V2Typography.caption,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text('-${formatYen(t.amount)}',
-                            style: V2Typography.numericCell.copyWith(
-                                color: V2Colors.negative,
-                                fontWeight: FontWeight.w700)),
-                      ],
+            const SizedBox(width: V2Spacing.sm),
+            Expanded(
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: V2Colors.surfaceMuted,
+                      borderRadius: BorderRadius.circular(3),
                     ),
+                    child: Text('🧾 ${members.length}件',
+                        style: V2Typography.micro),
                   ),
-                ),
-            ],
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(title,
+                        style: V2Typography.body,
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: V2Spacing.sm),
+            Text('-${formatYen(total)}',
+                style: V2Typography.numericCell.copyWith(
+                    color: V2Colors.negative,
+                    fontWeight: FontWeight.w700)),
           ],
         ),
       ),

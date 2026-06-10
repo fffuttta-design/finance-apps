@@ -5,6 +5,7 @@ import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
+import 'receipt_group_detail_screen.dart';
 import 'transaction_detail_screen.dart';
 
 /// 並び替えモード。
@@ -71,9 +72,6 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   _Sort _sort = _Sort.dateDesc;
   final _searchCtrl = TextEditingController();
   String _query = '';
-
-  /// 展開中のレシート（receiptId）。タップで内訳を開閉。
-  final Set<String> _expanded = {};
 
   /// 絞り込み済みの取引を、レシート単位でまとめた表示単位に変換する。
   /// 同じ receiptId が 2 件以上 → まとめ（group）、それ以外 → 単品（single）。
@@ -186,6 +184,16 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
       context,
       MaterialPageRoute(
           builder: (_) => TransactionDetailScreen(transaction: t)),
+    );
+    if (changed == true && mounted) await _load();
+  }
+
+  /// まとめ（複数品目）行タップ：まとめ編集画面（内訳＋まとめ編集・削除）へ。
+  Future<void> _showGroupDetail(List<core.Transaction> members) async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+          builder: (_) => ReceiptGroupDetailScreen(members: members)),
     );
     if (changed == true && mounted) await _load();
   }
@@ -421,103 +429,48 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     );
   }
 
-  /// レシートまとめの親行（白カード・タップで内訳を開閉）。
+  /// レシートまとめの親行（白カード）。タップでまとめ編集画面（内訳＋編集・削除）へ。
   Widget _groupRow(_Unit u) {
     final m = u.members!;
-    final rid = u.receiptId!;
-    final expanded = _expanded.contains(rid);
     final first = m.first;
     final store = m
         .map((t) => t.store?.trim() ?? '')
         .firstWhere((s) => s.isNotEmpty, orElse: () => '');
     final title = store.isNotEmpty ? store : 'まとめ記録';
     return _card(
-      onTap: () => setState(() {
-        if (expanded) {
-          _expanded.remove(rid);
-        } else {
-          _expanded.add(rid);
-        }
-      }),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      onTap: () => _showGroupDetail(m),
+      child: Row(
         children: [
-          Row(
-            children: [
-              SizedBox(
-                width: 38,
-                child: Text('${first.date.month}/${first.date.day}',
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontFamily: 'monospace',
-                        color: Color(0xFF6B7280))),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Row(
-                  children: [
-                    _badge('🧾 ${m.length}件まとめ'),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(title,
-                          style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF111827)),
-                          overflow: TextOverflow.ellipsis),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              // トグルアイコンは出さない（金額位置を単品行と揃えるため）。
-              // 行タップで開閉する挙動はそのまま。
-              _amountText(u.total),
-            ],
+          SizedBox(
+            width: 38,
+            child: Text('${first.date.month}/${first.date.day}',
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                    color: Color(0xFF6B7280))),
           ),
-          if (expanded) ...[
-            const SizedBox(height: 6),
-            const Divider(height: 1),
-            for (final t in m) _childRow(t),
-          ],
+          const SizedBox(width: 8),
+          Expanded(
+            child: Row(
+              children: [
+                _badge('🧾 ${m.length}件まとめ'),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(title,
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF111827)),
+                      overflow: TextOverflow.ellipsis),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          _amountText(u.total),
         ],
       ),
     );
   }
 
-  /// レシート内訳の子行（カード内・タップで詳細）。
-  Widget _childRow(core.Transaction t) {
-    return InkWell(
-      onTap: () => _editRow(t),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 0, 2),
-        child: Row(
-          children: [
-            const Icon(Icons.subdirectory_arrow_right_rounded,
-                size: 15, color: Color(0xFFC7CCD6)),
-            const SizedBox(width: 6),
-            _badge(_catLabel(t.category)),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                t.description.isEmpty ? '—' : t.description,
-                style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF374151)),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text('-${formatYen(t.amount)}',
-                style: const TextStyle(
-                    fontSize: 13,
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFFDC2626))),
-          ],
-        ),
-      ),
-    );
-  }
 }
