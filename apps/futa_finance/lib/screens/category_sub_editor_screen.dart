@@ -184,7 +184,7 @@ class _CategorySubEditorScreenState extends State<CategorySubEditorScreen> {
             categoryIconWidget(_major.iconKey,
                 color: const Color(0xFF1A237E), size: 22),
             const SizedBox(width: 8),
-            Text(_major.displayName(widget.majorIndex),
+            Text(_major.name,
                 style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,

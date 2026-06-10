@@ -64,7 +64,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
   core.IncomeSource? _selectedSource;
   String? _receiveAccount;
   final _descCtrl = TextEditingController();
-  final _amountCtrl = TextEditingController();
+  final _amountCtrl = NoComposingUnderlineController();
   final _balanceAfterCtrl = TextEditingController();
   final _memoCtrl = TextEditingController();
 

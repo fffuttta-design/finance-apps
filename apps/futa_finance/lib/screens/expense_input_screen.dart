@@ -143,7 +143,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   /// 現在選択中の支払元カテゴリ。デフォルト: クレカ（最も使用頻度が高いため）。
   _PayCategory _payCategory = _PayCategory.card;
   final _descCtrl = TextEditingController();
-  final _amountCtrl = TextEditingController(); // 円金額（USD時はここに概算円）
+  // composing 下線（入力中の無駄なアンダーバー）を出さないコントローラ。
+  final _amountCtrl =
+      NoComposingUnderlineController(); // 円金額（USD時はここに概算円）
   final _usdAmountCtrl = TextEditingController(); // USD金額
   final _balanceAfterCtrl = TextEditingController();
   final _memoCtrl = TextEditingController();

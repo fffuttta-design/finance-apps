@@ -364,7 +364,8 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        major.displayName(index),
+                        // 自動番号(0.1.2…)は付けず、カテゴリ名のみ表示。
+                        major.name,
                         style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,

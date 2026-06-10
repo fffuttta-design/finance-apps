@@ -55,7 +55,7 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
   DateTime _date = DateTime.now();
   String? _fromAccount;
   String? _toAccount;
-  final _amountCtrl = TextEditingController();
+  final _amountCtrl = NoComposingUnderlineController();
   final _memoCtrl = TextEditingController();
   bool _saving = false;
 

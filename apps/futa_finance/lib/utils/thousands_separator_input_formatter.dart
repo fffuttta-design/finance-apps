@@ -1,4 +1,25 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+/// 入力中の「変換中（composing）」下線を描かない TextEditingController。
+///
+/// 金額欄などで、IME（特に Web）が入力途中の文字に付ける下線が
+/// 「無駄なアンダーバー」として見えるのを防ぐ。挙動は通常の
+/// TextEditingController と同じで、composing の下線描画だけ止める。
+class NoComposingUnderlineController extends TextEditingController {
+  NoComposingUnderlineController({super.text});
+
+  @override
+  TextSpan buildTextSpan({
+    required BuildContext context,
+    TextStyle? style,
+    required bool withComposing,
+  }) {
+    // withComposing を常に false にして composing 下線を出さない。
+    return super.buildTextSpan(
+        context: context, style: style, withComposing: false);
+  }
+}
 
 /// 金額入力欄用の TextInputFormatter。
 /// 入力中にリアルタイムで 3桁区切りの `,` を自動挿入する。
