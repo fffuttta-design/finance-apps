@@ -147,14 +147,16 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
           ),
         );
       }
-      // 狭い画面（スマホ）：メニューだけを縦に。タップで各設定をフルスクリーンへ。
-      return Padding(
+      // 狭い画面（スマホ）：カテゴリごとに別カードへ分離して縦に並べる。
+      // タップで各設定をフルスクリーンへ。
+      return SingleChildScrollView(
         padding: const EdgeInsets.symmetric(vertical: V2Spacing.lg),
         child: _SettingsMenu(
           groups: _menus,
           currentId: '',
           accent: widget.accent,
           onSelect: _openPanelScreen,
+          splitCards: true,
         ),
       );
     });
@@ -424,15 +426,66 @@ class _SettingsMenu extends StatelessWidget {
   final String currentId;
   final Color accent;
   final ValueChanged<String> onSelect;
+
+  /// true のとき、カテゴリ（グループ）ごとに別カードへ分離して縦に並べる。
+  /// スマホの設定一覧で縦長になりすぎるのを防ぐため、見出し単位でまとまりを作る。
+  /// false（既定）のときは従来どおり1枚のカードに全グループを収める（PC サイドバー）。
+  final bool splitCards;
+
   const _SettingsMenu({
     required this.groups,
     required this.currentId,
     required this.accent,
     required this.onSelect,
+    this.splitCards = false,
   });
+
+  /// 1グループ分の見出し + 項目タイル列。
+  Widget _groupBody(_MenuGroup group) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+              V2Spacing.sm, 0, V2Spacing.sm, V2Spacing.xs),
+          child: Text(group.title,
+              style: V2Typography.micro.copyWith(
+                  color: V2Colors.textMuted,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5)),
+        ),
+        for (final item in group.items)
+          _MenuTile(
+            item: item,
+            selected: item.id == currentId,
+            accent: accent,
+            onTap: () => onSelect(item.id),
+          ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    // カテゴリごとに別カードへ分離（スマホ）。
+    if (splitCards) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var gi = 0; gi < groups.length; gi++) ...[
+            if (gi > 0) const SizedBox(height: V2Spacing.md),
+            V2Card(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: V2Spacing.sm, vertical: V2Spacing.md),
+              child: _groupBody(groups[gi]),
+            ),
+          ],
+        ],
+      );
+    }
+    // 従来: 1枚のカードに全グループ（PC サイドバー）。
     return V2Card(
       padding: const EdgeInsets.symmetric(
           horizontal: V2Spacing.sm, vertical: V2Spacing.md),
@@ -442,22 +495,7 @@ class _SettingsMenu extends StatelessWidget {
         children: [
           for (var gi = 0; gi < groups.length; gi++) ...[
             if (gi > 0) const SizedBox(height: V2Spacing.md),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                  V2Spacing.sm, 0, V2Spacing.sm, V2Spacing.xs),
-              child: Text(groups[gi].title,
-                  style: V2Typography.micro.copyWith(
-                      color: V2Colors.textMuted,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5)),
-            ),
-            for (final item in groups[gi].items)
-              _MenuTile(
-                item: item,
-                selected: item.id == currentId,
-                accent: accent,
-                onTap: () => onSelect(item.id),
-              ),
+            _groupBody(groups[gi]),
           ],
         ],
       ),
