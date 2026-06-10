@@ -812,10 +812,11 @@ class _CenterColumn extends StatelessWidget {
         : projected;
     final diff = actual - projected;
 
-    // 最新の入出金: 選択中の月のみ・日付降順で最新 5 件
+    // 最新の入出金: 選択中の月のみ・日付降順。
+    // 同じレシート（receiptId が2件以上）は1行にまとめる（支出明細と同じ挙動）。
     final recent = [...monthTxns]
       ..sort((a, b) => b.date.compareTo(a.date));
-    final recentTop = recent.take(8).toList();
+    final recentUnits = _groupByReceipt(recent).take(8).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1113,7 +1114,7 @@ class _CenterColumn extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: V2Spacing.md),
-              if (recentTop.isEmpty)
+              if (recentUnits.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Text('取引記録はまだありません',
@@ -1121,19 +1122,38 @@ class _CenterColumn extends StatelessWidget {
                           color: V2Colors.textSecondary)),
                 )
               else
-                for (final t in recentTop)
-                  _TransactionRow(
-                    t: t,
-                    onTap: () async {
-                      final changed = await Navigator.push<bool>(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) =>
-                                TransactionDetailScreen(transaction: t)),
-                      );
-                      if (changed == true) await state._load();
-                    },
-                  ),
+                for (final u in recentUnits)
+                  if (u.isGroup)
+                    // レシートのまとめ：タップで月の明細一覧へ（内訳を見られる）。
+                    _ReceiptGroupRow(
+                      members: u.members!,
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ExpenseListScreen(
+                              title:
+                                  isBusiness ? '経費明細一覧' : '支出明細一覧',
+                              month: state._selectedMonth,
+                            ),
+                          ),
+                        );
+                        await state._load();
+                      },
+                    )
+                  else
+                    _TransactionRow(
+                      t: u.single!,
+                      onTap: () async {
+                        final changed = await Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => TransactionDetailScreen(
+                                  transaction: u.single!)),
+                        );
+                        if (changed == true) await state._load();
+                      },
+                    ),
             ],
           ),
         ),
@@ -1221,6 +1241,114 @@ class _TransactionRow extends StatelessWidget {
     );
     if (onTap == null) return card;
     // 最近の入出金は編集しやすいよう、行タップで詳細画面を直接開く。
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: card,
+    );
+  }
+}
+
+/// 入出金一覧の表示単位：単品（single）か、同じレシートのまとめ（group）。
+class _RecentUnit {
+  final Transaction? single;
+  final List<Transaction>? members;
+  const _RecentUnit.single(this.single) : members = null;
+  const _RecentUnit.group(this.members) : single = null;
+  bool get isGroup => members != null;
+}
+
+/// 同じ receiptId が2件以上 → まとめ（group）、それ以外 → 単品（single）。
+/// 並び順は元の rows の順（親はその最初の品目の位置）を保つ。
+List<_RecentUnit> _groupByReceipt(List<Transaction> rows) {
+  final counts = <String, int>{};
+  for (final t in rows) {
+    final rid = t.receiptId;
+    if (rid != null && rid.isNotEmpty) counts[rid] = (counts[rid] ?? 0) + 1;
+  }
+  final units = <_RecentUnit>[];
+  final seen = <String>{};
+  for (final t in rows) {
+    final rid = t.receiptId;
+    if (rid != null && rid.isNotEmpty && (counts[rid] ?? 0) >= 2) {
+      if (seen.add(rid)) {
+        units.add(_RecentUnit.group(
+            rows.where((x) => x.receiptId == rid).toList()));
+      }
+    } else {
+      units.add(_RecentUnit.single(t));
+    }
+  }
+  return units;
+}
+
+/// レシートのまとめ行（同じレシートの複数品目を1行に集約）。
+/// 「日付 / レシートN件バッジ / 店舗 / 合計」を表示。
+class _ReceiptGroupRow extends StatelessWidget {
+  final List<Transaction> members;
+  final VoidCallback? onTap;
+  const _ReceiptGroupRow({required this.members, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final first = members.first;
+    final isIncome = first.type == TransactionType.income;
+    final color = isIncome ? V2Colors.positive : V2Colors.negative;
+    final sign = isIncome ? '+' : '-';
+    final total = members.fold<int>(0, (s, t) => s + t.amount);
+    final store = (first.store ?? '').trim().isNotEmpty
+        ? first.store!.trim()
+        : (first.description.trim().isNotEmpty
+            ? first.description.trim()
+            : first.paymentMethod);
+    final card = Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(
+          horizontal: V2Spacing.md, vertical: 10),
+      decoration: BoxDecoration(
+        color: V2Colors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: V2Colors.border),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+              width: 40,
+              child: Text('${first.date.month}/${first.date.day}',
+                  style: V2Typography.caption.copyWith(
+                      fontFeatures: V2Typography.tabularNums))),
+          // レシートまとめバッジ（N件）
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: V2Spacing.sm, vertical: 2),
+            decoration: BoxDecoration(
+              color: V2Colors.surfaceMuted,
+              borderRadius: BorderRadius.circular(V2Spacing.radiusXs),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.receipt_long,
+                    size: 11, color: V2Colors.textSecondary),
+                const SizedBox(width: 3),
+                Text('${members.length}件', style: V2Typography.micro),
+              ],
+            ),
+          ),
+          const SizedBox(width: V2Spacing.md),
+          Expanded(
+            child: Text(store,
+                style: V2Typography.body, overflow: TextOverflow.ellipsis),
+          ),
+          Text('$sign${formatYen(total)}',
+              style: V2Typography.body.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                  fontFeatures: V2Typography.tabularNums)),
+        ],
+      ),
+    );
+    if (onTap == null) return card;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,

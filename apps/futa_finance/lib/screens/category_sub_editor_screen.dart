@@ -3,6 +3,7 @@ import 'package:finance_core/finance_core.dart';
 
 import '../data/settings_repository.dart';
 import '../utils/emoji_palette.dart';
+import '../widgets/centered_body.dart';
 import '../widgets/emoji_picker_dialog.dart';
 
 /// 1つの大カテゴリのサブカテゴリ専用CRUD画面。
@@ -199,7 +200,10 @@ class _CategorySubEditorScreenState extends State<CategorySubEditorScreen> {
         ],
       ),
       body: SafeArea(
-        child: _major.subs.isEmpty
+        // Web/PC で横に広がりすぎないよう中央寄せ＋最大幅。スマホは全幅のまま。
+        child: CenteredBody(
+          maxWidth: 680,
+          child: _major.subs.isEmpty
             ? _empty()
             : ReorderableListView.builder(
                 padding: const EdgeInsets.all(16),
@@ -276,6 +280,7 @@ class _CategorySubEditorScreenState extends State<CategorySubEditorScreen> {
                   );
                 },
               ),
+        ),
       ),
     );
   }
