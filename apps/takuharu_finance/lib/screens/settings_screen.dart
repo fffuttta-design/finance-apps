@@ -19,6 +19,17 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  // サイドバーで選択中のカテゴリ（0:ふたり 1:お金 2:データ 3:アプリ）。
+  int _tab = 0;
+
+  /// サイドバーの項目（アイコン＋ラベル）。
+  static const _navItems = <({IconData icon, String label})>[
+    (icon: Icons.favorite_rounded, label: 'ふたり'),
+    (icon: Icons.account_balance_wallet_rounded, label: 'お金'),
+    (icon: Icons.storage_rounded, label: 'データ'),
+    (icon: Icons.smartphone_rounded, label: 'アプリ'),
+  ];
+
   Future<void> _addPayment() async {
     final ctrl = TextEditingController();
     final name = await showDialog<String>(
@@ -222,34 +233,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 4,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('設定'),
-          bottom: const TabBar(
-            isScrollable: true,
-            labelColor: AppColors.pinkDark,
-            unselectedLabelColor: AppColors.textSub,
-            indicatorColor: AppColors.pink,
-            labelStyle: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-            tabs: [
-              Tab(text: 'ふたり'),
-              Tab(text: 'お金'),
-              Tab(text: 'データ'),
-              Tab(text: 'アプリ'),
-            ],
-          ),
-        ),
-        body: TabBarView(
+    return Scaffold(
+      appBar: AppBar(title: const Text('設定')),
+      body: LayoutBuilder(builder: (context, c) {
+        // 左サイドバー＋右内容の2ペイン。スマホでは左レールを細くする。
+        final double railWidth = c.maxWidth < 480 ? 92 : 132;
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _coupleTab(),
-            _moneyTab(),
-            _dataTab(),
-            _appTab(),
+            Container(
+              width: railWidth,
+              decoration: const BoxDecoration(
+                color: AppColors.bg,
+                border: Border(
+                  right: BorderSide(color: AppColors.divider),
+                ),
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Column(
+                  children: [
+                    for (var i = 0; i < _navItems.length; i++)
+                      _NavTile(
+                        icon: _navItems[i].icon,
+                        label: _navItems[i].label,
+                        selected: _tab == i,
+                        onTap: () => setState(() => _tab = i),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(
+              child: IndexedStack(
+                index: _tab,
+                children: [
+                  _coupleTab(),
+                  _moneyTab(),
+                  _dataTab(),
+                  _appTab(),
+                ],
+              ),
+            ),
           ],
-        ),
-      ),
+        );
+      }),
     );
   }
 
@@ -538,4 +566,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 fontWeight: FontWeight.w800,
                 color: AppColors.text)),
       );
+}
+
+/// サイドバーの1項目（アイコンを上、ラベルを下）。選択中はピンクで強調。
+class _NavTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _NavTile({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = selected ? AppColors.pinkDark : AppColors.textSub;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Material(
+        color: selected ? AppColors.pinkSoft : Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Column(
+              children: [
+                Icon(icon, size: 22, color: fg),
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight:
+                        selected ? FontWeight.w800 : FontWeight.w600,
+                    color: fg,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

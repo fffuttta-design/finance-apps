@@ -15,7 +15,6 @@ import 'panels/v2_backup_panel.dart';
 import 'panels/v2_income_master_panel.dart';
 import 'panels/v2_replacement_panel.dart';
 import 'panels/v2_sidebar_order_panel.dart';
-import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
@@ -86,54 +85,23 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
     ]),
   ];
 
-  String _titleFor(String id) {
-    for (final g in _menus) {
-      for (final it in g.items) {
-        if (it.id == id) return it.label;
-      }
-    }
-    return '設定';
-  }
-
-  /// 狭い画面（スマホ）：メニュー項目タップで該当パネルをフルスクリーンで開く。
-  void _openPanelScreen(String id) {
-    setState(() => _currentId = id);
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => Theme(
-          data: V2Theme.light(),
-          child: Scaffold(
-            backgroundColor: V2Colors.surfaceMuted,
-            appBar: AppBar(
-              title: Text(_titleFor(id),
-                  style: const TextStyle(
-                      fontSize: 17, fontWeight: FontWeight.w700)),
-            ),
-            body: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(V2Spacing.lg),
-                child: _buildPanel(),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, c) {
-      // 広い画面：左メニュー＋右パネルのマスター/ディテール。
-      if (c.maxWidth >= 900) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: V2Spacing.xl),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: 240,
+      // 広い画面でも狭い画面（スマホ）でも、左メニュー＋右パネルの
+      // マスター/ディテール（サイドバー）で統一。スマホは左レールを細くする。
+      final wide = c.maxWidth >= 900;
+      final double sidebarWidth =
+          wide ? 240 : (c.maxWidth < 480 ? 128 : 200);
+      return Padding(
+        padding: EdgeInsets.symmetric(
+            vertical: wide ? V2Spacing.xl : V2Spacing.lg),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: sidebarWidth,
+              child: SingleChildScrollView(
                 child: _SettingsMenu(
                   groups: _menus,
                   currentId: _currentId,
@@ -141,22 +109,10 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
                   onSelect: (id) => setState(() => _currentId = id),
                 ),
               ),
-              const SizedBox(width: V2Spacing.lg),
-              Expanded(child: _buildPanel()),
-            ],
-          ),
-        );
-      }
-      // 狭い画面（スマホ）：カテゴリごとに別カードへ分離して縦に並べる。
-      // タップで各設定をフルスクリーンへ。
-      return SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: V2Spacing.lg),
-        child: _SettingsMenu(
-          groups: _menus,
-          currentId: '',
-          accent: widget.accent,
-          onSelect: _openPanelScreen,
-          splitCards: true,
+            ),
+            SizedBox(width: wide ? V2Spacing.lg : V2Spacing.sm),
+            Expanded(child: _buildPanel()),
+          ],
         ),
       );
     });
@@ -427,17 +383,11 @@ class _SettingsMenu extends StatelessWidget {
   final Color accent;
   final ValueChanged<String> onSelect;
 
-  /// true のとき、カテゴリ（グループ）ごとに別カードへ分離して縦に並べる。
-  /// スマホの設定一覧で縦長になりすぎるのを防ぐため、見出し単位でまとまりを作る。
-  /// false（既定）のときは従来どおり1枚のカードに全グループを収める（PC サイドバー）。
-  final bool splitCards;
-
   const _SettingsMenu({
     required this.groups,
     required this.currentId,
     required this.accent,
     required this.onSelect,
-    this.splitCards = false,
   });
 
   /// 1グループ分の見出し + 項目タイル列。
@@ -468,24 +418,6 @@ class _SettingsMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // カテゴリごとに別カードへ分離（スマホ）。
-    if (splitCards) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (var gi = 0; gi < groups.length; gi++) ...[
-            if (gi > 0) const SizedBox(height: V2Spacing.md),
-            V2Card(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: V2Spacing.sm, vertical: V2Spacing.md),
-              child: _groupBody(groups[gi]),
-            ),
-          ],
-        ],
-      );
-    }
-    // 従来: 1枚のカードに全グループ（PC サイドバー）。
     return V2Card(
       padding: const EdgeInsets.symmetric(
           horizontal: V2Spacing.sm, vertical: V2Spacing.md),
@@ -558,6 +490,8 @@ class _MenuTileState extends State<_MenuTile> {
                         fontWeight: selected
                             ? FontWeight.w700
                             : FontWeight.w500),
+                    // 狭いレールでも長いラベルが読めるよう2行まで折り返す。
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
