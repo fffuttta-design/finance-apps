@@ -15,6 +15,7 @@ import 'panels/v2_backup_panel.dart';
 import 'panels/v2_income_master_panel.dart';
 import 'panels/v2_replacement_panel.dart';
 import 'panels/v2_sidebar_order_panel.dart';
+import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
@@ -58,50 +59,93 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
 
   static const _menus = <_MenuGroup>[
     _MenuGroup(title: '表示・UI', items: [
-      _MenuItem('display', '表示設定', Icons.tune),
-      _MenuItem('sidebarOrder', 'サイドバー並び順', Icons.view_sidebar_outlined),
+      _MenuItem('display', '表示設定', Icons.tune,
+          desc: 'UI の見た目や挙動を切替'),
+      _MenuItem('sidebarOrder', 'サイドバー並び順', Icons.view_sidebar_outlined,
+          desc: 'メニューの並び順を変更'),
     ]),
     _MenuGroup(title: 'マスタデータ', items: [
-      _MenuItem('category', '支出カテゴリ', Icons.label_outline),
+      _MenuItem('category', '支出カテゴリ', Icons.label_outline,
+          desc: '大分類・小分類を編集'),
       _MenuItem('wallet', '支払方法マスタ',
-          Icons.account_balance_wallet_outlined),
-      _MenuItem('incomeMaster', '収入マスタ', Icons.savings_outlined),
-      _MenuItem('subscription', '固定費・サブスク', Icons.event_repeat),
-      _MenuItem('replacements', '変換マスタ', Icons.find_replace),
-      _MenuItem('checklist', '月末締めチェックリスト', Icons.checklist),
+          Icons.account_balance_wallet_outlined,
+          desc: '口座・クレジットカードを登録'),
+      _MenuItem('incomeMaster', '収入マスタ', Icons.savings_outlined,
+          desc: '収入源（売上）を登録'),
+      _MenuItem('subscription', '固定費・サブスク', Icons.event_repeat,
+          desc: '毎月・毎年の固定支払を管理'),
+      _MenuItem('replacements', '変換マスタ', Icons.find_replace,
+          desc: 'レシートの表記ゆれを置換'),
+      _MenuItem('checklist', '月末締めチェックリスト', Icons.checklist,
+          desc: '月末の確認項目を編集'),
     ]),
     _MenuGroup(title: 'データ管理', items: [
       _MenuItem('backup', 'バックアップ / 取り込み',
-          Icons.cloud_upload_outlined),
+          Icons.cloud_upload_outlined,
+          desc: 'データの書き出し・取り込み'),
       _MenuItem('devLab', '明細の貼り付け取込・開発ラボ',
-          Icons.upload_file_outlined),
+          Icons.upload_file_outlined,
+          desc: '明細を貼り付けて一括取込ほか'),
     ]),
     _MenuGroup(title: 'アプリ情報', items: [
-      _MenuItem('about', 'バージョン・更新確認', Icons.info_outline),
+      _MenuItem('about', 'バージョン・更新確認', Icons.info_outline,
+          desc: '現在の版・最新版を確認'),
     ]),
     _MenuGroup(title: 'アカウント', items: [
       _MenuItem('account', 'アカウント / サインアウト',
-          Icons.account_circle_outlined),
+          Icons.account_circle_outlined,
+          desc: 'ログイン中のアカウント'),
     ]),
   ];
+
+  String _titleFor(String id) {
+    for (final g in _menus) {
+      for (final it in g.items) {
+        if (it.id == id) return it.label;
+      }
+    }
+    return '設定';
+  }
+
+  /// 狭い画面（スマホ）：メニュー項目タップで該当パネルをフルスクリーンで開く。
+  void _openPanelScreen(String id) {
+    setState(() => _currentId = id);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Theme(
+          data: V2Theme.light(),
+          child: Scaffold(
+            backgroundColor: V2Colors.surfaceMuted,
+            appBar: AppBar(
+              title: Text(_titleFor(id),
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w700)),
+            ),
+            body: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(V2Spacing.lg),
+                child: _buildPanel(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, c) {
-      // 広い画面でも狭い画面（スマホ）でも、左メニュー＋右パネルの
-      // マスター/ディテール（サイドバー）で統一。スマホは左レールを細くする。
-      final wide = c.maxWidth >= 900;
-      final double sidebarWidth =
-          wide ? 240 : (c.maxWidth < 480 ? 128 : 200);
-      return Padding(
-        padding: EdgeInsets.symmetric(
-            vertical: wide ? V2Spacing.xl : V2Spacing.lg),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              width: sidebarWidth,
-              child: SingleChildScrollView(
+      // 広い画面：左メニュー＋右パネルのマスター/ディテール。
+      if (c.maxWidth >= 900) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: V2Spacing.xl),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 240,
                 child: _SettingsMenu(
                   groups: _menus,
                   currentId: _currentId,
@@ -109,11 +153,17 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
                   onSelect: (id) => setState(() => _currentId = id),
                 ),
               ),
-            ),
-            SizedBox(width: wide ? V2Spacing.lg : V2Spacing.sm),
-            Expanded(child: _buildPanel()),
-          ],
-        ),
+              const SizedBox(width: V2Spacing.lg),
+              Expanded(child: _buildPanel()),
+            ],
+          ),
+        );
+      }
+      // 狭い画面（スマホ）：カテゴリごとのカードに大きめタイルで縦並び。
+      // 各タイルはアイコン＋名前＋説明＋「›」で、タップでフルスクリーンを開く。
+      return _MobileSettingsList(
+        groups: _menus,
+        onSelect: _openPanelScreen,
       );
     });
   }
@@ -374,7 +424,132 @@ class _MenuItem {
   final String id;
   final String label;
   final IconData icon;
-  const _MenuItem(this.id, this.label, this.icon);
+
+  /// スマホの縦並び一覧で名前の下に出す短い説明（PC サイドバーでは未使用）。
+  final String? desc;
+  const _MenuItem(this.id, this.label, this.icon, {this.desc});
+}
+
+// ═════════════════════════════════════════════════
+// スマホ用: カテゴリごとのカードに大きめタイルで縦並び
+// ═════════════════════════════════════════════════
+
+class _MobileSettingsList extends StatelessWidget {
+  final List<_MenuGroup> groups;
+  final ValueChanged<String> onSelect;
+  const _MobileSettingsList({
+    required this.groups,
+    required this.onSelect,
+  });
+
+  /// グループごとのアクセント色（アイコンバッジ用）。見分けやすさのため色分け。
+  static const _groupColors = <Color>[
+    V2Colors.badgeBlue,
+    V2Colors.badgePurple,
+    V2Colors.info,
+    V2Colors.warning,
+    V2Colors.accent,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(vertical: V2Spacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var gi = 0; gi < groups.length; gi++) ...[
+            if (gi > 0) const SizedBox(height: V2Spacing.lg),
+            // カテゴリ見出し
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                  V2Spacing.xs, 0, V2Spacing.xs, V2Spacing.sm),
+              child: Text(groups[gi].title,
+                  style: V2Typography.micro.copyWith(
+                      color: V2Colors.textMuted,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5)),
+            ),
+            // カテゴリのカード（中に項目行）
+            V2Card(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  for (var ii = 0; ii < groups[gi].items.length; ii++) ...[
+                    if (ii > 0)
+                      const Divider(
+                          height: 1,
+                          thickness: 1,
+                          indent: 60,
+                          color: V2Colors.divider),
+                    _MobileSettingTile(
+                      item: groups[gi].items[ii],
+                      color: _groupColors[gi % _groupColors.length],
+                      onTap: () => onSelect(groups[gi].items[ii].id),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MobileSettingTile extends StatelessWidget {
+  final _MenuItem item;
+  final Color color;
+  final VoidCallback onTap;
+  const _MobileSettingTile({
+    required this.item,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+            horizontal: V2Spacing.md, vertical: V2Spacing.md),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(V2Spacing.radiusSm),
+              ),
+              alignment: Alignment.center,
+              child: Icon(item.icon, size: 19, color: color),
+            ),
+            const SizedBox(width: V2Spacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.label, style: V2Typography.bodyStrong),
+                  if (item.desc != null) ...[
+                    const SizedBox(height: 2),
+                    Text(item.desc!,
+                        style: V2Typography.micro.copyWith(
+                            color: V2Colors.textSecondary)),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: V2Spacing.sm),
+            const Icon(Icons.chevron_right,
+                size: 20, color: V2Colors.textMuted),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _SettingsMenu extends StatelessWidget {
