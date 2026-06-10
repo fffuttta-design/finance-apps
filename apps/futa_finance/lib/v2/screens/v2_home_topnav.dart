@@ -21,6 +21,7 @@ import '../../data/transaction_repository.dart';
 import '../../screens/account_detail_screen.dart';
 import '../../screens/card_detail_screen.dart';
 import '../../screens/expense_list_screen.dart';
+import '../../screens/receipt_group_detail_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
 import '../../utils/formatters.dart';
 import '../../utils/thousands_separator_input_formatter.dart';
@@ -1124,21 +1125,19 @@ class _CenterColumn extends StatelessWidget {
               else
                 for (final u in recentUnits)
                   if (u.isGroup)
-                    // レシートのまとめ：タップで月の明細一覧へ（内訳を見られる）。
+                    // まとめ（複数品目）：タップでそのまとまりの内訳だけを表示。
+                    // 単品（GU等）と同じく「その明細」へ進む感覚に揃える。
                     _ReceiptGroupRow(
                       members: u.members!,
                       onTap: () async {
-                        await Navigator.push(
+                        final changed = await Navigator.push<bool>(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => ExpenseListScreen(
-                              title:
-                                  isBusiness ? '経費明細一覧' : '支出明細一覧',
-                              month: state._selectedMonth,
-                            ),
+                            builder: (_) => ReceiptGroupDetailScreen(
+                                members: u.members!),
                           ),
                         );
-                        await state._load();
+                        if (changed == true) await state._load();
                       },
                     )
                   else
