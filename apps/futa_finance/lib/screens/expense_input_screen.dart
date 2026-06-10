@@ -336,11 +336,13 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       final tDesc = t.description.trim().toLowerCase();
       var weight = 0;
       if (store.isNotEmpty && tStore.isNotEmpty && tStore == store) {
-        weight = 3; // 店舗完全一致を最優先
+        weight = 4; // 店舗完全一致を最優先
+      } else if (desc.isNotEmpty && tDesc.isNotEmpty && tDesc == desc) {
+        weight = 3; // 件名（取引内容）の完全一致を強めに
       } else if (desc.isNotEmpty &&
           tDesc.isNotEmpty &&
-          (tDesc == desc || tDesc.contains(desc) || desc.contains(tDesc))) {
-        weight = 1;
+          (tDesc.contains(desc) || desc.contains(tDesc))) {
+        weight = 1; // 部分一致
       }
       if (weight == 0) continue;
       final key = '${t.category.major}${t.category.sub}';
@@ -352,12 +354,18 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     final parts = best.split('');
     final major = parts[0];
     final sub = parts.length > 1 ? parts[1] : '';
-    // 候補が現在の大カテゴリ一覧に存在する場合のみ採用。
-    final exists = [
-      for (var i = 0; i < cfg.majors.length; i++) cfg.majors[i].displayName(i)
-    ].contains(major);
-    if (!exists) return;
-    _majorCategory = major;
+    // 現在の大カテゴリ一覧から、番号を無視して名前一致するものを採用。
+    // （並び替えで番号が変わっても過去の予測が効くように）
+    String? matchedMajor;
+    for (var i = 0; i < cfg.majors.length; i++) {
+      final dn = cfg.majors[i].displayName(i);
+      if (dn == major || norm(dn) == norm(major)) {
+        matchedMajor = dn;
+        break;
+      }
+    }
+    if (matchedMajor == null) return;
+    _majorCategory = matchedMajor;
     _subCategory = sub.isEmpty ? null : sub;
     _categoryPredicted = true;
   }

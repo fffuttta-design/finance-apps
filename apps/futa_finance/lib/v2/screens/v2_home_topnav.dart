@@ -1212,13 +1212,20 @@ class _CenterColumn extends StatelessWidget {
   }
 }
 
-class _TransactionRow extends StatelessWidget {
+class _TransactionRow extends StatefulWidget {
   final Transaction t;
   final VoidCallback? onTap;
   const _TransactionRow({required this.t, this.onTap});
 
+  @override
+  State<_TransactionRow> createState() => _TransactionRowState();
+}
+
+class _TransactionRowState extends State<_TransactionRow> {
+  bool _hover = false;
+
   String _typeLabel() {
-    switch (t.type) {
+    switch (widget.t.type) {
       case TransactionType.income:
         return '収入';
       case TransactionType.expense:
@@ -1229,8 +1236,8 @@ class _TransactionRow extends StatelessWidget {
   }
 
   String _categoryLabel() {
-    final major = t.category.major.trim();
-    final sub = t.category.sub.trim();
+    final major = widget.t.category.major.trim();
+    final sub = widget.t.category.sub.trim();
     if (major.isEmpty && sub.isEmpty) return _typeLabel();
     if (sub.isEmpty) return major;
     return sub;
@@ -1238,6 +1245,8 @@ class _TransactionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = widget.t;
+    final onTap = widget.onTap;
     final isIncome = t.type == TransactionType.income;
     final isTransfer = t.type == TransactionType.transfer;
     final color = isTransfer
@@ -1245,12 +1254,12 @@ class _TransactionRow extends StatelessWidget {
         : (isIncome ? V2Colors.positive : V2Colors.negative);
     final sign = isTransfer ? '' : (isIncome ? '+' : '-');
     final card = Container(
-      // たくはる風: 1 行 = 角丸枠付きの長方形カード
+      // たくはる風: 1 行 = 角丸枠付きの長方形カード。ホバーで背景を変える。
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(
           horizontal: V2Spacing.md, vertical: 10),
       decoration: BoxDecoration(
-        color: V2Colors.surface,
+        color: _hover ? V2Colors.hover : V2Colors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: V2Colors.border),
       ),
@@ -1291,10 +1300,16 @@ class _TransactionRow extends StatelessWidget {
     );
     if (onTap == null) return card;
     // 最近の入出金は編集しやすいよう、行タップで詳細画面を直接開く。
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: card,
+    // カーソルを当てるとフォーカス（ホバー背景）が出る（支出タブと同じ）。
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: card,
+      ),
     );
   }
 }
@@ -1394,13 +1409,22 @@ List<_RecentUnit> _groupByReceipt(List<Transaction> rows) {
 
 /// レシートのまとめ行（同じレシートの複数品目を1行に集約）。
 /// 「日付 / レシートN件バッジ / 店舗 / 合計」を表示。
-class _ReceiptGroupRow extends StatelessWidget {
+class _ReceiptGroupRow extends StatefulWidget {
   final List<Transaction> members;
   final VoidCallback? onTap;
   const _ReceiptGroupRow({required this.members, this.onTap});
 
   @override
+  State<_ReceiptGroupRow> createState() => _ReceiptGroupRowState();
+}
+
+class _ReceiptGroupRowState extends State<_ReceiptGroupRow> {
+  bool _hover = false;
+
+  @override
   Widget build(BuildContext context) {
+    final members = widget.members;
+    final onTap = widget.onTap;
     final first = members.first;
     final isIncome = first.type == TransactionType.income;
     final color = isIncome ? V2Colors.positive : V2Colors.negative;
@@ -1416,7 +1440,7 @@ class _ReceiptGroupRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(
           horizontal: V2Spacing.md, vertical: 10),
       decoration: BoxDecoration(
-        color: V2Colors.surface,
+        color: _hover ? V2Colors.hover : V2Colors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: V2Colors.border),
       ),
@@ -1459,10 +1483,15 @@ class _ReceiptGroupRow extends StatelessWidget {
       ),
     );
     if (onTap == null) return card;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: card,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: card,
+      ),
     );
   }
 }

@@ -62,13 +62,32 @@ class V2TopNavShell extends StatelessWidget {
             Expanded(
               // 横は中央寄せ・縦は上揃え。Center だと内容が少ないタブ（収入など）が
               // 上下中央に寄ってしまい他タブと位置がズレるため topCenter にする。
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints:
-                      BoxConstraints(maxWidth: maxContentWidth),
-                  child: content,
-                ),
+              child: LayoutBuilder(
+                builder: (context, c) {
+                  // 広い画面（PC）でコンテンツ列の左右に余白があるときだけ、
+                  // 「ここまでが表示エリア」が分かる縦の区切り線を入れる。
+                  final showRails = c.maxWidth > maxContentWidth + 1;
+                  return Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints:
+                          BoxConstraints(maxWidth: maxContentWidth),
+                      child: showRails
+                          ? DecoratedBox(
+                              decoration: const BoxDecoration(
+                                border: Border(
+                                  left: BorderSide(
+                                      color: V2Colors.border),
+                                  right: BorderSide(
+                                      color: V2Colors.border),
+                                ),
+                              ),
+                              child: content,
+                            )
+                          : content,
+                    ),
+                  );
+                },
               ),
             ),
           ],
