@@ -10,6 +10,7 @@ import '../data/drive_receipt_service.dart';
 import '../data/receipt_ocr.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
+import '../utils/duplicate_check.dart';
 import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
 import 'receipt_image_screen.dart';
@@ -752,6 +753,11 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       await TransactionRepository.instance.update(tx);
       if (!mounted) return;
       Navigator.pop(context, true);
+      return;
+    }
+    // 新規追加：同じ日付・同じ金額の既存データがあれば確認（秘書登録分も検知）。
+    if (!await confirmIfDuplicateTransaction(context, tx)) {
+      if (mounted) setState(() => _saving = false);
       return;
     }
     await TransactionRepository.instance.add(tx);

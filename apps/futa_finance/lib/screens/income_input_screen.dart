@@ -9,6 +9,7 @@ import '../data/app_mode.dart';
 import '../data/income_source_repository.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
+import '../utils/duplicate_check.dart';
 import '../utils/formatters.dart';
 import 'income_master_screen.dart';
 
@@ -262,6 +263,11 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       incomeSourceId: _selectedSource!.id,
       isPending: _isPending,
     );
+    // 新規追加：同じ日付・同じ金額の既存データがあれば確認（秘書登録分も検知）。
+    if (!await confirmIfDuplicateTransaction(context, tx)) {
+      if (mounted) setState(() => _saving = false);
+      return;
+    }
     await TransactionRepository.instance.add(tx);
 
     // 銀行口座の currentBalance を更新
