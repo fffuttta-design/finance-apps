@@ -1,3 +1,5 @@
+import 'dart:ui' show Color;
+
 /// 円表記フォーマッタ（カンマ区切り、￥プレフィックス）。
 String formatYen(int amount, {bool withSign = false}) {
   final isNegative = amount < 0;
@@ -18,4 +20,15 @@ String formatMonthDay(DateTime d) =>
 String weekdayKanji(DateTime d) {
   const week = ['月', '火', '水', '木', '金', '土', '日'];
   return week[d.weekday - 1];
+}
+
+/// 「M/D(曜)」表記。明細の日付列で使う。
+String monthDayWeekday(DateTime d) =>
+    '${d.month}/${d.day}(${weekdayKanji(d)})';
+
+/// 曜日に応じた色：土曜=青 / 日曜=赤 / 平日=null（既定色のまま）。
+Color? weekendColor(DateTime d) {
+  if (d.weekday == DateTime.saturday) return const Color(0xFF2563EB);
+  if (d.weekday == DateTime.sunday) return const Color(0xFFDC2626);
+  return null;
 }

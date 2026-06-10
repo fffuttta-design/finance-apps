@@ -1062,9 +1062,10 @@ class _ReceiptGroupRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             SizedBox(
-              width: 38,
-              child: Text('${first.date.month}/${first.date.day}',
-                  style: V2Typography.numericCell),
+              width: 58,
+              child: Text(monthDayWeekday(first.date),
+                  style: V2Typography.numericCell.copyWith(
+                      color: weekendColor(first.date))),
             ),
             const SizedBox(width: V2Spacing.sm),
             Expanded(
@@ -1147,12 +1148,13 @@ class _ExpenseRowState extends State<_ExpenseRow> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 日付（M/D）
+              // 日付（M/D(曜)）。土=青/日=赤。
               SizedBox(
-                width: 38,
+                width: 58,
                 child: Text(
-                    '${widget.t.date.month}/${widget.t.date.day}',
-                    style: V2Typography.numericCell),
+                    monthDayWeekday(widget.t.date),
+                    style: V2Typography.numericCell.copyWith(
+                        color: weekendColor(widget.t.date))),
               ),
               const SizedBox(width: V2Spacing.sm),
               // 中央: カテゴリバッジ＋内容（支払方法は非表示）

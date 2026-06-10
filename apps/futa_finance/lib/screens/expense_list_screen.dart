@@ -396,12 +396,12 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
-            width: 38,
-            child: Text('${t.date.month}/${t.date.day}',
-                style: const TextStyle(
+            width: 58,
+            child: Text(monthDayWeekday(t.date),
+                style: TextStyle(
                     fontSize: 12,
                     fontFamily: 'monospace',
-                    color: Color(0xFF6B7280))),
+                    color: weekendColor(t.date) ?? const Color(0xFF6B7280))),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -442,12 +442,13 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
       child: Row(
         children: [
           SizedBox(
-            width: 38,
-            child: Text('${first.date.month}/${first.date.day}',
-                style: const TextStyle(
+            width: 58,
+            child: Text(monthDayWeekday(first.date),
+                style: TextStyle(
                     fontSize: 12,
                     fontFamily: 'monospace',
-                    color: Color(0xFF6B7280))),
+                    color: weekendColor(first.date) ??
+                        const Color(0xFF6B7280))),
           ),
           const SizedBox(width: 8),
           Expanded(
