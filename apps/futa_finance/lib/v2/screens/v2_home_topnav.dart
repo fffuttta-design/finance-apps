@@ -62,6 +62,10 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
   List<Subscription> _subs = [];
   bool _loading = true;
 
+  /// 読み込みに失敗/タイムアウトしたときのエラー文（null=正常）。
+  /// これがセットされると永久スピナーではなくエラー＋再読み込みを表示する。
+  String? _loadError;
+
   /// 表示月（既定は今月、月切替で前後）
   late DateTime _selectedMonth =
       DateTime(DateTime.now().year, DateTime.now().month);
@@ -309,18 +313,49 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
   }
 
   Future<void> _load() async {
-    final txns = await _txRepo.loadAll();
-    final payments = await _settings.loadPayments();
-    final snapshots = await _snapshotRepo.load();
-    final subs = await SubscriptionRepository.instance.load();
-    if (!mounted) return;
+    try {
+      // 4種類のデータをまとめて読み込み。回線不調で Firestore が
+      // 応答しないと終わらないため、全体にタイムアウトを掛ける。
+      final data = await (() async {
+        final txns = await _txRepo.loadAll();
+        final payments = await _settings.loadPayments();
+        final snapshots = await _snapshotRepo.load();
+        final subs = await SubscriptionRepository.instance.load();
+        return (txns, payments, snapshots, subs);
+      })()
+          .timeout(const Duration(seconds: 15));
+      if (!mounted) return;
+      setState(() {
+        _transactions = data.$1;
+        _payments = data.$2;
+        _snapshots = data.$3;
+        _subs = data.$4.subscriptions;
+        _loading = false;
+        _loadError = null;
+      });
+    } on TimeoutException {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = '読み込みに時間がかかっています（通信が不安定かもしれません）。';
+      });
+    } catch (e) {
+      // 例外を握りつぶさず画面に出す。回線以外の原因の切り分けに使う。
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = e.toString();
+      });
+    }
+  }
+
+  /// エラー状態からの再読み込み。
+  void _retryLoad() {
     setState(() {
-      _transactions = txns;
-      _payments = payments;
-      _snapshots = snapshots;
-      _subs = subs.subscriptions;
-      _loading = false;
+      _loading = true;
+      _loadError = null;
     });
+    _load();
   }
 
   /// 指定月（[m]）に計上すべき固定費（サブスク）合計。
@@ -377,6 +412,9 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
         padding: EdgeInsets.symmetric(vertical: 80),
         child: Center(child: CircularProgressIndicator()),
       );
+    }
+    if (_loadError != null) {
+      return _LoadErrorView(message: _loadError!, onRetry: _retryLoad);
     }
     // Shell の Expanded 内で content として展開されるため、
     // ホームの 3 カラム / 縦並びがコンテンツ高を超えた場合に
@@ -1187,6 +1225,76 @@ class _SummaryRow extends StatelessWidget {
                 fontFeatures: V2Typography.tabularNums,
               )),
         ],
+      ),
+    );
+  }
+}
+
+/// ホームのデータ読み込み失敗時に出すエラー＋再読み込みビュー。
+/// 永久スピナーを避け、原因切り分け用にエラー文も表示する。
+class _LoadErrorView extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _LoadErrorView({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+          vertical: 56, horizontal: V2Spacing.lg),
+      child: Center(
+        child: V2Card(
+          padding: const EdgeInsets.all(V2Spacing.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off,
+                  size: 40, color: V2Colors.textMuted),
+              const SizedBox(height: V2Spacing.md),
+              Text('データを読み込めませんでした',
+                  style: V2Typography.h2,
+                  textAlign: TextAlign.center),
+              const SizedBox(height: V2Spacing.xs),
+              Text(
+                '通信が不安定なときに起きやすいです。電波の良い場所で'
+                '「再読み込み」をお試しください。',
+                style: V2Typography.caption
+                    .copyWith(color: V2Colors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: V2Spacing.md),
+              // 原因切り分け用の生エラー（小さめ・折りたたみ無しで常時表示）。
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(V2Spacing.sm),
+                decoration: BoxDecoration(
+                  color: V2Colors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(V2Spacing.radiusSm),
+                ),
+                child: Text(message,
+                    style: V2Typography.micro
+                        .copyWith(color: V2Colors.textSecondary)),
+              ),
+              const SizedBox(height: V2Spacing.lg),
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: FilledButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('再読み込み'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: V2Colors.accent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(V2Spacing.radiusMd),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
