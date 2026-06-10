@@ -43,9 +43,14 @@ extension _PayCatX on _PayCat {
 /// レシートの品目ごとに「1品目=1取引」で複数まとめて記録する画面。
 /// 日付・支払方法・会計科目は共通で設定し、各品目の名前/金額は編集可。
 class ReceiptSplitScreen extends StatefulWidget {
+  /// 初期品目（レシートOCR由来）。手入力モードでは空でよい。
   final List<ReceiptItem> items;
   final DateTime? date;
   final String? storeName;
+
+  /// 手入力モード（レシート無しで、自分で品目行を足して明細を分ける）。
+  /// タイトルや初期行（空1行）などが変わる。
+  final bool manual;
 
   /// 上部に「まとめて1件 / 品目ごと」トグルを表示するか（OCRフローから true）。
   /// 「まとめて1件」を選ぶと [kReceiptSwitchMode] を返して閉じる。
@@ -59,7 +64,7 @@ class ReceiptSplitScreen extends StatefulWidget {
 
   const ReceiptSplitScreen({
     super.key,
-    required this.items,
+    this.items = const [],
     this.date,
     this.storeName,
     this.showModeToggle = false,
@@ -67,6 +72,7 @@ class ReceiptSplitScreen extends StatefulWidget {
     this.initialCategorySub,
     this.receiptId,
     this.receiptUrl,
+    this.manual = false,
   });
 
   /// 親レシートのグループID（全品目に同じIDを付与）。任意。
@@ -120,14 +126,41 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
   late final TextEditingController _storeCtrl =
       TextEditingController(text: widget.storeName ?? '');
 
-  late final List<_Row> _rows = widget.items
-      .map((it) => _Row(
-          true,
-          TextEditingController(text: it.name),
-          TextEditingController(text: formatAmount(it.price)),
-          it.quantity,
-          it.unitPrice))
-      .toList();
+  late final List<_Row> _rows = widget.items.isEmpty
+      // 手入力モード等で品目が無いときは、空の1行から始める。
+      ? [_emptyRow()]
+      : widget.items
+          .map((it) => _Row(
+              true,
+              TextEditingController(text: it.name),
+              NoComposingUnderlineController(text: formatAmount(it.price)),
+              it.quantity,
+              it.unitPrice))
+          .toList();
+
+  /// 空の品目行（手入力で追加するとき用）。金額欄は変換中下線を出さない。
+  _Row _emptyRow() => _Row(
+      true, TextEditingController(), NoComposingUnderlineController(), null, null);
+
+  /// 品目行を1つ追加。
+  void _addRow() => setState(() => _rows.add(_emptyRow()));
+
+  /// 品目行を削除（最後の1行はクリアのみ）。
+  void _removeRow(_Row r) {
+    if (_rows.length <= 1) {
+      setState(() {
+        r.name.clear();
+        r.amount.clear();
+        r.include = true;
+        r.catMajor = null;
+        r.catSub = null;
+      });
+      return;
+    }
+    setState(() => _rows.remove(r));
+    r.name.dispose();
+    r.amount.dispose();
+  }
 
   @override
   void initState() {
@@ -311,8 +344,8 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
     final loaded = _categories != null && _payments != null;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('品目ごとに記録',
-            style: TextStyle(
+        title: Text(widget.manual ? '明細を分けて記録' : '品目ごとに記録',
+            style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF111827))),
@@ -432,7 +465,7 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                                     : null,
                             items: _methodsFor(_payCat)
                                 .map((m) => DropdownMenuItem(
-                                    value: m, child: Text(m)))
+                                    value: m, child: Text(_bareName(m))))
                                 .toList(),
                             onChanged: (v) =>
                                 setState(() => _paymentMethod = v),
@@ -446,7 +479,7 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                               _majorNames.contains(_major) ? _major : null,
                           items: _majorNames
                               .map((m) => DropdownMenuItem(
-                                  value: m, child: Text(m)))
+                                  value: m, child: Text(_bareName(m))))
                               .toList(),
                           onChanged: (v) => setState(() {
                             _major = v;
@@ -513,6 +546,17 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                         const SizedBox(height: 12),
                         _label('品目'),
                         for (final r in _rows) _itemRow(r),
+                        const SizedBox(height: 4),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: _addRow,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('品目を追加'),
+                            style: TextButton.styleFrom(
+                                foregroundColor: const Color(0xFF1A237E)),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -592,6 +636,13 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.close,
+                      size: 16, color: Color(0xFF9CA3AF)),
+                  onPressed: () => _removeRow(r),
+                  tooltip: '品目を削除',
+                ),
               ],
             ),
             // カテゴリ行（共通継承 or 品目別上書き）＋単価×個数。
@@ -655,7 +706,7 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
           const SizedBox(width: 4),
           Flexible(
             child: Text(
-              '${r.catMajor} › ${r.catSub}',
+              '${_bareName(r.catMajor!)} › ${r.catSub}',
               style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
               overflow: TextOverflow.ellipsis,
             ),
@@ -701,7 +752,7 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                   isExpanded: true,
                   items: _majorNames
                       .map((m) =>
-                          DropdownMenuItem(value: m, child: Text(m)))
+                          DropdownMenuItem(value: m, child: Text(_bareName(m))))
                       .toList(),
                   onChanged: (v) => setLocal(() {
                     tmpMajor = v;
@@ -766,6 +817,10 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
     );
     if (picked != null) setState(() => _date = picked);
   }
+
+  /// 表示用に先頭の自動番号（"0." など）を取り除く。保存値は番号付きのまま。
+  String _bareName(String s) =>
+      s.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
 
   Widget _label(String t) => Padding(
         padding: const EdgeInsets.only(bottom: 6, left: 2),

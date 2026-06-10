@@ -12,6 +12,7 @@ import '../screens/expense_input_screen.dart';
 import '../utils/modal_input.dart';
 import '../utils/pwa_theme.dart';
 import '../screens/income_input_screen.dart';
+import '../screens/receipt_split_screen.dart';
 import '../screens/transfer_input_screen.dart';
 import 'layout/topnav_shell.dart';
 import 'screens/v2_devlab.dart';
@@ -310,6 +311,14 @@ class _V2RootState extends State<V2Root>
       await runReceiptOcrFlow(context);
       return;
     }
+    // 手入力で明細を分けて記録（レシートと同じく1グループにまとめる）。
+    // グループID（receiptId 流用）を発番し、各品目を同じIDで束ねる。
+    if (kind == 'split') {
+      final gid = 'manual-${DateTime.now().microsecondsSinceEpoch}';
+      showInputSheet(
+          context, ReceiptSplitScreen(manual: true, receiptId: gid));
+      return;
+    }
     Widget? page;
     switch (kind) {
       case 'expense':
@@ -370,6 +379,17 @@ class _RecordMenuButton extends StatelessWidget {
                   size: 16, color: Color(0xFFEF4444)),
               const SizedBox(width: 8),
               Text(isBusiness ? '経費を記録' : '支出を記録'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'split',
+          child: Row(
+            children: [
+              const Icon(Icons.format_list_bulleted,
+                  size: 16, color: Color(0xFFEF4444)),
+              const SizedBox(width: 8),
+              const Text('明細を分けて記録'),
             ],
           ),
         ),
