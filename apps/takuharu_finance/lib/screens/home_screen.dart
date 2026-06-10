@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/auth_service.dart';
+import '../widgets/load_error_view.dart';
 import '../data/budget_repository.dart';
 import '../data/categories.dart';
 import '../data/household_service.dart';
@@ -189,6 +191,17 @@ class _HomeScreenState extends State<HomeScreen> {
           : StreamBuilder<List<core.Transaction>>(
               stream: TxRepository.instance.watch(hid),
               builder: (context, snap) {
+                if (snap.hasError) {
+                  // 取引購読が失敗。permission-denied はアカウント違いの可能性。
+                  final err = snap.error;
+                  final perm = err is FirebaseException &&
+                      err.code == 'permission-denied';
+                  return LoadErrorView(
+                    permissionError: perm,
+                    message: perm ? null : err.toString(),
+                    onRetry: () => setState(() {}),
+                  );
+                }
                 if (snap.connectionState == ConnectionState.waiting &&
                     !snap.hasData) {
                   return const Center(child: CircularProgressIndicator());

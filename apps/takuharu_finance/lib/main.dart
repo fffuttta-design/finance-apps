@@ -9,6 +9,7 @@ import 'firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
 import 'theme/app_theme.dart';
+import 'widgets/load_error_view.dart';
 
 /// 通知タップからの画面遷移などで使うグローバル Navigator。
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
@@ -101,29 +102,17 @@ class _HouseholdGateState extends State<_HouseholdGate> {
           return const _Splash();
         }
         if (snap.hasError) {
-          return Scaffold(
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.cloud_off_rounded,
-                        size: 48, color: AppColors.pink),
-                    const SizedBox(height: 12),
-                    const Text('データの読み込みに失敗しました',
-                        style: TextStyle(color: AppColors.text)),
-                    const SizedBox(height: 12),
-                    FilledButton(
-                      onPressed: () => setState(() {
-                        _future = _ensure();
-                      }),
-                      child: const Text('もう一度'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          // permission-denied = このアカウントに権限が無い
+          // （＝ログインアカウント違いの可能性が高い）。専用案内＋アカウント切替。
+          final err = snap.error;
+          final perm = err is FirebaseException &&
+              err.code == 'permission-denied';
+          return LoadErrorView(
+            permissionError: perm,
+            message: perm ? null : err.toString(),
+            onRetry: () => setState(() {
+              _future = _ensure();
+            }),
           );
         }
         return const MainShell();
