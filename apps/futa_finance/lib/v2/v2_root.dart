@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../data/app_mode.dart';
 import '../data/data_migration_service.dart';
@@ -8,6 +10,7 @@ import '../data/repository_provider.dart';
 import '../data/ui_preferences.dart';
 import '../screens/expense_input_screen.dart';
 import '../utils/modal_input.dart';
+import '../utils/pwa_theme.dart';
 import '../screens/income_input_screen.dart';
 import '../screens/transfer_input_screen.dart';
 import 'layout/topnav_shell.dart';
@@ -48,6 +51,7 @@ class _V2RootState extends State<V2Root>
     WidgetsBinding.instance.addObserver(this);
     AppModeManager.instance.addListener(_onChange);
     UiPreferences.instance.addListener(_onChange);
+    _syncPwaThemeColor(); // 起動時に現モードの色でブラウザ枠を塗る（Webのみ）
     // 起動時にアプリ内アップデート（APK配信）をチェックして通知（v1と共通）。
     scheduleStartupUpdateCheck();
     // 事業用カテゴリをPL構成へ一度だけ移行（業務モード時のみ・idempotent）。
@@ -76,8 +80,17 @@ class _V2RootState extends State<V2Root>
 
   void _onChange() {
     if (mounted) setState(() {});
+    _syncPwaThemeColor(); // モード切替でブラウザ枠の色も切替（Webのみ）
     // 事業モードへ切替時にも移行を試行（個人で起動→事業に切替えた場合に対応）。
     DataMigrationService.migratePLCategoriesIfNeeded();
+  }
+
+  /// PWA（Web）のタイトルバー色を現モードに合わせて切替える。
+  /// 事業＝ニュートラルなグレー（事業の青/個人のオレンジと紛れない）、
+  /// 個人＝見やすいオレンジ。非Webでは何もしない。
+  void _syncPwaThemeColor() {
+    final personal = AppModeManager.instance.current == AppMode.personal;
+    setPwaThemeColor(personal ? '#C2410C' : '#3F3F46');
   }
 
   /// 現在のモードに応じて表示するナビ一覧。
@@ -142,7 +155,33 @@ class _V2RootState extends State<V2Root>
   Widget build(BuildContext context) {
     // UI は上タブ版（v2.1）に一本化。サイドバー版・v1 への切替は廃止。
     final accent = V2ModeAccent.of(AppModeManager.instance.current);
-    return _buildTopNav(context, accent);
+    Widget shell = _buildTopNav(context, accent);
+    // Web（キーボードのある環境）向けショートカット。
+    //  ・← / →            タブ切替
+    //  ・Alt + ← / →       モード切替（← 事業 / → 個人）
+    // テキスト入力中は矢印がフィールドに消費されるため誤爆しない。
+    if (kIsWeb) {
+      shell = CallbackShortcuts(
+        bindings: <ShortcutActivator, VoidCallback>{
+          const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+              _shiftTab(1),
+          const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+              _shiftTab(-1),
+          const SingleActivator(LogicalKeyboardKey.arrowRight, alt: true):
+              () => _setMode(AppMode.personal),
+          const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true): () =>
+              _setMode(AppMode.business),
+        },
+        child: Focus(autofocus: true, child: shell),
+      );
+    }
+    return shell;
+  }
+
+  /// モードを直接指定して切替（同じモードなら何もしない）。
+  void _setMode(AppMode m) {
+    if (AppModeManager.instance.current == m) return;
+    AppModeManager.instance.setMode(m);
   }
 
   /// マネフォ ME 風（v2.1）: 上タブ + 中央カラム

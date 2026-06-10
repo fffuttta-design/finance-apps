@@ -4,7 +4,7 @@
     "start_url": ".",
     "display": "standalone",
     "background_color": "#F8FAFC",
-    "theme_color": "#334155",
+    "theme_color": "#3F3F46",
     "description": "FutaFinance - 事業用財務管理アプリ",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,

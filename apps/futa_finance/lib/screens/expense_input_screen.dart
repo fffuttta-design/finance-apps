@@ -834,7 +834,21 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 _recordModeToggle(perItem: false),
                 const SizedBox(height: 16),
               ],
-              // 金額をヒーローとして最上部に大きく表示。
+              // 取引内容を一番上に（要望：先に内容を書くのが入力しやすい）。
+              _label('取引内容'),
+              TextFormField(
+                controller: _descCtrl,
+                decoration: _inputDecoration(),
+                onChanged: (_) {
+                  if (!_categoryTouched) {
+                    setState(() => _autoPredictCategory());
+                  }
+                },
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? '入力してください' : null,
+              ),
+              const SizedBox(height: 16),
+              // 金額をヒーローとして大きく表示。
               _heroAmount(),
               const SizedBox(height: 20),
               // レシート画像（Drive）がある取引は、上部に開くボタンを出す。
@@ -969,20 +983,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                       },
                 decoration: _inputDecoration(
                     hint: _majorCategory == null ? '先に大カテゴリを選択' : '選択してください'),
-              ),
-              const SizedBox(height: 16),
-
-              _label('取引内容'),
-              TextFormField(
-                controller: _descCtrl,
-                decoration: _inputDecoration(),
-                onChanged: (_) {
-                  if (!_categoryTouched) {
-                    setState(() => _autoPredictCategory());
-                  }
-                },
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? '入力してください' : null,
               ),
               const SizedBox(height: 16),
 
