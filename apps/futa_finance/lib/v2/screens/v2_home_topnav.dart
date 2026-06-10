@@ -4,12 +4,14 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:finance_core/finance_core.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/app_mode.dart';
+import '../../data/auth_service.dart';
 import '../../data/backup_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/monthly_snapshot_repository.dart';
@@ -65,6 +67,10 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
   /// 読み込みに失敗/タイムアウトしたときのエラー文（null=正常）。
   /// これがセットされると永久スピナーではなくエラー＋再読み込みを表示する。
   String? _loadError;
+
+  /// 権限エラー（permission-denied）。ログインアカウント違いの可能性が高いので
+  /// 専用メッセージ＋アカウント切替を出す。
+  bool _isPermissionError = false;
 
   /// 表示月（既定は今月、月切替で前後）
   late DateTime _selectedMonth =
@@ -332,19 +338,24 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
         _subs = data.$4.subscriptions;
         _loading = false;
         _loadError = null;
+        _isPermissionError = false;
       });
     } on TimeoutException {
       if (!mounted) return;
       setState(() {
         _loading = false;
+        _isPermissionError = false;
         _loadError = '読み込みに時間がかかっています（通信が不安定かもしれません）。';
       });
     } catch (e) {
-      // 例外を握りつぶさず画面に出す。回線以外の原因の切り分けに使う。
+      // permission-denied = このアカウントにデータの権限が無い
+      // （＝ログインアカウント違いの可能性が高い）。それ以外は生エラーを出す。
+      final perm = e is FirebaseException && e.code == 'permission-denied';
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _loadError = e.toString();
+        _isPermissionError = perm;
+        _loadError = perm ? null : e.toString();
       });
     }
   }
@@ -354,8 +365,21 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
     setState(() {
       _loading = true;
       _loadError = null;
+      _isPermissionError = false;
     });
     _load();
+  }
+
+  /// 別アカウントでログインし直す（サインアウト→AuthGate がログイン画面へ）。
+  Future<void> _signOutAndRelogin() async {
+    try {
+      await AuthService.instance.signOut();
+      // authStateChanges により自動でログイン画面へ遷移する。
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('サインアウトに失敗: $e')));
+    }
   }
 
   /// 指定月（[m]）に計上すべき固定費（サブスク）合計。
@@ -413,8 +437,14 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
         child: Center(child: CircularProgressIndicator()),
       );
     }
-    if (_loadError != null) {
-      return _LoadErrorView(message: _loadError!, onRetry: _retryLoad);
+    if (_loadError != null || _isPermissionError) {
+      return _LoadErrorView(
+        permissionError: _isPermissionError,
+        message: _loadError,
+        email: AuthService.instance.currentUser?.email,
+        onRetry: _retryLoad,
+        onSignOut: _signOutAndRelogin,
+      );
     }
     // Shell の Expanded 内で content として展開されるため、
     // ホームの 3 カラム / 縦並びがコンテンツ高を超えた場合に
@@ -1232,10 +1262,20 @@ class _SummaryRow extends StatelessWidget {
 
 /// ホームのデータ読み込み失敗時に出すエラー＋再読み込みビュー。
 /// 永久スピナーを避け、原因切り分け用にエラー文も表示する。
+/// [permissionError] のときは「権限なし＝アカウント違いかも」専用の案内を出す。
 class _LoadErrorView extends StatelessWidget {
-  final String message;
+  final bool permissionError;
+  final String? message;
+  final String? email;
   final VoidCallback onRetry;
-  const _LoadErrorView({required this.message, required this.onRetry});
+  final VoidCallback onSignOut;
+  const _LoadErrorView({
+    required this.permissionError,
+    required this.message,
+    required this.email,
+    required this.onRetry,
+    required this.onSignOut,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1245,57 +1285,131 @@ class _LoadErrorView extends StatelessWidget {
       child: Center(
         child: V2Card(
           padding: const EdgeInsets.all(V2Spacing.xl),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.cloud_off,
-                  size: 40, color: V2Colors.textMuted),
-              const SizedBox(height: V2Spacing.md),
-              Text('データを読み込めませんでした',
-                  style: V2Typography.h2,
-                  textAlign: TextAlign.center),
-              const SizedBox(height: V2Spacing.xs),
-              Text(
-                '通信が不安定なときに起きやすいです。電波の良い場所で'
-                '「再読み込み」をお試しください。',
-                style: V2Typography.caption
-                    .copyWith(color: V2Colors.textSecondary),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: V2Spacing.md),
-              // 原因切り分け用の生エラー（小さめ・折りたたみ無しで常時表示）。
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(V2Spacing.sm),
-                decoration: BoxDecoration(
-                  color: V2Colors.surfaceMuted,
-                  borderRadius: BorderRadius.circular(V2Spacing.radiusSm),
-                ),
-                child: Text(message,
-                    style: V2Typography.micro
-                        .copyWith(color: V2Colors.textSecondary)),
-              ),
-              const SizedBox(height: V2Spacing.lg),
-              SizedBox(
-                width: double.infinity,
-                height: 46,
-                child: FilledButton.icon(
-                  onPressed: onRetry,
-                  icon: const Icon(Icons.refresh, size: 18),
-                  label: const Text('再読み込み'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: V2Colors.accent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(V2Spacing.radiusMd),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+          child: permissionError
+              ? _buildPermission(context)
+              : _buildGeneric(context),
         ),
       ),
+    );
+  }
+
+  /// 権限エラー: ログインアカウント違いの可能性が高い。
+  Widget _buildPermission(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.lock_person_outlined,
+            size: 40, color: V2Colors.warning),
+        const SizedBox(height: V2Spacing.md),
+        Text('このアカウントでは表示できません',
+            style: V2Typography.h2, textAlign: TextAlign.center),
+        const SizedBox(height: V2Spacing.xs),
+        Text(
+          'ログイン中のアカウントには、このデータを見る権限がありません。'
+          'アカウントを間違えていないか確認してください。',
+          style: V2Typography.caption
+              .copyWith(color: V2Colors.textSecondary),
+          textAlign: TextAlign.center,
+        ),
+        if (email != null) ...[
+          const SizedBox(height: V2Spacing.md),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(V2Spacing.sm),
+            decoration: BoxDecoration(
+              color: V2Colors.surfaceMuted,
+              borderRadius: BorderRadius.circular(V2Spacing.radiusSm),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.account_circle_outlined,
+                    size: 18, color: V2Colors.textSecondary),
+                const SizedBox(width: V2Spacing.sm),
+                Expanded(
+                  child: Text('ログイン中: $email',
+                      style: V2Typography.caption
+                          .copyWith(color: V2Colors.textPrimary)),
+                ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: V2Spacing.lg),
+        SizedBox(
+          width: double.infinity,
+          height: 46,
+          child: FilledButton.icon(
+            onPressed: onSignOut,
+            icon: const Icon(Icons.swap_horiz, size: 18),
+            label: const Text('別のアカウントでログインし直す'),
+            style: FilledButton.styleFrom(
+              backgroundColor: V2Colors.accent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(V2Spacing.radiusMd),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: V2Spacing.sm),
+        TextButton.icon(
+          onPressed: onRetry,
+          icon: const Icon(Icons.refresh, size: 16),
+          label: const Text('もう一度試す'),
+        ),
+      ],
+    );
+  }
+
+  /// 通信エラーなどの汎用。
+  Widget _buildGeneric(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.cloud_off,
+            size: 40, color: V2Colors.textMuted),
+        const SizedBox(height: V2Spacing.md),
+        Text('データを読み込めませんでした',
+            style: V2Typography.h2, textAlign: TextAlign.center),
+        const SizedBox(height: V2Spacing.xs),
+        Text(
+          '通信が不安定なときに起きやすいです。電波の良い場所で'
+          '「再読み込み」をお試しください。',
+          style: V2Typography.caption
+              .copyWith(color: V2Colors.textSecondary),
+          textAlign: TextAlign.center,
+        ),
+        if (message != null) ...[
+          const SizedBox(height: V2Spacing.md),
+          // 原因切り分け用の生エラー（小さめ・常時表示）。
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(V2Spacing.sm),
+            decoration: BoxDecoration(
+              color: V2Colors.surfaceMuted,
+              borderRadius: BorderRadius.circular(V2Spacing.radiusSm),
+            ),
+            child: Text(message!,
+                style: V2Typography.micro
+                    .copyWith(color: V2Colors.textSecondary)),
+          ),
+        ],
+        const SizedBox(height: V2Spacing.lg),
+        SizedBox(
+          width: double.infinity,
+          height: 46,
+          child: FilledButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text('再読み込み'),
+            style: FilledButton.styleFrom(
+              backgroundColor: V2Colors.accent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(V2Spacing.radiusMd),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
