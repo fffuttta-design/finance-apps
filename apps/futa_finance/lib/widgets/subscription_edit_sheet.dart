@@ -47,7 +47,8 @@ Future<Subscription?> showSubscriptionEditSheet(
   List<String> accountingMajors = const [],
 }) {
   final nameCtrl = TextEditingController(text: initial?.name ?? '');
-  final amountCtrl = TextEditingController(
+  // 変換中（composing）下線が金額欄に出ないコントローラ。
+  final amountCtrl = NoComposingUnderlineController(
       text: initial != null ? formatAmount(initial.amount) : '');
   final billingDayCtrl =
       TextEditingController(text: initial?.billingDay?.toString() ?? '');

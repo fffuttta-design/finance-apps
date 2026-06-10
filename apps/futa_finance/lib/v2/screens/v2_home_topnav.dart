@@ -22,6 +22,7 @@ import '../../screens/card_detail_screen.dart';
 import '../../screens/expense_list_screen.dart';
 import '../../screens/receipt_group_detail_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
+import '../../utils/emoji_palette.dart';
 import '../../utils/formatters.dart';
 import '../../utils/thousands_separator_input_formatter.dart';
 import '../../widgets/brand_logo.dart';
@@ -62,6 +63,8 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
   MonthlySnapshotConfig _snapshots = MonthlySnapshotConfig.empty();
   // 当月経費に固定費（サブスク）を上乗せするためのサブスク一覧。
   List<Subscription> _subs = [];
+  // 支出の内訳セクションのアイコン解決用（大カテゴリ → iconKey）。
+  CategoryConfig? _categories;
   bool _loading = true;
 
   /// 読み込みに失敗/タイムアウトしたときのエラー文（null=正常）。
@@ -245,7 +248,7 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
     final suggestedBalance = _payments.bankAccounts
         .fold<int>(0, (s, b) => s + (b.displayBalance ?? 0));
     final controller =
-        TextEditingController(text: formatAmount(suggestedBalance));
+        NoComposingUnderlineController(text: formatAmount(suggestedBalance));
 
     final result = await showDialog<int?>(
       context: context,
@@ -327,7 +330,8 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
         final payments = await _settings.loadPayments();
         final snapshots = await _snapshotRepo.load();
         final subs = await SubscriptionRepository.instance.load();
-        return (txns, payments, snapshots, subs);
+        final cats = await _settings.loadCategories();
+        return (txns, payments, snapshots, subs, cats);
       })()
           .timeout(const Duration(seconds: 15));
       if (!mounted) return;
@@ -336,6 +340,7 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
         _payments = data.$2;
         _snapshots = data.$3;
         _subs = data.$4.subscriptions;
+        _categories = data.$5;
         _loading = false;
         _loadError = null;
         _isPermissionError = false;
@@ -380,6 +385,16 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('サインアウトに失敗: $e')));
     }
+  }
+
+  /// 大カテゴリ名（番号なし）→ アイコンキー。支出の内訳のアイコン解決用。
+  String? _iconKeyForMajor(String bareMajor) {
+    final c = _categories;
+    if (c == null) return null;
+    for (final m in c.majors) {
+      if (m.name == bareMajor) return m.iconKey;
+    }
+    return null;
   }
 
   /// 指定月（[m]）に計上すべき固定費（サブスク）合計。
@@ -818,6 +833,20 @@ class _CenterColumn extends StatelessWidget {
       ..sort((a, b) => b.date.compareTo(a.date));
     final recentUnits = _groupByReceipt(recent).take(8).toList();
 
+    // 支出の内訳（大カテゴリ別）。番号は表示・集計とも除いて名前で束ねる。
+    final byMajor = <String, int>{};
+    for (final t in monthTxns) {
+      if (t.type != TransactionType.expense) continue;
+      final major =
+          t.category.major.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
+      if (major.isEmpty) continue;
+      byMajor[major] = (byMajor[major] ?? 0) + t.amount;
+    }
+    final majorEntries = byMajor.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final byMajorTotal =
+        byMajor.values.fold<int>(0, (s, v) => s + v);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1075,6 +1104,29 @@ class _CenterColumn extends StatelessWidget {
           ),
         ),
         const SizedBox(height: V2Spacing.lg),
+        // ── 支出の内訳（大カテゴリ別） ──────────────────
+        if (majorEntries.isNotEmpty) ...[
+          V2Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('支出の内訳',
+                    style: V2Typography.h2
+                        .copyWith(color: V2Colors.textPrimary)),
+                const SizedBox(height: V2Spacing.md),
+                for (final e in majorEntries.take(6))
+                  _CategoryBar(
+                    name: e.key,
+                    amount: e.value,
+                    ratio: byMajorTotal == 0 ? 0 : e.value / byMajorTotal,
+                    iconKey: state._iconKeyForMajor(e.key),
+                    accent: state.widget.accent,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: V2Spacing.lg),
+        ],
         // ── 最新の入出金（選択中の月）──────────────────
         V2Card(
           child: Column(
@@ -1248,6 +1300,66 @@ class _TransactionRow extends StatelessWidget {
 }
 
 /// 入出金一覧の表示単位：単品（single）か、同じレシートのまとめ（group）。
+/// 支出の内訳の1行（アイコン＋カテゴリ名＋金額＋割合バー）。
+class _CategoryBar extends StatelessWidget {
+  final String name;
+  final int amount;
+  final double ratio;
+  final String? iconKey;
+  final Color accent;
+  const _CategoryBar({
+    required this.name,
+    required this.amount,
+    required this.ratio,
+    required this.iconKey,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
+                child: categoryIconWidget(iconKey, size: 17, color: accent),
+              ),
+              const SizedBox(width: V2Spacing.sm),
+              Expanded(
+                child: Text(name,
+                    style: V2Typography.body,
+                    overflow: TextOverflow.ellipsis),
+              ),
+              Text(formatYen(amount),
+                  style: V2Typography.numericCell
+                      .copyWith(fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: ratio.clamp(0.0, 1.0),
+              minHeight: 7,
+              backgroundColor: V2Colors.surfaceMuted,
+              valueColor: AlwaysStoppedAnimation(accent),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _RecentUnit {
   final Transaction? single;
   final List<Transaction>? members;

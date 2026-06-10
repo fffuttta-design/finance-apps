@@ -256,7 +256,7 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     final ym = _ymKey;
     final current = s.monthlyActuals[ym] ?? 0;
     final prev = s.monthlyActuals[prevYmKey(ym)] ?? 0;
-    final ctrl = TextEditingController(
+    final ctrl = NoComposingUnderlineController(
         text: current > 0 ? formatAmount(current) : '');
     final result = await showDialog<int?>(
       context: context,

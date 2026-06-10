@@ -654,7 +654,7 @@ class _CardDetailScreenState extends State<CardDetailScreen>
     final now = DateTime.now();
     int year = now.year;
     int month = now.month;
-    final amountCtrl = TextEditingController();
+    final amountCtrl = NoComposingUnderlineController();
     final memoCtrl =
         TextEditingController(text: '$month月のオリコ請求まとめ');
     bool confirmed = false;

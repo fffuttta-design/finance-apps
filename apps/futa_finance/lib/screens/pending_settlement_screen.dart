@@ -190,7 +190,7 @@ class _PendingSettlementScreenState extends State<PendingSettlementScreen> {
 
   Widget _pendingTile(core.Transaction t) {
     final amountCtrl =
-        TextEditingController(text: formatAmount(t.amount));
+        NoComposingUnderlineController(text: formatAmount(t.amount));
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),

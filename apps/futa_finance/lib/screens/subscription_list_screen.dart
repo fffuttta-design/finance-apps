@@ -119,7 +119,8 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
   Future<Subscription?> _editDialog(
       BuildContext context, Subscription? initial) async {
     final nameCtrl = TextEditingController(text: initial?.name ?? '');
-    final amountCtrl = TextEditingController(
+    // 変換中（composing）下線が金額欄に出ないコントローラ。
+    final amountCtrl = NoComposingUnderlineController(
         text: initial != null ? formatAmount(initial.amount) : '');
     final billingDayCtrl =
         TextEditingController(text: initial?.billingDay?.toString() ?? '');

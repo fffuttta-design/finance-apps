@@ -49,7 +49,7 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
         TextEditingController(text: initial?.iconUrl ?? '');
     final memoCtrl = TextEditingController(text: initial?.memo ?? '');
     // 開始残高(任意): 通帳画面の月初/月末残高をユーザーが直したい時用に復活。
-    final startingCtrl = TextEditingController(
+    final startingCtrl = NoComposingUnderlineController(
         text: initial?.startingBalance != null
             ? formatAmount(initial!.startingBalance!)
             : '');

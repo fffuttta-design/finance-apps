@@ -644,7 +644,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
 
   Future<void> _editVirtualBalance(bool isMonthStart, int currentValue) async {
     final ctrl =
-        TextEditingController(text: formatAmount(currentValue));
+        NoComposingUnderlineController(text: formatAmount(currentValue));
     final newValue = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -886,7 +886,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
 
     DateTime editingDate = t.date;
     final descCtrl = TextEditingController(text: t.description);
-    final amountCtrl = TextEditingController(text: formatAmount(t.amount));
+    final amountCtrl = NoComposingUnderlineController(text: formatAmount(t.amount));
     final memoCtrl = TextEditingController(text: t.memo ?? '');
 
     final saved = await showDialog<bool>(
