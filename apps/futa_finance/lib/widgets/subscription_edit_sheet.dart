@@ -10,35 +10,6 @@ import 'brand_logo.dart';
 /// 設定画面（SubscriptionListScreen）と支出タブ（V2ExpensesScreen）の両方から
 /// 同じ編集UIを直接開けるよう、トップレベル関数として共通化したもの。
 /// 返り値が null の場合はキャンセル。保存は呼び出し側で行う。
-/// 「＋ 新しいカテゴリ…」選択時に名前を入力させる小ダイアログ。
-Future<String?> _promptNewCategory(BuildContext context) {
-  final ctrl = TextEditingController();
-  return showDialog<String>(
-    context: context,
-    builder: (dctx) => AlertDialog(
-      title: const Text('新しいカテゴリ'),
-      content: TextField(
-        controller: ctrl,
-        autofocus: true,
-        decoration: const InputDecoration(
-          labelText: 'カテゴリ名',
-          hintText: '例: 住居系 / 娯楽系 / 通信',
-          border: OutlineInputBorder(),
-        ),
-        onSubmitted: (v) => Navigator.pop(dctx, v),
-      ),
-      actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(dctx, null),
-            child: const Text('キャンセル')),
-        FilledButton(
-            onPressed: () => Navigator.pop(dctx, ctrl.text),
-            child: const Text('追加')),
-      ],
-    ),
-  );
-}
-
 Future<Subscription?> showSubscriptionEditSheet(
   BuildContext context, {
   Subscription? initial,
@@ -50,20 +21,10 @@ Future<Subscription?> showSubscriptionEditSheet(
   // 変換中（composing）下線が金額欄に出ないコントローラ。
   final amountCtrl = NoComposingUnderlineController(
       text: initial != null ? formatAmount(initial.amount) : '');
-  final billingDayCtrl =
-      TextEditingController(text: initial?.billingDay?.toString() ?? '');
+  // 毎月の請求日（1〜31）。プルダウンで選択。
+  int? billingDay = initial?.billingDay;
   final memoCtrl = TextEditingController(text: initial?.memo ?? '');
   final iconUrlCtrl = TextEditingController(text: initial?.iconUrl ?? '');
-  // カテゴリ（=セクション）。プルダウンで既存から選択。新規は「＋新規」で追加。
-  final cats = <String>[
-    for (final c in categories)
-      if (c.trim().isNotEmpty) c.trim(),
-  ];
-  String? categorySel =
-      (initial?.category?.trim().isEmpty ?? true) ? null : initial!.category!.trim();
-  if (categorySel != null && !cats.contains(categorySel)) {
-    cats.add(categorySel);
-  }
   SubscriptionCycle cycle = initial?.cycle ?? SubscriptionCycle.monthly;
   SubscriptionAmountType amountType =
       initial?.amountType ?? SubscriptionAmountType.fixed;
@@ -240,19 +201,16 @@ Future<Subscription?> showSubscriptionEditSheet(
             Navigator.pop(ctx, null);
             return;
           }
-          final billingDay = int.tryParse(billingDayCtrl.text.trim());
           final memo =
               memoCtrl.text.trim().isEmpty ? null : memoCtrl.text.trim();
           final iconUrl = iconUrlCtrl.text.trim().isEmpty
               ? null
               : iconUrlCtrl.text.trim();
-          final category =
-              (categorySel == null || categorySel!.trim().isEmpty)
-                  ? null
-                  : categorySel!.trim();
           final pl = (plMajor == null || plMajor!.trim().isEmpty)
               ? null
               : plMajor!.trim();
+          // カテゴリ（まとめ表示用）は会計科目を兼用する。
+          final category = pl;
           final result = Subscription(
             id: initial?.id ??
                 DateTime.now().microsecondsSinceEpoch.toString(),
@@ -402,16 +360,22 @@ Future<Subscription?> showSubscriptionEditSheet(
                         ),
                         const SizedBox(height: 16),
                         if (cycle == SubscriptionCycle.monthly) ...[
-                          TextField(
-                            controller: billingDayCtrl,
-                            keyboardType: TextInputType.number,
-                            maxLength: 2,
+                          DropdownButtonFormField<int?>(
+                            initialValue: billingDay,
                             decoration: const InputDecoration(
-                              labelText: '毎月の請求日（1〜31、任意）',
-                              counterText: '',
+                              labelText: '毎月の請求日（任意）',
                               floatingLabelBehavior:
                                   FloatingLabelBehavior.always,
                             ),
+                            items: [
+                              const DropdownMenuItem<int?>(
+                                  value: null, child: Text('未設定')),
+                              for (var d = 1; d <= 31; d++)
+                                DropdownMenuItem<int?>(
+                                    value: d, child: Text('$d 日')),
+                            ],
+                            onChanged: (v) =>
+                                setLocal(() => billingDay = v),
                           ),
                         ] else ...[
                           InkWell(
@@ -470,75 +434,29 @@ Future<Subscription?> showSubscriptionEditSheet(
                             onChanged: (v) =>
                                 setLocal(() => paymentMethod = v),
                           ),
-                        const SizedBox(height: 16),
-                        DropdownButtonFormField<String>(
-                          initialValue: categorySel,
-                          isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'カテゴリ（任意）',
-                            floatingLabelBehavior:
-                                FloatingLabelBehavior.always,
-                            helperText: '同じカテゴリ名でまとめてセクション表示されます',
-                          ),
-                          hint: const Text('（未分類）'),
-                          items: [
-                            const DropdownMenuItem<String>(
-                                value: null, child: Text('（未分類）')),
-                            for (final c in cats)
-                              DropdownMenuItem<String>(
-                                  value: c, child: Text(c)),
-                            const DropdownMenuItem<String>(
-                                value: '__new__',
-                                child: Text('＋ 新しいカテゴリ…',
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.w700))),
-                          ],
-                          onChanged: (v) async {
-                            if (v == '__new__') {
-                              final name = await _promptNewCategory(ctx);
-                              if (name == null || name.trim().isEmpty) return;
-                              final n = name.trim();
-                              setLocal(() {
-                                if (!cats.contains(n)) cats.add(n);
-                                categorySel = n;
-                              });
-                            } else {
-                              setLocal(() => categorySel = v);
-                            }
-                          },
-                        ),
                         if (accountingMajors.isNotEmpty) ...[
                           const SizedBox(height: 16),
-                          DropdownButtonFormField<String>(
-                            initialValue:
-                                accountingMajors.contains(plMajor)
-                                    ? plMajor
-                                    : null,
-                            isExpanded: true,
-                            decoration: InputDecoration(
-                              labelText: '会計科目（任意・業績PLに合算）',
-                              floatingLabelBehavior:
-                                  FloatingLabelBehavior.always,
-                              helperText:
-                                  '「固定費」は支払形態。実体の科目（通信費・賃借料等）を選ぶとPLに反映',
-                              suffixIcon: plMajor != null
-                                  ? IconButton(
-                                      icon: const Icon(Icons.clear,
-                                          size: 18),
-                                      visualDensity:
-                                          VisualDensity.compact,
-                                      tooltip: '会計科目をクリア',
-                                      onPressed: () =>
-                                          setLocal(() => plMajor = null),
-                                    )
-                                  : null,
-                            ),
-                            items: accountingMajors
-                                .map((m) => DropdownMenuItem(
-                                    value: m, child: Text(m)))
-                                .toList(),
-                            onChanged: (v) =>
-                                setLocal(() => plMajor = v),
+                          const Text('会計科目（カテゴリ兼用・業績PLに合算）',
+                              style: TextStyle(
+                                  fontSize: 12, color: Color(0xFF6B7280))),
+                          const SizedBox(height: 2),
+                          const Text(
+                              '同じ科目でまとめてセクション表示。実体の科目（通信費・賃借料等）でPLにも反映',
+                              style: TextStyle(
+                                  fontSize: 11, color: Color(0xFF9CA3AF))),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final m in accountingMajors)
+                                ChoiceChip(
+                                  label: Text(m),
+                                  selected: plMajor == m,
+                                  onSelected: (sel) => setLocal(
+                                      () => plMajor = sel ? m : null),
+                                ),
+                            ],
                           ),
                           if (plMajor != null) ...[
                             const SizedBox(height: 10),
