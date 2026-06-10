@@ -6,6 +6,7 @@ import '../data/drive_receipt_service.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 import '../utils/modal_input.dart';
+import '../widgets/centered_body.dart';
 import 'expense_input_screen.dart';
 import 'receipt_image_screen.dart';
 
@@ -98,15 +99,21 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
   Widget build(BuildContext context) {
     final t = _t;
     final hasReceipt = t.receiptUrl != null && t.receiptUrl!.trim().isNotEmpty;
+    // 表示用に先頭の自動番号（"4." など）を取り除く。
+    final majorBare =
+        t.category.major.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
     final cat = t.category.sub.isNotEmpty
-        ? '${t.category.major} › ${t.category.sub}'
-        : t.category.major;
+        ? '$majorBare › ${t.category.sub}'
+        : majorBare;
     final wd = _wd[(t.date.weekday - 1) % 7];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       appBar: AppBar(title: const Text('明細')),
-      body: ListView(
+      // Web/PC で横いっぱいに広がりすぎないよう中央寄せ＋最大幅。スマホは全幅。
+      body: CenteredBody(
+        maxWidth: 560,
+        child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
           // 金額カード
@@ -228,6 +235,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
             ],
           ),
         ],
+      ),
       ),
     );
   }
