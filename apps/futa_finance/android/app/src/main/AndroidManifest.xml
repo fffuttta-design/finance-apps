@@ -3,8 +3,11 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- アプリ内からAPKをインストール（更新版を入手機能） -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!-- レシート撮影（自前カメラ画面） -->
+    <!-- レシート撮影（自前カメラ画面）＆ギャラリー直近写真サムネ表示用 -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application

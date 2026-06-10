@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:photo_manager/photo_manager.dart';
 
 /// レシート撮影用の自前カメラ画面。
 /// 中央下=シャッター、右下=ギャラリーから選択。
@@ -18,11 +19,31 @@ class _ReceiptCameraScreenState extends State<ReceiptCameraScreen> {
   CameraController? _controller;
   String? _error;
   bool _busy = false;
+  Uint8List? _latestThumb; // ギャラリーボタンに出す端末の直近写真サムネ
 
   @override
   void initState() {
     super.initState();
     _setup();
+    _loadLatestThumb();
+  }
+
+  /// 端末の一番新しい画像のサムネを取得（権限が無ければアイコン表示のまま）。
+  Future<void> _loadLatestThumb() async {
+    try {
+      final ps = await PhotoManager.requestPermissionExtend();
+      if (!ps.isAuth && !ps.hasAccess) return;
+      final albums = await PhotoManager.getAssetPathList(
+          type: RequestType.image, onlyAll: true);
+      if (albums.isEmpty) return;
+      final assets = await albums.first.getAssetListPaged(page: 0, size: 1);
+      if (assets.isEmpty) return;
+      final thumb = await assets.first
+          .thumbnailDataWithSize(const ThumbnailSize(160, 160));
+      if (thumb != null && mounted) setState(() => _latestThumb = thumb);
+    } catch (_) {
+      // 取得失敗時はアイコン表示にフォールバック。
+    }
   }
 
   Future<void> _setup() async {
@@ -158,18 +179,22 @@ class _ReceiptCameraScreenState extends State<ReceiptCameraScreen> {
                         ),
                       ),
                     ),
+                    // ギャラリー（端末の直近写真サムネ or アイコン）
                     GestureDetector(
                       onTap: _gallery,
                       child: Container(
                         width: 54,
                         height: 54,
+                        clipBehavior: Clip.antiAlias,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
                           color: Colors.white24,
                           border: Border.all(color: Colors.white54),
                         ),
-                        child: const Icon(Icons.photo_library_rounded,
-                            color: Colors.white, size: 26),
+                        child: _latestThumb != null
+                            ? Image.memory(_latestThumb!, fit: BoxFit.cover)
+                            : const Icon(Icons.photo_library_rounded,
+                                color: Colors.white, size: 26),
                       ),
                     ),
                   ],

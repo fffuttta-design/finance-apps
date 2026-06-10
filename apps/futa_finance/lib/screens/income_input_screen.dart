@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -9,6 +8,7 @@ import '../data/app_mode.dart';
 import '../data/income_source_repository.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
+import '../utils/date_pick.dart';
 import '../utils/duplicate_check.dart';
 import '../utils/formatters.dart';
 import 'income_master_screen.dart';
@@ -174,56 +174,13 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
   }
 
   Future<void> _pickDate() async {
+    // PC（広い画面）はカレンダー / スマホはホイール、で出し分け。
     final minDate = AppModeManager.instance.current.minDate;
-    DateTime temp = _date.isBefore(minDate) ? minDate : _date;
-    final picked = await showModalBottomSheet<DateTime>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (sheet) => SafeArea(
-        child: Container(
-          height: 280,
-          color: Colors.white,
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(sheet, null),
-                    child: const Text('キャンセル',
-                        style: TextStyle(color: Color(0xFF6B7280))),
-                  ),
-                  const Text('日付を選択',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF111827))),
-                  TextButton(
-                    onPressed: () => Navigator.pop(sheet, temp),
-                    child: const Text('完了',
-                        style: TextStyle(
-                            color: Color(0xFF16A34A),
-                            fontWeight: FontWeight.w700)),
-                  ),
-                ],
-              ),
-              Container(height: 1, color: const Color(0xFFE5E7EB)),
-              Expanded(
-                child: CupertinoDatePicker(
-                  mode: CupertinoDatePickerMode.date,
-                  initialDateTime: temp,
-                  minimumDate: minDate,
-                  maximumDate: DateTime(2030, 12, 31),
-                  dateOrder: DatePickerDateOrder.ymd,
-                  onDateTimeChanged: (d) => temp = d,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    final picked = await pickAdaptiveDate(
+      context,
+      initial: _date,
+      first: minDate,
+      last: DateTime(2030, 12, 31),
     );
     if (picked != null) setState(() => _date = picked);
   }

@@ -17,7 +17,7 @@ resolution: workspace
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.226+227
+version: 1.0.227+228
 
 environment:
   sdk: ^3.11.4
@@ -56,6 +56,8 @@ dependencies:
     path: ../../packages/finance_core
   image_picker: ^1.2.2
   camera: ^0.11.0+2
+  # レシートカメラのギャラリーボタンに端末の直近写真サムネを出すため
+  photo_manager: ^3.9.0
   # PWA タイトルバー色(theme-color)の実行時切替に使用（Webのみ、条件付きインポート）
   web: ^1.1.0
 
