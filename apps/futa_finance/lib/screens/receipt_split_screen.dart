@@ -468,10 +468,13 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        _label('店舗（共通）'),
+                        // 手入力（明細を分けて記録）では「支出名」、レシート読取では「店舗」。
+                        _label(widget.manual ? '支出名（共通）' : '店舗（共通）'),
                         TextField(
                           controller: _storeCtrl,
-                          decoration: _dec('例: ファミリーマート')
+                          decoration: _dec(widget.manual
+                                  ? '例: Amazonまとめ買い'
+                                  : '例: ファミリーマート')
                               .copyWith(
                             prefixIcon: const Icon(Icons.storefront_outlined,
                                 size: 18),
