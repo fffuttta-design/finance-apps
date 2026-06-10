@@ -3,9 +3,12 @@ import 'package:finance_core/finance_core.dart' as core;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/drive_receipt_service.dart';
+import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
+import '../utils/modal_input.dart';
 import '../widgets/centered_body.dart';
 import 'receipt_image_screen.dart';
+import 'receipt_split_screen.dart';
 import 'transaction_detail_screen.dart';
 
 /// 同じレシート/まとめの複数品目を1画面で見る「まとめ明細」詳細。
@@ -109,10 +112,84 @@ class ReceiptGroupDetailScreen extends StatelessWidget {
                 ),
               ),
             ],
+            const SizedBox(height: 24),
+            // 普通の明細と同じく、まとめ単位での編集・削除。
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _editGroup(context),
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('編集'),
+                    style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () => _deleteGroup(context),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    label: const Text('削除'),
+                    style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFDC2626),
+                        padding: const EdgeInsets.symmetric(vertical: 14)),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
+  }
+
+  /// まとめを編集（品目をまとめて編集し、保存で束ね直す）。
+  Future<void> _editGroup(BuildContext context) async {
+    final first = members.first;
+    final receiptUrl = members
+        .map((t) => t.receiptUrl?.trim() ?? '')
+        .firstWhere((s) => s.isNotEmpty, orElse: () => '');
+    final changed = await showInputSheet<bool>(
+      context,
+      ReceiptSplitScreen(
+        editingMembers: members,
+        date: first.date,
+        storeName: first.store,
+        receiptId: first.receiptId,
+        receiptUrl: receiptUrl.isEmpty ? null : receiptUrl,
+        initialCategoryMajor: first.category.major,
+        initialCategorySub: first.category.sub,
+      ),
+    );
+    if (changed == true && context.mounted) Navigator.pop(context, true);
+  }
+
+  /// まとめ全件を削除。
+  Future<void> _deleteGroup(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: const Text('このまとめを削除しますか？'),
+        content: Text('${members.length}件すべてを削除します。\nこの操作は取り消せません。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626)),
+            onPressed: () => Navigator.pop(dctx, true),
+            child: const Text('削除する'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    for (final m in members) {
+      await TransactionRepository.instance.delete(m.id);
+    }
+    if (context.mounted) Navigator.pop(context, true);
   }
 
   Widget _itemRow(BuildContext context, core.Transaction t) {

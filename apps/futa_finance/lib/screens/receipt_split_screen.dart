@@ -72,6 +72,7 @@ class ReceiptSplitScreen extends StatefulWidget {
     this.receiptId,
     this.receiptUrl,
     this.manual = false,
+    this.editingMembers = const [],
   });
 
   /// 親レシートのグループID（全品目に同じIDを付与）。任意。
@@ -79,6 +80,11 @@ class ReceiptSplitScreen extends StatefulWidget {
 
   /// Drive保存したレシート画像の閲覧リンク（全品目に付与）。任意。
   final String? receiptUrl;
+
+  /// 既存の「まとめ」を編集するときの、現在の取引一覧。
+  /// 非空のとき編集モード：これらから品目行を復元し、保存時は新しい内容を
+  /// 追加してから古いメンバーを削除する（同じ receiptId で束ね直す）。
+  final List<core.Transaction> editingMembers;
 
   @override
   State<ReceiptSplitScreen> createState() => _ReceiptSplitScreenState();
@@ -125,17 +131,40 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
   late final TextEditingController _storeCtrl =
       TextEditingController(text: widget.storeName ?? '');
 
-  late final List<_Row> _rows = widget.items.isEmpty
-      // 手入力モード等で品目が無いときは、空の1行から始める。
-      ? [_emptyRow()]
-      : widget.items
-          .map((it) => _Row(
-              true,
-              TextEditingController(text: it.name),
-              NoComposingUnderlineController(text: formatAmount(it.price)),
-              it.quantity,
-              it.unitPrice))
-          .toList();
+  late final List<_Row> _rows = _buildInitialRows();
+
+  List<_Row> _buildInitialRows() {
+    // 既存まとめの編集：各取引から品目行を復元。共通カテゴリと違う品目だけ
+    // 「品目別の上書き」として保持する（共通と同じなら継承表示）。
+    if (widget.editingMembers.isNotEmpty) {
+      final commonMajor = widget.editingMembers.first.category.major;
+      final commonSub = widget.editingMembers.first.category.sub;
+      return widget.editingMembers.map((t) {
+        final r = _Row(
+          true,
+          TextEditingController(text: t.description),
+          NoComposingUnderlineController(text: formatAmount(t.amount)),
+          null,
+          null,
+        );
+        if (t.category.major != commonMajor || t.category.sub != commonSub) {
+          r.catMajor = t.category.major;
+          r.catSub = t.category.sub;
+        }
+        return r;
+      }).toList();
+    }
+    // 手入力モード等で品目が無いときは、空の1行から始める。
+    if (widget.items.isEmpty) return [_emptyRow()];
+    return widget.items
+        .map((it) => _Row(
+            true,
+            TextEditingController(text: it.name),
+            NoComposingUnderlineController(text: formatAmount(it.price)),
+            it.quantity,
+            it.unitPrice))
+        .toList();
+  }
 
   /// 空の品目行（手入力で追加するとき用）。金額欄は変換中下線を出さない。
   _Row _emptyRow() => _Row(
@@ -184,11 +213,28 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
     setState(() {
       _categories = c;
       _payments = p;
-      // 既定カテゴリ（クレカ）の先頭項目を支払方法に。
-      _applyPayCategoryDefault();
-      // OCRの科目候補があれば共通大カテゴリに自動セット。
+      // 編集モードは既存メンバーの支払方法を復元。それ以外は既定（クレカ先頭）。
+      if (widget.editingMembers.isNotEmpty) {
+        _applyPaymentFromMethod(widget.editingMembers.first.paymentMethod);
+      } else {
+        _applyPayCategoryDefault();
+      }
+      // OCR/編集の科目候補があれば共通大カテゴリに自動セット。
       _applyCategoryGuess();
     });
+  }
+
+  /// 支払方法名から、それが属する支払カテゴリ（クレカ/電子/現金/銀行）を逆引きして
+  /// _payCat と _paymentMethod をセットする（見つからなければ既定）。
+  void _applyPaymentFromMethod(String method) {
+    for (final cat in _PayCat.values) {
+      if (_methodsFor(cat).contains(method)) {
+        _payCat = cat;
+        _paymentMethod = method;
+        return;
+      }
+    }
+    _applyPayCategoryDefault();
   }
 
   /// OCR推定カテゴリを共通大/小カテゴリに反映。
@@ -328,12 +374,22 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
       return;
     }
     setState(() => _saving = true);
+    // 先に新しい内容を追加してから、編集モードでは古いメンバーを削除する。
+    // （順番をこうすることで、途中失敗してもデータが欠損しない）
     for (final t in toSave) {
       await TransactionRepository.instance.add(t);
     }
+    if (widget.editingMembers.isNotEmpty) {
+      for (final m in widget.editingMembers) {
+        await TransactionRepository.instance.delete(m.id);
+      }
+    }
     if (!mounted) return;
+    final edited = widget.editingMembers.isNotEmpty;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${toSave.length}件を記録しました')),
+      SnackBar(
+          content: Text(
+              edited ? '${toSave.length}件で更新しました' : '${toSave.length}件を記録しました')),
     );
     Navigator.pop(context, true);
   }
@@ -343,7 +399,10 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
     final loaded = _categories != null && _payments != null;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.manual ? '明細を分けて記録' : '品目ごとに記録',
+        title: Text(
+            widget.editingMembers.isNotEmpty
+                ? 'まとめを編集'
+                : (widget.manual ? '明細を分けて記録' : '品目ごとに記録'),
             style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -570,7 +629,9 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                           icon: const Icon(Icons.check),
                           label: Text(_saving
                               ? '保存中…'
-                              : '$_includedCount 件を記録する'),
+                              : (widget.editingMembers.isNotEmpty
+                                  ? '$_includedCount 件で保存'
+                                  : '$_includedCount 件を記録する')),
                           style: FilledButton.styleFrom(
                             backgroundColor: const Color(0xFF1A237E),
                             padding:
