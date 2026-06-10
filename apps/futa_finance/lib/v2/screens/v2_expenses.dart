@@ -9,7 +9,6 @@ import '../../data/drive_receipt_service.dart';
 import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
-import '../../screens/expense_input_screen.dart';
 import '../../screens/expense_list_screen.dart';
 import '../../screens/receipt_image_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
@@ -121,14 +120,6 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     setState(() {
       _focused = DateTime(_focused.year, _focused.month + delta);
     });
-  }
-
-  Future<void> _openInput() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const ExpenseInputScreen()),
-    );
-    if (mounted) await _load();
   }
 
   /// 経費明細の全件一覧（並び替え・検索）を開く。
@@ -332,6 +323,9 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
         AppModeManager.instance.current == AppMode.business;
     final expenses = _monthExpenses;
     final total = expenses.fold<int>(0, (s, t) => s + t.amount);
+    // 固定費（毎月支出予定）の当月合計。一番上の月合計は「経費＋固定費」にする。
+    final fixedTotal =
+        _monthlyCharges.fold<int>(0, (s, c) => s + c.amountForMonth(_ymKey));
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(
@@ -363,11 +357,11 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
                     style: V2Typography.caption.copyWith(
                         color: V2Colors.textSecondary)),
                 const Spacer(),
-                Text('合計',
+                Text('合計（経費＋固定費）',
                     style: V2Typography.caption.copyWith(
                         color: V2Colors.textSecondary)),
                 const SizedBox(width: V2Spacing.sm),
-                Text(formatYen(-total, withSign: true),
+                Text(formatYen(-(total + fixedTotal), withSign: true),
                     style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
@@ -415,17 +409,13 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
                           ),
                         ),
                       ),
-                      OutlinedButton.icon(
-                        onPressed: () => _openInput(),
-                        icon: const Icon(Icons.add, size: 14),
-                        label: const Text('追加'),
-                        style: OutlinedButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                          minimumSize: const Size(0, 32),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10),
-                        ),
-                      ),
+                      // 追加ボタンは廃止。代わりに経費明細の合計を表示。
+                      Text('-${formatYen(total)}',
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: V2Colors.negative,
+                              fontFeatures: V2Typography.tabularNums)),
                     ],
                   ),
                 ),
@@ -1109,12 +1099,12 @@ class _ReceiptGroupRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: V2Spacing.sm),
+                // トグルアイコンは出さない（金額位置を単品行と揃えるため）。
+                // 行タップで開閉する挙動はそのまま。
                 Text('-${formatYen(total)}',
                     style: V2Typography.numericCell.copyWith(
                         color: V2Colors.negative,
                         fontWeight: FontWeight.w700)),
-                Icon(expanded ? Icons.expand_less : Icons.expand_more,
-                    size: 18, color: V2Colors.textMuted),
               ],
             ),
             if (expanded) ...[

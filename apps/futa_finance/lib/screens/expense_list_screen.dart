@@ -470,9 +470,9 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                 ),
               ),
               const SizedBox(width: 8),
+              // トグルアイコンは出さない（金額位置を単品行と揃えるため）。
+              // 行タップで開閉する挙動はそのまま。
               _amountText(u.total),
-              Icon(expanded ? Icons.expand_less : Icons.expand_more,
-                  size: 18, color: const Color(0xFF9CA3AF)),
             ],
           ),
           if (expanded) ...[
