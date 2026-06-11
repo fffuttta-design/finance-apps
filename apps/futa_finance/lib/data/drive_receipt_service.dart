@@ -6,6 +6,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'desktop_bridge.dart' as desktop;
 import 'windows_google_auth.dart';
 
 /// レシート画像を Google Drive に保存するサービス（最小権限 drive.file）。
@@ -126,6 +127,12 @@ class DriveReceiptService {
   Future<String?> _accessToken({bool forceRefresh = false}) async {
     if (!forceRefresh && _tokenCache != null) return _tokenCache;
     if (forceRefresh) _tokenCache = null;
+    if (desktop.isDesktopShell) {
+      // Electron デスクトップ版：ログイン時の OAuth で drive.file も認可済み。
+      // メインプロセスが refresh_token から access_token を更新して返す。
+      _tokenCache = await desktop.desktopDriveToken(forceRefresh: forceRefresh);
+      return _tokenCache;
+    }
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
       // Windows: ログイン時の OAuth で drive.file も認可済み。
       // WindowsGoogleAuth が保持する refresh_token から取得・更新する。

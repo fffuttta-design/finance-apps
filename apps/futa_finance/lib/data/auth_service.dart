@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import 'desktop_bridge.dart' as desktop;
 import 'windows_google_auth.dart';
 
 /// 認証サービス。
@@ -49,6 +50,22 @@ class AuthService {
   /// 戻り値=ログイン状態になったか。
   Future<bool> trySilentSignIn() async {
     if (_auth.currentUser != null) return true;
+    // Electron デスクトップ版：保存済み refresh_token から自動ログイン。
+    if (desktop.isDesktopShell) {
+      try {
+        final tokens = await desktop.desktopSilentTokens();
+        if (tokens == null) return false;
+        final credential = GoogleAuthProvider.credential(
+          idToken: tokens.idToken,
+          accessToken: tokens.accessToken,
+        );
+        final userCred = await _auth.signInWithCredential(credential);
+        return userCred.user != null;
+      } catch (e) {
+        if (kDebugMode) debugPrint('デスクトップ自動ログイン失敗: $e');
+        return false;
+      }
+    }
     if (!_isWindows) return false;
     try {
       final tokens = await WindowsGoogleAuth.instance.silentSignIn();
@@ -76,6 +93,18 @@ class AuthService {
     if (!_initialized) await init();
 
     try {
+      // Electron デスクトップ版：メインプロセスの自前 OAuth でブラウザログイン。
+      // （埋め込み画面は Google に弾かれるため signInWithPopup は使えない）
+      if (desktop.isDesktopShell) {
+        final tokens = await desktop.desktopSignIn();
+        final credential = GoogleAuthProvider.credential(
+          idToken: tokens.idToken,
+          accessToken: tokens.accessToken,
+        );
+        final userCred = await _auth.signInWithCredential(credential);
+        return userCred.user;
+      }
+
       if (kIsWeb) {
         // Web: Firebase Auth の signInWithPopup を直接利用。
         // google_sign_in の Web 用 client_id 設定が不要になる。
@@ -123,7 +152,9 @@ class AuthService {
       // Firebase 側
       await _auth.signOut();
       // Google 側（次回サインイン時にアカウント選択を再表示するため）
-      if (_isWindows) {
+      if (desktop.isDesktopShell) {
+        await desktop.desktopSignOut();
+      } else if (_isWindows) {
         await WindowsGoogleAuth.instance.signOut();
       } else if (!kIsWeb) {
         try {

@@ -1,0 +1,45 @@
+{
+  "name": "futafinance_desktop",
+  "productName": "FutaFinance",
+  "version": "0.1.0",
+  "description": "FutaFinance desktop shell (Electron wrapper around the Flutter web build).",
+  "main": "main.js",
+  "author": "RunStrategy",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "jp.runstrategy.futafinance.desktop",
+    "productName": "FutaFinance",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "assets/**/*",
+      "oauth.json",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "web-dist",
+        "to": "web-dist"
+      }
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "assets/icon.ico"
+    },
+    "portable": {
+      "artifactName": "FutaFinance-${version}.exe"
+    }
+  }
+}

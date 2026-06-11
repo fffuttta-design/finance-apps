@@ -80,3 +80,4 @@ gemini.key
 
 # Windows デスクトップ版の常設先（exe一式・コミット不要）
 /windows-app/
+/windows-app-electron/
