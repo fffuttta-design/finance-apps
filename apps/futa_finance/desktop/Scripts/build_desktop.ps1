@@ -90,8 +90,13 @@ Write-Host ("[5/5] built: {0} ({1:N1} MB)" -f $exe.Name, ($exe.Length/1MB)) -For
 $installDir = Join-Path $RepoRoot "windows-app-electron"
 New-Item -ItemType Directory -Force -Path $installDir | Out-Null
 $installExe = Join-Path $installDir "FutaFinance.exe"
-Copy-Item $exe.FullName $installExe -Force
-Write-Host "installed (for testing): $installExe" -ForegroundColor Green
+# Best-effort: if the app is currently running, the exe is locked. Don't abort.
+try {
+  Copy-Item $exe.FullName $installExe -Force -ErrorAction Stop
+  Write-Host "installed (for testing): $installExe" -ForegroundColor Green
+} catch {
+  Write-Host "WARN: local install exe is locked (app running?). Skipped local copy; continuing." -ForegroundColor Yellow
+}
 
 # ---- optional: publish to Drive ----
 if ($Publish) {
