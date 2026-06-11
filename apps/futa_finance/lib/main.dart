@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -26,12 +28,17 @@ Future<void> main() async {
   );
   // Google Sign-In 初期化
   await AuthService.instance.init();
-  // Windows は保存済みトークンで自動ログイン（再起動/更新でも再ログイン不要に）。
-  // 既ログイン or Web/Android は即 false で返る。ネットワーク遅延に上限を付ける。
-  await AuthService.instance
-      .trySilentSignIn()
-      .timeout(const Duration(seconds: 6), onTimeout: () => false);
+  // まず画面を即出す（白画面の待ち時間ゼロ）。
   runApp(const FutaFinanceApp());
+  // 自動ログイン（保存トークンでの再ログイン）は UI をブロックせず裏で実行。
+  // 結果は authStateChanges 経由で画面に反映される（Firebaseの永続復元も同様）。
+  // Windows/Electron で再起動・更新後も再ログイン不要にするための保険。
+  unawaited(
+    AuthService.instance
+        .trySilentSignIn()
+        .timeout(const Duration(seconds: 6), onTimeout: () => false)
+        .catchError((_) => false),
+  );
 }
 
 class FutaFinanceApp extends StatelessWidget {
