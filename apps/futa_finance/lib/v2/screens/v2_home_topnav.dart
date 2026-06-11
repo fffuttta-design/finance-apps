@@ -834,13 +834,16 @@ class _CenterColumn extends StatelessWidget {
     final recentUnits = _groupByReceipt(recent).take(8).toList();
 
     // 支出の内訳（大カテゴリ別）。番号は表示・集計とも除いて名前で束ねる。
+    // タップ展開用に、カテゴリ別の取引一覧も同時に集める。
     final byMajor = <String, int>{};
+    final txnsByMajor = <String, List<Transaction>>{};
     for (final t in monthTxns) {
       if (t.type != TransactionType.expense) continue;
       final major =
           t.category.major.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
       if (major.isEmpty) continue;
       byMajor[major] = (byMajor[major] ?? 0) + t.amount;
+      (txnsByMajor[major] ??= []).add(t);
     }
     final majorEntries = byMajor.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
@@ -1114,14 +1117,13 @@ class _CenterColumn extends StatelessWidget {
                     style: V2Typography.h2
                         .copyWith(color: V2Colors.textPrimary)),
                 const SizedBox(height: V2Spacing.md),
-                for (final e in majorEntries.take(6))
-                  _CategoryBar(
-                    name: e.key,
-                    amount: e.value,
-                    ratio: byMajorTotal == 0 ? 0 : e.value / byMajorTotal,
-                    iconKey: state._iconKeyForMajor(e.key),
-                    accent: state.widget.accent,
-                  ),
+                _CategoryBreakdown(
+                  entries: majorEntries.take(6).toList(),
+                  total: byMajorTotal,
+                  txnsByMajor: txnsByMajor,
+                  accent: state.widget.accent,
+                  iconKeyFor: state._iconKeyForMajor,
+                ),
               ],
             ),
           ),
@@ -1315,60 +1317,142 @@ class _TransactionRowState extends State<_TransactionRow> {
 }
 
 /// 入出金一覧の表示単位：単品（single）か、同じレシートのまとめ（group）。
-/// 支出の内訳の1行（アイコン＋カテゴリ名＋金額＋割合バー）。
-class _CategoryBar extends StatelessWidget {
-  final String name;
-  final int amount;
-  final double ratio;
-  final String? iconKey;
+/// 支出の内訳（カテゴリ別）。区切り線で各カテゴリを仕切り、
+/// 行タップでそのカテゴリにぶら下がる取引明細を展開表示する。
+class _CategoryBreakdown extends StatefulWidget {
+  final List<MapEntry<String, int>> entries;
+  final int total;
+  final Map<String, List<Transaction>> txnsByMajor;
   final Color accent;
-  const _CategoryBar({
-    required this.name,
-    required this.amount,
-    required this.ratio,
-    required this.iconKey,
+  final String? Function(String) iconKeyFor;
+  const _CategoryBreakdown({
+    required this.entries,
+    required this.total,
+    required this.txnsByMajor,
     required this.accent,
+    required this.iconKeyFor,
   });
 
   @override
+  State<_CategoryBreakdown> createState() => _CategoryBreakdownState();
+}
+
+class _CategoryBreakdownState extends State<_CategoryBreakdown> {
+  String? _open;
+
+  @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (int i = 0; i < widget.entries.length; i++) ...[
+          if (i > 0)
+            const Divider(height: 1, thickness: 1, color: V2Colors.border),
+          _categoryRow(widget.entries[i]),
+        ],
+      ],
+    );
+  }
+
+  Widget _categoryRow(MapEntry<String, int> e) {
+    final ratio = widget.total == 0 ? 0.0 : e.value / widget.total;
+    final open = _open == e.key;
+    final txns = widget.txnsByMajor[e.key] ?? const <Transaction>[];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: () => setState(() => _open = open ? null : e.key),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: widget.accent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
+                      child: categoryIconWidget(widget.iconKeyFor(e.key),
+                          size: 17, color: widget.accent),
+                    ),
+                    const SizedBox(width: V2Spacing.sm),
+                    Expanded(
+                      child: Text(e.key,
+                          style: V2Typography.body,
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                    Text(formatYen(e.value),
+                        style: V2Typography.numericCell
+                            .copyWith(fontWeight: FontWeight.w700)),
+                    const SizedBox(width: 4),
+                    Icon(open ? Icons.expand_less : Icons.expand_more,
+                        size: 18, color: V2Colors.textMuted),
+                  ],
                 ),
-                alignment: Alignment.center,
-                child: categoryIconWidget(iconKey, size: 17, color: accent),
-              ),
-              const SizedBox(width: V2Spacing.sm),
-              Expanded(
-                child: Text(name,
-                    style: V2Typography.body,
-                    overflow: TextOverflow.ellipsis),
-              ),
-              Text(formatYen(amount),
-                  style: V2Typography.numericCell
-                      .copyWith(fontWeight: FontWeight.w700)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: ratio.clamp(0.0, 1.0),
-              minHeight: 7,
-              backgroundColor: V2Colors.surfaceMuted,
-              valueColor: AlwaysStoppedAnimation(accent),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: ratio.clamp(0.0, 1.0),
+                    minHeight: 7,
+                    backgroundColor: V2Colors.surfaceMuted,
+                    valueColor: AlwaysStoppedAnimation(widget.accent),
+                  ),
+                ),
+              ],
             ),
           ),
+        ),
+        if (open)
+          Padding(
+            padding: const EdgeInsets.only(left: 38, bottom: 8),
+            child: Column(
+              children: [
+                for (final t in txns) _txnRow(t),
+                if (txns.isEmpty)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Text('明細なし',
+                          style: V2Typography.caption
+                              .copyWith(color: V2Colors.textMuted)),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _txnRow(Transaction t) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 44,
+            child: Text(formatMonthDay(t.date),
+                style:
+                    V2Typography.caption.copyWith(color: V2Colors.textMuted)),
+          ),
+          Expanded(
+            child: Text(t.description.isEmpty ? '—' : t.description,
+                style: V2Typography.caption
+                    .copyWith(color: V2Colors.textSecondary),
+                overflow: TextOverflow.ellipsis),
+          ),
+          Text('-${formatYen(t.amount)}',
+              style: V2Typography.caption.copyWith(
+                  color: V2Colors.textSecondary,
+                  fontWeight: FontWeight.w600)),
         ],
       ),
     );

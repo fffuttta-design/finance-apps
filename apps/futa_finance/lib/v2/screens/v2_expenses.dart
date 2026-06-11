@@ -380,21 +380,32 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
                   icon: const Icon(Icons.chevron_right, size: 20),
                   onPressed: () => _shiftMonth(1),
                 ),
-                const SizedBox(width: V2Spacing.lg),
-                Text('${expenses.length} 件',
-                    style: V2Typography.caption.copyWith(
-                        color: V2Colors.textSecondary)),
-                const Spacer(),
-                Text('合計（経費＋固定費）',
-                    style: V2Typography.caption.copyWith(
-                        color: V2Colors.textSecondary)),
-                const SizedBox(width: V2Spacing.sm),
-                Text(formatYen(-(total + fixedTotal), withSign: true),
-                    style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: V2Colors.negative,
-                        fontFeatures: V2Typography.tabularNums)),
+                // 右側：件数＋ラベルを上段、合計額を下段（右寄せ）。
+                // 狭い画面で合計額が見切れないよう FittedBox で縮小可にする。
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('${expenses.length}件 ・ 合計（経費＋固定費）',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: V2Typography.caption.copyWith(
+                              color: V2Colors.textSecondary)),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                            formatYen(-(total + fixedTotal), withSign: true),
+                            style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: V2Colors.negative,
+                                fontFeatures: V2Typography.tabularNums)),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),

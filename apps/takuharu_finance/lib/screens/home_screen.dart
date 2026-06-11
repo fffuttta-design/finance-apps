@@ -31,6 +31,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
 
+  // 支出の内訳で展開中のカテゴリ名（タップで開閉）。
+  String? _openCat;
+
   // ── 相手の登録の「未読まとめ通知」用 ───────────────────────
   StreamSubscription<List<core.Transaction>>? _notifySub;
   Set<String> _seenIds = {};
@@ -231,11 +234,13 @@ class _HomeScreenState extends State<HomeScreen> {
         .where((t) => t.type == core.TransactionType.expense)
         .fold<int>(0, (s, t) => s + t.amount);
 
-    // カテゴリ別（支出）集計。
+    // カテゴリ別（支出）集計。タップ展開用に取引一覧も同時に集める。
     final byCat = <String, int>{};
+    final txnsByCat = <String, List<core.Transaction>>{};
     for (final t in month) {
       if (t.type != core.TransactionType.expense) continue;
       byCat[t.category.major] = (byCat[t.category.major] ?? 0) + t.amount;
+      (txnsByCat[t.category.major] ??= []).add(t);
     }
     final catEntries = byCat.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
@@ -254,7 +259,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (catEntries.isNotEmpty) ...[
           _sectionTitle('支出の内訳'),
           const SizedBox(height: 8),
-          _categoryCard(catEntries, expense),
+          _categoryCard(catEntries, expense, txnsByCat),
           const SizedBox(height: 16),
         ],
         _sectionTitle('最近の入出金'),
@@ -619,20 +624,89 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _categoryCard(List<MapEntry<String, int>> entries, int total) {
+  Widget _categoryCard(List<MapEntry<String, int>> entries, int total,
+      Map<String, List<core.Transaction>> txnsByCat) {
+    final top = entries.take(6).toList();
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            for (final e in entries.take(6)) _catBar(e.key, e.value, total),
+            for (int i = 0; i < top.length; i++) ...[
+              if (i > 0)
+                const Divider(
+                    height: 1, thickness: 1, color: AppColors.pinkSoft),
+              _catRow(top[i], total, txnsByCat[top[i].key] ?? const []),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _catBar(String name, int amount, int total) {
+  // カテゴリ1行：タップでその下にぶら下がる取引明細を開閉する。
+  Widget _catRow(
+      MapEntry<String, int> e, int total, List<core.Transaction> txns) {
+    final open = _openCat == e.key;
+    return Column(
+      children: [
+        InkWell(
+          onTap: () => setState(() => _openCat = open ? null : e.key),
+          borderRadius: BorderRadius.circular(12),
+          child: _catBar(e.key, e.value, total, expanded: open),
+        ),
+        if (open)
+          Padding(
+            padding: const EdgeInsets.only(left: 40, bottom: 4),
+            child: Column(
+              children: [for (final t in txns) _catTxnRow(t)],
+            ),
+          ),
+      ],
+    );
+  }
+
+  // 展開時の明細1行（タップで会話/編集画面へ）。
+  Widget _catTxnRow(core.Transaction t) {
+    return InkWell(
+      onTap: () async {
+        final changed = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+              builder: (_) => TransactionChatScreen(transaction: t)),
+        );
+        if (changed == true && mounted) setState(() {});
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 40,
+              child: Text('${t.date.month}/${t.date.day}',
+                  style: const TextStyle(
+                      fontSize: 11, color: AppColors.textSub)),
+            ),
+            Expanded(
+              child: Text(
+                  t.description.isEmpty ? t.category.major : t.description,
+                  style: const TextStyle(fontSize: 12, color: AppColors.text),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ),
+            Text(formatYen(t.amount),
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.text)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _catBar(String name, int amount, int total, {bool? expanded}) {
     final c = categoryFor(name, income: false);
     final ratio = total == 0 ? 0.0 : amount / total;
     return Padding(
@@ -660,6 +734,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: AppColors.text)),
+              if (expanded != null) ...[
+                const SizedBox(width: 4),
+                Icon(expanded ? Icons.expand_less : Icons.expand_more,
+                    size: 18, color: AppColors.textSub),
+              ],
             ],
           ),
           const SizedBox(height: 6),
