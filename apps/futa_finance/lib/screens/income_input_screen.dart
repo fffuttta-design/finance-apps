@@ -38,10 +38,8 @@ Future<bool?> showIncomeInputModal(BuildContext context) {
 
 /// 収入を1件入力する画面（マスタから選択）。
 ///
-/// 入金額と入金後残高は双方向同期：
-/// - 入金額編集 → 残高自動更新（現残高 + 入金額）
-/// - 残高編集 → 入金額自動更新（残高 - 現残高）
-/// 保存時は選択銀行の currentBalance を新残高で上書きする。
+/// 残高の自動計算・手動上書きは廃止（金の流れは取引で記録。残高調整は
+/// 専用画面＋「残高調整」科目の取引で厳正に行う方針）。現在残高は参考表示のみ。
 class IncomeInputScreen extends StatefulWidget {
   const IncomeInputScreen({super.key, this.initialReceiveAccount});
 
@@ -64,38 +62,29 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
   String? _receiveAccount;
   final _descCtrl = TextEditingController();
   final _amountCtrl = NoComposingUnderlineController();
-  final _balanceAfterCtrl = TextEditingController();
   final _memoCtrl = TextEditingController();
 
   /// 見込み売上として記録するか。デフォルト false（=確定）。
   /// 発生主義の運用で「発生月に計上、実額は来月確定」の時に使う。
   bool _isPending = false;
   final _amountFocus = FocusNode();
-  final _balanceFocus = FocusNode();
   bool _saving = false;
 
   /// 選択中の銀行口座の現在残高。
   int _currentBalance = 0;
 
-  /// 双方向同期の再帰呼び出し防止フラグ。
-  bool _syncing = false;
-
   @override
   void initState() {
     super.initState();
     _load();
-    _amountCtrl.addListener(_syncBalanceFromAmount);
-    _balanceAfterCtrl.addListener(_syncAmountFromBalance);
   }
 
   @override
   void dispose() {
     _descCtrl.dispose();
     _amountCtrl.dispose();
-    _balanceAfterCtrl.dispose();
     _memoCtrl.dispose();
     _amountFocus.dispose();
-    _balanceFocus.dispose();
     super.dispose();
   }
 
@@ -130,8 +119,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
   void _onReceiveAccountChanged(String? name) {
     setState(() => _receiveAccount = name);
     if (name == null) {
-      _currentBalance = 0;
-      _balanceAfterCtrl.text = '';
+      setState(() => _currentBalance = 0);
       return;
     }
     final bank = _payments?.bankAccounts.firstWhere(
@@ -141,35 +129,6 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
     setState(() {
       _currentBalance = bank?.displayBalance ?? 0;
     });
-    // 既に入金額が入ってればそれを反映、空なら現残高そのまま
-    final amount = parseAmount(_amountCtrl.text) ?? 0;
-    _syncing = true;
-    _balanceAfterCtrl.text = formatAmount(_currentBalance + amount);
-    _syncing = false;
-  }
-
-  void _syncBalanceFromAmount() {
-    if (_syncing) return;
-    if (!_amountFocus.hasFocus) return;
-    final amount = parseAmount(_amountCtrl.text) ?? 0;
-    final newBalance = formatAmount(_currentBalance + amount);
-    if (_balanceAfterCtrl.text != newBalance) {
-      _syncing = true;
-      _balanceAfterCtrl.text = newBalance;
-      _syncing = false;
-    }
-  }
-
-  void _syncAmountFromBalance() {
-    if (_syncing) return;
-    if (!_balanceFocus.hasFocus) return;
-    final balance = parseAmount(_balanceAfterCtrl.text) ?? 0;
-    final newAmount = formatAmount(balance - _currentBalance);
-    if (_amountCtrl.text != newAmount) {
-      _syncing = true;
-      _amountCtrl.text = newAmount;
-      _syncing = false;
-    }
   }
 
   Future<void> _pickDate() async {
@@ -199,8 +158,6 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       );
       return;
     }
-    final balanceAfter = parseAmount(_balanceAfterCtrl.text);
-
     setState(() => _saving = true);
     final tx = core.Transaction(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -226,12 +183,13 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
     }
     await TransactionRepository.instance.add(tx);
 
-    // 銀行口座の currentBalance を更新
+    // 入金先ウォレットの残高を自動で増やす（金額ぶん）。手で残高をいじる機能は無し。
     // 見込み売上は実際にはまだ入金されていないので、残高は更新しない。
-    if (!_isPending && balanceAfter != null && _payments != null) {
+    if (!_isPending && _payments != null) {
+      final newBalance = _currentBalance + amount;
       final updated = _payments!.bankAccounts.map((b) {
         if (b.name == _receiveAccount) {
-          return b.copyWith(currentBalance: balanceAfter);
+          return b.copyWith(currentBalance: newBalance);
         }
         return b;
       }).toList();
@@ -425,29 +383,6 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
-
-                    if (!_isPending) ...[
-                      _label('入金後の残高（円）— 自動計算・編集可'),
-                      TextFormField(
-                        controller: _balanceAfterCtrl,
-                        focusNode: _balanceFocus,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          HalfWidthDigitsFormatter(),
-                          ThousandsSeparatorInputFormatter(),
-                        ],
-                        decoration: _inputDecoration().copyWith(
-                          prefixIcon: const Icon(Icons.account_balance,
-                              size: 18, color: Color(0xFF16A34A)),
-                        ),
-                        style: const TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 16,
-                            color: Color(0xFF16A34A),
-                            fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
 
                     _label('備考（任意）'),
                     TextFormField(

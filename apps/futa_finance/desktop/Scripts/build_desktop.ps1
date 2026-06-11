@@ -50,6 +50,9 @@ $webDst = Join-Path $ProjectDir "web-dist"
 if (-not (Test-Path $webSrc)) { throw "web build not found: $webSrc" }
 if (Test-Path $webDst) { Remove-Item $webDst -Recurse -Force }
 Copy-Item $webSrc $webDst -Recurse -Force
+# Disable the service worker (local serving needs no SW; prevents stale cache on update).
+$sw = Join-Path $webDst "flutter_service_worker.js"
+if (Test-Path $sw) { Remove-Item $sw -Force }
 
 # ---- 3. oauth.json from win_oauth.key ----
 Write-Host "[3/5] write oauth.json" -ForegroundColor Yellow
@@ -103,6 +106,25 @@ if ($Publish) {
     Copy-Item $exe.FullName (Join-Path $driveDir "FutaFinance.exe") -Force
     $ver = (Get-Content $pkgPath -Raw -Encoding UTF8 | ConvertFrom-Json).version
     [System.IO.File]::WriteAllText((Join-Path $driveDir "version.txt"), $ver, [System.Text.UTF8Encoding]::new($false))
+
+    # First-time installer (copies exe to LOCALAPPDATA + shortcuts + launch).
+    $install = @'
+# install.ps1 - FutaFinance desktop first-time install
+$ErrorActionPreference = "Stop"
+$src = Join-Path $PSScriptRoot "FutaFinance.exe"
+$dstDir = Join-Path $env:LOCALAPPDATA "Programs\FutaFinance"
+New-Item -ItemType Directory -Force -Path $dstDir | Out-Null
+$dst = Join-Path $dstDir "FutaFinance.exe"
+Copy-Item $src $dst -Force
+$ws = New-Object -ComObject WScript.Shell
+$startMenu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\FutaFinance.lnk"
+$sc = $ws.CreateShortcut($startMenu); $sc.TargetPath = $dst; $sc.Save()
+$desktop = Join-Path ([Environment]::GetFolderPath("Desktop")) "FutaFinance.lnk"
+$sc2 = $ws.CreateShortcut($desktop); $sc2.TargetPath = $dst; $sc2.Save()
+Start-Process $dst
+Write-Host "FutaFinance installed to $dst" -ForegroundColor Green
+'@
+    [System.IO.File]::WriteAllText((Join-Path $driveDir "install.ps1"), $install, [System.Text.UTF8Encoding]::new($false))
     Write-Host "published to Drive: $driveDir (v$ver)" -ForegroundColor Green
   } else {
     Write-Host "Drive folder not found; skipped publish." -ForegroundColor DarkGray

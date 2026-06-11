@@ -7,7 +7,7 @@
 //     preload 経由で Flutter に渡す（埋め込み画面は Google に弾かれるため）
 //  3. Drive リリースフォルダを見て自己更新（best-effort）
 const {
-  app, BrowserWindow, ipcMain, shell, dialog, nativeImage,
+  app, BrowserWindow, ipcMain, shell, dialog, session,
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -415,7 +415,14 @@ if (!gotLock) {
       mainWindow.focus();
     }
   });
+  app.setAppUserModelId('jp.runstrategy.futafinance.desktop');
   app.whenReady().then(async () => {
+    // Service Worker は使わない（ローカル配信なので不要）。過去に登録された
+    // SW のキャッシュで更新後も古い画面が出るのを防ぐため、起動毎に破棄。
+    // ※ IndexedDB（Firebase の認証/オフライン永続）は消さない。
+    try {
+      await session.defaultSession.clearStorageData({ storages: ['serviceworkers'] });
+    } catch (_) {}
     await createWindow();
     setTimeout(() => { checkForUpdate().catch((e) => console.error(e)); }, 2500);
   });

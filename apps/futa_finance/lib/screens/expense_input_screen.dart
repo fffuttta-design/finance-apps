@@ -72,11 +72,10 @@ Future<bool?> showExpenseInputModal(BuildContext context) {
 
 /// 支出を1件入力する画面。
 ///
-/// 支払方法に銀行口座を選んだ場合、支出後残高が自動計算される：
-/// - 金額編集 → 残高自動更新（現残高 - 支出額）
-/// - 残高編集 → 金額自動更新（現残高 - 残高）
-/// 保存時は該当銀行のcurrentBalanceを新残高で上書き。
-/// クレジットカード選択時は残高欄を表示しない。
+/// 支払元に銀行/現金/電子マネーを選んだ場合、保存時にその残高を
+/// 金額ぶん自動で減らす（現残高 - 支出額）。
+/// 手で残高を直接いじる機能は無し（厳格管理。調整は専用画面＋
+/// 「残高調整」科目の取引で行う）。クレカは請求側なので残高は触らない。
 class ExpenseInputScreen extends StatefulWidget {
   const ExpenseInputScreen({
     super.key,
@@ -146,12 +145,10 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   final _amountCtrl =
       NoComposingUnderlineController(); // 円金額（USD時はここに概算円）
   final _usdAmountCtrl = TextEditingController(); // USD金額
-  final _balanceAfterCtrl = TextEditingController();
   final _memoCtrl = TextEditingController();
   final _storeCtrl = TextEditingController();
   final _receiptUrlCtrl = TextEditingController();
   final _amountFocus = FocusNode();
-  final _balanceFocus = FocusNode();
   bool _saving = false;
 
   /// 入力通貨。'JPY' or 'USD'。
@@ -163,9 +160,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   /// 選択中の支払い元がクレジットカードなら true。
   /// (true: 支出は累積額に +、false: 支出は残高から -)
   bool _selectedIsCard = false;
-
-  /// 双方向同期の再帰呼び出し防止フラグ。
-  bool _syncing = false;
 
   /// 過去の取引（カテゴリ予測の履歴学習に使う）。
   List<core.Transaction> _history = const [];
@@ -235,8 +229,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       }
     }
     _load();
-    _amountCtrl.addListener(_syncBalanceFromAmount);
-    _balanceAfterCtrl.addListener(_syncAmountFromBalance);
   }
 
   @override
@@ -244,12 +236,10 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     _descCtrl.dispose();
     _amountCtrl.dispose();
     _usdAmountCtrl.dispose();
-    _balanceAfterCtrl.dispose();
     _memoCtrl.dispose();
     _storeCtrl.dispose();
     _receiptUrlCtrl.dispose();
     _amountFocus.dispose();
-    _balanceFocus.dispose();
     super.dispose();
   }
 
@@ -466,57 +456,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         _currentBalance = null;
         _selectedIsCard = false;
       });
-      _syncing = true;
-      _balanceAfterCtrl.text = '';
-      _syncing = false;
-      return;
-    }
-    final amount = parseAmount(_amountCtrl.text) ?? 0;
-    _syncing = true;
-    _balanceAfterCtrl.text = formatAmount(_computeAfter(amount));
-    _syncing = false;
-  }
-
-  /// 支出金額から「支出後の値」を計算。
-  /// 銀行系: 残高 - 支出 / カード: 累積額 + 支出
-  int _computeAfter(int amount) {
-    if (_selectedIsCard) {
-      return _currentBalance! + amount;
-    }
-    return _currentBalance! - amount;
-  }
-
-  /// 「支出後の値」から支出金額を逆算。
-  int _computeAmount(int after) {
-    if (_selectedIsCard) {
-      return after - _currentBalance!;
-    }
-    return _currentBalance! - after;
-  }
-
-  void _syncBalanceFromAmount() {
-    if (_syncing) return;
-    if (_currentBalance == null) return;
-    if (!_amountFocus.hasFocus) return;
-    final amount = parseAmount(_amountCtrl.text) ?? 0;
-    final newBalance = formatAmount(_computeAfter(amount));
-    if (_balanceAfterCtrl.text != newBalance) {
-      _syncing = true;
-      _balanceAfterCtrl.text = newBalance;
-      _syncing = false;
-    }
-  }
-
-  void _syncAmountFromBalance() {
-    if (_syncing) return;
-    if (_currentBalance == null) return;
-    if (!_balanceFocus.hasFocus) return;
-    final balance = parseAmount(_balanceAfterCtrl.text) ?? 0;
-    final newAmount = formatAmount(_computeAmount(balance));
-    if (_amountCtrl.text != newAmount) {
-      _syncing = true;
-      _amountCtrl.text = newAmount;
-      _syncing = false;
     }
   }
 
@@ -687,8 +626,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       }
     }
 
-    final balanceAfter = parseAmount(_balanceAfterCtrl.text);
-
     setState(() => _saving = true);
     final editing = widget.editing;
     final tx = core.Transaction(
@@ -728,14 +665,15 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     }
     await TransactionRepository.instance.add(tx);
 
-    // 銀行/現金/電子マネーの残高のみ更新（新規記録時・クレカ累計は廃止）。
-    if (!_selectedIsCard &&
-        _currentBalance != null &&
-        balanceAfter != null &&
-        _payments != null) {
+    // 支出元ウォレットの残高を自動で減らす（金額ぶん）。
+    // 手で残高を調整する機能は廃止＝厳格管理。残高の調整が要るときは
+    // 専用画面＋「残高調整」科目の取引で厳正に行う。
+    // 銀行/現金/電子マネーのみ。クレカは請求側なので残高は触らない。
+    if (!_selectedIsCard && _currentBalance != null && _payments != null) {
+      final newBalance = _currentBalance! - amount;
       final updated = _payments!.bankAccounts.map((b) {
         if (b.name == _paymentMethod) {
-          return b.copyWith(currentBalance: balanceAfter);
+          return b.copyWith(currentBalance: newBalance);
         }
         return b;
       }).toList();
@@ -1073,29 +1011,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
             '現在残高: ${formatYen(_currentBalance!)}',
             style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
           ),
-        ),
-      ],
-      // 支出後の残高（銀行系のみ・新規時のみ）。
-      if (hasBalanceTracking && widget.editing == null && !isCard) ...[
-        const SizedBox(height: 12),
-        _label('支出後の残高（円）— 自動計算・編集可'),
-        TextFormField(
-          controller: _balanceAfterCtrl,
-          focusNode: _balanceFocus,
-          keyboardType: TextInputType.number,
-          inputFormatters: [
-            HalfWidthDigitsFormatter(),
-            ThousandsSeparatorInputFormatter(),
-          ],
-          decoration: _inputDecoration().copyWith(
-            prefixIcon: const Icon(Icons.account_balance,
-                size: 18, color: Color(0xFFDC2626)),
-          ),
-          style: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 16,
-              color: Color(0xFFDC2626),
-              fontWeight: FontWeight.bold),
         ),
       ],
     ];
