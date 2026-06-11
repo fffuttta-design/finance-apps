@@ -20,6 +20,10 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell>
     with StartupUpdateMixin, WidgetsBindingObserver {
   int _index = 0;
+  final _pageController = PageController();
+
+  static const _kPageDuration = Duration(milliseconds: 260);
+  static const _kPageCurve = Curves.easeOutCubic;
 
   @override
   void initState() {
@@ -34,7 +38,16 @@ class _MainShellState extends State<MainShell>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _pageController.dispose();
     super.dispose();
+  }
+
+  /// 下部ナビのタップ → そのページへアニメ移動。
+  void _goTo(int i) {
+    if (i == _index) return;
+    setState(() => _index = i);
+    _pageController.animateToPage(i,
+        duration: _kPageDuration, curve: _kPageCurve);
   }
 
   @override
@@ -48,20 +61,23 @@ class _MainShellState extends State<MainShell>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _index,
+      // 横スワイプでタブを切り替え。各タブは keep-alive で状態を保持。
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (i) => setState(() => _index = i),
         children: [
           // ホームの「支出をすべて見る」から支出タブ(1)へ切替。
-          HomeScreen(onOpenExpenses: () => setState(() => _index = 1)),
-          const ExpensesScreen(),
-          const IncomeScreen(),
-          const AnalysisScreen(),
-          const PlanningScreen(),
+          _KeepAlivePage(
+              child: HomeScreen(onOpenExpenses: () => _goTo(1))),
+          const _KeepAlivePage(child: ExpensesScreen()),
+          const _KeepAlivePage(child: IncomeScreen()),
+          const _KeepAlivePage(child: AnalysisScreen()),
+          const _KeepAlivePage(child: PlanningScreen()),
         ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        onDestinationSelected: _goTo,
         indicatorColor: AppColors.pinkSoft,
         destinations: const [
           NavigationDestination(
@@ -95,5 +111,27 @@ class _MainShellState extends State<MainShell>
         ],
       ),
     );
+  }
+}
+
+/// PageView の各ページを生かしたまま保持する（IndexedStack 同様にタブの
+/// 状態・スクロール位置を維持するため）。
+class _KeepAlivePage extends StatefulWidget {
+  final Widget child;
+  const _KeepAlivePage({required this.child});
+
+  @override
+  State<_KeepAlivePage> createState() => _KeepAlivePageState();
+}
+
+class _KeepAlivePageState extends State<_KeepAlivePage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }
