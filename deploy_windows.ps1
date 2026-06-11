@@ -1,6 +1,6 @@
 ﻿# =====================================================================
 #  FutaFinance Windows desktop deploy
-#    build -> install to C:\dev\FutaFinance-Windows -> make shortcuts
+#    build -> install to finance-apps\windows-app -> make shortcuts
 #    (optional) zip to Google Drive
 #
 #  NOTE: ASCII-only on purpose. Windows PowerShell 5.1 misreads
@@ -48,8 +48,9 @@ if (-not (Test-Path (Join-Path $src 'futa_finance.exe'))) {
 
 # --- install location ---
 #  Profile paths like %LOCALAPPDATA% are NOT reliably visible across the
-#  dev environment, so install under C:\dev (a shared location).
-$install = 'C:\dev\FutaFinance-Windows'
+#  dev environment, so install under the project (a shared C:\dev location).
+#  Kept inside finance-apps but git-ignored (see .gitignore: /windows-app/).
+$install = Join-Path $repo 'windows-app'
 Write-Host "[2/5] install to: $install"
 
 # stop running instance so files can be overwritten
