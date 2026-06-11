@@ -349,30 +349,19 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
         _accountChoices.where((c) => c.value != _toAccount).toList();
     final toCandidates =
         _accountChoices.where((c) => c.value != _fromAccount).toList();
+    final canSave = !_saving &&
+        _fromAccount != null &&
+        _toAccount != null &&
+        _amountCtrl.text.isNotEmpty;
     return Scaffold(
       appBar: AppBar(
         title: const Text('振替を記録',
             style: TextStyle(fontWeight: FontWeight.w700)),
-        actions: [
-          TextButton(
-            onPressed: _saving ||
-                    _fromAccount == null ||
-                    _toAccount == null ||
-                    _amountCtrl.text.isEmpty
-                ? null
-                : _save,
-            child: _saving
-                ? const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('保存',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
-          ),
-        ],
       ),
-      body: Center(
+      body: Column(
+        children: [
+          Expanded(
+            child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),
           child: SingleChildScrollView(
@@ -478,6 +467,59 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
           ],
         ),
       ),
+        ),
+      ),
+          ),
+          _bottomActions(canSave),
+        ],
+      ),
+    );
+  }
+
+  // 下部アクションバー（左=キャンセル / 右=保存）。よくある入力パネルの形。
+  Widget _bottomActions(bool canSave) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed:
+                    _saving ? null : () => Navigator.of(context).pop(false),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('キャンセル'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton(
+                onPressed: canSave ? _save : null,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _saving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Text('保存',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
         ),
       ),
     );
