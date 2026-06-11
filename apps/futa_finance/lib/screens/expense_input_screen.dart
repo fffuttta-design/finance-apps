@@ -806,6 +806,11 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 controller: _descCtrl,
                 decoration: _inputDecoration(),
                 onChanged: (_) {
+                  // 変換中（IME composing中）は setState で再描画しない。
+                  // Windowsデスクトップで「変換しようとスペースを押すとカーソルが
+                  // 先頭へ飛ぶ」フレームワーク不具合を誘発しないため、予測は
+                  // 変換が確定してから走らせる。
+                  if (_descCtrl.value.composing.isValid) return;
                   if (!_categoryTouched) {
                     setState(() => _autoPredictCategory());
                   }
@@ -1204,6 +1209,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               prefixIcon: const Icon(Icons.storefront_outlined, size: 18),
             ),
             onChanged: (_) {
+              // 変換中は再描画しない（Windowsのカーソル飛び誘発を防ぐ）。
+              if (_storeCtrl.value.composing.isValid) return;
               if (!_categoryTouched) {
                 setState(() => _autoPredictCategory());
               }
