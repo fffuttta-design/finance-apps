@@ -598,15 +598,19 @@ class _SettingsMenu extends StatelessWidget {
     return V2Card(
       padding: const EdgeInsets.symmetric(
           horizontal: V2Spacing.sm, vertical: V2Spacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (var gi = 0; gi < groups.length; gi++) ...[
-            if (gi > 0) const SizedBox(height: V2Spacing.md),
-            _groupBody(groups[gi]),
+      // 項目が多いと下（アカウント/サインアウト）が見切れるため内部スクロール可に。
+      child: SingleChildScrollView(
+        primary: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var gi = 0; gi < groups.length; gi++) ...[
+              if (gi > 0) const SizedBox(height: V2Spacing.md),
+              _groupBody(groups[gi]),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
