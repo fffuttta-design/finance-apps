@@ -9,6 +9,7 @@ import '../utils/modal_input.dart';
 import '../widgets/centered_body.dart';
 import 'expense_input_screen.dart';
 import 'receipt_image_screen.dart';
+import 'transfer_input_screen.dart';
 
 /// 取引の詳細画面（フル画面）。
 /// 明細をタップ → ここで内容を確認 → 「編集」「削除」を選べる。
@@ -53,10 +54,16 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
   }
 
   Future<void> _edit() async {
-    // 現状エディタは支出のみ対応。
-    if (_t.type != core.TransactionType.expense) return;
-    final changed =
-        await showInputSheet<bool>(context, ExpenseInputScreen(editing: _t));
+    bool? changed;
+    if (_t.type == core.TransactionType.transfer) {
+      // 振替は専用エディタで編集（汎用の支出エディタは振替を扱えない）。
+      changed = await showTransferInputModal(context, editing: _t);
+    } else if (_t.type == core.TransactionType.expense) {
+      changed =
+          await showInputSheet<bool>(context, ExpenseInputScreen(editing: _t));
+    } else {
+      return; // 収入は現状この画面からの編集は未対応。
+    }
     if (changed == true && mounted) Navigator.pop(context, true);
   }
 

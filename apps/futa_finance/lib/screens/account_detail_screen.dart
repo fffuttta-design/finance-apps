@@ -880,6 +880,12 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   // ───────────────────────────────────────────────────────────
 
   Future<void> _showEditDialog(core.Transaction t) async {
+    // 振替は専用の振替エディタで編集（汎用ダイアログは移動元/先を扱えない）。
+    if (t.type == core.TransactionType.transfer) {
+      final changed = await showTransferInputModal(context, editing: t);
+      if (changed == true && mounted) await _load();
+      return;
+    }
     final isTransfer = t.type == core.TransactionType.transfer;
     final isOut = (t.type == core.TransactionType.expense) ||
         (isTransfer && t.transferFromAccount == _account.name);

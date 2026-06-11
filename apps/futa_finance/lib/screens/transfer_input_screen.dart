@@ -9,8 +9,10 @@ import '../utils/date_pick.dart';
 import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
 
-/// 振替入力モーダルを表示する。保存成功時は true を返す。
-Future<bool?> showTransferInputModal(BuildContext context) {
+/// 振替入力モーダルを表示する。保存/削除成功時は true を返す。
+/// [editing] を渡すと「振替を編集」モードで開く（プリフィル＋更新/削除）。
+Future<bool?> showTransferInputModal(BuildContext context,
+    {core.Transaction? editing}) {
   return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
@@ -26,7 +28,7 @@ Future<bool?> showTransferInputModal(BuildContext context) {
             color: Color(0xFFFAFAFA),
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          child: const TransferInputScreen(),
+          child: TransferInputScreen(editing: editing),
         ),
       );
     },
@@ -40,10 +42,13 @@ Future<bool?> showTransferInputModal(BuildContext context) {
 ///   - 銀行 → 現金（ATM 引出し）
 ///   - 銀行 → クレジットカード（カード引落）
 class TransferInputScreen extends StatefulWidget {
-  const TransferInputScreen({super.key, this.initialFromAccount});
+  const TransferInputScreen({super.key, this.initialFromAccount, this.editing});
 
   /// 起動時に移動元口座をプリセット（口座詳細画面から呼ばれた時など）。
   final String? initialFromAccount;
+
+  /// 編集対象の振替取引（null=新規作成）。
+  final core.Transaction? editing;
 
   @override
   State<TransferInputScreen> createState() => _TransferInputScreenState();
@@ -64,6 +69,15 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
   @override
   void initState() {
     super.initState();
+    // 編集モードなら既存値でプリフィル。
+    final e = widget.editing;
+    if (e != null) {
+      _date = e.date;
+      _fromAccount = e.transferFromAccount;
+      _toAccount = e.transferToAccount;
+      _amountCtrl.text = formatAmount(e.amount);
+      _memoCtrl.text = e.memo ?? '';
+    }
     _load();
   }
 
@@ -123,8 +137,10 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
     }
     setState(() => _saving = true);
     try {
+      final editing = widget.editing;
       final tx = core.Transaction(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        id: editing?.id ??
+            DateTime.now().microsecondsSinceEpoch.toString(),
         date: _date,
         type: core.TransactionType.transfer,
         // 振替時は category 不要だが、空文字でも初期化が要るため固定値。
@@ -137,7 +153,11 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
         transferFromAccount: _fromAccount,
         transferToAccount: _toAccount,
       );
-      await TransactionRepository.instance.add(tx);
+      if (editing != null) {
+        await TransactionRepository.instance.update(tx);
+      } else {
+        await TransactionRepository.instance.add(tx);
+      }
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {
@@ -147,6 +167,41 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
       );
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _delete() async {
+    final e = widget.editing;
+    if (e == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('この振替を削除しますか？'),
+        content: const Text('元に戻せません。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('削除'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _saving = true);
+    try {
+      await TransactionRepository.instance.delete(e.id);
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (err) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('削除に失敗しました: $err')));
     }
   }
 
@@ -353,10 +408,20 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
         _fromAccount != null &&
         _toAccount != null &&
         _amountCtrl.text.isNotEmpty;
+    final isEditing = widget.editing != null;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('振替を記録',
-            style: TextStyle(fontWeight: FontWeight.w700)),
+        title: Text(isEditing ? '振替を編集' : '振替を記録',
+            style: const TextStyle(fontWeight: FontWeight.w700)),
+        actions: [
+          if (isEditing)
+            TextButton(
+              onPressed: _saving ? null : _delete,
+              style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFFDC2626)),
+              child: const Text('削除'),
+            ),
+        ],
       ),
       body: Column(
         children: [
