@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -70,6 +71,19 @@ class FutaFinanceApp extends StatelessWidget {
             ),
           ),
           home: const _AuthGate(),
+          // マウスの「戻る」ボタン（サイドボタン）で前の画面へ戻れるようにする。
+          // 一覧→明細 と進んだあと、戻るボタンで一覧へ戻れる（PC/Web向け）。
+          builder: (context, child) {
+            return Listener(
+              onPointerDown: (event) {
+                if (event.buttons == kBackMouseButton) {
+                  final nav = Navigator.maybeOf(context);
+                  if (nav != null && nav.canPop()) nav.pop();
+                }
+              },
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
         );
       },
     );

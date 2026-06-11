@@ -16,6 +16,7 @@ import '../../screens/transaction_detail_screen.dart';
 import '../../utils/formatters.dart';
 import '../../utils/thousands_separator_input_formatter.dart';
 import '../../widgets/brand_logo.dart';
+import '../../widgets/date_weekday_text.dart';
 import '../../widgets/subscription_edit_sheet.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
@@ -1079,9 +1080,8 @@ class _ReceiptGroupRow extends StatelessWidget {
           children: [
             SizedBox(
               width: 58,
-              child: Text(monthDayWeekday(first.date),
-                  style: V2Typography.numericCell.copyWith(
-                      color: weekendColor(first.date))),
+              child: dateWeekdayText(first.date,
+                  baseStyle: V2Typography.numericCell),
             ),
             const SizedBox(width: V2Spacing.sm),
             Expanded(
@@ -1169,10 +1169,8 @@ class _ExpenseRowState extends State<_ExpenseRow> {
               // 日付（M/D(曜)）。土=青/日=赤。
               SizedBox(
                 width: 58,
-                child: Text(
-                    monthDayWeekday(widget.t.date),
-                    style: V2Typography.numericCell.copyWith(
-                        color: weekendColor(widget.t.date))),
+                child: dateWeekdayText(widget.t.date,
+                    baseStyle: V2Typography.numericCell),
               ),
               const SizedBox(width: V2Spacing.sm),
               // 中央: カテゴリバッジ＋内容（支払方法は非表示）

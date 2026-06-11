@@ -5,6 +5,7 @@ import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
+import '../widgets/date_weekday_text.dart';
 import 'receipt_group_detail_screen.dart';
 import 'transaction_detail_screen.dart';
 
@@ -430,11 +431,11 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
         children: [
           SizedBox(
             width: 58,
-            child: Text(monthDayWeekday(t.date),
-                style: TextStyle(
+            child: dateWeekdayText(t.date,
+                baseStyle: const TextStyle(
                     fontSize: 12,
                     fontFamily: 'monospace',
-                    color: weekendColor(t.date) ?? const Color(0xFF6B7280))),
+                    color: Color(0xFF6B7280))),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -476,12 +477,11 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
         children: [
           SizedBox(
             width: 58,
-            child: Text(monthDayWeekday(first.date),
-                style: TextStyle(
+            child: dateWeekdayText(first.date,
+                baseStyle: const TextStyle(
                     fontSize: 12,
                     fontFamily: 'monospace',
-                    color: weekendColor(first.date) ??
-                        const Color(0xFF6B7280))),
+                    color: Color(0xFF6B7280))),
           ),
           const SizedBox(width: 8),
           Expanded(

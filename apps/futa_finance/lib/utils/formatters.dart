@@ -26,6 +26,12 @@ String weekdayKanji(DateTime d) {
 String monthDayWeekday(DateTime d) =>
     '${d.month}/${d.day}(${weekdayKanji(d)})';
 
+/// 「M/D」表記（曜日なし）。日付部分だけ通常色で出したいとき用。
+String monthDayOnly(DateTime d) => '${d.month}/${d.day}';
+
+/// 「(曜)」表記。曜日だけ色付けしたいとき用。
+String weekdayParen(DateTime d) => '(${weekdayKanji(d)})';
+
 /// 曜日に応じた色：土曜=青 / 日曜=赤 / 平日=null（既定色のまま）。
 Color? weekendColor(DateTime d) {
   if (d.weekday == DateTime.saturday) return const Color(0xFF2563EB);
