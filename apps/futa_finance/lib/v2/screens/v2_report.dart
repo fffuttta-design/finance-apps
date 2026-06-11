@@ -6,8 +6,8 @@ import 'package:finance_core/finance_core.dart' as core;
 import '../../data/app_mode.dart';
 import '../../data/monthly_snapshot_repository.dart';
 import '../../data/subscription_repository.dart';
+import '../../data/tax_estimate_repository.dart';
 import '../../data/transaction_repository.dart';
-import '../../screens/report_screen.dart';
 import '../../utils/formatters.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
@@ -147,15 +147,23 @@ class _V2ReportScreenState extends State<V2ReportScreen>
       if (!mounted) return;
       setState(() => _transactions = list);
     });
+    // 法人税の概算設定が変わったら再描画。
+    TaxEstimateRepository.instance.addListener(_onTaxSettingChanged);
+  }
+
+  void _onTaxSettingChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
     _sub?.cancel();
+    TaxEstimateRepository.instance.removeListener(_onTaxSettingChanged);
     super.dispose();
   }
 
   Future<void> _load() async {
+    await TaxEstimateRepository.instance.ensureLoaded();
     final txns = await _txRepo.loadAll();
     final subs =
         (await SubscriptionRepository.instance.load()).subscriptions;
@@ -595,6 +603,59 @@ class _V2ReportScreenState extends State<V2ReportScreen>
               months: months,
               rows: _buildRows(),
               totalLabel: _yearView ? '年度累計' : '合計'),
+          const SizedBox(height: V2Spacing.md),
+          _taxEstimateCard(),
+        ],
+      ),
+    );
+  }
+
+  /// 法人税等を概算で計上する設定カード（業績タブ内）。
+  Widget _taxEstimateCard() {
+    final t = TaxEstimateRepository.instance;
+    const rates = [20, 25, 30, 35, 40];
+    return V2Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text('法人税等を概算で計上',
+                    style: V2Typography.bodyStrong
+                        .copyWith(color: V2Colors.textPrimary)),
+              ),
+              Switch(
+                value: t.enabled,
+                activeThumbColor: V2Colors.accent,
+                onChanged: (v) => t.setEnabled(v),
+              ),
+            ],
+          ),
+          if (t.enabled) ...[
+            const SizedBox(height: V2Spacing.xs),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text('実効税率', style: V2Typography.caption),
+                ...rates.map((p) => ChoiceChip(
+                      label: Text('$p%'),
+                      selected: t.ratePercent == p,
+                      onSelected: (_) => t.setRatePercent(p),
+                      visualDensity: VisualDensity.compact,
+                    )),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '税引前利益（黒字の分）に税率をかけた見込みです。'
+              '確定申告の数字ではありません。赤字の期は0。',
+              style:
+                  V2Typography.micro.copyWith(color: V2Colors.textMuted),
+            ),
+          ],
         ],
       ),
     );
@@ -618,15 +679,6 @@ class _V2ReportScreenState extends State<V2ReportScreen>
             '・法人税 / 住民税 / 事業税 / 所得税（完全一致） → 法人税等\n'
             '・上記以外の expense → 販売管理費（内訳は標準勘定科目で表示）',
             style: V2Typography.caption,
-          ),
-          const SizedBox(height: V2Spacing.md),
-          OutlinedButton.icon(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ReportScreen()),
-            ),
-            icon: const Icon(Icons.open_in_new, size: 14),
-            label: const Text('v1 集計画面（カテゴリ別/月末締め）を開く'),
           ),
         ],
       ),
@@ -793,7 +845,12 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     final ord = _addSub(oper, nonOpIncomeMonthly, nonOpExpenseMonthly);
     final preTax =
         _addSub(ord, extraIncomeMonthly, extraExpenseMonthly);
-    final net = _diff(preTax, taxMonthly);
+    // 法人税等: 概算ONなら税引前利益(黒字分)に実効税率をかけた見込み額、
+    // OFFなら実際に記帳された税額(_PLCategory.tax)を使う。
+    final taxEst = TaxEstimateRepository.instance;
+    final effectiveTax =
+        taxEst.enabled ? taxEst.estimateFor(preTax) : taxMonthly;
+    final net = _diff(preTax, effectiveTax);
 
     final unlistedSga = _unlistedMajors(_PLCategory.sga, _sgaItems);
     final unlistedNonOpIn =
@@ -899,7 +956,9 @@ class _V2ReportScreenState extends State<V2ReportScreen>
 
     // ── 法人税等 ──
     rows.add(_PLRow(
-        label: '法人税等', monthly: taxMonthly, kind: _RowKind.data));
+        label: taxEst.enabled ? '法人税等（概算${taxEst.ratePercent}%）' : '法人税等',
+        monthly: effectiveTax,
+        kind: _RowKind.data));
 
     rows.add(_PLRow(
         label: '当期純利益', monthly: net, kind: _RowKind.emphasize));
