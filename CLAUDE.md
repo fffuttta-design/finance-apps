@@ -27,7 +27,9 @@
 |---|---|---|
 | **Web** | `git push origin main` | GitHub Actions が自動で gh-pages 更新 |
 | **Android** | `pwsh deploy.ps1` | 手動実行。APK ビルド + GitHub Release + version.json |
-| **Windows Desktop** | `flutter build windows` (TODO) | 未自動化、要対応 |
+| **Windows Desktop** | **Electron版**（`apps/futa_finance/desktop`）。`desktop/Scripts/build_desktop.ps1 -Version X.Y.Z -Publish` で NSIS インストーラをビルド → Drive `FutaFinance-Desktop` へ配布（自動更新あり） | 手動実行 |
+
+> ※ Windows は Flutter ネイティブ版を**退役**（日本語IMEのカーソル飛び対策で Electron 化）。`flutter build windows` 用の `windows/` と `deploy_windows.ps1` は削除済み。詳細はメモリ「FutaFinance Electronデスクトップ版」。
 
 - Web は git push で自動完了（数分で反映）
 - Android は `deploy.ps1` を実行しないとリリースされない。バージョンは pubspec.yaml から読まれる
