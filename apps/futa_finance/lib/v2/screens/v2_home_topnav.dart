@@ -845,6 +845,12 @@ class _CenterColumn extends StatelessWidget {
       byMajor[major] = (byMajor[major] ?? 0) + t.amount;
       (txnsByMajor[major] ??= []).add(t);
     }
+    // 固定費（サブスク）の当月分も大カテゴリ別内訳に1行として加える。
+    // 支払方法別の内訳と同じ扱いにし、内訳合計を当月経費（固定費込み）と一致させる。
+    if (subTotal > 0) {
+      const kFixed = '固定費・サブスク';
+      byMajor[kFixed] = (byMajor[kFixed] ?? 0) + subTotal;
+    }
     final majorEntries = byMajor.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final byMajorTotal =
