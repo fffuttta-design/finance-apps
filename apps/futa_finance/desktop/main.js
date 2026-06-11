@@ -303,12 +303,35 @@ function startServer() {
   });
 }
 
+// ─────────────────── ウィンドウ状態の記憶/復元 ───────────────────
+function windowStatePath() {
+  return path.join(app.getPath('userData'), 'window.json');
+}
+function readWindowState() {
+  try { return JSON.parse(fs.readFileSync(windowStatePath(), 'utf8')); } catch (_) { return {}; }
+}
+function saveWindowState(win) {
+  if (!win || win.isDestroyed()) return;
+  try {
+    // 最大化前の通常サイズ/位置を保存（最大化フラグも別に持つ）。
+    const b = win.getNormalBounds();
+    const state = {
+      x: b.x, y: b.y, width: b.width, height: b.height,
+      isMaximized: win.isMaximized(),
+    };
+    fs.writeFileSync(windowStatePath(), JSON.stringify(state), 'utf8');
+  } catch (_) {}
+}
+
 // ─────────────────── ウィンドウ ───────────────────
 async function createWindow() {
   const port = await startServer();
+  const st = readWindowState();
   mainWindow = new BrowserWindow({
-    width: 1180,
-    height: 820,
+    width: st.width || 1180,
+    height: st.height || 820,
+    x: st.x,            // 未保存なら undefined → 中央
+    y: st.y,
     minWidth: 760,
     minHeight: 560,
     backgroundColor: '#F7F8FA',
@@ -321,12 +344,27 @@ async function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
     },
   });
+  // 前回が最大化なら最大化で開く。
+  if (st.isMaximized) mainWindow.maximize();
+
   // アプリ外リンクはシステムブラウザで。
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http://127.0.0.1')) return { action: 'allow' };
     shell.openExternal(url);
     return { action: 'deny' };
   });
+
+  // サイズ/位置/最大化の変化を保存（連続イベントはデバウンス）。
+  let saveTimer = null;
+  const scheduleSave = () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => saveWindowState(mainWindow), 400);
+  };
+  mainWindow.on('resize', scheduleSave);
+  mainWindow.on('move', scheduleSave);
+  mainWindow.on('maximize', () => saveWindowState(mainWindow));
+  mainWindow.on('unmaximize', () => saveWindowState(mainWindow));
+  mainWindow.on('close', () => saveWindowState(mainWindow));
   mainWindow.on('closed', () => { mainWindow = null; });
   mainWindow.loadURL(`http://127.0.0.1:${port}/`);
 }
