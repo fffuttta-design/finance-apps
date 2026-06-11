@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import 'windows_google_auth.dart';
+
 /// 認証サービス。
 /// Google Sign-In + Firebase Auth を統合し、ログイン状態を提供する。
 ///
@@ -21,12 +23,17 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _initialized = false;
 
+  /// Windows デスクトップ判定（google_sign_in 非対応プラットフォーム）。
+  bool get _isWindows =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+
   /// 起動時に1回だけ呼ぶ。google_sign_in の初期化。
-  /// Web では google_sign_in は使わず Firebase Auth の signInWithPopup を
-  /// 直接呼ぶため、初期化はスキップ（Web 用 clientId 設定不要）。
+  /// Web / Windows では google_sign_in を使わないため初期化スキップ。
+  ///   - Web: Firebase Auth の signInWithPopup を直接利用
+  ///   - Windows: 自前の OAuth ループバック方式（WindowsGoogleAuth）
   Future<void> init() async {
     if (_initialized) return;
-    if (!kIsWeb) {
+    if (!kIsWeb && !_isWindows) {
       await GoogleSignIn.instance.initialize();
     }
     _initialized = true;
@@ -51,6 +58,17 @@ class AuthService {
         // google_sign_in の Web 用 client_id 設定が不要になる。
         final provider = GoogleAuthProvider();
         final userCred = await _auth.signInWithPopup(provider);
+        return userCred.user;
+      }
+
+      if (_isWindows) {
+        // Windows: 自前 OAuth でブラウザログイン → id_token を Firebase に渡す。
+        final tokens = await WindowsGoogleAuth.instance.signIn();
+        final credential = GoogleAuthProvider.credential(
+          idToken: tokens.idToken,
+          accessToken: tokens.accessToken,
+        );
+        final userCred = await _auth.signInWithCredential(credential);
         return userCred.user;
       }
 
@@ -82,7 +100,9 @@ class AuthService {
       // Firebase 側
       await _auth.signOut();
       // Google 側（次回サインイン時にアカウント選択を再表示するため）
-      if (!kIsWeb) {
+      if (_isWindows) {
+        await WindowsGoogleAuth.instance.signOut();
+      } else if (!kIsWeb) {
         try {
           await GoogleSignIn.instance.signOut();
         } catch (_) {}

@@ -33,10 +33,7 @@ class DefaultFirebaseOptions {
           'you can reconfigure this by running the FlutterFire CLI again.',
         );
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -58,6 +55,17 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyDstjlA_ahoM4yDyOas3Tc9c-FdRCeDjt4',
+    appId: '1:746983928581:web:3481abb1480d46a16efd6c',
+    messagingSenderId: '746983928581',
+    projectId: 'futa-finance',
+    authDomain: 'futa-finance.firebaseapp.com',
+    storageBucket: 'futa-finance.firebasestorage.app',
+  );
+
+  // Windows デスクトップは Firebase C++ SDK 経由。web と同じ構成を流用する
+  // （同一 Firebase プロジェクトなので apiKey/authDomain 等を共有）。
+  static const FirebaseOptions windows = FirebaseOptions(
     apiKey: 'AIzaSyDstjlA_ahoM4yDyOas3Tc9c-FdRCeDjt4',
     appId: '1:746983928581:web:3481abb1480d46a16efd6c',
     messagingSenderId: '746983928581',

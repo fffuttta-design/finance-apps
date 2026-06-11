@@ -74,3 +74,6 @@ dev-control.txt
 /.chrome-dev-profile/
 gemini.key
 **/gemini.key
+
+# Windows デスクトップ版 OAuth クライアント設定（client_secret 含む・コミット禁止）
+apps/futa_finance/lib/config/windows_oauth_config.dart
