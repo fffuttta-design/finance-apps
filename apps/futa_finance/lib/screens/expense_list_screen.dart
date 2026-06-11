@@ -141,7 +141,10 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     final q = _query.trim().toLowerCase();
     final m = _month;
     var list = _transactions
-        .where((t) => t.type == core.TransactionType.expense)
+        // 支出に加えて振替も一覧に載せる（振替と分かるよう行側で区別表示）。
+        .where((t) =>
+            t.type == core.TransactionType.expense ||
+            t.type == core.TransactionType.transfer)
         .where((t) =>
             m == null || (t.date.year == m.year && t.date.month == m.month))
         .where((t) {
@@ -201,7 +204,10 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   @override
   Widget build(BuildContext context) {
     final rows = _filtered;
-    final total = rows.fold<int>(0, (s, t) => s + t.amount);
+    // 合計は支出のみ（振替はお金の移動なので足さない）。
+    final total = rows
+        .where((t) => t.type == core.TransactionType.expense)
+        .fold<int>(0, (s, t) => s + t.amount);
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title,
@@ -365,6 +371,32 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
           fontWeight: FontWeight.w700,
           color: Color(0xFFDC2626)));
 
+  /// 振替バッジ（青系・スワップアイコン付き）。支出と区別する。
+  Widget _transferBadge() => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE0F2FE),
+          borderRadius: BorderRadius.circular(3),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.swap_horiz, size: 11, color: Color(0xFF0EA5E9)),
+            SizedBox(width: 2),
+            Text('振替',
+                style: TextStyle(fontSize: 11, color: Color(0xFF0EA5E9))),
+          ],
+        ),
+      );
+
+  /// 振替金額（中立色・マイナスなし）。
+  Widget _transferAmount(int amount) => Text(formatYen(amount),
+      style: const TextStyle(
+          fontSize: 15,
+          fontFamily: 'monospace',
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF475569)));
+
   /// 白カード（角丸・枠付き・左右余白）。概要タブの行デザインに合わせる。
   Widget _card({required Widget child, VoidCallback? onTap}) {
     return Padding(
@@ -388,8 +420,9 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     );
   }
 
-  /// 単品行（1取引）。白カード：日付｜カテゴリバッジ＋内容｜金額。
+  /// 単品行（1取引）。白カード：日付｜カテゴリ/振替バッジ＋内容｜金額。
   Widget _singleRow(core.Transaction t) {
+    final isTransfer = t.type == core.TransactionType.transfer;
     return _card(
       onTap: () => _editRow(t),
       child: Row(
@@ -407,7 +440,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
           Expanded(
             child: Row(
               children: [
-                _badge(_catLabel(t.category)),
+                isTransfer ? _transferBadge() : _badge(_catLabel(t.category)),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -423,7 +456,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          _amountText(t.amount),
+          isTransfer ? _transferAmount(t.amount) : _amountText(t.amount),
         ],
       ),
     );

@@ -103,6 +103,19 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
       ..sort((a, b) => b.date.compareTo(a.date));
   }
 
+  /// 当月の支出＋振替（明細一覧の表示用）。
+  /// 合計（経費）は _monthExpenses のみで計算し、振替は金額に足さない。
+  List<core.Transaction> get _monthEntries {
+    return _transactions
+        .where((t) =>
+            (t.type == core.TransactionType.expense ||
+                t.type == core.TransactionType.transfer) &&
+            t.date.year == _focused.year &&
+            t.date.month == _focused.month)
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+  }
+
   /// 当月の毎月引落予定（subscription の monthly）
   List<core.Subscription> get _monthlyCharges {
     final list = _subscriptions.subscriptions
@@ -147,9 +160,10 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     if (changed == true && mounted) await _load();
   }
 
-  /// 行タップ：経費はまず詳細画面を表示（そこから編集/削除）。それ以外は明細シート。
+  /// 行タップ：経費・振替は詳細画面を表示（そこから編集/削除）。それ以外は明細シート。
   Future<void> _showTxnSummary(core.Transaction t) async {
-    if (t.type == core.TransactionType.expense) {
+    if (t.type == core.TransactionType.expense ||
+        t.type == core.TransactionType.transfer) {
       final changed = await Navigator.push<bool>(
         context,
         MaterialPageRoute(
@@ -333,6 +347,8 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     final isBusiness =
         AppModeManager.instance.current == AppMode.business;
     final expenses = _monthExpenses;
+    // 一覧には振替も載せる（合計には足さない）。
+    final entries = _monthEntries;
     final total = expenses.fold<int>(0, (s, t) => s + t.amount);
     // 固定費（毎月支出予定）の当月合計。一番上の月合計は「経費＋固定費」にする。
     final fixedTotal =
@@ -430,7 +446,7 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
                     ],
                   ),
                 ),
-                if (expenses.isEmpty)
+                if (entries.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 48),
                     child: Column(
@@ -446,7 +462,7 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
                   )
                 else
                   _ExpensesTable(
-                    rows: expenses,
+                    rows: entries,
                     onTapRow: _showTxnSummary,
                     onTapGroup: _showGroupDetail,
                   ),
@@ -1127,6 +1143,8 @@ class _ExpenseRowState extends State<_ExpenseRow> {
 
   @override
   Widget build(BuildContext context) {
+    // 振替は「支出」と区別して表示する（バッジ色・金額色・符号）。
+    final isTransfer = widget.t.type == core.TransactionType.transfer;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
@@ -1165,11 +1183,25 @@ class _ExpenseRowState extends State<_ExpenseRow> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: V2Colors.surfaceMuted,
+                        color: isTransfer
+                            ? V2Colors.infoSoft
+                            : V2Colors.surfaceMuted,
                         borderRadius: BorderRadius.circular(3),
                       ),
-                      child: Text(_categoryLabel(),
-                          style: V2Typography.micro),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isTransfer) ...[
+                            const Icon(Icons.swap_horiz,
+                                size: 11, color: V2Colors.info),
+                            const SizedBox(width: 2),
+                          ],
+                          Text(isTransfer ? '振替' : _categoryLabel(),
+                              style: V2Typography.micro.copyWith(
+                                  color:
+                                      isTransfer ? V2Colors.info : null)),
+                        ],
+                      ),
                     ),
                     const SizedBox(width: 6),
                     Expanded(
@@ -1185,11 +1217,14 @@ class _ExpenseRowState extends State<_ExpenseRow> {
                 ),
               ),
               const SizedBox(width: V2Spacing.sm),
-              // 金額（右・固定幅なしで見切れ防止）
+              // 金額（右）。振替はお金の移動なのでマイナスを付けず中立色に。
               Text(
-                '-${formatYen(widget.t.amount)}',
+                isTransfer
+                    ? formatYen(widget.t.amount)
+                    : '-${formatYen(widget.t.amount)}',
                 style: V2Typography.numericCell.copyWith(
-                    color: V2Colors.negative,
+                    color:
+                        isTransfer ? V2Colors.textBody : V2Colors.negative,
                     fontWeight: FontWeight.w700),
               ),
             ],
