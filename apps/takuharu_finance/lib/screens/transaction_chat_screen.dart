@@ -27,12 +27,27 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
   final _ctrl = TextEditingController();
   final _scroll = ScrollController();
   bool _sending = false;
+  // 画像をアップロード中か（送信直後〜コメント反映までのプレースホルダ表示用）。
+  bool _uploadingImage = false;
   // 自分が送信した直後、新しいコメントの位置（末尾）まで自動スクロールするフラグ。
   bool _pendingScroll = false;
   int _lastMsgCount = 0;
 
+  // 末尾（最新コメント）まで滑らかにスクロール。
+  void _animateToBottom() {
+    if (!mounted || !_scroll.hasClients) return;
+    _scroll.animateTo(
+      _scroll.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOut,
+    );
+  }
+
   void _scrollToBottomSoon() {
     _pendingScroll = true;
+    // ストリーム反映のタイミングに依存しないよう、時間差のバックストップも入れる。
+    Future.delayed(const Duration(milliseconds: 250), _animateToBottom);
+    Future.delayed(const Duration(milliseconds: 600), _animateToBottom);
   }
 
   // ビルド時に呼ぶ。コメントが実際に増えていて送信直後フラグが立っていれば、
@@ -42,14 +57,7 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
     _lastMsgCount = msgCount;
     if (!_pendingScroll || !grew) return;
     _pendingScroll = false;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scroll.hasClients) return;
-      _scroll.animateTo(
-        _scroll.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeOut,
-      );
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _animateToBottom());
   }
 
   // 編集で内容が変わったら差し替えるため可変で持つ。
@@ -133,7 +141,11 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
     final x = await ImagePicker().pickImage(
         source: ImageSource.gallery, imageQuality: 80, maxWidth: 1600);
     if (x == null) return;
-    setState(() => _sending = true);
+    setState(() {
+      _sending = true;
+      _uploadingImage = true; // 「アップロード中」プレースホルダを表示
+    });
+    _scrollToBottomSoon(); // プレースホルダが見えるよう末尾へ
     try {
       final bytes = await x.readAsBytes();
       final url = await DriveReceiptService.instance
@@ -150,7 +162,12 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
           .add(hid, _t.id, _myUid, '', imageUrl: url);
       _scrollToBottomSoon();
     } finally {
-      if (mounted) setState(() => _sending = false);
+      if (mounted) {
+        setState(() {
+          _sending = false;
+          _uploadingImage = false;
+        });
+      }
     }
   }
 
@@ -254,6 +271,11 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
                                   child: _bubble(m),
                                 )),
                           ],
+                          if (_uploadingImage)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+                              child: _uploadingBubble(),
+                            ),
                         ],
                       );
                     },
@@ -553,6 +575,37 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
             ? [bubble, const SizedBox(width: 8), avatar]
             : [avatar, const SizedBox(width: 8), bubble],
       ),
+    );
+  }
+
+  // 画像アップロード中の仮バブル（自分側・スピナー＋文言）。
+  Widget _uploadingBubble() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.pink,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation(Colors.white)),
+              ),
+              SizedBox(width: 8),
+              Text('画像をアップロード中…',
+                  style: TextStyle(fontSize: 13, color: Colors.white)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
