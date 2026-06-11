@@ -1,11 +1,15 @@
-# =====================================================================
-#  FutaFinance Windows デスクトップ版 デプロイ
-#   ビルド → %LOCALAPPDATA%\FutaFinance へ常設 → ショートカット作成
-#   （任意）Drive へ zip 配布
+﻿# =====================================================================
+#  FutaFinance Windows desktop deploy
+#    build -> install to C:\dev\FutaFinance-Windows -> make shortcuts
+#    (optional) zip to Google Drive
 #
-#  使い方:  pwsh .\deploy_windows.ps1
-#           pwsh .\deploy_windows.ps1 -NoBuild   # 既存ビルドをそのまま設置
-#           pwsh .\deploy_windows.ps1 -Drive     # Drive へ zip もコピー
+#  NOTE: ASCII-only on purpose. Windows PowerShell 5.1 misreads
+#        UTF-8 (no BOM) .ps1 files and can break parsing on Japanese
+#        comments. Keep this file ASCII to stay safe.
+#
+#  Usage:  powershell -ExecutionPolicy Bypass -File .\deploy_windows.ps1
+#          powershell -ExecutionPolicy Bypass -File .\deploy_windows.ps1 -NoBuild
+#          powershell -ExecutionPolicy Bypass -File .\deploy_windows.ps1 -Drive
 # =====================================================================
 param(
   [switch]$NoBuild,
@@ -18,88 +22,84 @@ $repo = $PSScriptRoot
 $app  = Join-Path $repo 'apps\futa_finance'
 $pubspec = Join-Path $app 'pubspec.yaml'
 
-# --- バージョン取得 ---
+# --- read version from pubspec ---
 $verLine = Select-String -Path $pubspec -Pattern '^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)' | Select-Object -First 1
-if (-not $verLine) { throw 'pubspec.yaml から version を読めませんでした' }
+if (-not $verLine) { throw 'could not read version from pubspec.yaml' }
 $version = $verLine.Matches[0].Groups[1].Value
 $build   = $verLine.Matches[0].Groups[2].Value
 Write-Host "==============================================="
 Write-Host " FutaFinance Windows Deploy: v$version+$build"
 Write-Host "==============================================="
 
-# --- ビルド ---
+# --- build ---
 if (-not $NoBuild) {
   Write-Host "[1/5] flutter build windows --release ..."
   Push-Location $app
   flutter build windows --release
   Pop-Location
 } else {
-  Write-Host "[1/5] ビルドはスキップ (-NoBuild)"
+  Write-Host "[1/5] build skipped (-NoBuild)"
 }
 
 $src = Join-Path $app 'build\windows\x64\runner\Release'
 if (-not (Test-Path (Join-Path $src 'futa_finance.exe'))) {
-  throw "ビルド成果物が見つかりません: $src"
+  throw "build output not found: $src"
 }
 
-# --- 常設先へコピー (%LOCALAPPDATA%\FutaFinance) ---
-$install = Join-Path $env:LOCALAPPDATA 'FutaFinance'
-Write-Host "[2/5] 常設先へ配置: $install"
+# --- install location ---
+#  Profile paths like %LOCALAPPDATA% are NOT reliably visible across the
+#  dev environment, so install under C:\dev (a shared location).
+$install = 'C:\dev\FutaFinance-Windows'
+Write-Host "[2/5] install to: $install"
 
-# 起動中なら止める（上書きのため）
+# stop running instance so files can be overwritten
 Get-Process futa_finance -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Milliseconds 400
 
 New-Item -ItemType Directory -Force -Path $install | Out-Null
-# robocopy でミラー。中間生成物(.lib/.exp/.pdb)は除外。
-# robocopy の終了コードは 0-7 が正常。
+# mirror copy, excluding build intermediates (.lib/.exp/.pdb) and VERSION.txt
 robocopy $src $install /MIR /XF *.lib *.exp *.pdb VERSION.txt /NFL /NDL /NJH /NJS /NP | Out-Null
-if ($LASTEXITCODE -ge 8) { throw "robocopy 失敗 (code=$LASTEXITCODE)" }
+if ($LASTEXITCODE -ge 8) { throw "robocopy failed (code=$LASTEXITCODE)" }
 $global:LASTEXITCODE = 0
 
-# バージョン情報を残す
-"v$version+$build" | Out-File -FilePath (Join-Path $install 'VERSION.txt') -Encoding utf8
+"v$version+$build" | Out-File -FilePath (Join-Path $install 'VERSION.txt') -Encoding ascii
 
 $exe = Join-Path $install 'futa_finance.exe'
 
-# --- ショートカット作成（デスクトップ + スタートメニュー） ---
-Write-Host "[3/5] ショートカット作成"
+# --- shortcuts (desktop + start menu) ---
+Write-Host "[3/5] shortcuts"
 function New-Shortcut($lnkPath, $target) {
   $ws = New-Object -ComObject WScript.Shell
   $s = $ws.CreateShortcut($lnkPath)
   $s.TargetPath = $target
   $s.WorkingDirectory = (Split-Path $target)
-  $s.Description = "FutaFinance 事業用財務管理 (Windows)"
+  $s.Description = "FutaFinance (Windows)"
   $s.Save()
 }
 $desktop = [Environment]::GetFolderPath('Desktop')
 New-Shortcut (Join-Path $desktop 'FutaFinance.lnk') $exe
 $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
 New-Shortcut (Join-Path $startMenu 'FutaFinance.lnk') $exe
-# 旧テスト用ショートカットがあれば掃除
-$oldLnk = Join-Path $desktop 'FutaFinance (Windows版テスト).lnk'
-if (Test-Path $oldLnk) { Remove-Item $oldLnk -Force }
 
-# --- (任意) Drive へ zip 配布 ---
+# --- (optional) zip to Drive ---
 if ($Drive) {
   $driveDir = 'H:\マイドライブ\ツール開発\FutaFinance\windows'
-  Write-Host "[4/5] Drive へ zip 配布: $driveDir"
+  Write-Host "[4/5] zip to Drive: $driveDir"
   if (Test-Path 'H:\') {
     New-Item -ItemType Directory -Force -Path $driveDir | Out-Null
-    # 最新1つだけ残す
     Get-ChildItem $driveDir -Filter 'FutaFinance-Windows-*.zip' -ErrorAction SilentlyContinue | Remove-Item -Force
     $zip = Join-Path $driveDir "FutaFinance-Windows-v$version.zip"
     Compress-Archive -Path (Join-Path $install '*') -DestinationPath $zip -Force
     Write-Host "  OK $zip"
   } else {
-    Write-Host "  -- H: ドライブ未接続。スキップ"
+    Write-Host "  -- H: drive not mounted. skipped"
   }
 } else {
-  Write-Host "[4/5] Drive 配布はスキップ (-Drive で有効)"
+  Write-Host "[4/5] Drive zip skipped (use -Drive to enable)"
 }
 
-Write-Host "[5/5] 完了"
+Write-Host "[5/5] done"
 Write-Host "==============================================="
-Write-Host " インストール先: $install"
-Write-Host " 起動: デスクトップ/スタートメニューの『FutaFinance』"
+Write-Host " install: $install"
+Write-Host " run:     $exe"
 Write-Host "==============================================="
