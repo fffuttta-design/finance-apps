@@ -27,6 +27,30 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
   final _ctrl = TextEditingController();
   final _scroll = ScrollController();
   bool _sending = false;
+  // 自分が送信した直後、新しいコメントの位置（末尾）まで自動スクロールするフラグ。
+  bool _pendingScroll = false;
+  int _lastMsgCount = 0;
+
+  void _scrollToBottomSoon() {
+    _pendingScroll = true;
+  }
+
+  // ビルド時に呼ぶ。コメントが実際に増えていて送信直後フラグが立っていれば、
+  // 描画後に末尾（新しいコメント）まで自動スクロールする。
+  void _maybeScrollAfterBuild(int msgCount) {
+    final grew = msgCount > _lastMsgCount;
+    _lastMsgCount = msgCount;
+    if (!_pendingScroll || !grew) return;
+    _pendingScroll = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients) return;
+      _scroll.animateTo(
+        _scroll.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOut,
+      );
+    });
+  }
 
   // 編集で内容が変わったら差し替えるため可変で持つ。
   late core.Transaction _t = widget.transaction;
@@ -95,6 +119,7 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
     _ctrl.clear();
     try {
       await CommentRepository.instance.add(hid, _t.id, _myUid, text);
+      _scrollToBottomSoon();
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -123,6 +148,7 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
       }
       await CommentRepository.instance
           .add(hid, _t.id, _myUid, '', imageUrl: url);
+      _scrollToBottomSoon();
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -203,6 +229,7 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
                     stream: CommentRepository.instance.watch(hid, t.id),
                     builder: (context, snap) {
                       final msgs = snap.data ?? const <TxComment>[];
+                      _maybeScrollAfterBuild(msgs.length);
                       return ListView(
                         controller: _scroll,
                         padding: const EdgeInsets.only(bottom: 12),
@@ -467,36 +494,46 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
             ),
           ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxBubbleWidth),
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: mine ? AppColors.pink : Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: mine ? null : Border.all(color: AppColors.divider),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (m.imageUrl != null && m.imageUrl!.isNotEmpty)
-                    _commentImage(m.imageUrl!, mine),
-                  if (m.text.isNotEmpty)
-                    Padding(
-                      padding: EdgeInsets.only(
-                          top: (m.imageUrl != null &&
-                                  m.imageUrl!.isNotEmpty)
-                              ? 6
-                              : 0),
-                      child: Text(m.text,
-                          style: TextStyle(
-                              fontSize: 14,
-                              color:
-                                  mine ? Colors.white : AppColors.text)),
+            // 画像だけのコメントは吹き出し枠なしで画像をそのまま表示する。
+            child: (m.imageUrl != null &&
+                    m.imageUrl!.isNotEmpty &&
+                    m.text.isEmpty)
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: _commentImage(m.imageUrl!, mine),
+                  )
+                : Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: mine ? AppColors.pink : Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border:
+                          mine ? null : Border.all(color: AppColors.divider),
                     ),
-                ],
-              ),
-            ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (m.imageUrl != null && m.imageUrl!.isNotEmpty)
+                          _commentImage(m.imageUrl!, mine),
+                        if (m.text.isNotEmpty)
+                          Padding(
+                            padding: EdgeInsets.only(
+                                top: (m.imageUrl != null &&
+                                        m.imageUrl!.isNotEmpty)
+                                    ? 6
+                                    : 0),
+                            child: Text(m.text,
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    color: mine
+                                        ? Colors.white
+                                        : AppColors.text)),
+                          ),
+                      ],
+                    ),
+                  ),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),

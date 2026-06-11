@@ -252,10 +252,16 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 12),
         _summaryCard(income, expense),
         const SizedBox(height: 12),
+        _sectionTitle('今月の予算'),
+        const SizedBox(height: 8),
         _budgetCard(expense),
-        const SizedBox(height: 12),
-        _personalFoodCard(month),
         const SizedBox(height: 16),
+        if (HouseholdService.instance.memberNames.isNotEmpty) ...[
+          _sectionTitle('個人の食費わく'),
+          const SizedBox(height: 8),
+          _personalFoodCard(month),
+          const SizedBox(height: 16),
+        ],
         if (catEntries.isNotEmpty) ...[
           _sectionTitle('支出の内訳'),
           const SizedBox(height: 8),
@@ -414,20 +420,11 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.savings_rounded, size: 18, color: color),
-                    const SizedBox(width: 6),
-                    const Text('今月の予算',
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.text)),
-                    const Spacer(),
-                    Text('${formatYen(expense)} / ${formatYen(budget)}',
-                        style: const TextStyle(
-                            fontSize: 12, color: AppColors.textSub)),
-                  ],
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text('${formatYen(expense)} / ${formatYen(budget)}',
+                      style: const TextStyle(
+                          fontSize: 12, color: AppColors.textSub)),
                 ),
                 const SizedBox(height: 10),
                 ClipRRect(
@@ -481,19 +478,6 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            children: [
-              Icon(Icons.lunch_dining_rounded,
-                  size: 18, color: AppColors.pinkDark),
-              SizedBox(width: 6),
-              Text('個人の食費わく',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.text)),
-            ],
-          ),
-          const SizedBox(height: 10),
           for (final e in names.entries) ...[
             _personalFoodRow(
               e.key,
