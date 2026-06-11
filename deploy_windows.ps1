@@ -13,7 +13,8 @@
 # =====================================================================
 param(
   [switch]$NoBuild,
-  [switch]$Drive
+  [switch]$Drive,
+  [switch]$Publish
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -97,6 +98,47 @@ if ($Drive) {
   }
 } else {
   Write-Host "[4/5] Drive zip skipped (use -Drive to enable)"
+}
+
+# --- (optional) publish for in-app auto-update ---
+#  zip -> GitHub Release -> write release\futa-windows-version.json -> commit
+if ($Publish) {
+  Write-Host "[4b/5] publish (GitHub Release + version.json)"
+  $tag   = "futa-win-v$version"
+  $asset = "FutaFinance-Windows-v$version.zip"
+  $zip   = Join-Path $env:TEMP $asset
+  if (Test-Path $zip) { Remove-Item $zip -Force }
+  Compress-Archive -Path (Join-Path $install '*') -DestinationPath $zip -Force
+
+  $notes = "FutaFinance Windows v$version"
+  # gh writes to stderr; under ErrorActionPreference=Stop that becomes terminating.
+  # Relax it for the gh calls and rely on $LASTEXITCODE instead.
+  $ErrorActionPreference = 'Continue'
+  # delete first if it already exists, so re-publish is idempotent (ignore if absent)
+  gh release delete $tag --yes --cleanup-tag 2>$null | Out-Null
+  gh release create $tag $zip --title $tag --notes $notes 2>$null | Out-Null
+  $ghOk = ($LASTEXITCODE -eq 0)
+  $ErrorActionPreference = 'Stop'
+  if (-not $ghOk) { throw "gh release create failed (exit $LASTEXITCODE)" }
+
+  $downloadUrl = "https://github.com/fffuttta-design/finance-apps/releases/download/$tag/$asset"
+  $jsonObj = [ordered]@{
+    version      = $version
+    buildNumber  = $build
+    downloadUrl  = $downloadUrl
+    releaseNotes = $notes
+  }
+  $relDir = Join-Path $repo 'release'
+  New-Item -ItemType Directory -Force -Path $relDir | Out-Null
+  # NOTE: write WITHOUT BOM. A UTF-8 BOM would break jsonDecode() in the app.
+  [System.IO.File]::WriteAllText(
+    (Join-Path $relDir 'futa-windows-version.json'),
+    ($jsonObj | ConvertTo-Json),
+    (New-Object System.Text.UTF8Encoding($false)))
+  Write-Host "  OK release\futa-windows-version.json -> v$version"
+  Write-Host "  NOTE: commit & push release\futa-windows-version.json to activate in-app update."
+} else {
+  Write-Host "[4b/5] publish skipped (use -Publish to enable in-app auto-update)"
 }
 
 Write-Host "[5/5] done"

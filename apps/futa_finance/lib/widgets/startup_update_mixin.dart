@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/update_checker.dart';
 import '../data/update_flow.dart';
+import '../data/windows_update.dart';
 
 /// 起動時のアプリ内アップデート（APK配信）チェック＋通知ダイアログを提供する mixin。
 ///
@@ -41,6 +42,11 @@ mixin StartupUpdateMixin<T extends StatefulWidget> on State<T> {
   }
 
   Future<void> _checkForUpdateAtStartup() async {
+    // Windows ネイティブは zip 自己置換方式の専用フローへ。
+    if (WindowsUpdateService.isTarget) {
+      if (mounted) await WindowsUpdateService.instance.checkAtStartup(context);
+      return;
+    }
     final r = await UpdateChecker.instance.check();
     if (!mounted) return;
     if (!r.hasUpdate) return;

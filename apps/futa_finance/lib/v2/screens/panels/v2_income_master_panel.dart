@@ -459,6 +459,7 @@ Future<_IncomeSheetResult?> _showSourceSheet(BuildContext context,
           padding:
               EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
           child: SingleChildScrollView(
+          primary: false,
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
             child: Column(
               mainAxisSize: MainAxisSize.min,

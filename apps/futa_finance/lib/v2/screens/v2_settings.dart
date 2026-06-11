@@ -5,6 +5,7 @@ import '../../data/app_mode.dart';
 import '../../data/auth_service.dart';
 import '../../data/ui_preferences.dart';
 import '../../data/update_flow.dart';
+import '../../data/windows_update.dart';
 import '../../screens/account_editor_screen.dart';
 import '../../screens/card_editor_screen.dart';
 import '../../screens/category_editor_screen.dart';
@@ -454,6 +455,7 @@ class _MobileSettingsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
+          primary: false,
       padding: const EdgeInsets.symmetric(vertical: V2Spacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -730,6 +732,7 @@ class _DisplayPanel extends StatelessWidget {
             const SizedBox(height: V2Spacing.sm),
             Expanded(
               child: SingleChildScrollView(
+          primary: false,
                 child: Column(
                   children: [
                     _SettingTile(
@@ -861,6 +864,7 @@ class _AboutPanelState extends State<_AboutPanel> {
         const SizedBox(height: V2Spacing.sm),
         Expanded(
           child: SingleChildScrollView(
+          primary: false,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -904,7 +908,9 @@ class _AboutPanelState extends State<_AboutPanel> {
                 SizedBox(
                   height: 46,
                   child: FilledButton.icon(
-                    onPressed: () => UpdateFlow.checkManually(context),
+                    onPressed: () => WindowsUpdateService.isTarget
+                        ? WindowsUpdateService.instance.checkManually(context)
+                        : UpdateFlow.checkManually(context),
                     icon: const Icon(Icons.system_update, size: 18),
                     label: const Text('最新バージョンを確認'),
                     style: FilledButton.styleFrom(

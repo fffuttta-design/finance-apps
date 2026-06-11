@@ -65,12 +65,14 @@ class UpdateChecker {
     return (version: info.version, buildNumber: info.buildNumber);
   }
 
-  Future<UpdateCheckResult> check() async {
+  /// [overrideVersionUrl] を渡すと別の version.json を見る（例: Windows 用）。
+  Future<UpdateCheckResult> check({String? overrideVersionUrl}) async {
     final current = await getCurrent();
     try {
       // キャッシュバスター＋no-cache で GitHub raw のCDNキャッシュを回避し、
       // 公開直後の新バージョンを即検知できるようにする。
-      final url = '$versionUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+      final base = overrideVersionUrl ?? versionUrl;
+      final url = '$base?t=${DateTime.now().millisecondsSinceEpoch}';
       final response = await http.get(
         Uri.parse(url),
         headers: const {

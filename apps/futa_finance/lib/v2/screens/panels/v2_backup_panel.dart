@@ -151,6 +151,7 @@ class _V2BackupPanelState extends State<V2BackupPanel> {
         const SizedBox(height: V2Spacing.sm),
         Expanded(
           child: SingleChildScrollView(
+          primary: false,
             padding: const EdgeInsets.only(bottom: V2Spacing.xl),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
