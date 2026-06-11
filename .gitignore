@@ -75,8 +75,8 @@ dev-control.txt
 gemini.key
 **/gemini.key
 
-# Windows デスクトップ版 OAuth クライアント設定（client_secret 含む・コミット禁止）
-apps/futa_finance/lib/config/windows_oauth_config.dart
+# Windows デスクトップ版 OAuth の client_secret（ビルド時 --dart-define 注入）
+**/win_oauth.key
 
 # Windows デスクトップ版の常設先（exe一式・コミット不要）
 /windows-app/

@@ -35,8 +35,18 @@ Write-Host "==============================================="
 # --- build ---
 if (-not $NoBuild) {
   Write-Host "[1/5] flutter build windows --release ..."
+  # Inject the OAuth client_secret from win_oauth.key (git-ignored) so it never
+  # lands in source. Web/Android builds skip this (secret stays empty there).
+  $defines = @()
+  $keyFile = Join-Path $app 'win_oauth.key'
+  if (Test-Path $keyFile) {
+    $sec = (Get-Content $keyFile -Raw).Trim()
+    if ($sec) { $defines += "--dart-define=WIN_OAUTH_CLIENT_SECRET=$sec" }
+  } else {
+    Write-Host "  WARN: win_oauth.key not found -> Windows Google login disabled"
+  }
   Push-Location $app
-  flutter build windows --release
+  flutter build windows --release @defines
   Pop-Location
 } else {
   Write-Host "[1/5] build skipped (-NoBuild)"
