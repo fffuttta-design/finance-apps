@@ -14,4 +14,6 @@ contextBridge.exposeInMainWorld('futaDesktop', {
   driveToken: (force) => ipcRenderer.invoke('futa:driveToken', !!force),
   // サインアウト（refresh_token 破棄）
   signOut: () => ipcRenderer.invoke('futa:signOut'),
+  // 手動アップデート確認（Driveのversion.txtと照合・ネイティブダイアログ表示）
+  checkUpdate: () => ipcRenderer.invoke('futa:checkUpdate'),
 });

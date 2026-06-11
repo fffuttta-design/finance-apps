@@ -17,3 +17,5 @@ Future<DesktopTokens?> desktopSilentTokens() async => null;
 Future<String?> desktopDriveToken({bool forceRefresh = false}) async => null;
 
 Future<void> desktopSignOut() async {}
+
+Future<void> desktopCheckUpdate() async {}

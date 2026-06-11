@@ -3,6 +3,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../data/app_mode.dart';
 import '../../data/auth_service.dart';
+import '../../data/desktop_bridge.dart' as desktop;
 import '../../data/ui_preferences.dart';
 import '../../data/update_flow.dart';
 import '../../data/windows_update.dart';
@@ -912,9 +913,16 @@ class _AboutPanelState extends State<_AboutPanel> {
                 SizedBox(
                   height: 46,
                   child: FilledButton.icon(
-                    onPressed: () => WindowsUpdateService.isTarget
-                        ? WindowsUpdateService.instance.checkManually(context)
-                        : UpdateFlow.checkManually(context),
+                    onPressed: () {
+                      // Electronデスクトップ版はElectronの自己更新へ。
+                      if (desktop.isDesktopShell) {
+                        desktop.desktopCheckUpdate();
+                      } else if (WindowsUpdateService.isTarget) {
+                        WindowsUpdateService.instance.checkManually(context);
+                      } else {
+                        UpdateFlow.checkManually(context);
+                      }
+                    },
                     icon: const Icon(Icons.system_update, size: 18),
                     label: const Text('最新バージョンを確認'),
                     style: FilledButton.styleFrom(
@@ -928,8 +936,11 @@ class _AboutPanelState extends State<_AboutPanel> {
                 ),
                 const SizedBox(height: V2Spacing.sm),
                 Text(
-                  'Android では最新版があればこの場でダウンロードしてインストールできます。'
-                  'Web は再読み込みで最新になります。',
+                  desktop.isDesktopShell
+                      ? 'デスクトップ版は起動時に自動で更新を確認します。'
+                          'このボタンでも手動で確認できます。'
+                      : 'Android では最新版があればこの場でダウンロードしてインストールできます。'
+                          'Web は再読み込みで最新になります。',
                   style: V2Typography.micro
                       .copyWith(color: V2Colors.textSecondary),
                 ),

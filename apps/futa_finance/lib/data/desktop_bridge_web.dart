@@ -52,6 +52,11 @@ Future<void> desktopSignOut() async {
   await _bridge!.callMethod<JSPromise<JSAny?>>('signOut'.toJS).toDart;
 }
 
+/// 手動アップデート確認（Electron側がDriveと照合してネイティブ通知を出す）。
+Future<void> desktopCheckUpdate() async {
+  await _bridge!.callMethod<JSPromise<JSAny?>>('checkUpdate'.toJS).toDart;
+}
+
 DesktopTokens _toTokens(JSObject o) {
   final id = (o['idToken'] as JSString?)?.toDart ?? '';
   final ac = (o['accessToken'] as JSString?)?.toDart ?? '';

@@ -349,15 +349,47 @@ function cmpVer(a, b) {
   }
   return 0;
 }
-async function checkForUpdate() {
-  if (!app.isPackaged) return;
+async function checkForUpdate(opts = {}) {
+  const manual = opts.manual === true; // 設定画面の「最新バージョンを確認」から呼ぶ時 true
+  if (!app.isPackaged && !manual) return;
   const dir = findDriveDir();
-  if (!dir) return;
+  if (!dir) {
+    if (manual) {
+      await dialog.showMessageBox(mainWindow, {
+        type: 'warning', title: '更新確認',
+        message: '配布フォルダが見つかりません（Google ドライブの同期を確認してください）。',
+      });
+    }
+    return;
+  }
   let remote;
-  try { remote = fs.readFileSync(path.join(dir, 'version.txt'), 'utf8').trim(); } catch (_) { return; }
-  if (!remote || cmpVer(remote, app.getVersion()) <= 0) return;
+  try {
+    remote = fs.readFileSync(path.join(dir, 'version.txt'), 'utf8').trim();
+  } catch (_) {
+    if (manual) {
+      await dialog.showMessageBox(mainWindow, {
+        type: 'warning', title: '更新確認', message: 'バージョン情報を取得できませんでした。',
+      });
+    }
+    return;
+  }
+  if (!remote || cmpVer(remote, app.getVersion()) <= 0) {
+    if (manual) {
+      await dialog.showMessageBox(mainWindow, {
+        type: 'info', title: '更新確認', message: `最新版です（v${app.getVersion()}）。`,
+      });
+    }
+    return;
+  }
   const exeSrc = path.join(dir, RELEASE_EXE_NAME);
-  if (!fs.existsSync(exeSrc)) return;
+  if (!fs.existsSync(exeSrc)) {
+    if (manual) {
+      await dialog.showMessageBox(mainWindow, {
+        type: 'warning', title: '更新確認', message: '更新ファイルが見つかりませんでした。',
+      });
+    }
+    return;
+  }
   const choice = await dialog.showMessageBox(mainWindow, {
     type: 'info',
     buttons: ['更新する', '後で'],
@@ -402,6 +434,7 @@ ipcMain.handle('futa:signOut', () => {
   accessCache = null; accessExpiry = 0;
   return true;
 });
+ipcMain.handle('futa:checkUpdate', () => checkForUpdate({ manual: true }));
 
 // ─────────────────── 起動 ───────────────────
 // 二重起動防止。
