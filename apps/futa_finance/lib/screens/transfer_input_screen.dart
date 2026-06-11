@@ -3,6 +3,7 @@ import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
+import '../data/transfer_template.dart';
 import '../utils/date_pick.dart';
 import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
@@ -50,6 +51,7 @@ class TransferInputScreen extends StatefulWidget {
 class _TransferInputScreenState extends State<TransferInputScreen> {
   final _settings = SettingsRepository();
   core.PaymentMethodsConfig? _payments;
+  List<TransferTemplate> _templates = const [];
 
   DateTime _date = DateTime.now();
   String? _fromAccount;
@@ -73,24 +75,33 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
 
   Future<void> _load() async {
     final p = await _settings.loadPayments();
+    final t = await _settings.loadTransferTemplates();
     if (!mounted) return;
     setState(() {
       _payments = p;
+      _templates = t.templates;
       if (_fromAccount == null && widget.initialFromAccount != null) {
         _fromAccount = widget.initialFromAccount;
       }
     });
   }
 
-  /// 移動元/先の候補リスト。
-  /// 銀行 + 「現金」(固定)。振替はお金の移動なのでクレカは候補に出さない。
-  List<String> get _accountChoices {
+  /// 移動元/先の候補（value=口座名 / label=[種別]口座名）。
+  /// 銀行/現金/電子マネー + 固定の「現金」。休眠中(inactive)は除外、クレカは出さない。
+  List<({String value, String label})> get _accountChoices {
     final p = _payments;
-    if (p == null) return const ['現金'];
-    return [
-      ...p.bankAccounts.map((b) => b.name),
-      '現金',
-    ];
+    final list = <({String value, String label})>[];
+    if (p != null) {
+      for (final b in p.bankAccounts) {
+        if (b.inactive) continue; // 休眠中は候補に出さない
+        list.add((
+          value: b.name,
+          label: '[${b.accountType.shortLabel}]${b.name}',
+        ));
+      }
+    }
+    list.add((value: '現金', label: '[現金]現金'));
+    return list;
   }
 
   Future<void> _save() async {
@@ -149,6 +160,183 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
     if (picked != null) setState(() => _date = picked);
   }
 
+  // よく使う振替（テンプレ）セクション。チップタップで移動元/先をセット。
+  Widget _buildTemplateSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text('よく使う振替',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF6B7280))),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: _openTemplateManager,
+              icon: const Icon(Icons.edit_outlined, size: 16),
+              label: const Text('編集'),
+              style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8)),
+            ),
+          ],
+        ),
+        if (_templates.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 2, bottom: 4),
+            child: Text('「編集」からよく使う振替（例: 新生銀行→PayPay）を登録できます',
+                style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF))),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _templates
+                .map((t) => ActionChip(
+                      avatar: const Icon(Icons.swap_horiz, size: 16),
+                      label: Text(t.label),
+                      onPressed: () => _applyTemplate(t),
+                    ))
+                .toList(),
+          ),
+      ],
+    );
+  }
+
+  void _applyTemplate(TransferTemplate t) {
+    setState(() {
+      _fromAccount = t.fromAccount;
+      _toAccount = t.toAccount;
+    });
+  }
+
+  // テンプレの登録・編集・削除シート。
+  Future<void> _openTemplateManager() async {
+    final working = List<TransferTemplate>.from(_templates);
+    final choices = _accountChoices; // value/label
+    String firstValue() => choices.isNotEmpty ? choices.first.value : '現金';
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (sheetCtx, setSheet) {
+            Widget acctDropdown(String value, ValueChanged<String> onChanged) {
+              final exists = choices.any((c) => c.value == value);
+              return DropdownButton<String>(
+                value: exists ? value : null,
+                isExpanded: true,
+                hint: Text(value),
+                items: choices
+                    .map((c) => DropdownMenuItem(
+                        value: c.value, child: Text(c.label)))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) onChanged(v);
+                },
+              );
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text('よく使う振替の編集',
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 12),
+                      ...working.asMap().entries.map((e) {
+                        final i = e.key;
+                        final t = e.value;
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: acctDropdown(t.fromAccount, (v) {
+                                  setSheet(() => working[i] =
+                                      t.copyWith(fromAccount: v));
+                                }),
+                              ),
+                              const Padding(
+                                padding:
+                                    EdgeInsets.symmetric(horizontal: 6),
+                                child: Icon(Icons.arrow_forward,
+                                    size: 16, color: Color(0xFF9CA3AF)),
+                              ),
+                              Expanded(
+                                child: acctDropdown(t.toAccount, (v) {
+                                  setSheet(() => working[i] =
+                                      working[i].copyWith(toAccount: v));
+                                }),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline,
+                                    color: Color(0xFFDC2626)),
+                                onPressed: () =>
+                                    setSheet(() => working.removeAt(i)),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 4),
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          final v = firstValue();
+                          setSheet(() => working.add(TransferTemplate(
+                                id: DateTime.now()
+                                    .microsecondsSinceEpoch
+                                    .toString(),
+                                fromAccount:
+                                    _fromAccount ?? v,
+                                toAccount: _toAccount ?? v,
+                              )));
+                        },
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('セットを追加'),
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton(
+                        onPressed: () async {
+                          // 移動元=先 の不正セットは除外して保存。
+                          final cleaned = working
+                              .where((t) =>
+                                  t.fromAccount.isNotEmpty &&
+                                  t.toAccount.isNotEmpty &&
+                                  t.fromAccount != t.toAccount)
+                              .toList();
+                          await _settings.saveTransferTemplates(
+                              TransferTemplatesConfig(templates: cleaned));
+                          if (!mounted) return;
+                          setState(() => _templates = cleaned);
+                          if (sheetCtx.mounted) Navigator.of(sheetCtx).pop();
+                        },
+                        child: const Text('保存'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_payments == null) {
@@ -157,9 +345,9 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
       );
     }
     final fromCandidates =
-        _accountChoices.where((a) => a != _toAccount).toList();
+        _accountChoices.where((c) => c.value != _toAccount).toList();
     final toCandidates =
-        _accountChoices.where((a) => a != _fromAccount).toList();
+        _accountChoices.where((c) => c.value != _fromAccount).toList();
     return Scaffold(
       appBar: AppBar(
         title: const Text('振替を記録',
@@ -191,6 +379,9 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // よく使う振替（テンプレ）
+            _buildTemplateSection(),
+            const SizedBox(height: 12),
             // 日付
             InkWell(
               onTap: _pickDate,
@@ -208,14 +399,15 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
             const SizedBox(height: 12),
             // 振替元
             DropdownButtonFormField<String>(
+              key: ValueKey('from_$_fromAccount'),
               initialValue: _fromAccount,
               decoration: const InputDecoration(
                 labelText: '移動元（必須）',
                 border: OutlineInputBorder(),
               ),
               items: fromCandidates
-                  .map((a) =>
-                      DropdownMenuItem(value: a, child: Text(a)))
+                  .map((c) =>
+                      DropdownMenuItem(value: c.value, child: Text(c.label)))
                   .toList(),
               onChanged: (v) => setState(() => _fromAccount = v),
             ),
@@ -227,14 +419,15 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
             const SizedBox(height: 8),
             // 振替先
             DropdownButtonFormField<String>(
+              key: ValueKey('to_$_toAccount'),
               initialValue: _toAccount,
               decoration: const InputDecoration(
                 labelText: '移動先（必須）',
                 border: OutlineInputBorder(),
               ),
               items: toCandidates
-                  .map((a) =>
-                      DropdownMenuItem(value: a, child: Text(a)))
+                  .map((c) =>
+                      DropdownMenuItem(value: c.value, child: Text(c.label)))
                   .toList(),
               onChanged: (v) => setState(() => _toAccount = v),
             ),

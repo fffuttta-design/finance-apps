@@ -5,6 +5,7 @@ import 'package:finance_core/finance_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_mode.dart';
+import 'transfer_template.dart';
 
 /// 設定（カテゴリ・支払方法）のリポジトリ抽象。
 ///
@@ -27,6 +28,8 @@ abstract class SettingsRepository {
   Future<void> saveCategories(CategoryConfig config);
   Future<PaymentMethodsConfig> loadPayments();
   Future<void> savePayments(PaymentMethodsConfig config);
+  Future<TransferTemplatesConfig> loadTransferTemplates();
+  Future<void> saveTransferTemplates(TransferTemplatesConfig config);
 
   /// 指定モードのカテゴリ/支払方法を裏で先読みしてキャッシュを温める。
   /// 既定は何もしない（Local は元々即時）。
@@ -39,6 +42,8 @@ class LocalSettingsRepository implements SettingsRepository {
       'futa.${AppModeManager.instance.current.keyPrefix}.categories';
   String get _kPayments =>
       'futa.${AppModeManager.instance.current.keyPrefix}.payments';
+  String get _kTransferTemplates =>
+      'futa.${AppModeManager.instance.current.keyPrefix}.transfer_templates';
 
   // モード別の解析済みキャッシュ（prefix 'b'/'p' → Config）。
   // 切替のたびに JSON を解析し直すのを避ける。書き込みは save* を通る。
@@ -103,6 +108,24 @@ class LocalSettingsRepository implements SettingsRepository {
     _paymentsCache[AppModeManager.instance.current.keyPrefix] = config;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kPayments, config.toJsonString());
+  }
+
+  @override
+  Future<TransferTemplatesConfig> loadTransferTemplates() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kTransferTemplates);
+    if (raw == null) return TransferTemplatesConfig.empty();
+    try {
+      return TransferTemplatesConfig.fromJsonString(raw);
+    } catch (_) {
+      return TransferTemplatesConfig.empty();
+    }
+  }
+
+  @override
+  Future<void> saveTransferTemplates(TransferTemplatesConfig config) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kTransferTemplates, config.toJsonString());
   }
 
   @override
@@ -222,6 +245,31 @@ class FirestoreSettingsRepository implements SettingsRepository {
     final mk = _modeKey;
     _paymentsCache[mk] = config;
     await _paymentsDocFor(mk).set({
+      'json': config.toJsonString(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  DocumentReference<Map<String, dynamic>> _transferTemplatesDocFor(
+          String modeKey) =>
+      FirebaseFirestore.instance
+          .doc('users/$uid/config/${modeKey}_transfer_templates');
+
+  @override
+  Future<TransferTemplatesConfig> loadTransferTemplates() async {
+    final snap = await _transferTemplatesDocFor(_modeKey).get();
+    final raw = snap.data()?['json'] as String?;
+    if (raw == null) return TransferTemplatesConfig.empty();
+    try {
+      return TransferTemplatesConfig.fromJsonString(raw);
+    } catch (_) {
+      return TransferTemplatesConfig.empty();
+    }
+  }
+
+  @override
+  Future<void> saveTransferTemplates(TransferTemplatesConfig config) async {
+    await _transferTemplatesDocFor(_modeKey).set({
       'json': config.toJsonString(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
