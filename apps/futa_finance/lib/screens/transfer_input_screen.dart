@@ -1,9 +1,9 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
+import '../utils/date_pick.dart';
 import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
 
@@ -83,13 +83,12 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
   }
 
   /// 移動元/先の候補リスト。
-  /// 銀行 + クレカ + 「現金」(固定) を統合。
+  /// 銀行 + 「現金」(固定)。振替はお金の移動なのでクレカは候補に出さない。
   List<String> get _accountChoices {
     final p = _payments;
     if (p == null) return const ['現金'];
     return [
       ...p.bankAccounts.map((b) => b.name),
-      ...p.creditCards.map((c) => c.name),
       '現金',
     ];
   }
@@ -140,35 +139,12 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
   }
 
   Future<void> _pickDate() async {
-    final picked = await showCupertinoModalPopup<DateTime>(
-      context: context,
-      builder: (_) => Container(
-        height: 300,
-        color: Colors.white,
-        child: Column(
-          children: [
-            SizedBox(
-              height: 40,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  CupertinoButton(
-                    onPressed: () => Navigator.pop(context, _date),
-                    child: const Text('完了'),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: CupertinoDatePicker(
-                mode: CupertinoDatePickerMode.date,
-                initialDateTime: _date,
-                onDateTimeChanged: (d) => _date = d,
-              ),
-            ),
-          ],
-        ),
-      ),
+    // PC（広い画面）はカレンダー / スマホはホイール、で出し分け（支出・収入と統一）。
+    final picked = await pickAdaptiveDate(
+      context,
+      initial: _date,
+      first: DateTime(2018),
+      last: DateTime(2035, 12, 31),
     );
     if (picked != null) setState(() => _date = picked);
   }
