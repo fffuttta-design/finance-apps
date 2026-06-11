@@ -370,6 +370,16 @@ async function createWindow() {
 }
 
 // ─────────────────── 自己更新（Drive・best-effort）───────────────────
+// 更新の試行回数を覚えておくための小さな状態（ループ暴走の防止用）。
+function updateStatePath() {
+  return path.join(app.getPath('userData'), 'update.json');
+}
+function readUpdateState() {
+  try { return JSON.parse(fs.readFileSync(updateStatePath(), 'utf8')); } catch (_) { return {}; }
+}
+function writeUpdateState(s) {
+  try { fs.writeFileSync(updateStatePath(), JSON.stringify(s), 'utf8'); } catch (_) {}
+}
 function findDriveDir() {
   for (const d of DRIVE_CANDIDATES) {
     try { if (fs.statSync(d).isDirectory()) return d; } catch (_) {}
@@ -410,6 +420,8 @@ async function checkForUpdate(opts = {}) {
     return;
   }
   if (!remote || cmpVer(remote, app.getVersion()) <= 0) {
+    // すでに最新（＝前回の更新が成功）。試行カウンタをクリア。
+    writeUpdateState({});
     if (manual) {
       await dialog.showMessageBox(mainWindow, {
         type: 'info', title: '更新確認', message: `最新版です（v${app.getVersion()}）。`,
@@ -428,6 +440,15 @@ async function checkForUpdate(opts = {}) {
   }
   // 起動時の自動チェックで新版が見つかったら、確認なしでそのまま適用＆再起動。
   if (auto) {
+    // ループガード：同じ版に2回試して更新できていなければ、自動適用を止める
+    // （更新が効かない環境で「適用→再起動→また適用…」の無限ループ＝起動即落ちを防ぐ）。
+    const st = readUpdateState();
+    const tried = st.version === remote ? (st.count || 0) : 0;
+    if (tried >= 2) {
+      console.warn('[update] loop guard: 自動更新を見送り（v%s を%d回試行済）', remote, tried);
+      return;
+    }
+    writeUpdateState({ version: remote, count: tried + 1 });
     applyUpdate(exeSrc);
     return;
   }
