@@ -5,6 +5,51 @@
 
 #include "resource.h"
 
+#include <fstream>
+#include <string>
+
+namespace {
+
+// Persist/restore the window state (size/position/maximized) on close.
+// Saved to %LOCALAPPDATA%\FutaFinance\window_placement.bin
+std::wstring WindowStateFilePath() {
+  wchar_t buf[MAX_PATH];
+  DWORD n = GetEnvironmentVariableW(L"LOCALAPPDATA", buf, MAX_PATH);
+  std::wstring dir = (n > 0 && n < MAX_PATH) ? std::wstring(buf, n) : L".";
+  dir += L"\\FutaFinance";
+  CreateDirectoryW(dir.c_str(), nullptr);
+  return dir + L"\\window_placement.bin";
+}
+
+void SaveWindowPlacement(HWND hwnd) {
+  WINDOWPLACEMENT wp;
+  wp.length = sizeof(wp);
+  if (!GetWindowPlacement(hwnd, &wp)) {
+    return;
+  }
+  // If closed while minimized, restore as normal/maximized next time.
+  if (wp.showCmd == SW_SHOWMINIMIZED) {
+    wp.showCmd =
+        (wp.flags & WPF_RESTORETOMAXIMIZED) ? SW_SHOWMAXIMIZED : SW_SHOWNORMAL;
+  }
+  std::ofstream f(WindowStateFilePath(), std::ios::binary | std::ios::trunc);
+  if (f) {
+    f.write(reinterpret_cast<const char*>(&wp), sizeof(wp));
+  }
+}
+
+bool LoadWindowPlacement(WINDOWPLACEMENT* wp) {
+  std::ifstream f(WindowStateFilePath(), std::ios::binary);
+  if (!f) {
+    return false;
+  }
+  f.read(reinterpret_cast<char*>(wp), sizeof(*wp));
+  return f.gcount() == static_cast<std::streamsize>(sizeof(*wp)) &&
+         wp->length == sizeof(*wp);
+}
+
+}  // namespace
+
 namespace {
 
 /// Window attribute that enables dark mode window decorations.
@@ -150,6 +195,11 @@ bool Win32Window::Create(const std::wstring& title,
 }
 
 bool Win32Window::Show() {
+  // Restore the previous window state (size/position/maximized) if present.
+  WINDOWPLACEMENT wp;
+  if (LoadWindowPlacement(&wp)) {
+    return SetWindowPlacement(window_handle_, &wp) != 0;
+  }
   return ShowWindow(window_handle_, SW_SHOWNORMAL);
 }
 
@@ -179,6 +229,10 @@ Win32Window::MessageHandler(HWND hwnd,
                             WPARAM const wparam,
                             LPARAM const lparam) noexcept {
   switch (message) {
+    case WM_CLOSE:
+      // Save the window state just before closing (restored on next launch).
+      SaveWindowPlacement(hwnd);
+      break;
     case WM_DESTROY:
       window_handle_ = nullptr;
       Destroy();
