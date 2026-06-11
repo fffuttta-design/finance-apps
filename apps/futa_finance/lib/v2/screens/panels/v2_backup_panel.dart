@@ -361,62 +361,6 @@ class _V2BackupPanelState extends State<V2BackupPanel> {
                     ],
                   ),
                 ),
-                const SizedBox(height: V2Spacing.lg),
-                // ── 自動スナップショット ──
-                V2Card(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: V2Colors.badgePurpleSoft,
-                              borderRadius:
-                                  BorderRadius.circular(
-                                      V2Spacing.radiusSm),
-                            ),
-                            alignment: Alignment.center,
-                            child: const Icon(
-                                Icons.history,
-                                size: 16,
-                                color: V2Colors.badgePurple),
-                          ),
-                          const SizedBox(width: V2Spacing.md),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
-                              children: [
-                                Text('自動スナップショット',
-                                    style: V2Typography
-                                        .bodyStrong),
-                                Text(
-                                    '取り込み/破壊的操作の前に自動取得した履歴を確認・復元できます',
-                                    style: V2Typography.micro
-                                        .copyWith(
-                                            color: V2Colors
-                                                .textSecondary)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: V2Spacing.md),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: OutlinedButton.icon(
-                          onPressed: _openImportV1,
-                          icon: const Icon(Icons.open_in_new,
-                              size: 14),
-                          label: const Text('履歴を開く（v1 設定）'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
