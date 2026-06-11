@@ -41,7 +41,7 @@ const DRIVE_CANDIDATES = [
   'H:\\My Drive\\ツール開発\\FutaFinance-Desktop',
   'G:\\My Drive\\ツール開発\\FutaFinance-Desktop',
 ];
-const RELEASE_EXE_NAME = 'FutaFinance.exe';
+const RELEASE_EXE_NAME = 'FutaFinance-Setup.exe'; // DriveのNSISインストーラ（固定名）
 
 let mainWindow = null;
 let isQuitting = false;
@@ -332,9 +332,6 @@ async function createWindow() {
 }
 
 // ─────────────────── 自己更新（Drive・best-effort）───────────────────
-function selfExePath() {
-  return process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
-}
 function findDriveDir() {
   for (const d of DRIVE_CANDIDATES) {
     try { if (fs.statSync(d).isDirectory()) return d; } catch (_) {}
@@ -407,19 +404,18 @@ async function checkForUpdate(opts = {}) {
   });
   if (choice.response === 0) applyUpdate(exeSrc);
 }
-function applyUpdate(newExeSrc) {
+function applyUpdate(setupSrc) {
   const ourPid = process.pid;
-  const target = selfExePath();
-  const src = newExeSrc.replace(/'/g, "''");
-  const dst = target.replace(/'/g, "''");
+  const setup = setupSrc.replace(/'/g, "''");
+  // NSISインストーラをサイレント実行し、固定のインストール先を上書き更新する。
+  // インストール先・ショートカット・AppUserModelIdが固定なので、
+  // タスクバーのピン留めは更新後も維持される（portable方式の宿命を解消）。
   const ps =
     "$host.UI.RawUI.WindowTitle = 'FutaFinance アップデート'\n" +
     `try { Wait-Process -Id ${ourPid} -Timeout 15 -ErrorAction Stop } catch {}\n` +
-    'for ($i = 0; $i -lt 20; $i++) {\n' +
-    `  try { Copy-Item -LiteralPath '${src}' -Destination '${dst}' -Force -ErrorAction Stop; break }\n` +
-    '  catch { Start-Sleep -Milliseconds 500 }\n' +
-    '}\n' +
-    `Start-Process -FilePath '${dst}' -ArgumentList '--updated'\n`;
+    `Start-Process -FilePath '${setup}' -ArgumentList '/S' -Wait\n` +
+    "$lnk = Join-Path $env:APPDATA 'Microsoft\\Windows\\Start Menu\\Programs\\FutaFinance.lnk'\n" +
+    "if (Test-Path $lnk) { Start-Process -FilePath $lnk }\n";
   const scriptPath = path.join(os.tmpdir(), 'futafinance_update.ps1');
   fs.writeFileSync(scriptPath, ps, { encoding: 'utf8' });
   spawn('powershell.exe', ['-ExecutionPolicy', 'Bypass', '-NoProfile', '-File', scriptPath], {

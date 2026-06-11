@@ -81,24 +81,24 @@ try {
   if ($LASTEXITCODE -ne 0) { throw "electron-builder failed" }
 } finally { Pop-Location }
 
-# ---- 5. copy exe to local install dir (visible under C:\dev) ----
-$exe = Get-ChildItem (Join-Path $ProjectDir "dist") -Filter "FutaFinance-*.exe" -File |
+# ---- 5. locate the NSIS installer (Setup.exe) ----
+$exe = Get-ChildItem (Join-Path $ProjectDir "dist") -Filter "FutaFinance-Setup-*.exe" -File |
   Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if (-not $exe) { throw "portable exe not found under dist/" }
-Write-Host ("[5/5] built: {0} ({1:N1} MB)" -f $exe.Name, ($exe.Length/1MB)) -ForegroundColor Green
+if (-not $exe) { throw "NSIS setup exe not found under dist/" }
+Write-Host ("[5/5] built installer: {0} ({1:N1} MB)" -f $exe.Name, ($exe.Length/1MB)) -ForegroundColor Green
 
+# Keep a copy under C:\dev (visible) for reference / first-time install.
 $installDir = Join-Path $RepoRoot "windows-app-electron"
 New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-$installExe = Join-Path $installDir "FutaFinance.exe"
-# Best-effort: if the app is currently running, the exe is locked. Don't abort.
+$installExe = Join-Path $installDir "FutaFinance-Setup.exe"
 try {
   Copy-Item $exe.FullName $installExe -Force -ErrorAction Stop
-  Write-Host "installed (for testing): $installExe" -ForegroundColor Green
+  Write-Host "copied installer: $installExe" -ForegroundColor Green
 } catch {
-  Write-Host "WARN: local install exe is locked (app running?). Skipped local copy; continuing." -ForegroundColor Yellow
+  Write-Host "WARN: could not copy installer locally (locked?). Continuing." -ForegroundColor Yellow
 }
 
-# ---- optional: publish to Drive ----
+# ---- optional: publish to Drive (Setup.exe + version.txt; self-update runs it /S) ----
 if ($Publish) {
   $jp1 = -join ([char]0x30DE,[char]0x30A4,[char]0x30C9,[char]0x30E9,[char]0x30A4,[char]0x30D6) # My Drive (kana)
   $jp2 = -join ([char]0x30C4,[char]0x30FC,[char]0x30EB,[char]0x958B,[char]0x767A)               # tool dev
@@ -108,28 +108,14 @@ if ($Publish) {
   foreach ($c in $cands) { if (Test-Path (Split-Path $c -Parent)) { $driveDir = $c; break } }
   if ($driveDir) {
     New-Item -ItemType Directory -Force -Path $driveDir | Out-Null
-    Copy-Item $exe.FullName (Join-Path $driveDir "FutaFinance.exe") -Force
+    Copy-Item $exe.FullName (Join-Path $driveDir "FutaFinance-Setup.exe") -Force
     $ver = (Get-Content $pkgPath -Raw -Encoding UTF8 | ConvertFrom-Json).version
     [System.IO.File]::WriteAllText((Join-Path $driveDir "version.txt"), $ver, [System.Text.UTF8Encoding]::new($false))
-
-    # First-time installer (copies exe to LOCALAPPDATA + shortcuts + launch).
-    $install = @'
-# install.ps1 - FutaFinance desktop first-time install
-$ErrorActionPreference = "Stop"
-$src = Join-Path $PSScriptRoot "FutaFinance.exe"
-$dstDir = Join-Path $env:LOCALAPPDATA "Programs\FutaFinance"
-New-Item -ItemType Directory -Force -Path $dstDir | Out-Null
-$dst = Join-Path $dstDir "FutaFinance.exe"
-Copy-Item $src $dst -Force
-$ws = New-Object -ComObject WScript.Shell
-$startMenu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\FutaFinance.lnk"
-$sc = $ws.CreateShortcut($startMenu); $sc.TargetPath = $dst; $sc.Save()
-$desktop = Join-Path ([Environment]::GetFolderPath("Desktop")) "FutaFinance.lnk"
-$sc2 = $ws.CreateShortcut($desktop); $sc2.TargetPath = $dst; $sc2.Save()
-Start-Process $dst
-Write-Host "FutaFinance installed to $dst" -ForegroundColor Green
-'@
-    [System.IO.File]::WriteAllText((Join-Path $driveDir "install.ps1"), $install, [System.Text.UTF8Encoding]::new($false))
+    # Remove the legacy portable artifacts so old portable installs stop self-replacing.
+    foreach ($old in @("FutaFinance.exe", "install.ps1")) {
+      $op = Join-Path $driveDir $old
+      if (Test-Path $op) { Remove-Item $op -Force -ErrorAction SilentlyContinue }
+    }
     Write-Host "published to Drive: $driveDir (v$ver)" -ForegroundColor Green
   } else {
     Write-Host "Drive folder not found; skipped publish." -ForegroundColor DarkGray
@@ -137,4 +123,4 @@ Write-Host "FutaFinance installed to $dst" -ForegroundColor Green
 }
 
 Write-Host "== done ==" -ForegroundColor Cyan
-Write-Host "Run it: $installExe"
+Write-Host "Installer: $installExe  (run it once to install/migrate)"
