@@ -816,7 +816,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               const SizedBox(height: 16),
               // 金額をヒーローとして大きく表示。
               _heroAmount(),
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
               // レシート画像（Drive）がある取引は、上部に開くボタンを出す。
               if (_receiptUrlCtrl.text.trim().isNotEmpty) ...[
                 Align(
@@ -959,7 +959,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
 
               // 任意項目は「詳細を追加 ▾」で畳む（店舗・備考・領収書）。
               _detailsExpansion(),
-              const SizedBox(height: 28),
+              const SizedBox(height: 18),
 
               FilledButton.icon(
                 onPressed: _saving ? null : _save,
@@ -969,7 +969,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                     : (widget.editing != null ? '更新する' : '記録する')),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF1A237E),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
             ],
@@ -1100,7 +1100,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   Widget _heroAmount() {
     final isUsd = _currency == 'USD';
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(12),
@@ -1164,11 +1164,11 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
             decoration: _inputDecoration().copyWith(
               prefixText: '¥ ',
               prefixStyle: const TextStyle(
-                  fontSize: 22, color: Color(0xFF9CA3AF)),
+                  fontSize: 20, color: Color(0xFF9CA3AF)),
             ),
             style: const TextStyle(
                 fontFamily: 'monospace',
-                fontSize: 30,
+                fontSize: 26,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF111827)),
             validator: (v) {
