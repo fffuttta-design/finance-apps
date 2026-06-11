@@ -8,6 +8,7 @@ import '../../data/ui_preferences.dart';
 import '../../data/update_flow.dart';
 import '../../data/windows_update.dart';
 import '../../screens/account_editor_screen.dart';
+import '../../screens/balance_adjust_screen.dart';
 import '../../screens/card_editor_screen.dart';
 import '../../screens/category_editor_screen.dart';
 import '../../screens/checklist_editor_screen.dart';
@@ -72,6 +73,8 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
       _MenuItem('wallet', '支払方法マスタ',
           Icons.account_balance_wallet_outlined,
           desc: '口座・クレジットカードを登録'),
+      _MenuItem('balanceAdjust', '残高調整', Icons.tune_outlined,
+          desc: 'ウォレット残高を実際に合わせる（差は営業外に記録）'),
       _MenuItem('incomeMaster', '収入マスタ', Icons.savings_outlined,
           desc: '収入源（売上）を登録'),
       _MenuItem('subscription', '固定費・サブスク', Icons.event_repeat,
@@ -194,6 +197,13 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
             iconColor: V2Colors.badgePurple);
       case 'wallet':
         return const _PaymentMethodMasterPanel();
+      case 'balanceAdjust':
+        return _embedV1(const BalanceAdjustScreen(),
+            title: '残高調整',
+            note: 'ウォレットの残高を実際の金額に合わせます。ズレ分は「残高調整」として記録し、'
+                '収支に含めます（事業モードのPLでは営業外）。',
+            icon: Icons.tune_outlined,
+            iconColor: V2Colors.info);
       case 'incomeMaster':
         return const V2IncomeMasterPanel();
       case 'subscription':
