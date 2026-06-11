@@ -351,6 +351,7 @@ function cmpVer(a, b) {
 }
 async function checkForUpdate(opts = {}) {
   const manual = opts.manual === true; // 設定画面の「最新バージョンを確認」から呼ぶ時 true
+  const auto = opts.auto === true;     // 起動時の自動チェック（見つかれば確認なしで適用）
   if (!app.isPackaged && !manual) return;
   const dir = findDriveDir();
   if (!dir) {
@@ -388,6 +389,11 @@ async function checkForUpdate(opts = {}) {
         type: 'warning', title: '更新確認', message: '更新ファイルが見つかりませんでした。',
       });
     }
+    return;
+  }
+  // 起動時の自動チェックで新版が見つかったら、確認なしでそのまま適用＆再起動。
+  if (auto) {
+    applyUpdate(exeSrc);
     return;
   }
   const choice = await dialog.showMessageBox(mainWindow, {
@@ -457,7 +463,15 @@ if (!gotLock) {
       await session.defaultSession.clearStorageData({ storages: ['serviceworkers'] });
     } catch (_) {}
     await createWindow();
-    setTimeout(() => { checkForUpdate().catch((e) => console.error(e)); }, 2500);
+    // 自己置換更新で再起動してきた時は、完了をさりげなく通知。
+    if (process.argv.includes('--updated')) {
+      dialog.showMessageBox(mainWindow, {
+        type: 'info', title: 'FutaFinance',
+        message: `最新版 v${app.getVersion()} に更新しました。`,
+      }).catch(() => {});
+    }
+    // 起動時の自動更新チェック（新版があれば確認なしで適用＆再起動）。
+    setTimeout(() => { checkForUpdate({ auto: true }).catch((e) => console.error(e)); }, 2500);
   });
   app.on('window-all-closed', () => { if (!isQuitting) app.quit(); });
   app.on('activate', () => { if (mainWindow === null) createWindow(); });
