@@ -118,7 +118,14 @@ if ($Publish) {
   $asset = "FutaFinance-Windows-v$version.zip"
   $zip   = Join-Path $env:TEMP $asset
   if (Test-Path $zip) { Remove-Item $zip -Force }
-  Compress-Archive -Path (Join-Path $install '*') -DestinationPath $zip -Force
+  # Zip from a fresh staging copy of the BUILD output, not the live install
+  # (the installed exe may be locked if the user is running the app).
+  $stage = Join-Path $env:TEMP 'futa_win_stage'
+  robocopy $src $stage /MIR /XF *.lib *.exp *.pdb VERSION.txt /NFL /NDL /NJH /NJS /NP | Out-Null
+  if ($LASTEXITCODE -ge 8) { throw "stage robocopy failed (code=$LASTEXITCODE)" }
+  $global:LASTEXITCODE = 0
+  Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -Force
+  Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
 
   $notes = "FutaFinance Windows v$version"
   # gh writes to stderr; under ErrorActionPreference=Stop that becomes terminating.
