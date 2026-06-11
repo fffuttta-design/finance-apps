@@ -2,16 +2,14 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:finance_core/finance_core.dart' as core;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 
 import '../data/drive_receipt_service.dart';
 import '../data/household_service.dart';
 import '../data/receipt_ocr.dart';
 import '../data/tx_repository.dart';
-import '../utils/format.dart';
-import 'add_transaction_screen.dart';
 import 'receipt_camera_screen.dart';
+import 'receipt_split_screen.dart';
 
 /// レシートで記録：画像選択 → Gemini読み取り → 入力画面をプリフィルして開く。
 /// 何か記録できたら true を返す。
@@ -97,23 +95,15 @@ Future<bool> runReceiptFlow(BuildContext context) async {
 
   if (!context.mounted) return false;
 
-  // 常に「まとめて1件」で記録。品目はメモ（備考）にぶら下げて1レシート=1記録に紐づける。
-  // 合計額が読めなければ品目の合計で代用。
   final r = result; // ここまでで null チェック済み（非null確定）
-  final total = r.amount ?? r.items.fold<int>(0, (s, it) => s + it.price);
-  final memo = _itemsMemo(r.items);
 
+  // レシートは常に「品目ごと」に記録（1品目=1記録）。まとめて1件は廃止。
   final changed = await Navigator.push<bool>(
     context,
     MaterialPageRoute(
-      builder: (_) => AddTransactionScreen(
-        initialType: core.TransactionType.expense,
-        initialAmount: total > 0 ? total : null,
-        initialDate: r.date,
-        initialCategory: r.category,
-        initialDescription: r.store,
-        initialReceiptId: receiptId,
-        initialMemo: memo,
+      builder: (_) => ReceiptSplitScreen(
+        result: r,
+        receiptId: receiptId,
       ),
     ),
   );
@@ -137,10 +127,4 @@ Future<Uint8List> _compressReceipt(Uint8List src) async {
     }
   } catch (_) {/* 圧縮失敗時は元画像を使う */}
   return src;
-}
-
-/// 品目リストをメモ用テキスト（・品名 ¥金額）にまとめる。空なら null。
-String? _itemsMemo(List<ReceiptItem> items) {
-  if (items.isEmpty) return null;
-  return items.map((it) => '・${it.name} ${formatYen(it.price)}').join('\n');
 }

@@ -19,15 +19,11 @@ class ReceiptSplitScreen extends StatefulWidget {
   final String? receiptId;
   final String? receiptUrl;
 
-  /// 上部に「まとめて1件 / 品目ごと」トグルを出すか（OCRフローから true）。
-  /// 「まとめて1件」を選ぶと [kReceiptSwitchMode] を返して閉じる。
-  final bool showModeToggle;
   const ReceiptSplitScreen({
     super.key,
     required this.result,
     this.receiptId,
     this.receiptUrl,
-    this.showModeToggle = false,
   });
 
   @override
@@ -64,6 +60,10 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
     _payer = AuthService.instance.currentUser?.uid;
     for (final it in r.items) {
       _items.add(_Item(it.name, it.price, it.category ?? r.category));
+    }
+    // 品目が読めなかった場合でも、編集できるよう空の1行を用意。
+    if (_items.isEmpty) {
+      _items.add(_Item('', 0, r.category));
     }
   }
 
@@ -197,31 +197,6 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
-            // まとめて1件 / 品目ごと トグル（OCRフローから開いたときだけ）
-            if (widget.showModeToggle) ...[
-              SegmentedButton<bool>(
-                segments: const [
-                  ButtonSegment(
-                      value: false,
-                      icon: Icon(Icons.receipt_long_rounded, size: 16),
-                      label: Text('まとめて1件', style: TextStyle(fontSize: 12))),
-                  ButtonSegment(
-                      value: true,
-                      icon: Icon(Icons.list_alt_rounded, size: 16),
-                      label: Text('品目ごと', style: TextStyle(fontSize: 12))),
-                ],
-                selected: const {true},
-                showSelectedIcon: false,
-                onSelectionChanged: (s) {
-                  if (s.first == false) {
-                    Navigator.pop(context, kReceiptSwitchMode);
-                  }
-                },
-                style: const ButtonStyle(
-                    visualDensity: VisualDensity.compact),
-              ),
-              const SizedBox(height: 12),
-            ],
             // 共通情報
             Card(
               child: Padding(
@@ -292,6 +267,17 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
             ),
             const SizedBox(height: 8),
             for (int i = 0; i < _items.length; i++) _itemCard(i),
+            const SizedBox(height: 4),
+            OutlinedButton.icon(
+              onPressed: () => setState(
+                  () => _items.add(_Item('', 0, widget.result.category))),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('品目を追加'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.pinkDark,
+                side: const BorderSide(color: AppColors.pinkSoft),
+              ),
+            ),
             const SizedBox(height: 20),
             FilledButton(
               onPressed: _saving ? null : _save,
