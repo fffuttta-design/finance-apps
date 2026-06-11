@@ -200,6 +200,52 @@ class WindowsGoogleAuth {
     return accessToken;
   }
 
+  /// 保存済み refresh_token から黙って再ログイン用のトークンを取得する。
+  /// ブラウザを開かずに id_token / access_token を得る（起動時の自動ログイン用）。
+  /// refresh_token が無い・失効していれば null。
+  Future<WindowsGoogleTokens?> silentSignIn() async {
+    if (!isConfigured) return null;
+    final prefs = await SharedPreferences.getInstance();
+    final refresh = prefs.getString(_kRefreshToken);
+    if (refresh == null) return null;
+    try {
+      final res = await http.post(
+        Uri.parse(_tokenEndpoint),
+        body: {
+          'client_id': WindowsOAuthConfig.clientId,
+          'client_secret': WindowsOAuthConfig.clientSecret,
+          'refresh_token': refresh,
+          'grant_type': 'refresh_token',
+        },
+      ).timeout(const Duration(seconds: 8));
+      if (res.statusCode != 200) {
+        if (kDebugMode) {
+          debugPrint('silentSignIn 失敗: ${res.statusCode} ${res.body}');
+        }
+        return null;
+      }
+      final j = jsonDecode(res.body) as Map<String, dynamic>;
+      final idToken = j['id_token'] as String?;
+      final accessToken = j['access_token'] as String?;
+      if (idToken == null || accessToken == null) return null;
+      final expiresIn = (j['expires_in'] as num?)?.toInt() ?? 3600;
+      _cacheAccessToken(accessToken, expiresIn);
+      // 稀に refresh_token がローテーションされる場合に備えて更新。
+      final newRefresh = j['refresh_token'] as String?;
+      if (newRefresh != null) {
+        await prefs.setString(_kRefreshToken, newRefresh);
+      }
+      return WindowsGoogleTokens(
+        idToken: idToken,
+        accessToken: accessToken,
+        refreshToken: newRefresh ?? refresh,
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('silentSignIn 例外: $e');
+      return null;
+    }
+  }
+
   /// サインアウト。保存した refresh_token を破棄。
   Future<void> signOut() async {
     _accessTokenCache = null;

@@ -42,6 +42,29 @@ class AuthService {
   /// 現在ログイン中のユーザー（未ログインなら null）。
   User? get currentUser => _auth.currentUser;
 
+  /// 起動時の自動ログイン。
+  /// Windows は FlutterFire のセッション永続が不安定なため、保存済みの
+  /// refresh_token から黙って再ログインする（ブラウザを開かない）。
+  /// 既にログイン済み、または Web/Android（セッションが永続する）なら何もしない。
+  /// 戻り値=ログイン状態になったか。
+  Future<bool> trySilentSignIn() async {
+    if (_auth.currentUser != null) return true;
+    if (!_isWindows) return false;
+    try {
+      final tokens = await WindowsGoogleAuth.instance.silentSignIn();
+      if (tokens == null) return false;
+      final credential = GoogleAuthProvider.credential(
+        idToken: tokens.idToken,
+        accessToken: tokens.accessToken,
+      );
+      final userCred = await _auth.signInWithCredential(credential);
+      return userCred.user != null;
+    } catch (e) {
+      if (kDebugMode) debugPrint('自動ログイン失敗: $e');
+      return false;
+    }
+  }
+
   /// ログイン状態のストリーム（リアルタイム）。
   Stream<User?> get userStream => _auth.authStateChanges();
 

@@ -26,6 +26,11 @@ Future<void> main() async {
   );
   // Google Sign-In 初期化
   await AuthService.instance.init();
+  // Windows は保存済みトークンで自動ログイン（再起動/更新でも再ログイン不要に）。
+  // 既ログイン or Web/Android は即 false で返る。ネットワーク遅延に上限を付ける。
+  await AuthService.instance
+      .trySilentSignIn()
+      .timeout(const Duration(seconds: 6), onTimeout: () => false);
   runApp(const FutaFinanceApp());
 }
 
