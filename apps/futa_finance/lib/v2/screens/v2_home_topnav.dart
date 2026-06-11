@@ -20,7 +20,6 @@ import '../../data/transaction_repository.dart';
 import '../../screens/account_detail_screen.dart';
 import '../../screens/card_detail_screen.dart';
 import '../../screens/expense_list_screen.dart';
-import '../../screens/receipt_group_detail_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
 import '../../utils/emoji_palette.dart';
 import '../../utils/formatters.dart';
@@ -404,6 +403,22 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
     final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
     return _subs.fold<int>(0, (s, sub) => s + sub.plAmountForMonth(ym, curYm));
+  }
+
+  /// 指定月に計上される固定費（サブスク）の明細（名前・金額）。amount>0のみ・金額降順。
+  List<({String name, int amount})> subsLinesForMonth(DateTime m) {
+    final now = DateTime.now();
+    final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
+    final lines = <({String name, int amount})>[];
+    for (final sub in _subs) {
+      final amt = sub.plAmountForMonth(ym, curYm);
+      if (amt > 0) {
+        lines.add((name: sub.name.trim().isEmpty ? '固定費' : sub.name, amount: amt));
+      }
+    }
+    lines.sort((a, b) => b.amount.compareTo(a.amount));
+    return lines;
   }
 
   // ── 計算ヘルパー ──────────────────────────
@@ -847,9 +862,10 @@ class _CenterColumn extends StatelessWidget {
     }
     // 固定費（サブスク）の当月分も大カテゴリ別内訳に1行として加える。
     // 支払方法別の内訳と同じ扱いにし、内訳合計を当月経費（固定費込み）と一致させる。
+    // 展開時の明細は subsLinesForMonth（各サブスク名＋金額）で表示する。
+    final fixedLines = state.subsLinesForMonth(state._selectedMonth);
     if (subTotal > 0) {
-      const kFixed = '固定費・サブスク';
-      byMajor[kFixed] = (byMajor[kFixed] ?? 0) + subTotal;
+      byMajor[_kFixedCostKey] = (byMajor[_kFixedCostKey] ?? 0) + subTotal;
     }
     final majorEntries = byMajor.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
@@ -1127,6 +1143,7 @@ class _CenterColumn extends StatelessWidget {
                   entries: majorEntries.take(6).toList(),
                   total: byMajorTotal,
                   txnsByMajor: txnsByMajor,
+                  fixedLines: fixedLines,
                   accent: state.widget.accent,
                   iconKeyFor: state._iconKeyForMajor,
                 ),
@@ -1184,17 +1201,16 @@ class _CenterColumn extends StatelessWidget {
               else
                 for (final u in recentUnits)
                   if (u.isGroup)
-                    // まとめ（複数品目）：タップでそのまとまりの内訳だけを表示。
-                    // 単品（GU等）と同じく「その明細」へ進む感覚に揃える。
+                    // まとめ（複数品目）：タップでその場で展開し、明細を行内に表示。
+                    // 各明細をタップすると、その取引の編集画面へ。
                     _ReceiptGroupRow(
                       members: u.members!,
-                      onTap: () async {
+                      onTapMember: (t) async {
                         final changed = await Navigator.push<bool>(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => ReceiptGroupDetailScreen(
-                                members: u.members!),
-                          ),
+                              builder: (_) => TransactionDetailScreen(
+                                  transaction: t)),
                         );
                         if (changed == true) await state._load();
                       },
@@ -1325,16 +1341,23 @@ class _TransactionRowState extends State<_TransactionRow> {
 /// 入出金一覧の表示単位：単品（single）か、同じレシートのまとめ（group）。
 /// 支出の内訳（カテゴリ別）。区切り線で各カテゴリを仕切り、
 /// 行タップでそのカテゴリにぶら下がる取引明細を展開表示する。
+/// 大カテゴリ別内訳における「固定費」のまとめ行キー。
+const String _kFixedCostKey = '固定費・サブスク';
+
 class _CategoryBreakdown extends StatefulWidget {
   final List<MapEntry<String, int>> entries;
   final int total;
   final Map<String, List<Transaction>> txnsByMajor;
+
+  /// 固定費まとめ行（[_kFixedCostKey]）を展開したときに出す明細（名前・金額）。
+  final List<({String name, int amount})> fixedLines;
   final Color accent;
   final String? Function(String) iconKeyFor;
   const _CategoryBreakdown({
     required this.entries,
     required this.total,
     required this.txnsByMajor,
+    required this.fixedLines,
     required this.accent,
     required this.iconKeyFor,
   });
@@ -1420,17 +1443,14 @@ class _CategoryBreakdownState extends State<_CategoryBreakdown> {
             padding: const EdgeInsets.only(left: 38, bottom: 8),
             child: Column(
               children: [
-                for (final t in txns) _txnRow(t),
-                if (txns.isEmpty)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: Text('明細なし',
-                          style: V2Typography.caption
-                              .copyWith(color: V2Colors.textMuted)),
-                    ),
-                  ),
+                // 固定費まとめ行は、各サブスク（名前＋金額）を明細として出す。
+                if (e.key == _kFixedCostKey) ...[
+                  for (final f in widget.fixedLines) _fixedRow(f),
+                  if (widget.fixedLines.isEmpty) _noDetail(),
+                ] else ...[
+                  for (final t in txns) _txnRow(t),
+                  if (txns.isEmpty) _noDetail(),
+                ],
               ],
             ),
           ),
@@ -1463,6 +1483,40 @@ class _CategoryBreakdownState extends State<_CategoryBreakdown> {
       ),
     );
   }
+
+  /// 固定費（サブスク）1件の明細行。
+  Widget _fixedRow(({String name, int amount}) f) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          const Icon(Icons.subscriptions_outlined,
+              size: 14, color: V2Colors.textMuted),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(f.name,
+                style: V2Typography.caption
+                    .copyWith(color: V2Colors.textSecondary),
+                overflow: TextOverflow.ellipsis),
+          ),
+          Text('-${formatYen(f.amount)}',
+              style: V2Typography.caption.copyWith(
+                  color: V2Colors.textSecondary,
+                  fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  Widget _noDetail() => Align(
+        alignment: Alignment.centerLeft,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Text('明細なし',
+              style:
+                  V2Typography.caption.copyWith(color: V2Colors.textMuted)),
+        ),
+      );
 }
 
 class _RecentUnit {
@@ -1501,8 +1555,10 @@ List<_RecentUnit> _groupByReceipt(List<Transaction> rows) {
 /// 「日付 / レシートN件バッジ / 店舗 / 合計」を表示。
 class _ReceiptGroupRow extends StatefulWidget {
   final List<Transaction> members;
-  final VoidCallback? onTap;
-  const _ReceiptGroupRow({required this.members, this.onTap});
+
+  /// 展開後、明細をタップしたとき（その取引の編集など）。
+  final void Function(Transaction)? onTapMember;
+  const _ReceiptGroupRow({required this.members, this.onTapMember});
 
   @override
   State<_ReceiptGroupRow> createState() => _ReceiptGroupRowState();
@@ -1510,11 +1566,11 @@ class _ReceiptGroupRow extends StatefulWidget {
 
 class _ReceiptGroupRowState extends State<_ReceiptGroupRow> {
   bool _hover = false;
+  bool _open = false;
 
   @override
   Widget build(BuildContext context) {
     final members = widget.members;
-    final onTap = widget.onTap;
     final first = members.first;
     final isIncome = first.type == TransactionType.income;
     final color = isIncome ? V2Colors.positive : V2Colors.negative;
@@ -1525,64 +1581,115 @@ class _ReceiptGroupRowState extends State<_ReceiptGroupRow> {
         : (first.description.trim().isNotEmpty
             ? first.description.trim()
             : first.paymentMethod);
-    final card = Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(
-          horizontal: V2Spacing.md, vertical: 10),
-      decoration: BoxDecoration(
-        color: _hover ? V2Colors.hover : V2Colors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: V2Colors.border),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-              width: 40,
-              child: Text('${first.date.month}/${first.date.day}',
-                  style: V2Typography.caption.copyWith(
-                      fontFeatures: V2Typography.tabularNums))),
-          // レシートまとめバッジ（N件）
-          Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: V2Spacing.sm, vertical: 2),
-            decoration: BoxDecoration(
-              color: V2Colors.surfaceMuted,
-              borderRadius: BorderRadius.circular(V2Spacing.radiusXs),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.receipt_long,
-                    size: 11, color: V2Colors.textSecondary),
-                const SizedBox(width: 3),
-                Text('${members.length}件', style: V2Typography.micro),
-              ],
-            ),
-          ),
-          const SizedBox(width: V2Spacing.md),
-          Expanded(
-            child: Text(store,
-                style: V2Typography.body, overflow: TextOverflow.ellipsis),
-          ),
-          Text('$sign${formatYen(total)}',
-              style: V2Typography.body.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w700,
-                  fontFeatures: V2Typography.tabularNums)),
-        ],
-      ),
-    );
-    if (onTap == null) return card;
-    return MouseRegion(
+
+    final summary = MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: card,
+        onTap: () => setState(() => _open = !_open),
+        child: Container(
+          color: _hover ? V2Colors.hover : V2Colors.surface,
+          padding: const EdgeInsets.symmetric(
+              horizontal: V2Spacing.md, vertical: 10),
+          child: Row(
+            children: [
+              SizedBox(
+                  width: 40,
+                  child: Text('${first.date.month}/${first.date.day}',
+                      style: V2Typography.caption.copyWith(
+                          fontFeatures: V2Typography.tabularNums))),
+              // レシートまとめバッジ（N件）
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: V2Spacing.sm, vertical: 2),
+                decoration: BoxDecoration(
+                  color: V2Colors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(V2Spacing.radiusXs),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.receipt_long,
+                        size: 11, color: V2Colors.textSecondary),
+                    const SizedBox(width: 3),
+                    Text('${members.length}件', style: V2Typography.micro),
+                  ],
+                ),
+              ),
+              const SizedBox(width: V2Spacing.md),
+              Expanded(
+                child: Text(store,
+                    style: V2Typography.body,
+                    overflow: TextOverflow.ellipsis),
+              ),
+              Text('$sign${formatYen(total)}',
+                  style: V2Typography.body.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: V2Typography.tabularNums)),
+              const SizedBox(width: 4),
+              Icon(_open ? Icons.expand_less : Icons.expand_more,
+                  size: 18, color: V2Colors.textMuted),
+            ],
+          ),
+        ),
       ),
     );
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: V2Colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          summary,
+          if (_open) ...[
+            const Divider(height: 1, color: V2Colors.border),
+            for (final t in members) _memberRow(t, color, sign),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _memberRow(Transaction t, Color color, String sign) {
+    final name = t.description.trim().isNotEmpty
+        ? t.description.trim()
+        : (t.category.sub.trim().isNotEmpty
+            ? t.category.sub.trim()
+            : t.category.major
+                .replaceFirst(RegExp(r'^\s*\d+\.\s*'), '')
+                .trim());
+    final row = Container(
+      color: V2Colors.surface,
+      padding: const EdgeInsets.fromLTRB(V2Spacing.md, 9, V2Spacing.md, 9),
+      child: Row(
+        children: [
+          const SizedBox(width: 44),
+          const Icon(Icons.subdirectory_arrow_right,
+              size: 14, color: V2Colors.textMuted),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(name,
+                style: V2Typography.caption, overflow: TextOverflow.ellipsis),
+          ),
+          Text('$sign${formatYen(t.amount)}',
+              style: V2Typography.caption.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: V2Typography.tabularNums)),
+        ],
+      ),
+    );
+    final onTapMember = widget.onTapMember;
+    if (onTapMember == null) return row;
+    return InkWell(onTap: () => onTapMember(t), child: row);
   }
 }
 
