@@ -111,11 +111,9 @@ if ($Publish) {
     Copy-Item $exe.FullName (Join-Path $driveDir "FutaFinance-Setup.exe") -Force
     $ver = (Get-Content $pkgPath -Raw -Encoding UTF8 | ConvertFrom-Json).version
     [System.IO.File]::WriteAllText((Join-Path $driveDir "version.txt"), $ver, [System.Text.UTF8Encoding]::new($false))
-    # Remove the legacy portable artifacts so old portable installs stop self-replacing.
-    foreach ($old in @("FutaFinance.exe", "install.ps1")) {
-      $op = Join-Path $driveDir $old
-      if (Test-Path $op) { Remove-Item $op -Force -ErrorAction SilentlyContinue }
-    }
+    # 旧portable版の救済用 FutaFinance.exe(0.3.1 portable) はDriveに残す。
+    # これがあると、ループ中の旧portableが更新→自己回復→さらにNSISへ移行できる。
+    # （消すと旧portableが更新元を失い再びクラッシュループするため削除しない）
     Write-Host "published to Drive: $driveDir (v$ver)" -ForegroundColor Green
   } else {
     Write-Host "Drive folder not found; skipped publish." -ForegroundColor DarkGray
