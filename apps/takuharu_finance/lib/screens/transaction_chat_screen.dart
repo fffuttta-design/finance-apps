@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
+import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/auth_service.dart';
@@ -97,6 +98,85 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
     } finally {
       if (mounted) setState(() => _sending = false);
     }
+  }
+
+  /// 画像をギャラリーから選び、Driveに保存してコメントとして送る。
+  Future<void> _sendImage() async {
+    if (_sending) return;
+    final hid = HouseholdService.instance.householdId;
+    if (hid == null) return;
+    final x = await ImagePicker().pickImage(
+        source: ImageSource.gallery, imageQuality: 80, maxWidth: 1600);
+    if (x == null) return;
+    setState(() => _sending = true);
+    try {
+      final bytes = await x.readAsBytes();
+      final url = await DriveReceiptService.instance
+          .uploadReceiptImage(bytes: bytes, date: DateTime.now());
+      if (url == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(
+                  '画像の保存に失敗しました: ${DriveReceiptService.instance.lastError ?? ''}')));
+        }
+        return;
+      }
+      await CommentRepository.instance
+          .add(hid, _t.id, _myUid, '', imageUrl: url);
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  // 同じ画像を何度もDLしないよう fileId 単位でキャッシュ。
+  final Map<String, Future<Uint8List?>> _imgCache = {};
+
+  /// コメントの添付画像（Driveから取得して表示・タップで全画面）。
+  Widget _commentImage(String url, bool mine) {
+    final fileId = DriveReceiptService.fileIdFromUrl(url);
+    if (fileId == null) return const SizedBox.shrink();
+    final future = _imgCache.putIfAbsent(
+        fileId, () => DriveReceiptService.instance.downloadFile(fileId));
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => ReceiptImageScreen(fileId: fileId)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          width: 180,
+          child: FutureBuilder<Uint8List?>(
+            future: future,
+            builder: (context, snap) {
+              if (snap.connectionState != ConnectionState.done) {
+                return Container(
+                  height: 120,
+                  color: AppColors.pinkSoft.withValues(alpha: 0.4),
+                  alignment: Alignment.center,
+                  child: const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2)),
+                );
+              }
+              final bytes = snap.data;
+              if (bytes == null) {
+                return Container(
+                  height: 120,
+                  color: AppColors.pinkSoft.withValues(alpha: 0.4),
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.broken_image_outlined,
+                      color: AppColors.textSub),
+                );
+              }
+              return Image.memory(bytes, fit: BoxFit.cover);
+            },
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -395,10 +475,27 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
                 borderRadius: BorderRadius.circular(18),
                 border: mine ? null : Border.all(color: AppColors.divider),
               ),
-              child: Text(m.text,
-                  style: TextStyle(
-                      fontSize: 14,
-                      color: mine ? Colors.white : AppColors.text)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (m.imageUrl != null && m.imageUrl!.isNotEmpty)
+                    _commentImage(m.imageUrl!, mine),
+                  if (m.text.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.only(
+                          top: (m.imageUrl != null &&
+                                  m.imageUrl!.isNotEmpty)
+                              ? 6
+                              : 0),
+                      child: Text(m.text,
+                          style: TextStyle(
+                              fontSize: 14,
+                              color:
+                                  mine ? Colors.white : AppColors.text)),
+                    ),
+                ],
+              ),
             ),
           ),
           Padding(
@@ -433,6 +530,12 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
         ),
         child: Row(
           children: [
+            IconButton(
+              icon: const Icon(Icons.add_photo_alternate_outlined,
+                  color: AppColors.pinkDark),
+              tooltip: '画像を送る',
+              onPressed: _sending ? null : _sendImage,
+            ),
             Expanded(
               child: TextField(
                 controller: _ctrl,

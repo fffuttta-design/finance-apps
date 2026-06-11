@@ -20,7 +20,9 @@ import 'transaction_chat_screen.dart';
 
 /// ホーム：月次サマリー＋カテゴリ内訳＋取引一覧（可愛い系）。
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  /// 「支出をすべて見る」タップで支出タブへ切替えるためのコールバック。
+  final VoidCallback? onOpenExpenses;
+  const HomeScreen({super.key, this.onOpenExpenses});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -260,16 +262,34 @@ class _HomeScreenState extends State<HomeScreen> {
         if (month.isEmpty)
           _empty()
         else ...[
-          // 最新5件だけ表示（全部は支出・収入タブで見られる）。
+          // 最新5件だけ表示（全部は「支出をすべて見る」から支出タブで）。
           ...month.take(5).map(_txTile),
-          if (month.length > 5)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text('ほか ${month.length - 5}件（支出・収入タブで全部見れるよ）',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontSize: 11, color: AppColors.textSub)),
+          const SizedBox(height: 4),
+          // 「支出の記録を見る」→ 支出タブへジャンプ。
+          InkWell(
+            onTap: widget.onOpenExpenses,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    month.length > 5
+                        ? '支出をすべて見る（ほか ${month.length - 5}件）'
+                        : '支出をすべて見る',
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.pinkDark),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right_rounded,
+                      size: 18, color: AppColors.pinkDark),
+                ],
+              ),
             ),
+          ),
         ],
       ],
     );

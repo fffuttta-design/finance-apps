@@ -5,11 +5,15 @@ class TxComment {
   final String id;
   final String uid;
   final String text;
+
+  /// 添付画像のDriveリンク（任意）。
+  final String? imageUrl;
   final DateTime? createdAt;
   const TxComment(
       {required this.id,
       required this.uid,
       required this.text,
+      this.imageUrl,
       this.createdAt});
 }
 
@@ -38,6 +42,7 @@ class CommentRepository {
           id: d.id,
           uid: (m['uid'] ?? '') as String,
           text: (m['text'] ?? '') as String,
+          imageUrl: m['imageUrl'] as String?,
           createdAt: (m['createdAt'] as Timestamp?)?.toDate(),
         ));
       }
@@ -45,14 +50,17 @@ class CommentRepository {
     });
   }
 
-  Future<void> add(String hid, String txId, String uid, String text) async {
+  Future<void> add(String hid, String txId, String uid, String text,
+      {String? imageUrl}) async {
     final t = text.trim();
-    if (t.isEmpty) return;
+    // テキストか画像のどちらかがあれば送信。
+    if (t.isEmpty && (imageUrl == null || imageUrl.isEmpty)) return;
     final id = DateTime.now().microsecondsSinceEpoch.toString();
     final batch = _db.batch();
     batch.set(_coll(hid, txId).doc(id), {
       'uid': uid,
       'text': t,
+      if (imageUrl != null && imageUrl.isNotEmpty) 'imageUrl': imageUrl,
       'createdAt': FieldValue.serverTimestamp(),
     });
     // 親取引にコメント数を持たせて、一覧でバッジ表示できるようにする。

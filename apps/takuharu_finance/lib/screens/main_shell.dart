@@ -50,12 +50,13 @@ class _MainShellState extends State<MainShell>
     return Scaffold(
       body: IndexedStack(
         index: _index,
-        children: const [
-          HomeScreen(),
-          ExpensesScreen(),
-          IncomeScreen(),
-          AnalysisScreen(),
-          PlanningScreen(),
+        children: [
+          // ホームの「支出をすべて見る」から支出タブ(1)へ切替。
+          HomeScreen(onOpenExpenses: () => setState(() => _index = 1)),
+          const ExpensesScreen(),
+          const IncomeScreen(),
+          const AnalysisScreen(),
+          const PlanningScreen(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
