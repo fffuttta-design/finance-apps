@@ -4,6 +4,7 @@ import 'package:finance_core/finance_core.dart' as core;
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../data/transfer_template.dart';
+import '../widgets/memo_field.dart';
 import '../utils/date_pick.dart';
 import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
@@ -464,14 +465,7 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
               ),
             const SizedBox(height: 12),
             // 備考
-            TextField(
-              controller: _memoCtrl,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: '備考（任意）',
-                border: OutlineInputBorder(),
-              ),
-            ),
+            MemoField(controller: _memoCtrl),
             const SizedBox(height: 8),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),

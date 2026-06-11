@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import '../widgets/memo_field.dart';
 import 'package:finance_core/finance_core.dart';
 
 import '../data/settings_repository.dart';
@@ -658,13 +659,7 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                           const SizedBox(height: 16),
                           _logoUrlField(iconUrlCtrl, '🔁', setLocal),
                           const SizedBox(height: 12),
-                          TextField(
-                              controller: memoCtrl,
-                              maxLines: 2,
-                              decoration: const InputDecoration(
-                                  labelText: '備考（任意）',
-                                  floatingLabelBehavior:
-                                      FloatingLabelBehavior.always)),
+                          MemoField(controller: memoCtrl),
                           // 下端のフッターに被らないようのpadding
                           const SizedBox(height: 8),
                         ],

@@ -5,6 +5,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../widgets/memo_field.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/app_mode.dart';
@@ -1044,11 +1045,7 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
                       prefixText: '¥ '),
                 ),
                 const SizedBox(height: 10),
-                TextField(
-                  controller: noteCtrl,
-                  decoration:
-                      const InputDecoration(labelText: '備考（任意）'),
-                ),
+                MemoField(controller: noteCtrl, label: '備考（任意）'),
               ],
             ),
           ),
@@ -2099,14 +2096,7 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
                               setLocal(() => kind = v ?? kind),
                         ),
                         const SizedBox(height: 12),
-                        TextField(
-                          controller: noteCtrl,
-                          decoration: const InputDecoration(
-                            labelText: '備考（任意）',
-                            floatingLabelBehavior:
-                                FloatingLabelBehavior.always,
-                          ),
-                        ),
+                        MemoField(controller: noteCtrl),
                         const SizedBox(height: 16),
                         Row(
                           children: [

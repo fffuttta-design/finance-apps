@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/memo_field.dart';
 import 'package:finance_core/finance_core.dart';
 
 import '../data/settings_repository.dart';
@@ -218,15 +219,7 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
                           const SizedBox(height: 12),
                           // 下4桁の入力は UI から廃止（last4 モデルは互換のため残す）。
                           // 備考欄を直接配置。
-                          TextField(
-                            controller: memoCtrl,
-                            maxLines: 1,
-                            decoration: const InputDecoration(
-                              labelText: '備考（任意）',
-                              floatingLabelBehavior:
-                                  FloatingLabelBehavior.always,
-                            ),
-                          ),
+                          MemoField(controller: memoCtrl),
                           const SizedBox(height: 16),
                           _logoUrlField(
                               iconUrlCtrl, selectedType.emoji, setLocal),

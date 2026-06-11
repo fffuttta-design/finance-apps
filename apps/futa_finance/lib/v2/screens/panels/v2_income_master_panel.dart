@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../widgets/memo_field.dart';
 import 'package:finance_core/finance_core.dart';
 
 import '../../../data/app_mode.dart';
@@ -518,15 +519,7 @@ Future<_IncomeSheetResult?> _showSourceSheet(BuildContext context,
                   ),
                 ],
                 const SizedBox(height: 14),
-                TextField(
-                  controller: memoCtrl,
-                  maxLines: 1,
-                  decoration: const InputDecoration(
-                    labelText: '備考（任意）',
-                    border: OutlineInputBorder(),
-                    floatingLabelBehavior: FloatingLabelBehavior.always,
-                  ),
-                ),
+                MemoField(controller: memoCtrl),
                 if (isEdit) ...[
                   const SizedBox(height: 6),
                   SwitchListTile(

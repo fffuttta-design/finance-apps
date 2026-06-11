@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/memo_field.dart';
 import 'package:finance_core/finance_core.dart';
 
 import '../data/settings_repository.dart';
@@ -170,15 +171,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                               onChanged: (_) => setLocal(() {})),
                           const SizedBox(height: 12),
                           // 備考欄（1行）
-                          TextField(
-                            controller: memoCtrl,
-                            maxLines: 1,
-                            decoration: const InputDecoration(
-                              labelText: '備考（任意）',
-                              floatingLabelBehavior:
-                                  FloatingLabelBehavior.always,
-                            ),
-                          ),
+                          MemoField(controller: memoCtrl),
                           const SizedBox(height: 12),
                           // 引き落とし日: Dropdown 選択（1〜31 or 未設定）
                           DropdownButtonFormField<int?>(

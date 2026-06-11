@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'memo_field.dart';
 import 'package:finance_core/finance_core.dart';
 
 import '../utils/thousands_separator_input_formatter.dart';
@@ -499,13 +500,7 @@ Future<Subscription?> showSubscriptionEditSheet(
                         const SizedBox(height: 16),
                         logoUrlField(setLocal),
                         const SizedBox(height: 12),
-                        TextField(
-                            controller: memoCtrl,
-                            maxLines: 2,
-                            decoration: const InputDecoration(
-                                labelText: '備考（任意）',
-                                floatingLabelBehavior:
-                                    FloatingLabelBehavior.always)),
+                        MemoField(controller: memoCtrl),
                         const SizedBox(height: 8),
                       ],
                     ),

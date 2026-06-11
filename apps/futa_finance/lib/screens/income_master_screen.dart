@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/memo_field.dart';
 import 'package:finance_core/finance_core.dart';
 
 import '../data/income_source_repository.dart';
@@ -185,15 +186,7 @@ class _IncomeMasterScreenState extends State<IncomeMasterScreen> {
                           ],
                           const SizedBox(height: 12),
                           // 備考欄（1行）
-                          TextField(
-                            controller: memoCtrl,
-                            maxLines: 1,
-                            decoration: const InputDecoration(
-                              labelText: '備考（任意）',
-                              floatingLabelBehavior:
-                                  FloatingLabelBehavior.always,
-                            ),
-                          ),
+                          MemoField(controller: memoCtrl),
                           const SizedBox(height: 8),
                         ],
                       ),
