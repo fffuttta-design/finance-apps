@@ -69,7 +69,15 @@ class ThousandsSeparatorInputFormatter extends TextInputFormatter {
   /// マイナス値の入力を許可するか。デフォルト false（金額は通常正の値）。
   final bool allowNegative;
 
-  const ThousandsSeparatorInputFormatter({this.allowNegative = false});
+  /// 桁数の上限（区切りカンマを除く実数字）。これを超える入力は弾く。
+  /// 連打/貼り付け等で天文学的な桁数に膨れる暴走を防ぐ安全弁。
+  /// 12桁＝最大 999,999,999,999（約1兆円）あれば実用上十分。
+  final int maxDigits;
+
+  const ThousandsSeparatorInputFormatter({
+    this.allowNegative = false,
+    this.maxDigits = 12,
+  });
 
   @override
   TextEditingValue formatEditUpdate(
@@ -88,6 +96,9 @@ class ThousandsSeparatorInputFormatter extends TextInputFormatter {
             TextSelection.collapsed(offset: negative ? 1 : 0),
       );
     }
+
+    // 桁数上限を超える入力は受け付けない（暴走・誤連打のガード）。
+    if (digitsOnly.length > maxDigits) return oldValue;
 
     // 先頭のゼロを 1桁になるよう削る（"007" → "7" など）
     final trimmed = digitsOnly.replaceFirst(RegExp(r'^0+(?=\d)'), '');
