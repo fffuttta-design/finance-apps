@@ -45,6 +45,8 @@ const RELEASE_EXE_NAME = 'FutaFinance-Setup.exe'; // DriveのNSISインストー
 
 let mainWindow = null;
 let isQuitting = false;
+// 起動時チェックで見つかった新版インストーラ。アプリ終了時に静かに適用する。
+let pendingUpdateSetup = null;
 
 // ─────────────────── client_secret の読込 ───────────────────
 function clientSecret() {
@@ -438,10 +440,11 @@ async function checkForUpdate(opts = {}) {
     }
     return;
   }
-  // 起動時の自動チェックで新版が見つかったら、確認なしでそのまま適用＆再起動。
+  // 起動時の自動チェックで新版が見つかったら、起動直後に落とさず「終了時に静かに適用」する。
+  // （以前は起動2.5秒後に即終了→再起動で更新していたため、更新がある間は
+  //   『起動して即落ちる』ように見えていた。これを終了時サイレント適用に変更）
   if (auto) {
-    // ループガード：同じ版に2回試して更新できていなければ、自動適用を止める
-    // （更新が効かない環境で「適用→再起動→また適用…」の無限ループ＝起動即落ちを防ぐ）。
+    // ループガード：同じ版に2回試しても上がらなければ自動適用を止める。
     const st = readUpdateState();
     const tried = st.version === remote ? (st.count || 0) : 0;
     if (tried >= 2) {
@@ -449,7 +452,8 @@ async function checkForUpdate(opts = {}) {
       return;
     }
     writeUpdateState({ version: remote, count: tried + 1 });
-    applyUpdate(exeSrc);
+    // アプリ終了時に静かにインストール（次回起動で新版になる）。
+    pendingUpdateSetup = exeSrc;
     return;
   }
   const choice = await dialog.showMessageBox(mainWindow, {
@@ -490,6 +494,32 @@ function applyUpdate(setupSrc) {
   app.quit();
 }
 
+/// アプリ終了時に、保留中の更新をサイレント(/S)で適用する（再起動はしない）。
+/// 起動中にアプリを落とさないので「起動して即落ちる」ように見えない。
+/// ローカルtempにコピーしてから実行（Drive直実行を避ける）。次回起動で新版になる。
+function installPendingOnQuit() {
+  const setupSrc = pendingUpdateSetup;
+  if (!setupSrc) return;
+  pendingUpdateSetup = null;
+  const ourPid = process.pid;
+  const src = setupSrc.replace(/'/g, "''");
+  const localSetup =
+    path.join(os.tmpdir(), 'FutaFinance-Setup.exe').replace(/'/g, "''");
+  const ps =
+    `try { Wait-Process -Id ${ourPid} -Timeout 20 -ErrorAction Stop } catch {}\n` +
+    `$setup = '${localSetup}'\n` +
+    `try { Copy-Item -LiteralPath '${src}' -Destination $setup -Force -ErrorAction Stop }\n` +
+    `catch { $setup = '${src}' }\n` +
+    "Start-Process -FilePath $setup -ArgumentList '/S' -Wait\n";
+  const scriptPath = path.join(os.tmpdir(), 'futafinance_update_onquit.ps1');
+  try {
+    fs.writeFileSync(scriptPath, ps, { encoding: 'utf8' });
+    spawn('powershell.exe',
+        ['-ExecutionPolicy', 'Bypass', '-NoProfile', '-File', scriptPath],
+        { detached: true, stdio: 'ignore' }).unref();
+  } catch (e) { console.error('on-quit update failed', e); }
+}
+
 // ─────────────────── IPC ───────────────────
 ipcMain.handle('futa:signIn', () => interactiveSignIn());
 ipcMain.handle('futa:silent', () => silentTokens());
@@ -516,6 +546,8 @@ if (!gotLock) {
     }
   });
   app.setAppUserModelId('jp.runstrategy.futafinance.desktop');
+  // アプリ終了時、保留中の更新があれば静かに適用（次回起動で新版）。
+  app.on('before-quit', installPendingOnQuit);
   app.whenReady().then(async () => {
     // Service Worker は使わない（ローカル配信なので不要）。過去に登録された
     // SW のキャッシュで更新後も古い画面が出るのを防ぐため、起動毎に破棄。
