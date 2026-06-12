@@ -21,8 +21,17 @@ $RepoRoot   = Split-Path (Split-Path $AppDir -Parent) -Parent  # finance-apps/
 Write-Host "== FutaFinance desktop build ==" -ForegroundColor Cyan
 Write-Host "project: $ProjectDir"
 
-# ---- 0. optional version bump in package.json ----
+# ---- 0. version: default = Flutter app version (pubspec) so UI and desktop match ----
+# 表示版番号(アプリ情報)と更新ダイアログの版番号を1本化するため、-Version 未指定なら
+# pubspec.yaml の version（+build を除く）に揃える。
 $pkgPath = Join-Path $ProjectDir "package.json"
+if ($Version -eq "") {
+  $pubspec = Get-Content (Join-Path $AppDir "pubspec.yaml") -Raw
+  if ($pubspec -match "(?m)^\s*version:\s*([0-9]+\.[0-9]+\.[0-9]+)") {
+    $Version = $Matches[1]
+    Write-Host "version (from pubspec) -> $Version"
+  }
+}
 if ($Version -ne "") {
   $pkg = Get-Content $pkgPath -Raw -Encoding UTF8 | ConvertFrom-Json
   $pkg.version = $Version
