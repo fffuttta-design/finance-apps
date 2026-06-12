@@ -45,8 +45,6 @@ const RELEASE_EXE_NAME = 'FutaFinance-Setup.exe'; // DriveのNSISインストー
 
 let mainWindow = null;
 let isQuitting = false;
-// 起動時チェックで見つかった新版インストーラ。アプリ終了時に静かに適用する。
-let pendingUpdateSetup = null;
 
 // ─────────────────── client_secret の読込 ───────────────────
 function clientSecret() {
@@ -440,9 +438,9 @@ async function checkForUpdate(opts = {}) {
     }
     return;
   }
-  // 起動時の自動チェックで新版が見つかったら、起動直後に落とさず「終了時に静かに適用」する。
-  // （以前は起動2.5秒後に即終了→再起動で更新していたため、更新がある間は
-  //   『起動して即落ちる』ように見えていた。これを終了時サイレント適用に変更）
+  // 起動時の自動チェックで新版が見つかったら、画面に「アップデート中」を出してから
+  // インストーラ(進捗表示あり)を実行＆自動再起動する。
+  // （黙って落ちる/黙って入れ替えるとクラッシュや不審な挙動に見えるため、必ず明示する）
   if (auto) {
     // ループガード：同じ版に2回試しても上がらなければ自動適用を止める。
     const st = readUpdateState();
@@ -452,8 +450,8 @@ async function checkForUpdate(opts = {}) {
       return;
     }
     writeUpdateState({ version: remote, count: tried + 1 });
-    // アプリ終了時に静かにインストール（次回起動で新版になる）。
-    pendingUpdateSetup = exeSrc;
+    await showUpdatingOverlay(remote);
+    applyUpdate(exeSrc);
     return;
   }
   const choice = await dialog.showMessageBox(mainWindow, {
@@ -494,30 +492,23 @@ function applyUpdate(setupSrc) {
   app.quit();
 }
 
-/// アプリ終了時に、保留中の更新をサイレント(/S)で適用する（再起動はしない）。
-/// 起動中にアプリを落とさないので「起動して即落ちる」ように見えない。
-/// ローカルtempにコピーしてから実行（Drive直実行を避ける）。次回起動で新版になる。
-function installPendingOnQuit() {
-  const setupSrc = pendingUpdateSetup;
-  if (!setupSrc) return;
-  pendingUpdateSetup = null;
-  const ourPid = process.pid;
-  const src = setupSrc.replace(/'/g, "''");
-  const localSetup =
-    path.join(os.tmpdir(), 'FutaFinance-Setup.exe').replace(/'/g, "''");
-  const ps =
-    `try { Wait-Process -Id ${ourPid} -Timeout 20 -ErrorAction Stop } catch {}\n` +
-    `$setup = '${localSetup}'\n` +
-    `try { Copy-Item -LiteralPath '${src}' -Destination $setup -Force -ErrorAction Stop }\n` +
-    `catch { $setup = '${src}' }\n` +
-    "Start-Process -FilePath $setup -ArgumentList '/S' -Wait\n";
-  const scriptPath = path.join(os.tmpdir(), 'futafinance_update_onquit.ps1');
+/// 画面に「アップデート中…」を表示してから少し待つ（更新が始まることを明示）。
+/// 黙って落ちる/入れ替えるとクラッシュや不審な挙動に見えるのを防ぐ。
+async function showUpdatingOverlay(remote) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const html = '<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">' +
+    "<style>body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;" +
+    "font-family:'Segoe UI','Meiryo',sans-serif;background:#F7F8FA;color:#1A237E}" +
+    '.box{text-align:center}.spin{width:40px;height:40px;margin:0 auto 16px;border:4px solid #C5CAE9;' +
+    'border-top-color:#1A237E;border-radius:50%;animation:s .9s linear infinite}' +
+    '@keyframes s{to{transform:rotate(360deg)}}h2{margin:0 0 8px;font-size:20px}' +
+    'p{margin:0;font-size:13px;color:#6B7280}</style></head><body><div class="box">' +
+    '<div class="spin"></div><h2>アップデート中です… (v' + remote + ')</h2>' +
+    '<p>インストールが終わると自動で開き直します。少しお待ちください。</p></div></body></html>';
   try {
-    fs.writeFileSync(scriptPath, ps, { encoding: 'utf8' });
-    spawn('powershell.exe',
-        ['-ExecutionPolicy', 'Bypass', '-NoProfile', '-File', scriptPath],
-        { detached: true, stdio: 'ignore' }).unref();
-  } catch (e) { console.error('on-quit update failed', e); }
+    await mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+    await new Promise((r) => setTimeout(r, 1400));
+  } catch (_) {}
 }
 
 // ─────────────────── IPC ───────────────────
@@ -546,8 +537,6 @@ if (!gotLock) {
     }
   });
   app.setAppUserModelId('jp.runstrategy.futafinance.desktop');
-  // アプリ終了時、保留中の更新があれば静かに適用（次回起動で新版）。
-  app.on('before-quit', installPendingOnQuit);
   app.whenReady().then(async () => {
     // Service Worker は使わない（ローカル配信なので不要）。過去に登録された
     // SW のキャッシュで更新後も古い画面が出るのを防ぐため、起動毎に破棄。
