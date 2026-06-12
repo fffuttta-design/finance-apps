@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.71",
-    "buildNumber":  "76",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.71/takuharu-finance-v0.2.71.apk",
-    "releaseNotes":  "手入力にくわしい情報(画像)添付を追加"
+    "version":  "0.2.72",
+    "buildNumber":  "77",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.72/takuharu-finance-v0.2.72.apk",
+    "releaseNotes":  "支払元の既定をワンバンクに統一・支払い方法なしでの登録を禁止"
 }
