@@ -183,6 +183,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _toast('カテゴリを選んでね');
       return;
     }
+    // 支払い方法がないまま登録させない。
+    if (_payment == null || _payment!.isEmpty) {
+      _toast('支払い方法を選んでね');
+      return;
+    }
     final hid = HouseholdService.instance.householdId;
     final uid = AuthService.instance.currentUser?.uid;
     if (hid == null || uid == null) {

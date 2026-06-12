@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
+import '../data/account.dart';
+import '../data/account_repository.dart';
 import '../data/auth_service.dart';
 import '../data/categories.dart';
 import '../data/drive_receipt_service.dart';
@@ -47,8 +49,13 @@ class _Item {
 class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
   late DateTime _date;
   String? _payer;
+  String? _payment = _defaultPayment; // 支払元（既定はワンバンク）
+  List<Account> _accounts = []; // 登録済みの口座/クレカ
   final _items = <_Item>[];
   bool _saving = false;
+
+  /// レシート記録の既定の支払元。手入力画面と揃える。
+  static const _defaultPayment = 'ワンバンク';
 
   Map<String, String> get _members => HouseholdService.instance.memberNames;
 
@@ -64,6 +71,13 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
     // 品目が読めなかった場合でも、編集できるよう空の1行を用意。
     if (_items.isEmpty) {
       _items.add(_Item('', 0, r.category));
+    }
+    // 登録済みの口座/クレカを読み込む（支払元の選択肢）。
+    final hid = HouseholdService.instance.householdId;
+    if (hid != null) {
+      AccountRepository.instance.loadAll(hid).then((a) {
+        if (mounted) setState(() => _accounts = a);
+      });
     }
   }
 
@@ -141,6 +155,13 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
     final hid = HouseholdService.instance.householdId;
     final uid = AuthService.instance.currentUser?.uid;
     if (hid == null || uid == null) return;
+    // 支払い方法がないまま登録させない。
+    if (_payment == null || _payment!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('支払い方法を選んでね')),
+      );
+      return;
+    }
     final receiptId =
         widget.receiptId ?? DateTime.now().microsecondsSinceEpoch.toString();
     final store = widget.result.store;
@@ -155,7 +176,7 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
         date: _date,
         type: core.TransactionType.expense,
         category: core.Category(major: cat, sub: ''),
-        paymentMethod: '',
+        paymentMethod: _payment ?? '',
         description: name,
         amount: price,
         store: store,
@@ -247,6 +268,31 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                         ],
                       ),
                     ],
+                    const SizedBox(height: 10),
+                    // 支払元（既定ワンバンク・未選択では登録できない）
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('支払元',
+                              style: TextStyle(
+                                  fontSize: 12, color: AppColors.textSub)),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              if (_accounts.isNotEmpty)
+                                ..._accounts.map((a) => _payChip(a.name))
+                              else
+                                ...HouseholdService.instance.paymentMethods
+                                    .map(_payChip),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -287,6 +333,31 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _payChip(String name) {
+    final selected = _payment == name;
+    return GestureDetector(
+      onTap: () => setState(() => _payment = name),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color:
+              selected ? AppColors.pink.withValues(alpha: 0.18) : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected ? AppColors.pink : AppColors.divider,
+            width: selected ? 1.6 : 1,
+          ),
+        ),
+        child: Text(name,
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: AppColors.text)),
       ),
     );
   }
