@@ -39,16 +39,15 @@ class V2Root extends StatefulWidget {
 class _V2RootState extends State<V2Root>
     with StartupUpdateMixin, WidgetsBindingObserver {
   String _currentId = 'home';
-  // スワイプ開始の「本文エリア内」ローカルY と 本文の高さ。
-  // 上1/3=モード切替 / 下2/3=タブ送り の判定に使う（画面ではなく本文基準）。
-  double? _dragStartLocalY;
-  double _dragContentH = 0;
-  // スワイプ中の横移動量の累積（速度が出ないゆっくりスワイプも拾うため）
-  double _dragDx = 0;
+  // 本文を左右スワイプでタブ切替（PageView・指追従）。たくはると同じ操作感。
+  late final PageController _pageController;
 
   @override
   void initState() {
     super.initState();
+    final items = _navItems;
+    final idx = items.indexWhere((e) => e.id == _currentId);
+    _pageController = PageController(initialPage: idx < 0 ? 0 : idx);
     WidgetsBinding.instance.addObserver(this);
     AppModeManager.instance.addListener(_onChange);
     UiPreferences.instance.addListener(_onChange);
@@ -68,6 +67,7 @@ class _V2RootState extends State<V2Root>
     WidgetsBinding.instance.removeObserver(this);
     AppModeManager.instance.removeListener(_onChange);
     UiPreferences.instance.removeListener(_onChange);
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -185,6 +185,21 @@ class _V2RootState extends State<V2Root>
     AppModeManager.instance.setMode(m);
   }
 
+  /// タブを delta 個ぶん送る（範囲外は何もしない）。Webの ←/→ ショートカット用。
+  void _shiftTab(int delta) {
+    final items = _navItems;
+    final idx = items.indexWhere((e) => e.id == _currentId);
+    if (idx < 0) return;
+    final next = idx + delta;
+    if (next < 0 || next >= items.length) return;
+    setState(() => _currentId = items[next].id);
+    if (_pageController.hasClients) {
+      _pageController.animateToPage(next,
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic);
+    }
+  }
+
   /// マネフォ ME 風（v2.1）: 上タブ + 中央カラム
   /// 事業モード時はヘッダーがダークネイビー、個人モード時は白
   Widget _buildTopNav(BuildContext context, Color accent) {
@@ -192,7 +207,17 @@ class _V2RootState extends State<V2Root>
     final isBusiness = mode == AppMode.business;
     // モバイル幅（スマホ）はタブを下部に置く（たくはる風）。広い画面は従来の上タブ。
     final isNarrow = MediaQuery.sizeOf(context).width < 700;
-    void selectTab(String id) => setState(() => _currentId = id);
+    // タブのタップ → そのページへ指追従と同じカーブで移動。
+    void selectTab(String id) {
+      final items = _navItems;
+      final idx = items.indexWhere((e) => e.id == id);
+      setState(() => _currentId = id);
+      if (idx >= 0 && _pageController.hasClients) {
+        _pageController.animateToPage(idx,
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic);
+      }
+    }
     return V2TopNavShell(
       navAtBottom: isNarrow,
       bottomNav: isNarrow
@@ -224,84 +249,27 @@ class _V2RootState extends State<V2Root>
         // Shell の maxContentWidth と揃える（マネフォ ME 寄りに 1040px）
         maxWidth: 1040,
       ),
-      // 本文を左右スワイプで切替（上1/3=事業⇄個人 / 下2/3=タブ送り）。
-      // 中身が短い画面でも検知できるよう、本文を常に画面いっぱいに広げる。
-      content: LayoutBuilder(
-        builder: (context, constraints) {
-          final contentH = constraints.maxHeight;
-          return GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onHorizontalDragStart: (d) {
-              _dragStartLocalY = d.localPosition.dy;
-              _dragContentH = contentH;
-              _dragDx = 0;
-            },
-            onHorizontalDragUpdate: (d) => _dragDx += d.delta.dx,
-            onHorizontalDragEnd: _onBodySwipe,
-            child: SizedBox(
-              // 中身が短くても本文エリア全体でスワイプを拾えるよう高さを満たす。
-              height: contentH.isFinite ? contentH : null,
-              // モード/タブ切替時にサッと横スライド＋フェード（自然な範囲）。
-              child: AnimatedSwitcher(
-                // スライドは残像/バウンド感の原因になるため廃止。
-                // 横移動なしの素早いフェードのみにする。
-                duration: const Duration(milliseconds: 160),
-                switchInCurve: Curves.easeOut,
-                switchOutCurve: Curves.easeOut,
-                transitionBuilder: (child, animation) =>
-                    FadeTransition(opacity: animation, child: child),
-                layoutBuilder: (currentChild, previousChildren) => Stack(
-                  alignment: Alignment.topCenter,
-                  children: [
-                    ...previousChildren,
-                    ?currentChild,
-                  ],
-                ),
-                child: KeyedSubtree(
-                  key: ValueKey(
-                      '${AppModeManager.instance.current}_$_currentId'),
-                  child: _bodyFor(_currentId, accent: accent),
-                ),
+      // 本文を左右スワイプでタブ切替（PageView・指追従）。たくはると同じ操作感。
+      // 各タブは keep-alive で状態を保持。モード切替時はキーが変わり作り直す。
+      content: PageView(
+        controller: _pageController,
+        onPageChanged: (i) {
+          final items = _navItems;
+          if (i >= 0 && i < items.length && items[i].id != _currentId) {
+            setState(() => _currentId = items[i].id);
+          }
+        },
+        children: [
+          for (final item in _navItems)
+            KeyedSubtree(
+              key: ValueKey('${mode}_${item.id}'),
+              child: _V2KeepAlivePage(
+                child: _bodyFor(item.id, accent: accent),
               ),
             ),
-          );
-        },
+        ],
       ),
     );
-  }
-
-  /// 本文の左右スワイプ。
-  /// 本文エリアを縦3分割し、上1/3＝事業⇄個人のモード切替、下2/3＝タブ送り。
-  void _onBodySwipe(DragEndDetails d) {
-    final v = d.primaryVelocity ?? 0;
-    final dx = _dragDx;
-    // 距離(48px) か 速度(180) のどちらかを満たせば成立。
-    // ゆっくり/短いスワイプでも反応するよう緩めにする。
-    if (dx.abs() < 48 && v.abs() < 180) return;
-    // 方向は移動量を優先（速度ゼロでも距離で判定）。左方向=次。
-    final leftward = dx.abs() > 4 ? dx < 0 : v < 0;
-    // 「本文エリア内」のローカルY基準で上1/3判定（ヘッダー/タブの影響を受けない）。
-    final h = _dragContentH > 0 ? _dragContentH : 600.0;
-    final startedTop = (_dragStartLocalY ?? h) < h / 3;
-    if (startedTop) {
-      // 上1/3: モード切替。2モードなので方向に関係なくトグル（必ず反応）。
-      final cur = AppModeManager.instance.current;
-      AppModeManager.instance.setMode(
-          cur == AppMode.business ? AppMode.personal : AppMode.business);
-    } else {
-      // 下2/3: タブ送り（左スワイプ=次タブ / 右スワイプ=前タブ）
-      _shiftTab(leftward ? 1 : -1);
-    }
-  }
-
-  /// タブを delta 個ぶん送る（範囲外は何もしない）。
-  void _shiftTab(int delta) {
-    final items = _navItems;
-    final idx = items.indexWhere((e) => e.id == _currentId);
-    if (idx < 0) return;
-    final next = idx + delta;
-    if (next < 0 || next >= items.length) return;
-    setState(() => _currentId = items[next].id);
   }
 
   /// 記録メニュー: レシート読取 / 支出 / 収入 / 振替を選んで対応する入力を開く。
@@ -443,3 +411,26 @@ class _RecordMenuButton extends StatelessWidget {
   }
 }
 
+
+/// PageView の各タブを生かしたまま保持する（IndexedStack 同様にタブの
+/// スクロール位置・状態を維持するため）。モード切替時は外側の KeyedSubtree の
+/// キーが変わるので作り直される（モードごとに正しいデータで再構築）。
+class _V2KeepAlivePage extends StatefulWidget {
+  final Widget child;
+  const _V2KeepAlivePage({required this.child});
+
+  @override
+  State<_V2KeepAlivePage> createState() => _V2KeepAlivePageState();
+}
+
+class _V2KeepAlivePageState extends State<_V2KeepAlivePage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+}
