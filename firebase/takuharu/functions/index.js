@@ -117,3 +117,61 @@ exports.onCommentCreated = onDocumentCreated(
       });
     },
 );
+
+// プランニング項目のリスト見出し（種類別）。
+const PLAN_KIND_LABEL = {
+  todo: "やりたいこと",
+  place: "行きたい場所",
+  shop: "行きたいお店",
+};
+
+// プランニング項目の新規作成 → 相手へ通知
+exports.onPlanCreated = onDocumentCreated(
+    {document: "households/{hid}/plan_items/{planId}", region: REGION},
+    async (event) => {
+      const snap = event.data;
+      if (!snap) return;
+      const p = snap.data() || {};
+      const hid = event.params.hid;
+      const author = p.updatedBy || "";
+      const {targets, names} = await targetsForOthers(hid, author);
+      if (!targets.length) return;
+
+      const who = names[author] || "あいて";
+      const kindLabel = PLAN_KIND_LABEL[p.kind] || "プラン";
+      const name = (p.name && String(p.name).trim()) || "新しい項目";
+      const title = `${who} が${kindLabel}を追加 ♡`;
+      const body = name;
+      await sendToTargets(targets, title, body, {
+        type: "plan",
+        hid,
+        planId: event.params.planId,
+      });
+    },
+);
+
+// プランニング項目のコメント新規作成 → 相手へ通知
+exports.onPlanCommentCreated = onDocumentCreated(
+    {
+      document: "households/{hid}/plan_items/{planId}/comments/{cid}",
+      region: REGION,
+    },
+    async (event) => {
+      const snap = event.data;
+      if (!snap) return;
+      const c = snap.data() || {};
+      const hid = event.params.hid;
+      const author = c.uid || "";
+      const {targets, names} = await targetsForOthers(hid, author);
+      if (!targets.length) return;
+
+      const who = names[author] || "あいて";
+      const title = `${who} からコメント ♡`;
+      const body = String(c.text || "") || "画像が届きました";
+      await sendToTargets(targets, title, body, {
+        type: "plan_comment",
+        hid,
+        planId: event.params.planId,
+      });
+    },
+);

@@ -48,6 +48,10 @@ class PlanItem {
   /// 同じ kind 内での並び順（小さいほど上）。
   final int order;
 
+  /// この項目に付いたコメント数（読み取り専用・toJsonには含めない）。
+  /// コメント投稿時に別途インクリメントされる。
+  final int commentCount;
+
   const PlanItem({
     required this.id,
     required this.kind,
@@ -55,6 +59,7 @@ class PlanItem {
     this.memo,
     this.done = false,
     this.order = 0,
+    this.commentCount = 0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -73,6 +78,7 @@ class PlanItem {
         memo: j['memo'] as String?,
         done: j['done'] as bool? ?? false,
         order: (j['order'] as num?)?.toInt() ?? 0,
+        commentCount: (j['commentCount'] as num?)?.toInt() ?? 0,
       );
 
   PlanItem copyWith({
@@ -88,5 +94,6 @@ class PlanItem {
         memo: memo ?? this.memo,
         done: done ?? this.done,
         order: order ?? this.order,
+        commentCount: commentCount,
       );
 }

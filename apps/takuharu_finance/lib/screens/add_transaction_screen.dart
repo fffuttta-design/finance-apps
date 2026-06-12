@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../data/auth_service.dart';
 import '../data/categories.dart';
@@ -14,7 +15,6 @@ import '../data/household_service.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
-import 'receipt_camera_screen.dart';
 import 'receipt_image_screen.dart';
 
 /// 収支を1件記録／編集する画面（可愛い系）。
@@ -233,17 +233,21 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     }
   }
 
-  /// 「くわしい情報」画像をカメラ/アルバムから選んで添付する。
+  /// 「くわしい情報」画像を添付する。
+  /// 既定はギャラリー（アルバム）優先。カメラは右下のボタンから。
   /// レシートと同じく Drive へは“裏で”保存し、ユーザーは待たない。
-  Future<void> _attachDetailImage() async {
-    final bytes = await Navigator.push<Uint8List>(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            const ReceiptCameraScreen(hint: 'くわしい情報を写真に撮る ♡'),
-      ),
-    );
-    if (bytes == null || !mounted) return;
+  Future<void> _attachDetailImage(
+      {ImageSource source = ImageSource.gallery}) async {
+    final XFile? x;
+    try {
+      x = await ImagePicker().pickImage(
+          source: source, imageQuality: 85, maxWidth: 2200);
+    } catch (_) {
+      if (mounted) _toast('画像を取得できませんでした');
+      return;
+    }
+    if (x == null || !mounted) return;
+    final bytes = await x.readAsBytes();
 
     final imgBytes = await _compressImage(bytes);
     if (!mounted) return;
@@ -785,16 +789,34 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         _attachPreview != null || (_receiptUrl != null && _receiptUrl!.isNotEmpty);
 
     if (!hasImage) {
-      // まだ画像なし → カメラ/アルバムから追加ボタン。
-      return OutlinedButton.icon(
-        onPressed: _attachDetailImage,
-        icon: const Icon(Icons.add_a_photo_outlined, size: 18),
-        label: const Text('写真を追加（カメラ / アルバム）'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.pinkDark,
-          side: const BorderSide(color: AppColors.pinkSoft, width: 1.4),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-        ),
+      // まだ画像なし → アルバム（ギャラリー）優先。カメラは右側のボタン。
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () =>
+                  _attachDetailImage(source: ImageSource.gallery),
+              icon: const Icon(Icons.photo_library_outlined, size: 18),
+              label: const Text('アルバムから選ぶ'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.pinkDark,
+                side: const BorderSide(color: AppColors.pinkSoft, width: 1.4),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // カメラ（右下のサブ動線）。
+          OutlinedButton(
+            onPressed: () => _attachDetailImage(source: ImageSource.camera),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.pinkDark,
+              side: const BorderSide(color: AppColors.pinkSoft, width: 1.4),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+            child: const Icon(Icons.photo_camera_outlined, size: 20),
+          ),
+        ],
       );
     }
 
@@ -859,8 +881,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                           Icons.visibility_outlined, _viewDetailImage),
                       const SizedBox(width: 4),
                     ],
-                    _smallTextButton(
-                        '変更', Icons.swap_horiz_rounded, _attachDetailImage),
+                    _smallTextButton('変更', Icons.swap_horiz_rounded,
+                        () => _attachDetailImage()),
                     const SizedBox(width: 4),
                     _smallTextButton('削除', Icons.delete_outline_rounded,
                         _removeDetailImage,

@@ -25,6 +25,17 @@ class PlanRepository {
     });
   }
 
+  /// 1件取得（通知タップから詳細を開く用）。
+  Future<PlanItem?> getById(String hid, String id) async {
+    try {
+      final d = await _coll(hid).doc(id).get();
+      if (!d.exists || d.data() == null) return null;
+      return PlanItem.fromJson(Map<String, dynamic>.from(d.data()!));
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> save(String hid, PlanItem item, String uid) async {
     await _coll(hid).doc(item.id).set({
       ...item.toJson(),

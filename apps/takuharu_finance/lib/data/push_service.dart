@@ -3,9 +3,11 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 import '../main.dart';
+import '../screens/plan_detail_screen.dart';
 import '../screens/transaction_chat_screen.dart';
 import 'auth_service.dart';
 import 'household_service.dart';
+import 'plan_repository.dart';
 import 'tx_repository.dart';
 
 /// プッシュ通知（FCM）の登録。
@@ -48,12 +50,30 @@ class PushService {
     });
   }
 
-  /// 通知データの txId から、その取引のチャット画面へ遷移する。
+  /// 通知データから、対象画面へ遷移する。
+  /// - 取引（tx / comment）: その取引のチャット画面。
+  /// - プランニング（plan / plan_comment）: その項目の詳細画面。
   Future<void> _handleTap(Map<String, dynamic> data) async {
-    final txId = data['txId'];
-    if (txId is! String || txId.isEmpty) return;
     final hid = HouseholdService.instance.householdId;
     if (hid == null) return;
+
+    final planId = data['planId'];
+    if (planId is String && planId.isNotEmpty) {
+      // 起動直後はデータ未準備のことがあるので軽くリトライ。
+      for (var i = 0; i < 3; i++) {
+        final p = await PlanRepository.instance.getById(hid, planId);
+        final nav = appNavigatorKey.currentState;
+        if (p != null && nav != null) {
+          nav.push(MaterialPageRoute(builder: (_) => PlanDetailScreen(item: p)));
+          return;
+        }
+        await Future.delayed(const Duration(milliseconds: 800));
+      }
+      return;
+    }
+
+    final txId = data['txId'];
+    if (txId is! String || txId.isEmpty) return;
     // 起動直後はデータ未準備のことがあるので軽くリトライ。
     for (var i = 0; i < 3; i++) {
       final t = await TxRepository.instance.getById(hid, txId);

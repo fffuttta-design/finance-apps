@@ -6,6 +6,7 @@ import '../data/plan_item.dart';
 import '../data/plan_repository.dart';
 import '../theme/app_theme.dart';
 import '../widgets/settings_button.dart';
+import 'plan_detail_screen.dart';
 
 /// プランニング：やりたいこと／行きたい場所／行きたいお店（世帯共有）。
 class PlanningScreen extends StatelessWidget {
@@ -157,7 +158,11 @@ class _KindSection extends StatelessWidget {
                     item: it,
                     onToggle: () => PlanRepository.instance
                         .save(hid, it.copyWith(done: !it.done), _uid),
-                    onTap: () => _addOrEdit(context, editing: it),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => PlanDetailScreen(item: it)),
+                    ),
                   );
                 },
               ),
@@ -213,12 +218,32 @@ class _PlanTile extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(top: 1),
                       child: Text(item.memo!.trim(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                               fontSize: 12, color: AppColors.textSub)),
                     ),
                 ],
               ),
             ),
+            // コメントが付いていれば件数バッジ。
+            if (item.commentCount > 0)
+              Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.chat_bubble_outline_rounded,
+                        size: 14, color: AppColors.pinkDark),
+                    const SizedBox(width: 2),
+                    Text('${item.commentCount}',
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.pinkDark)),
+                  ],
+                ),
+              ),
             ReorderableDragStartListener(
               index: index,
               child: const Padding(
@@ -282,9 +307,11 @@ class _EditDialogState extends State<_EditDialog> {
           const SizedBox(height: 12),
           TextField(
             controller: _memo,
-            maxLines: 2,
+            minLines: 2,
+            maxLines: 6,
             decoration: const InputDecoration(
-              labelText: 'メモ（任意）',
+              labelText: '詳細（任意）',
+              alignLabelWithHint: true,
               border: OutlineInputBorder(),
             ),
           ),
