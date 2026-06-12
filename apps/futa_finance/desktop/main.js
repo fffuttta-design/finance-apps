@@ -465,16 +465,22 @@ async function checkForUpdate(opts = {}) {
 }
 function applyUpdate(setupSrc) {
   const ourPid = process.pid;
-  const setup = setupSrc.replace(/'/g, "''");
-  // NSISインストーラをサイレント実行し、固定のインストール先を上書き更新する。
-  // インストール先・ショートカット・AppUserModelIdが固定なので、
-  // タスクバーのピン留めは更新後も維持される（portable方式の宿命を解消）。
+  const src = setupSrc.replace(/'/g, "''");
+  // Driveから直接サイレント実行すると（クラウド同期・サイズ・SmartScreen等で）
+  // 失敗して『アプリだけ終了→戻らない』になりやすい。そこで：
+  //   1) インストーラをローカルtempにコピーしてから実行（Drive直実行を避ける）
+  //   2) /S を付けず通常実行し、NSISの runAfterFinish に再起動を任せる（確実性優先）
+  // インストール先・ショートカット・AppUserModelIdは固定なのでpinは維持される。
+  const localSetup =
+    path.join(os.tmpdir(), 'FutaFinance-Setup.exe').replace(/'/g, "''");
   const ps =
     "$host.UI.RawUI.WindowTitle = 'FutaFinance アップデート'\n" +
-    `try { Wait-Process -Id ${ourPid} -Timeout 15 -ErrorAction Stop } catch {}\n` +
-    `Start-Process -FilePath '${setup}' -ArgumentList '/S' -Wait\n` +
-    "$lnk = Join-Path $env:APPDATA 'Microsoft\\Windows\\Start Menu\\Programs\\FutaFinance.lnk'\n" +
-    "if (Test-Path $lnk) { Start-Process -FilePath $lnk }\n";
+    "Write-Host '更新を準備しています...'\n" +
+    `try { Wait-Process -Id ${ourPid} -Timeout 20 -ErrorAction Stop } catch {}\n` +
+    `$setup = '${localSetup}'\n` +
+    `try { Copy-Item -LiteralPath '${src}' -Destination $setup -Force -ErrorAction Stop }\n` +
+    `catch { $setup = '${src}' }\n` +
+    "Start-Process -FilePath $setup\n";
   const scriptPath = path.join(os.tmpdir(), 'futafinance_update.ps1');
   fs.writeFileSync(scriptPath, ps, { encoding: 'utf8' });
   spawn('powershell.exe', ['-ExecutionPolicy', 'Bypass', '-NoProfile', '-File', scriptPath], {
