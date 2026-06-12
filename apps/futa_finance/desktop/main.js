@@ -603,11 +603,11 @@ if (!gotLock) {
     // 戻り値 true なら終了シーケンス中なのでここで終わる。
     if (await autoInstallIfNeeded()) return;
     // Service Worker は使わない（ローカル配信なので不要）。過去に登録された
-    // SW のキャッシュで更新後も古い画面が出るのを防ぐため、起動毎に破棄。
-    // ※ IndexedDB（Firebase の認証/オフライン永続）は消さない。
-    try {
-      await session.defaultSession.clearStorageData({ storages: ['serviceworkers'] });
-    } catch (_) {}
+    // SW のキャッシュで更新後も古い画面が出るのを防ぐため破棄するが、
+    // ウィンドウ表示を待たせないよう非同期で投げる（起動を速く）。
+    session.defaultSession
+        .clearStorageData({ storages: ['serviceworkers'] })
+        .catch(() => {});
     await createWindow();
     // 起動後しばらくして更新チェック（新版があれば「今すぐ更新/後で」ダイアログ）。
     setTimeout(() => { checkForUpdate({}).catch((e) => console.error(e)); }, 3000);
