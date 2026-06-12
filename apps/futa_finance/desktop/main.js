@@ -438,28 +438,54 @@ function launchPS1(scriptLines) {
   } catch (e) { console.error('launchPS1 failed', e); }
 }
 
-// 新版を robocopy で適用してから explorer.exe で起動（進捗コンソールあり）。
-function applyUpdate(sourcePath, newVersion, newBuild) {
-  launchPS1([
+// インストール/更新のPSスクリプトを組み立てる。
+// 重要: Google Drive のファイルは「オンラインのみ(未DL)」のことがあり、その状態で
+// robocopy /MIR を直接かけると読めず、ローカルのexeごと消してしまう。そこで：
+//   1) まず Drive → ローカル一時フォルダ($stage)へコピー(=実体をDLさせる, /E retries)
+//   2) $stage に FutaFinance.exe があるか検証。無ければ中断(=ローカルは壊さない)
+//   3) 検証OKなら $stage → LOCAL_INSTALL_DIR を /MIR で反映(ソースはローカルなので安全)
+//   4) explorer.exe で起動(=シェルの子→旧アプリの道連れにならない)
+function buildInstallScript(sourcePath, title, makeShortcuts) {
+  const lines = [
     'Write-Host ""',
-    'Write-Host "=====================================" -ForegroundColor Cyan',
-    'Write-Host "  FutaFinance  アップデート" -ForegroundColor Cyan',
-    'Write-Host "=====================================" -ForegroundColor Cyan',
-    'Write-Host ""',
-    'Write-Host "[1/3] アプリを終了しました" -ForegroundColor Green',
-    'Start-Sleep -Seconds 2',
-    `Write-Host "[2/3] 最新版をコピー中... (v${newVersion} / build ${newBuild})" -ForegroundColor Yellow`,
-    `robocopy "${sourcePath}" "${LOCAL_INSTALL_DIR}" /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /NC /NS /NP`,
-    'if ($LASTEXITCODE -ge 8) {',
-    '  Write-Host "  [エラー] コピーに失敗しました (code: $LASTEXITCODE)" -ForegroundColor Red',
+    'Write-Host "  ' + title + '" -ForegroundColor Cyan',
+    'Write-Host "[1/3] 最新版を取得中..." -ForegroundColor Yellow',
+    'Start-Sleep -Seconds 1',
+    '$src = "' + sourcePath + '"',
+    '$stage = Join-Path $env:TEMP "FutaFinance-stage"',
+    'if (Test-Path $stage) { Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue }',
+    'robocopy "$src" "$stage" /E /R:3 /W:5 /NFL /NDL /NJH /NJS /NC /NS /NP | Out-Null',
+    'if (-not (Test-Path (Join-Path $stage "FutaFinance.exe"))) {',
+    '  Write-Host "  [エラー] 更新ファイルを取得できませんでした" -ForegroundColor Red',
+    '  Write-Host "  Google ドライブの同期（オフライン利用可）を確認してください。" -ForegroundColor Red',
     '  Read-Host "  Enterキーで閉じる"; exit 1',
     '}',
-    'Write-Host "    コピーしました" -ForegroundColor Green',
-    'Start-Sleep -Seconds 1',
+    'Write-Host "[2/3] 反映中..." -ForegroundColor Yellow',
+    'robocopy "$stage" "' + LOCAL_INSTALL_DIR + '" /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /NC /NS /NP | Out-Null',
+    'if ($LASTEXITCODE -ge 8) { Write-Host "  [エラー] 反映に失敗 (code: $LASTEXITCODE)" -ForegroundColor Red; Read-Host "Enterで閉じる"; exit 1 }',
+    'Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue',
+  ];
+  if (makeShortcuts) {
+    lines.push(
+      '$ws = New-Object -ComObject WScript.Shell',
+      '$dt = [Environment]::GetFolderPath("Desktop")',
+      '$sc = $ws.CreateShortcut((Join-Path $dt "FutaFinance.lnk")); $sc.TargetPath = "' + LOCAL_EXE + '"; $sc.Save()',
+      '$sm = Join-Path $env:APPDATA "Microsoft\\Windows\\Start Menu\\Programs"',
+      '$sc2 = $ws.CreateShortcut((Join-Path $sm "FutaFinance.lnk")); $sc2.TargetPath = "' + LOCAL_EXE + '"; $sc2.Save()',
+    );
+  }
+  lines.push(
     'Write-Host "[3/3] アプリを起動します..." -ForegroundColor Cyan',
-    `explorer.exe "${LOCAL_EXE}"`,
+    'explorer.exe "' + LOCAL_EXE + '"',
     'Start-Sleep -Seconds 1',
-  ]);
+  );
+  return lines;
+}
+
+// 新版を適用してから explorer.exe で起動（退避→検証→反映、進捗コンソールあり）。
+function applyUpdate(sourcePath, newVersion, newBuild) {
+  launchPS1(buildInstallScript(sourcePath,
+      `FutaFinance アップデート (v${newVersion} / build ${newBuild})`, false));
   isQuitting = true;
   setTimeout(() => app.exit(0), 400);
 }
@@ -486,23 +512,8 @@ async function autoInstallIfNeeded() {
       return true;
     }
   }
-  // 初回 or Driveが新しい → インストール(robocopy)＋ショートカット作成＋explorer起動。
-  launchPS1([
-    'Write-Host ""',
-    'Write-Host "  FutaFinance インストール" -ForegroundColor Cyan',
-    'Write-Host "[1/2] ローカルにインストール中..." -ForegroundColor Yellow',
-    `robocopy "${exeDir}" "${LOCAL_INSTALL_DIR}" /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /NC /NS /NP`,
-    'if ($LASTEXITCODE -ge 8) { Write-Host "  [エラー] インストール失敗 (code: $LASTEXITCODE)" -ForegroundColor Red; Read-Host "Enterで閉じる"; exit 1 }',
-    '$ws = New-Object -ComObject WScript.Shell',
-    '$dt = [Environment]::GetFolderPath("Desktop")',
-    `$sc = $ws.CreateShortcut((Join-Path $dt "FutaFinance.lnk")); $sc.TargetPath = "${LOCAL_EXE}"; $sc.Save()`,
-    '$sm = Join-Path $env:APPDATA "Microsoft\\Windows\\Start Menu\\Programs"',
-    `$sc2 = $ws.CreateShortcut((Join-Path $sm "FutaFinance.lnk")); $sc2.TargetPath = "${LOCAL_EXE}"; $sc2.Save()`,
-    'Write-Host "    完了" -ForegroundColor Green',
-    'Write-Host "[2/2] アプリを起動します..." -ForegroundColor Cyan',
-    `explorer.exe "${LOCAL_EXE}"`,
-    'Start-Sleep -Seconds 1',
-  ]);
+  // 初回 or Driveが新しい → 退避→検証→反映＋ショートカット作成＋explorer起動。
+  launchPS1(buildInstallScript(exeDir, 'FutaFinance インストール', true));
   isQuitting = true;
   setTimeout(() => app.exit(0), 400);
   return true;
