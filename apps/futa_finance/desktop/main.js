@@ -15,7 +15,7 @@ const os = require('os');
 const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 
 // ───────────────────────── 設定 ─────────────────────────
 const APP_TITLE = 'FutaFinance';
@@ -369,146 +369,207 @@ async function createWindow() {
   mainWindow.loadURL(`http://127.0.0.1:${port}/`);
 }
 
-// ─────────────────── 自己更新（Drive・best-effort）───────────────────
-// 更新の試行回数を覚えておくための小さな状態（ループ暴走の防止用）。
-function updateStatePath() {
-  return path.join(app.getPath('userData'), 'update.json');
-}
-function readUpdateState() {
-  try { return JSON.parse(fs.readFileSync(updateStatePath(), 'utf8')); } catch (_) { return {}; }
-}
-function writeUpdateState(s) {
-  try { fs.writeFileSync(updateStatePath(), JSON.stringify(s), 'utf8'); } catch (_) {}
-}
+// ─────────────── 自己更新（FutaMemo方式: dir + robocopy + explorer.exe）───────────────
+// 配布はNSISではなく「展開済みフォルダ」。Driveの app\ から %LOCALAPPDATA%\FutaFinance へ
+// robocopy でコピーし、新版は explorer.exe 経由で起動する。explorer.exe で起動すると新
+// プロセスはシェル(explorer)の子になり、終了する旧アプリの道連れにならない＝
+// 「更新→落ちて戻らない」ループの根本対策。
+const APP_NAME = 'FutaFinance';
+const LOCAL_INSTALL_DIR = path.join(process.env.LOCALAPPDATA || '', APP_NAME);
+const LOCAL_EXE = path.join(LOCAL_INSTALL_DIR, `${APP_NAME}.exe`);
+
 function findDriveDir() {
   for (const d of DRIVE_CANDIDATES) {
     try { if (fs.statSync(d).isDirectory()) return d; } catch (_) {}
   }
   return null;
 }
-function cmpVer(a, b) {
-  const pa = String(a).split('.').map((n) => parseInt(n, 10) || 0);
-  const pb = String(b).split('.').map((n) => parseInt(n, 10) || 0);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0);
-  }
-  return 0;
+
+// このアプリ自身の版情報（build-info.json をアプリ内に同梱）。
+function readBuildInfo() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, 'build-info.json'), 'utf8'));
+  } catch (_) { return { version: app.getVersion(), buildNumber: 0 }; }
 }
+
+// 更新元（Driveの app フォルダ）のパスを覚えておく。
+function updateSourceCfgPath() {
+  return path.join(app.getPath('userData'), 'update-source.json');
+}
+function getUpdateSourcePath() {
+  try {
+    const c = JSON.parse(fs.readFileSync(updateSourceCfgPath(), 'utf8'));
+    return typeof c.sourcePath === 'string' ? c.sourcePath : null;
+  } catch (_) { return null; }
+}
+function saveUpdateSourcePath(sourcePath) {
+  try {
+    fs.writeFileSync(updateSourceCfgPath(), JSON.stringify({ sourcePath }), 'utf8');
+  } catch (_) {}
+}
+
+// 進捗表示するPowerShellコンソールを新規ウィンドウで実行（✕無効化・末尾自動クローズ）。
+function launchPS1(scriptLines) {
+  const tmpPath = path.join(app.getPath('temp'), `futafinance-${Date.now()}.ps1`);
+  const bom = '﻿';
+  const header = [
+    '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8',
+    '$OutputEncoding = [System.Text.Encoding]::UTF8',
+    'Add-Type @"',
+    'using System;',
+    'using System.Runtime.InteropServices;',
+    'public class FfConsole {',
+    '    [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();',
+    '    [DllImport("user32.dll")]   public static extern IntPtr GetSystemMenu(IntPtr hWnd, bool bRevert);',
+    '    [DllImport("user32.dll")]   public static extern bool RemoveMenu(IntPtr hMenu, uint nPos, uint wFlags);',
+    '}',
+    '"@',
+    '$hwnd = [FfConsole]::GetConsoleWindow()',
+    'if ($hwnd -ne [IntPtr]::Zero) {',
+    '    $hmenu = [FfConsole]::GetSystemMenu($hwnd, $false)',
+    '    [void][FfConsole]::RemoveMenu($hmenu, 0xF060, 0x00000000)',
+    '}',
+    '',
+  ];
+  const footer = ['', 'exit 0'];
+  try {
+    fs.writeFileSync(tmpPath, bom + [...header, ...scriptLines, ...footer].join('\n'), 'utf8');
+    exec(`cmd /c start powershell.exe -ExecutionPolicy Bypass -NoProfile -File "${tmpPath}"`);
+  } catch (e) { console.error('launchPS1 failed', e); }
+}
+
+// 新版を robocopy で適用してから explorer.exe で起動（進捗コンソールあり）。
+function applyUpdate(sourcePath, newVersion, newBuild) {
+  launchPS1([
+    'Write-Host ""',
+    'Write-Host "=====================================" -ForegroundColor Cyan',
+    'Write-Host "  FutaFinance  アップデート" -ForegroundColor Cyan',
+    'Write-Host "=====================================" -ForegroundColor Cyan',
+    'Write-Host ""',
+    'Write-Host "[1/3] アプリを終了しました" -ForegroundColor Green',
+    'Start-Sleep -Seconds 2',
+    `Write-Host "[2/3] 最新版をコピー中... (v${newVersion} / build ${newBuild})" -ForegroundColor Yellow`,
+    `robocopy "${sourcePath}" "${LOCAL_INSTALL_DIR}" /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /NC /NS /NP`,
+    'if ($LASTEXITCODE -ge 8) {',
+    '  Write-Host "  [エラー] コピーに失敗しました (code: $LASTEXITCODE)" -ForegroundColor Red',
+    '  Read-Host "  Enterキーで閉じる"; exit 1',
+    '}',
+    'Write-Host "    コピーしました" -ForegroundColor Green',
+    'Start-Sleep -Seconds 1',
+    'Write-Host "[3/3] アプリを起動します..." -ForegroundColor Cyan',
+    `explorer.exe "${LOCAL_EXE}"`,
+    'Start-Sleep -Seconds 1',
+  ]);
+  isQuitting = true;
+  setTimeout(() => app.exit(0), 400);
+}
+
+// Drive等から直接起動されたら、ローカル(%LOCALAPPDATA%\FutaFinance)へ入れて起動し直す。
+// 戻り値 true なら終了シーケンスに入っているので呼び出し側はそのまま return する。
+async function autoInstallIfNeeded() {
+  if (!app.isPackaged) return false;
+  const exeDir = path.dirname(app.getPath('exe'));
+  if (exeDir.toLowerCase() === LOCAL_INSTALL_DIR.toLowerCase()) return false;
+
+  // 次回更新の参照元として、今起動した場所(=Driveのappフォルダ)を保存。
+  saveUpdateSourcePath(exeDir);
+
+  // ローカルに既にあり最新なら、窓を出さず静かにローカル版を起動。
+  if (fs.existsSync(LOCAL_EXE)) {
+    let driveBuild = 0; let localBuild = 0;
+    try { driveBuild = JSON.parse(fs.readFileSync(path.join(exeDir, 'version.json'), 'utf8')).buildNumber || 0; } catch (_) {}
+    try { localBuild = JSON.parse(fs.readFileSync(path.join(LOCAL_INSTALL_DIR, 'version.json'), 'utf8')).buildNumber || 0; } catch (_) {}
+    if (localBuild >= driveBuild) {
+      try { app.releaseSingleInstanceLock(); } catch (_) {}
+      await shell.openPath(LOCAL_EXE);
+      setTimeout(() => app.exit(0), 600);
+      return true;
+    }
+  }
+  // 初回 or Driveが新しい → インストール(robocopy)＋ショートカット作成＋explorer起動。
+  launchPS1([
+    'Write-Host ""',
+    'Write-Host "  FutaFinance インストール" -ForegroundColor Cyan',
+    'Write-Host "[1/2] ローカルにインストール中..." -ForegroundColor Yellow',
+    `robocopy "${exeDir}" "${LOCAL_INSTALL_DIR}" /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /NC /NS /NP`,
+    'if ($LASTEXITCODE -ge 8) { Write-Host "  [エラー] インストール失敗 (code: $LASTEXITCODE)" -ForegroundColor Red; Read-Host "Enterで閉じる"; exit 1 }',
+    '$ws = New-Object -ComObject WScript.Shell',
+    '$dt = [Environment]::GetFolderPath("Desktop")',
+    `$sc = $ws.CreateShortcut((Join-Path $dt "FutaFinance.lnk")); $sc.TargetPath = "${LOCAL_EXE}"; $sc.Save()`,
+    '$sm = Join-Path $env:APPDATA "Microsoft\\Windows\\Start Menu\\Programs"',
+    `$sc2 = $ws.CreateShortcut((Join-Path $sm "FutaFinance.lnk")); $sc2.TargetPath = "${LOCAL_EXE}"; $sc2.Save()`,
+    'Write-Host "    完了" -ForegroundColor Green',
+    'Write-Host "[2/2] アプリを起動します..." -ForegroundColor Cyan',
+    `explorer.exe "${LOCAL_EXE}"`,
+    'Start-Sleep -Seconds 1',
+  ]);
+  isQuitting = true;
+  setTimeout(() => app.exit(0), 400);
+  return true;
+}
+
 async function checkForUpdate(opts = {}) {
-  const manual = opts.manual === true; // 設定画面の「最新バージョンを確認」から呼ぶ時 true
-  const auto = opts.auto === true;     // 起動時の自動チェック（見つかれば確認なしで適用）
-  if (!app.isPackaged && !manual) return;
-  const dir = findDriveDir();
-  if (!dir) {
+  const manual = opts.manual === true;
+  if (!app.isPackaged) {
+    if (manual) {
+      await dialog.showMessageBox(mainWindow, {
+        type: 'info', title: '更新確認', message: '開発モードでは更新チェックは無効です。',
+      });
+    }
+    return;
+  }
+  // 更新元(Driveのappフォルダ)。記録が無ければ Drive 候補の app\ を探す。
+  let sourcePath = getUpdateSourcePath();
+  if (!sourcePath || !fs.existsSync(path.join(sourcePath, 'version.json'))) {
+    const dir = findDriveDir();
+    if (dir && fs.existsSync(path.join(dir, 'app', 'version.json'))) {
+      sourcePath = path.join(dir, 'app');
+      saveUpdateSourcePath(sourcePath);
+    }
+  }
+  if (!sourcePath || !fs.existsSync(path.join(sourcePath, 'version.json'))) {
     if (manual) {
       await dialog.showMessageBox(mainWindow, {
         type: 'warning', title: '更新確認',
-        message: '配布フォルダが見つかりません（Google ドライブの同期を確認してください）。',
+        message: '更新情報が見つかりません（Google ドライブの同期を確認してください）。',
       });
     }
     return;
   }
-  let remote;
+  let remote; let local;
   try {
-    remote = fs.readFileSync(path.join(dir, 'version.txt'), 'utf8').trim();
+    remote = JSON.parse(fs.readFileSync(path.join(sourcePath, 'version.json'), 'utf8'));
+    local = readBuildInfo();
   } catch (_) {
     if (manual) {
       await dialog.showMessageBox(mainWindow, {
-        type: 'warning', title: '更新確認', message: 'バージョン情報を取得できませんでした。',
+        type: 'warning', title: '更新確認', message: '更新情報の読込に失敗しました。',
       });
     }
     return;
   }
-  if (!remote || cmpVer(remote, app.getVersion()) <= 0) {
-    // すでに最新（＝前回の更新が成功）。試行カウンタをクリア。
-    writeUpdateState({});
+  const remoteNum = remote.buildNumber || 0;
+  const localNum = local.buildNumber || 0;
+  if (remoteNum <= localNum) {
     if (manual) {
       await dialog.showMessageBox(mainWindow, {
-        type: 'info', title: '更新確認', message: `最新版です（v${app.getVersion()}）。`,
+        type: 'info', title: '更新確認', message: `最新版です（v${local.version}）。`,
       });
     }
     return;
   }
-  const exeSrc = path.join(dir, RELEASE_EXE_NAME);
-  if (!fs.existsSync(exeSrc)) {
-    if (manual) {
-      await dialog.showMessageBox(mainWindow, {
-        type: 'warning', title: '更新確認', message: '更新ファイルが見つかりませんでした。',
-      });
-    }
-    return;
-  }
-  // 起動時の自動チェックで新版が見つかったら、画面に「アップデート中」を出してから
-  // インストーラ(進捗表示あり)を実行＆自動再起動する。
-  // （黙って落ちる/黙って入れ替えるとクラッシュや不審な挙動に見えるため、必ず明示する）
-  if (auto) {
-    // ループガード：同じ版に2回試しても上がらなければ自動適用を止める。
-    const st = readUpdateState();
-    const tried = st.version === remote ? (st.count || 0) : 0;
-    if (tried >= 2) {
-      console.warn('[update] loop guard: 自動更新を見送り（v%s を%d回試行済）', remote, tried);
-      return;
-    }
-    writeUpdateState({ version: remote, count: tried + 1 });
-    await showUpdatingOverlay(remote);
-    applyUpdate(exeSrc);
-    return;
-  }
-  const choice = await dialog.showMessageBox(mainWindow, {
-    type: 'info',
-    buttons: ['更新する', '後で'],
-    defaultId: 0,
-    cancelId: 1,
-    title: 'アップデート',
-    message: `新しいバージョン v${remote} があります（現在 v${app.getVersion()}）。`,
-    detail: '更新すると一度アプリを再起動します。',
-  });
-  if (choice.response === 0) applyUpdate(exeSrc);
-}
-function applyUpdate(setupSrc) {
-  const ourPid = process.pid;
-  const src = setupSrc.replace(/'/g, "''");
-  // Driveから直接サイレント実行すると（クラウド同期・サイズ・SmartScreen等で）
-  // 失敗して『アプリだけ終了→戻らない』になりやすい。そこで：
-  //   1) インストーラをローカルtempにコピーしてから実行（Drive直実行を避ける）
-  //   2) /S を付けず通常実行し、NSISの runAfterFinish に再起動を任せる（確実性優先）
-  // インストール先・ショートカット・AppUserModelIdは固定なのでpinは維持される。
-  const localSetup =
-    path.join(os.tmpdir(), 'FutaFinance-Setup.exe').replace(/'/g, "''");
-  const ps =
-    "$host.UI.RawUI.WindowTitle = 'FutaFinance アップデート'\n" +
-    "Write-Host '更新を準備しています...'\n" +
-    `try { Wait-Process -Id ${ourPid} -Timeout 20 -ErrorAction Stop } catch {}\n` +
-    `$setup = '${localSetup}'\n` +
-    `try { Copy-Item -LiteralPath '${src}' -Destination $setup -Force -ErrorAction Stop }\n` +
-    `catch { $setup = '${src}' }\n` +
-    "Start-Process -FilePath $setup\n";
-  const scriptPath = path.join(os.tmpdir(), 'futafinance_update.ps1');
-  fs.writeFileSync(scriptPath, ps, { encoding: 'utf8' });
-  spawn('powershell.exe', ['-ExecutionPolicy', 'Bypass', '-NoProfile', '-File', scriptPath], {
-    detached: true, stdio: 'ignore',
-  }).unref();
-  isQuitting = true;
-  app.quit();
-}
-
-/// 画面に「アップデート中…」を表示してから少し待つ（更新が始まることを明示）。
-/// 黙って落ちる/入れ替えるとクラッシュや不審な挙動に見えるのを防ぐ。
-async function showUpdatingOverlay(remote) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  const html = '<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">' +
-    "<style>body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;" +
-    "font-family:'Segoe UI','Meiryo',sans-serif;background:#F7F8FA;color:#1A237E}" +
-    '.box{text-align:center}.spin{width:40px;height:40px;margin:0 auto 16px;border:4px solid #C5CAE9;' +
-    'border-top-color:#1A237E;border-radius:50%;animation:s .9s linear infinite}' +
-    '@keyframes s{to{transform:rotate(360deg)}}h2{margin:0 0 8px;font-size:20px}' +
-    'p{margin:0;font-size:13px;color:#6B7280}</style></head><body><div class="box">' +
-    '<div class="spin"></div><h2>アップデート中です… (v' + remote + ')</h2>' +
-    '<p>インストールが終わると自動で開き直します。少しお待ちください。</p></div></body></html>';
-  try {
-    await mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
-    await new Promise((r) => setTimeout(r, 1400));
-  } catch (_) {}
+  if (!mainWindow.isVisible()) { mainWindow.show(); mainWindow.focus(); }
+  const { response } = await dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: 'FutaFinance - アップデート',
+    message: '新しいバージョンがあります',
+    detail: `現在 : v${local.version}\n最新 : v${remote.version}\n\n`
+        + '今すぐ更新しますか？（進捗が表示され、自動で開き直します）',
+    buttons: ['今すぐ更新', '後で'],
+    defaultId: 0, cancelId: 1, noLink: true,
+  });
+  if (response === 0) applyUpdate(sourcePath, remote.version, remoteNum);
 }
 
 // ─────────────────── IPC ───────────────────
@@ -538,6 +599,9 @@ if (!gotLock) {
   });
   app.setAppUserModelId('jp.runstrategy.futafinance.desktop');
   app.whenReady().then(async () => {
+    // Drive等から直接起動された場合は %LOCALAPPDATA% へ入れて起動し直す（安定起動）。
+    // 戻り値 true なら終了シーケンス中なのでここで終わる。
+    if (await autoInstallIfNeeded()) return;
     // Service Worker は使わない（ローカル配信なので不要）。過去に登録された
     // SW のキャッシュで更新後も古い画面が出るのを防ぐため、起動毎に破棄。
     // ※ IndexedDB（Firebase の認証/オフライン永続）は消さない。
@@ -545,15 +609,8 @@ if (!gotLock) {
       await session.defaultSession.clearStorageData({ storages: ['serviceworkers'] });
     } catch (_) {}
     await createWindow();
-    // 自己置換更新で再起動してきた時は、完了をさりげなく通知。
-    if (process.argv.includes('--updated')) {
-      dialog.showMessageBox(mainWindow, {
-        type: 'info', title: 'FutaFinance',
-        message: `最新版 v${app.getVersion()} に更新しました。`,
-      }).catch(() => {});
-    }
-    // 起動時の自動更新チェック（新版があれば確認なしで適用＆再起動）。
-    setTimeout(() => { checkForUpdate({ auto: true }).catch((e) => console.error(e)); }, 2500);
+    // 起動後しばらくして更新チェック（新版があれば「今すぐ更新/後で」ダイアログ）。
+    setTimeout(() => { checkForUpdate({}).catch((e) => console.error(e)); }, 3000);
   });
   app.on('window-all-closed', () => { if (!isQuitting) app.quit(); });
   app.on('activate', () => { if (mainWindow === null) createWindow(); });
