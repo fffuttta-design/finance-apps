@@ -8,6 +8,7 @@ import '../utils/formatters.dart';
 import '../utils/modal_input.dart';
 import '../widgets/centered_body.dart';
 import 'expense_input_screen.dart';
+import 'income_input_screen.dart';
 import 'receipt_image_screen.dart';
 import 'transfer_input_screen.dart';
 
@@ -62,7 +63,9 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
       changed =
           await showInputSheet<bool>(context, ExpenseInputScreen(editing: _t));
     } else {
-      return; // 収入は現状この画面からの編集は未対応。
+      // 収入
+      changed =
+          await showInputSheet<bool>(context, IncomeInputScreen(editing: _t));
     }
     if (changed == true && mounted) Navigator.pop(context, true);
   }
@@ -208,21 +211,19 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
             ),
           ],
           const SizedBox(height: 28),
-          // アクション
+          // アクション（編集は支出/収入/振替すべてで可能）
           Row(
             children: [
-              if (t.type == core.TransactionType.expense)
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _busy ? null : _edit,
-                    icon: const Icon(Icons.edit_outlined, size: 18),
-                    label: const Text('編集'),
-                    style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14)),
-                  ),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _busy ? null : _edit,
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('編集'),
+                  style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14)),
                 ),
-              if (t.type == core.TransactionType.expense)
-                const SizedBox(width: 12),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: FilledButton.icon(
                   onPressed: _busy ? null : _delete,

@@ -88,14 +88,13 @@ class _V2IncomeScreenState extends State<V2IncomeScreen>
     if (mounted) await _load();
   }
 
-  void _showTxnSummary(core.Transaction t) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-            '${t.date.month}/${t.date.day} ${t.description.isEmpty ? t.paymentMethod : t.description} +${formatYen(t.amount)}'),
-        duration: const Duration(seconds: 2),
-      ),
+  /// 売上/収入明細の行タップ → 収入入力画面を編集モードで開く。
+  Future<void> _editTxn(core.Transaction t) async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => IncomeInputScreen(editing: t)),
     );
+    if (changed == true && mounted) await _load();
   }
 
   @override
@@ -235,7 +234,7 @@ class _V2IncomeScreenState extends State<V2IncomeScreen>
                 else
                   _IncomeTable(
                     rows: all,
-                    onTapRow: _showTxnSummary,
+                    onTapRow: _editTxn,
                   ),
               ],
             ),

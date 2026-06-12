@@ -41,10 +41,14 @@ Future<bool?> showIncomeInputModal(BuildContext context) {
 /// 残高の自動計算・手動上書きは廃止（金の流れは取引で記録。残高調整は
 /// 専用画面＋「残高調整」科目の取引で厳正に行う方針）。現在残高は参考表示のみ。
 class IncomeInputScreen extends StatefulWidget {
-  const IncomeInputScreen({super.key, this.initialReceiveAccount});
+  const IncomeInputScreen(
+      {super.key, this.initialReceiveAccount, this.editing});
 
   /// 起動時に入金先口座をプリセット（口座詳細画面から呼ばれた時など）。
   final String? initialReceiveAccount;
+
+  /// 既存の収入取引の編集（指定すると編集モード：プリフィル＋更新/削除）。
+  final core.Transaction? editing;
 
   @override
   State<IncomeInputScreen> createState() => _IncomeInputScreenState();
@@ -76,6 +80,15 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
   @override
   void initState() {
     super.initState();
+    final e = widget.editing;
+    if (e != null) {
+      _date = e.date;
+      _amountCtrl.text = formatAmount(e.amount);
+      _descCtrl.text = e.description;
+      if (e.memo != null) _memoCtrl.text = e.memo!;
+      _isPending = e.isPending;
+      _receiveAccount = e.paymentMethod;
+    }
     _load();
   }
 
@@ -95,9 +108,22 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
     setState(() {
       _sources = s;
       _payments = p;
-      // 呼び出し元から入金先プリセットがあれば適用
-      if (_receiveAccount == null &&
+      final e = widget.editing;
+      if (e != null) {
+        // 編集モード：収入源と入金先を復元。
+        core.IncomeSource? src;
+        for (final x in s.sources) {
+          if (x.id == e.incomeSourceId || x.name == e.category.major) {
+            src = x;
+            break;
+          }
+        }
+        _selectedSource = src;
+        _receiveAccount = e.paymentMethod;
+        _onReceiveAccountChanged(e.paymentMethod);
+      } else if (_receiveAccount == null &&
           widget.initialReceiveAccount != null) {
+        // 呼び出し元から入金先プリセットがあれば適用
         _receiveAccount = widget.initialReceiveAccount;
         _onReceiveAccountChanged(_receiveAccount);
       }
@@ -143,6 +169,35 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
     if (picked != null) setState(() => _date = picked);
   }
 
+  Future<void> _delete() async {
+    final e = widget.editing;
+    if (e == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('この収入を削除？'),
+        content: Text(
+            '${e.date.month}/${e.date.day} ${e.description.isEmpty ? e.category.major : e.description} +${formatYen(e.amount)}\n削除すると元に戻せません。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626)),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('削除'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _saving = true);
+    await TransactionRepository.instance.delete(e.id);
+    if (!mounted) return;
+    Navigator.pop(context, true);
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedSource == null || _receiveAccount == null) {
@@ -159,8 +214,9 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       return;
     }
     setState(() => _saving = true);
+    final editing = widget.editing;
     final tx = core.Transaction(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: editing?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
       date: _date,
       type: core.TransactionType.income,
       // 大カテゴリ＝収入源名（＝売上科目）。PLが売上を科目別に内訳表示でき、
@@ -176,6 +232,13 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       incomeSourceId: _selectedSource!.id,
       isPending: _isPending,
     );
+    if (editing != null) {
+      // 編集：記録を更新するだけ（残高は二重加算を避けるため触らない）。
+      await TransactionRepository.instance.update(tx);
+      if (!mounted) return;
+      Navigator.pop(context, true);
+      return;
+    }
     // 新規追加：同じ日付・同じ金額の既存データがあれば確認（秘書登録分も検知）。
     if (!await confirmIfDuplicateTransaction(context, tx)) {
       if (mounted) setState(() => _saving = false);
@@ -213,8 +276,8 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('収入を記録',
-            style: TextStyle(
+        title: Text(widget.editing != null ? '収入を編集' : '収入を記録',
+            style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF111827))),
@@ -222,6 +285,15 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          if (widget.editing != null)
+            IconButton(
+              icon: const Icon(Icons.delete_outline,
+                  color: Color(0xFFDC2626)),
+              tooltip: 'この収入を削除',
+              onPressed: _saving ? null : _delete,
+            ),
+        ],
       ),
       body: SafeArea(
         child: Center(
