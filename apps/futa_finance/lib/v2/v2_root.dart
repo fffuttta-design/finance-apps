@@ -97,6 +97,7 @@ class _V2RootState extends State<V2Root>
   /// 現在のモードに応じて表示するナビ一覧。
   /// 「設定→上タブの並び順」(UiPreferences.sidebarOrder)で並びを反映する。
   List<V2NavItem> get _navItems {
+    final isBusiness = AppModeManager.instance.current == AppMode.business;
     final all = <String, V2NavItem>{
       'home': const V2NavItem(
           id: 'home', label: 'ホーム', icon: Icons.dashboard_outlined),
@@ -104,8 +105,11 @@ class _V2RootState extends State<V2Root>
           id: 'expenses', label: '支出', icon: Icons.receipt_long_outlined),
       'income': const V2NavItem(
           id: 'income', label: '収入', icon: Icons.savings_outlined),
-      'report': const V2NavItem(
-          id: 'report', label: '業績', icon: Icons.bar_chart_outlined),
+      // 事業＝業績（PL重視）/ 個人＝集計（家計の集計）。
+      'report': V2NavItem(
+          id: 'report',
+          label: isBusiness ? '業績' : '集計',
+          icon: Icons.bar_chart_outlined),
       'assets': const V2NavItem(
           id: 'assets',
           label: '資産',
