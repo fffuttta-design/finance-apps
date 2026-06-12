@@ -1,6 +1,7 @@
-# Takuharu Finance - Firebase deploy
-#   Step 1: Firestore rules  (works on the FREE Spark plan) -> enables comments
-#   Step 2: Cloud Functions   (needs the Blaze pay-as-you-go plan) -> enables notifications
+# Takuharu Finance - Firestore rules deploy (FREE Spark plan OK; no Blaze needed)
+#   Enables the planning comment section (plan_items/{}/comments permission).
+#   Notifications are handled by the VPS 'takuharu-notifier' (not Cloud Functions),
+#   so Cloud Functions / Blaze are NOT required.
 #
 # How to run: paste this into Explorer's address bar and press Enter:
 #   powershell -NoExit -ExecutionPolicy Bypass -File "C:\dev\CoreBusinessTools\finance-apps\firebase\takuharu\deploy_firebase.ps1"
@@ -8,7 +9,7 @@
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 
-Write-Host "==== Takuharu Finance: Firebase deploy ====" -ForegroundColor Magenta
+Write-Host "==== Takuharu Finance: Firestore rules deploy ====" -ForegroundColor Magenta
 
 # Resolve firebase: prefer global 'firebase', otherwise use 'npx firebase-tools'
 $useNpx = $false
@@ -32,31 +33,18 @@ function Invoke-FB {
   }
 }
 
-# Login (no-op if already logged in; opens a browser otherwise). Use takuharumika@gmail.com.
+# Login (no-op if already logged in). Use takuharumika@gmail.com.
 Write-Host "[login] Checking Firebase login (use takuharumika@gmail.com)..." -ForegroundColor Cyan
 Invoke-FB login
 
-# Step 1: Firestore rules (free plan OK) -> comments
-Write-Host "[1/2] Deploying Firestore rules (enables the comment section)..." -ForegroundColor Cyan
+# Deploy Firestore rules only (free; enables the comment section)
+Write-Host "[deploy] Deploying Firestore rules..." -ForegroundColor Cyan
 Invoke-FB deploy --only "firestore:rules" --project takuharu-finance
-$rulesOk = ($LASTEXITCODE -eq 0)
 
-# Step 2: Cloud Functions (Blaze plan required) -> notifications
-Write-Host "[2/2] Deploying Cloud Functions (enables partner notifications; needs Blaze plan)..." -ForegroundColor Cyan
-Invoke-FB deploy --only "functions" --project takuharu-finance
-$funcOk = ($LASTEXITCODE -eq 0)
-
-Write-Host ""
-Write-Host "==== RESULT ====" -ForegroundColor Magenta
-if ($rulesOk) {
-  Write-Host "[OK] Firestore rules deployed -> the comment section now works." -ForegroundColor Green
+if ($LASTEXITCODE -eq 0) {
+  Write-Host ""
+  Write-Host "==== DONE: the planning comment section is now enabled. ====" -ForegroundColor Green
 } else {
-  Write-Host "[NG] Firestore rules deploy failed (see messages above)." -ForegroundColor Red
-}
-if ($funcOk) {
-  Write-Host "[OK] Cloud Functions deployed -> partner notifications now work." -ForegroundColor Green
-} else {
-  Write-Host "[NG] Cloud Functions NOT deployed. The project needs the Blaze (pay-as-you-go) plan." -ForegroundColor Yellow
-  Write-Host "     Upgrade here, then re-run this script:" -ForegroundColor Yellow
-  Write-Host "     https://console.firebase.google.com/project/takuharu-finance/usage/details" -ForegroundColor Yellow
+  Write-Host ""
+  Write-Host "==== FAILED. See the messages above (often it just needs login). ====" -ForegroundColor Red
 }
