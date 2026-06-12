@@ -365,10 +365,18 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                     else
                       DropdownButtonFormField<String>(
                         initialValue: _receiveAccount,
-                        items: banks
-                            .map((b) => DropdownMenuItem(
-                                value: b.name, child: Text(b.name)))
-                            .toList(),
+                        items: [
+                          for (final b in banks)
+                            // 休眠中は隠す（選択中の値だけは残す）。
+                            if (!b.inactive || b.name == _receiveAccount)
+                              DropdownMenuItem(
+                                value: b.name,
+                                child: Text(
+                                  '[${b.accountType.shortLabel}]${b.name}',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                        ],
                         onChanged: _onReceiveAccountChanged,
                         decoration: _inputDecoration(hint: '選択してください'),
                       ),
