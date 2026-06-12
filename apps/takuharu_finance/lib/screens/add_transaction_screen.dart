@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 
 import '../data/auth_service.dart';
 import '../data/categories.dart';
@@ -11,6 +14,8 @@ import '../data/household_service.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
+import 'receipt_camera_screen.dart';
+import 'receipt_image_screen.dart';
 
 /// 収支を1件記録／編集する画面（可愛い系）。
 class AddTransactionScreen extends StatefulWidget {
@@ -63,6 +68,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final _memoCtrl = TextEditingController();
   bool _saving = false;
 
+  // ── くわしい情報（画像）─────────────────────────────────
+  // 手入力でも、レシートと同じ仕組み（Drive保存＋receiptId/receiptUrl）で
+  // 1枚の画像をぶら下げられる。手入力で付けた画像は receiptId を "detail_" で
+  // 始める印にして、表示側のボタン名を「くわしい情報を見る」に出し分ける。
+  String? _receiptId; // この記録に紐づく画像の参照ID
+  String? _receiptUrl; // Drive保存済みの閲覧URL（裏で付く）
+  Uint8List? _attachPreview; // 今この画面で選んだ画像（即プレビュー用）
+  bool _uploadingImage = false; // 裏のDrive保存中フラグ
+
+  /// 手入力で付けた「くわしい情報」画像かどうか（receiptId の印で判定）。
+  bool get _isDetailImage => (_receiptId ?? '').startsWith('detail_');
+
   bool get _isIncome => _type == core.TransactionType.income;
 
   /// 新規記録の既定の支払元。
@@ -92,6 +109,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _paidBy = e.paidBy ?? e.recordedBy ?? myUid;
       _payment = e.paymentMethod.isEmpty ? null : e.paymentMethod;
       _personalFood = e.personalFor != null;
+      _receiptId = e.receiptId;
+      _receiptUrl = e.receiptUrl;
     } else {
       _type = widget.initialType ?? core.TransactionType.expense;
       _date = widget.initialDate ?? DateTime.now();
@@ -106,6 +125,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _paidBy = myUid;
       // 新規記録の支払元は「ワンバンク」を既定にする。
       _payment = _defaultPayment;
+      // レシート読み取りから来た場合の画像参照を引き継ぐ。
+      _receiptId = widget.initialReceiptId;
+      _receiptUrl = widget.initialReceiptUrl ??
+          (widget.initialReceiptId != null
+              ? DriveReceiptService.instance.urlFor(widget.initialReceiptId!)
+              : null);
     }
     // 登録済みの口座/クレカを読み込む（支払元の選択肢）。
     final hid = HouseholdService.instance.householdId;
@@ -179,13 +204,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       memo: widget.editing?.memo ?? widget.initialMemo,
       // 「食費」で個人わくONのときだけ、だれの個人わくから引くか記録。
       personalFor: (_canPersonalFood && _personalFood) ? _paidBy : null,
-      // レシート画像の参照（編集時は既存値を維持、新規はレシート読取からの値）。
+      // レシート/くわしい情報の画像参照。手入力で添付した画像もここに乗る。
       // 裏のDrive保存が先に終わっていればキャッシュURLを付与。
-      receiptId: widget.editing?.receiptId ?? widget.initialReceiptId,
-      receiptUrl: widget.editing?.receiptUrl ??
-          widget.initialReceiptUrl ??
-          (widget.initialReceiptId != null
-              ? DriveReceiptService.instance.urlFor(widget.initialReceiptId!)
+      receiptId: _receiptId,
+      receiptUrl: _receiptUrl ??
+          (_receiptId != null
+              ? DriveReceiptService.instance.urlFor(_receiptId!)
               : null),
     );
     try {
@@ -202,6 +226,90 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         _toast('保存に失敗しました');
       }
     }
+  }
+
+  /// 「くわしい情報」画像をカメラ/アルバムから選んで添付する。
+  /// レシートと同じく Drive へは“裏で”保存し、ユーザーは待たない。
+  Future<void> _attachDetailImage() async {
+    final bytes = await Navigator.push<Uint8List>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            const ReceiptCameraScreen(hint: 'くわしい情報を写真に撮る ♡'),
+      ),
+    );
+    if (bytes == null || !mounted) return;
+
+    final imgBytes = await _compressImage(bytes);
+    if (!mounted) return;
+
+    // 手入力で付けた画像の印として receiptId を "detail_" で始める。
+    final receiptId = 'detail_${DateTime.now().microsecondsSinceEpoch}';
+    setState(() {
+      _receiptId = receiptId;
+      _receiptUrl = null;
+      _attachPreview = imgBytes;
+      _uploadingImage = true;
+    });
+
+    // 裏でDrive保存。完了したら URL をキャッシュ＋（保存済みなら）後付けする。
+    final hid = HouseholdService.instance.householdId;
+    unawaited(() async {
+      final url = await DriveReceiptService.instance
+          .uploadReceiptImage(bytes: imgBytes, date: _date);
+      if (url != null) {
+        DriveReceiptService.instance.rememberUrl(receiptId, url);
+        if (hid != null) {
+          try {
+            await TxRepository.instance.attachReceiptUrl(hid, receiptId, url);
+          } catch (_) {/* 後付け失敗は無視（リンクが付かないだけ） */}
+        }
+      }
+      if (mounted) {
+        setState(() {
+          if (url != null) _receiptUrl = url;
+          _uploadingImage = false;
+        });
+      }
+    }());
+  }
+
+  void _removeDetailImage() {
+    setState(() {
+      _receiptId = null;
+      _receiptUrl = null;
+      _attachPreview = null;
+      _uploadingImage = false;
+    });
+  }
+
+  /// 既に保存済みの画像をアプリ内ビューアで開く。
+  void _viewDetailImage() {
+    final raw = _receiptUrl?.trim();
+    if (raw == null || raw.isEmpty) return;
+    final fileId = DriveReceiptService.fileIdFromUrl(raw);
+    if (fileId == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ReceiptImageScreen(fileId: fileId)),
+    );
+  }
+
+  /// 画像を軽く圧縮（保存・表示を速くする）。失敗時は元画像のまま。
+  Future<Uint8List> _compressImage(Uint8List src) async {
+    try {
+      final out = await FlutterImageCompress.compressWithList(
+        src,
+        quality: 70,
+        minWidth: 1080,
+        minHeight: 1920,
+        format: CompressFormat.jpeg,
+      );
+      if (out.isNotEmpty && out.length < src.length) {
+        return Uint8List.fromList(out);
+      }
+    } catch (_) {/* 圧縮失敗時は元画像を使う */}
+    return src;
   }
 
   Future<void> _delete() async {
@@ -420,6 +528,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               const SizedBox(height: 18),
               _personalFoodToggle(),
             ],
+            const SizedBox(height: 18),
+            // くわしい情報（画像）。手入力でも写真を1枚ぶら下げられる。
+            _section('くわしい情報（画像）'),
+            _detailImageSection(),
             const SizedBox(height: 28),
             FilledButton(
               onPressed: _saving ? null : _save,
@@ -657,6 +769,118 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             onChanged: (v) => setState(() => _personalFood = v),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 「くわしい情報（画像）」セクション。
+  /// 画像が無ければ追加ボタン、有ればプレビュー＋変更/削除を出す。
+  Widget _detailImageSection() {
+    final hasImage =
+        _attachPreview != null || (_receiptUrl != null && _receiptUrl!.isNotEmpty);
+
+    if (!hasImage) {
+      // まだ画像なし → カメラ/アルバムから追加ボタン。
+      return OutlinedButton.icon(
+        onPressed: _attachDetailImage,
+        icon: const Icon(Icons.add_a_photo_outlined, size: 18),
+        label: const Text('写真を追加（カメラ / アルバム）'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.pinkDark,
+          side: const BorderSide(color: AppColors.pinkSoft, width: 1.4),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Row(
+        children: [
+          // サムネ（今選んだ画像があればそれ、無ければ保存済みをビューアで開く）。
+          GestureDetector(
+            onTap: _attachPreview != null ? null : _viewDetailImage,
+            child: Container(
+              width: 64,
+              height: 64,
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: AppColors.pinkSoft.withValues(alpha: 0.35),
+              ),
+              child: _attachPreview != null
+                  ? Image.memory(_attachPreview!, fit: BoxFit.cover)
+                  : const Icon(Icons.image_rounded,
+                      color: AppColors.pinkDark, size: 28),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    if (_uploadingImage) ...[
+                      const SizedBox(
+                          width: 13,
+                          height: 13,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: AppColors.pinkDark)),
+                      const SizedBox(width: 6),
+                      const Text('保存中…',
+                          style: TextStyle(
+                              fontSize: 12, color: AppColors.textSub)),
+                    ] else
+                      const Text('画像を添付しました',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    // 保存済み（今選んだ画像でない）ときは見るボタン。
+                    if (_attachPreview == null &&
+                        _receiptUrl != null &&
+                        _receiptUrl!.isNotEmpty) ...[
+                      _smallTextButton(
+                          _isDetailImage ? 'くわしい情報を見る' : 'レシートを見る',
+                          Icons.visibility_outlined, _viewDetailImage),
+                      const SizedBox(width: 4),
+                    ],
+                    _smallTextButton(
+                        '変更', Icons.swap_horiz_rounded, _attachDetailImage),
+                    const SizedBox(width: 4),
+                    _smallTextButton('削除', Icons.delete_outline_rounded,
+                        _removeDetailImage,
+                        danger: true),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _smallTextButton(String label, IconData icon, VoidCallback onTap,
+      {bool danger = false}) {
+    final color = danger ? AppColors.pinkDark : AppColors.text;
+    return TextButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 16, color: color),
+      label: Text(label, style: TextStyle(fontSize: 12, color: color)),
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
     );
   }

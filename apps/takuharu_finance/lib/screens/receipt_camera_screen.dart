@@ -11,7 +11,13 @@ import '../theme/app_theme.dart';
 /// 中央下=シャッター、右下=ギャラリー（端末の直近写真サムネを表示）。
 /// 撮影/選択した画像バイトを Navigator.pop で返す（キャンセルは null）。
 class ReceiptCameraScreen extends StatefulWidget {
-  const ReceiptCameraScreen({super.key});
+  /// 画面上部の案内文（レシート以外の用途でも使えるよう差し替え可能）。
+  final String hint;
+
+  const ReceiptCameraScreen({
+    super.key,
+    this.hint = 'レシートを画面に収めて撮影 ♡',
+  });
 
   @override
   State<ReceiptCameraScreen> createState() => _ReceiptCameraScreenState();
@@ -135,13 +141,14 @@ class _ReceiptCameraScreenState extends State<ReceiptCameraScreen> {
               ),
             ),
           ),
-          const SafeArea(
+          SafeArea(
             child: Align(
               alignment: Alignment.topCenter,
               child: Padding(
-                padding: EdgeInsets.only(top: 10),
-                child: Text('レシートを画面に収めて撮影 ♡',
-                    style: TextStyle(color: Colors.white70, fontSize: 13)),
+                padding: const EdgeInsets.only(top: 10),
+                child: Text(widget.hint,
+                    style:
+                        const TextStyle(color: Colors.white70, fontSize: 13)),
               ),
             ),
           ),

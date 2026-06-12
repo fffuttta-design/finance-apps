@@ -396,8 +396,14 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
                     );
                   }
                 },
-                icon: const Icon(Icons.receipt_long_rounded, size: 18),
-                label: const Text('レシートを見る'),
+                icon: Icon(
+                    (t.receiptId ?? '').startsWith('detail_')
+                        ? Icons.image_rounded
+                        : Icons.receipt_long_rounded,
+                    size: 18),
+                label: Text((t.receiptId ?? '').startsWith('detail_')
+                    ? 'くわしい情報を見る'
+                    : 'レシートを見る'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.pinkDark,
                   side: const BorderSide(color: AppColors.pinkSoft, width: 1.4),
