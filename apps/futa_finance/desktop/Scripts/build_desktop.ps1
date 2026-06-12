@@ -22,8 +22,8 @@ Write-Host "== FutaFinance desktop build ==" -ForegroundColor Cyan
 Write-Host "project: $ProjectDir"
 
 # ---- 0. version: default = Flutter app version (pubspec) so UI and desktop match ----
-# 表示版番号(アプリ情報)と更新ダイアログの版番号を1本化するため、-Version 未指定なら
-# pubspec.yaml の version（+build を除く）に揃える。
+# Unify the displayed app version and the desktop/update version. If -Version is not
+# given, use the pubspec.yaml version (without the +build suffix).
 $pkgPath = Join-Path $ProjectDir "package.json"
 if ($Version -eq "") {
   $pubspec = Get-Content (Join-Path $AppDir "pubspec.yaml") -Raw
@@ -120,9 +120,7 @@ if ($Publish) {
     Copy-Item $exe.FullName (Join-Path $driveDir "FutaFinance-Setup.exe") -Force
     $ver = (Get-Content $pkgPath -Raw -Encoding UTF8 | ConvertFrom-Json).version
     [System.IO.File]::WriteAllText((Join-Path $driveDir "version.txt"), $ver, [System.Text.UTF8Encoding]::new($false))
-    # 旧portable版の救済用 FutaFinance.exe(0.3.1 portable) はDriveに残す。
-    # これがあると、ループ中の旧portableが更新→自己回復→さらにNSISへ移行できる。
-    # （消すと旧portableが更新元を失い再びクラッシュループするため削除しない）
+    # Keep the legacy rescue FutaFinance.exe (if present) on Drive; do not delete it.
     Write-Host "published to Drive: $driveDir (v$ver)" -ForegroundColor Green
   } else {
     Write-Host "Drive folder not found; skipped publish." -ForegroundColor DarkGray
