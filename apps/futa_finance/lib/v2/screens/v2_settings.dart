@@ -845,7 +845,6 @@ class _AboutPanel extends StatefulWidget {
 
 class _AboutPanelState extends State<_AboutPanel> {
   String? _version;
-  String? _buildNumber;
 
   @override
   void initState() {
@@ -859,7 +858,6 @@ class _AboutPanelState extends State<_AboutPanel> {
       if (!mounted) return;
       setState(() {
         _version = info.version;
-        _buildNumber = info.buildNumber;
       });
     } catch (_) {/* ignore */}
   }
@@ -868,7 +866,7 @@ class _AboutPanelState extends State<_AboutPanel> {
   Widget build(BuildContext context) {
     final versionText =
         _version == null ? '読み込み中...' : 'v$_version';
-    final buildText = _buildNumber == null ? '' : ' (build $_buildNumber)';
+    const buildText = '';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
