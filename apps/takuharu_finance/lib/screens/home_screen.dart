@@ -220,13 +220,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     if (c != 0) return c;
                     return b.id.compareTo(a.id);
                   });
-                return _body(month);
+                // 「最近の入出金」用：追加した順（ID降順）で最新5件。
+                // 月フィルタではなく全件から取るので、月をまたいで追加しても必ず出る。
+                final recentAll = all.toList()
+                  ..sort((a, b) => b.id.compareTo(a.id));
+                return _body(month, recentAll);
               },
             ),
     );
   }
 
-  Widget _body(List<core.Transaction> month) {
+  Widget _body(List<core.Transaction> month, List<core.Transaction> recentAll) {
     final income = month
         .where((t) => t.type == core.TransactionType.income)
         .fold<int>(0, (s, t) => s + t.amount);
@@ -270,13 +274,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
         _sectionTitle('最近の入出金'),
         const SizedBox(height: 8),
-        if (month.isEmpty)
+        if (recentAll.isEmpty)
           _empty()
         else ...[
-          // 最新5件だけ表示（全部は「支出をすべて見る」から支出タブで）。
-          ...month.take(5).map(_txTile),
+          // 追加した順で最新5件（取引日でなく登録順なので、古い日付を後から追加しても必ず出る）。
+          ...recentAll.take(5).map(_txTile),
           const SizedBox(height: 4),
-          // 「支出の記録を見る」→ 支出タブへジャンプ。
           InkWell(
             onTap: widget.onOpenExpenses,
             borderRadius: BorderRadius.circular(12),

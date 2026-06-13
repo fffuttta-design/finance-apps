@@ -57,9 +57,17 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     }).toList();
     switch (_sort) {
       case _Sort.dateDesc:
-        l.sort((a, b) => b.date.compareTo(a.date));
+        l.sort((a, b) {
+          final c = b.date.compareTo(a.date);
+          if (c != 0) return c;
+          return b.id.compareTo(a.id); // 同日は追加が新しい順
+        });
       case _Sort.dateAsc:
-        l.sort((a, b) => a.date.compareTo(b.date));
+        l.sort((a, b) {
+          final c = a.date.compareTo(b.date);
+          if (c != 0) return c;
+          return b.id.compareTo(a.id); // 同日は追加が新しい順
+        });
       case _Sort.amountDesc:
         l.sort((a, b) => b.amount.compareTo(a.amount));
       case _Sort.amountAsc:
