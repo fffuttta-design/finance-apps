@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.74",
-    "buildNumber":  "79",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.74/takuharu-finance-v0.2.74.apk",
-    "releaseNotes":  "通知漏れを解消(前面表示/編集/完了/削除/固定費)"
+    "version":  "0.2.75",
+    "buildNumber":  "80",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.75/takuharu-finance-v0.2.75.apk",
+    "releaseNotes":  "設定に通知タブを追加(各自が種類別にON/OFF)"
 }
