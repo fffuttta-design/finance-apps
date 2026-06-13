@@ -68,7 +68,7 @@ class _KindSection extends StatelessWidget {
     if (result == null) return;
     final repo = PlanRepository.instance;
     if (result.delete && editing != null) {
-      await repo.delete(hid, editing.id);
+      await repo.delete(hid, editing.id, _uid);
       return;
     }
     if (editing != null) {

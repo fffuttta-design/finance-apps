@@ -25,9 +25,12 @@ class SubscriptionRepository {
     });
   }
 
-  Future<void> save(String hid, Subscription s) async {
+  /// 固定費を保存する。更新した本人 [uid] を記録し、通知サービスが
+  /// 「変更した人を除いた相手」へ通知できるようにする。
+  Future<void> save(String hid, Subscription s, String uid) async {
     await _coll(hid).doc(s.id).set({
       ...s.toJson(),
+      'updatedBy': uid,
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }

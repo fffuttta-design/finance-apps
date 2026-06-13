@@ -167,7 +167,7 @@ class _PlanDetailScreenState extends State<PlanDetailScreen> {
     if (ok != true) return;
     final hid = _hid;
     if (hid == null) return;
-    await PlanRepository.instance.delete(hid, _item.id);
+    await PlanRepository.instance.delete(hid, _item.id, _myUid);
     if (mounted) Navigator.pop(context, true);
   }
 

@@ -98,12 +98,13 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     );
     if (result == null) return;
     final hid = HouseholdService.instance.householdId;
-    if (hid == null) return;
+    final uid = AuthService.instance.currentUser?.uid;
+    if (hid == null || uid == null) return;
     if (result.amount < 0) {
       // 削除シグナル（amount=-1）
       await SubscriptionRepository.instance.delete(hid, result.id);
     } else {
-      await SubscriptionRepository.instance.save(hid, result);
+      await SubscriptionRepository.instance.save(hid, result, uid);
     }
   }
 
@@ -160,7 +161,8 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   /// 変動費の「今月の実額」を入力して保存する。
   Future<void> _inputActual(Subscription s) async {
     final hid = HouseholdService.instance.householdId;
-    if (hid == null) return;
+    final uid = AuthService.instance.currentUser?.uid;
+    if (hid == null || uid == null) return;
     final ym = Subscription.ymKey(_now.year, _now.month);
     final ctrl =
         TextEditingController(text: s.monthlyActuals[ym]?.toString() ?? '');
@@ -208,7 +210,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     if (v == null || v < 0) return;
     final next = Map<String, int>.from(s.monthlyActuals)..[ym] = v;
     await SubscriptionRepository.instance
-        .save(hid, s.copyWith(monthlyActuals: next));
+        .save(hid, s.copyWith(monthlyActuals: next), uid);
     if (mounted) _toast('${_now.month}月の実額を保存しました');
   }
 

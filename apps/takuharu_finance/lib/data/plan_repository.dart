@@ -44,7 +44,14 @@ class PlanRepository {
     }, SetOptions(merge: true));
   }
 
-  Future<void> delete(String hid, String id) async {
+  /// 項目を削除する。削除した本人 [uid] を記録してから消すことで、
+  /// 通知サービス側が「削除した人を除いた相手」へ通知できる。
+  Future<void> delete(String hid, String id, String uid) async {
+    try {
+      await _coll(hid)
+          .doc(id)
+          .set({'deletedBy': uid}, SetOptions(merge: true));
+    } catch (_) {/* 失敗しても削除は続行 */}
     await _coll(hid).doc(id).delete();
   }
 

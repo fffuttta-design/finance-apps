@@ -107,7 +107,7 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
     if (ok != true) return;
     final hid = HouseholdService.instance.householdId;
     if (hid == null) return;
-    await TxRepository.instance.delete(hid, _t.id);
+    await TxRepository.instance.delete(hid, _t.id, _myUid);
     if (mounted) Navigator.pop(context, true);
   }
 

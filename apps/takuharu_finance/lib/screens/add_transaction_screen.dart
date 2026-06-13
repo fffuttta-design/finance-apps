@@ -344,9 +344,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
     if (ok != true) return;
     final hid = HouseholdService.instance.householdId;
-    if (hid == null) return;
+    final uid = AuthService.instance.currentUser?.uid;
+    if (hid == null || uid == null) return;
     setState(() => _saving = true);
-    await TxRepository.instance.delete(hid, e.id);
+    await TxRepository.instance.delete(hid, e.id, uid);
     if (mounted) Navigator.pop(context, true);
   }
 
