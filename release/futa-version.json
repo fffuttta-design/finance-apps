@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.275",
-    "buildNumber":  "276",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.275/futa-finance-v1.0.275.apk",
-    "releaseNotes":  "v1.0.275+276 リリース"
+    "version":  "1.0.280",
+    "buildNumber":  "281",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.280/futa-finance-v1.0.280.apk",
+    "releaseNotes":  "v1.0.280 - 事業モードのタブ名変更・経費タブを諸経費/外注費に分割"
 }
