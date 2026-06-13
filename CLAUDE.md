@@ -47,7 +47,7 @@
 | **Web** | `git push origin main` | Claude（push で自動） |
 | **Android (FutaFinance)** | Bash で flutter build → gh release → version.json push | Claude が直接実行 |
 | **Android (たくはる)** | Bash で flutter build → gh release → version.json push | Claude が直接実行 |
-| **Windows Desktop** | `desktop/Scripts/build_desktop.ps1 -Version X.Y.Z -Publish` | ユーザーが実行 |
+| **Windows Desktop** | `desktop/Scripts/build_desktop.ps1 -Publish` | ユーザーが実行 |
 
 > ※ Windows Desktop のみユーザー実行（NSIS ビルドがユーザー実機依存）。それ以外は Claude が Bash で直接実行する。
 
@@ -91,6 +91,24 @@ git add release/futa-version.json
 git commit -m "release(futa): vX.Y.Z+B - リリースノート"
 git push origin main
 ```
+
+### Windows Desktop 配信（ユーザーが実行）
+
+デスクトップ版は **GitHub Releases** で配信する（Drive非依存）。
+更新チェック: アプリ起動時に `release/futa-windows-version.json` を GitHub raw から fetch。
+
+```powershell
+# ユーザーの実機で実行（デスクトップアプリのビルドは Claude の Bash では不可）
+cd C:\dev\CoreBusinessTools\finance-apps\apps\futa_finance\desktop\Scripts
+.\build_desktop.ps1 -Publish
+# → zip 作成 → gh release create futa-win-vX.Y.Z → futa-windows-version.json 更新 → git push
+```
+
+初回インストール手順（他PC）:
+1. GitHub Releases から `futa-desktop-vX.Y.Z.zip` をダウンロード
+2. 任意の場所に解凍
+3. `FutaFinance.exe` を一度実行 → `%LOCALAPPDATA%\FutaFinance` へ自動インストール
+4. 以降は `%LOCALAPPDATA%\FutaFinance\FutaFinance.exe`（またはデスクトップのショートカット）から起動
 
 ---
 
