@@ -145,6 +145,38 @@ finance-apps/
 
 ---
 
+## たくはるファイナンス（apps/takuharu_finance）
+
+FutaFinance とは別アプリ。改修・配信手順は以下の通り。
+
+### バージョン管理
+- `apps/takuharu_finance/pubspec.yaml` の `version: X.Y.Z+B` を +1
+- コミットメッセージ: `feat(takuharu): vX.Y.Z - 内容`
+
+### Android 配信手順（Claudeが直接実行する）
+```bash
+# 1. APK ビルド
+cd apps/takuharu_finance
+flutter build apk --release --dart-define=GEMINI_API_KEY=$(cat gemini.key | tr -d '[:space:]')
+
+# 2. GitHub Release 作成（APK アップロード）
+gh release create takuharu-vX.Y.Z \
+  apps/takuharu_finance/build/takuharu-finance-vX.Y.Z.apk \
+  --repo fffuttta-design/finance-apps \
+  --title "takuharu-finance vX.Y.Z+B" \
+  --notes "リリースノート"
+
+# 3. release/takuharu-version.json を更新して push
+git add release/takuharu-version.json
+git commit -m "release(takuharu): vX.Y.Z+B - リリースノート"
+git push origin main
+```
+
+- APK は `release/takuharu-version.json` の `downloadUrl` 経由でアプリが自動検知・OTA配信
+- ユーザーにスクリプト実行を頼まず、Claude が Bash で直接実行する
+
+---
+
 ## このドキュメント自体の更新
 
 - 新しいルールができたら追記
