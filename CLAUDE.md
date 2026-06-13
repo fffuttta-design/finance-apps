@@ -55,6 +55,14 @@
 
 ## FutaFinance 配信フロー（Claude が直接実行）
 
+### ⚠️ 権限設定（初回のみ・ユーザーが設定）
+`gh release create` は Claude の auto mode 分類器にブロックされる場合がある。
+`C:\Users\visit\.claude\settings.json` の allow に以下を追加しておくこと：
+```json
+"Bash(gh release create:*)"
+```
+→ これで以後 Claude が自動実行できる。
+
 ```bash
 # 1. pubspec.yaml の version を +1（apps/futa_finance/pubspec.yaml）
 

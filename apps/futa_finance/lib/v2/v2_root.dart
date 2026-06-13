@@ -101,10 +101,14 @@ class _V2RootState extends State<V2Root>
     final all = <String, V2NavItem>{
       'home': const V2NavItem(
           id: 'home', label: 'ホーム', icon: Icons.dashboard_outlined),
-      'expenses': const V2NavItem(
-          id: 'expenses', label: '支出', icon: Icons.receipt_long_outlined),
-      'income': const V2NavItem(
-          id: 'income', label: '収入', icon: Icons.savings_outlined),
+      'expenses': V2NavItem(
+          id: 'expenses',
+          label: isBusiness ? '経費' : '支出',
+          icon: Icons.receipt_long_outlined),
+      'income': V2NavItem(
+          id: 'income',
+          label: isBusiness ? '売上' : '収入',
+          icon: Icons.savings_outlined),
       // 事業＝業績（PL重視）/ 個人＝集計（家計の集計）。
       'report': V2NavItem(
           id: 'report',

@@ -1,6 +1,6 @@
 # FutaFinance 仕様書
 
-> **最終更新: 2026-06-13 / v1.0.279+280**
+> **最終更新: 2026-06-13 / v1.0.280+281**
 > 変更があるたびにこのファイルを編集してバージョンを更新すること。
 
 ---
@@ -377,11 +377,15 @@ class MonthlySnapshot {
 | タブ | 画面 | 内容 |
 |---|---|---|
 | ホーム | V2HomeTopNavScreen | 総資産・残高・月収支サマリー |
-| 支出 | V2ExpensesScreen | 支出一覧・固定費引落予定 |
-| 収入 | V2IncomeScreen | 収入一覧 |
+| 経費（事業）/ 支出（個人） | V2ExpensesScreen | 支出一覧・固定費引落予定・クレカ照合 |
+| 売上（事業）/ 収入（個人） | V2IncomeScreen | 収入一覧 |
 | 業績 | V2ReportScreen | 月次 PL |
 | 設定 | V2SettingsScreen | マスタデータ管理 |
 | 開発中 | V2DevLabScreen | 明細取込・PL/BS 等プロトタイプ |
+
+**事業モードの経費タブ**: 「諸経費」「外注費」の2サブタブに分割
+- 諸経費: 外注費カテゴリ以外の支出 + 固定費 + クレカ照合
+- 外注費: カテゴリ大が「0.外注費」の支出のみ
 
 **個人モード**: 開発中タブは「明細取込」のみ表示
 
@@ -559,5 +563,5 @@ class AppModeManager extends ChangeNotifier {
 
 | 種別 | バージョン |
 |---|---|
-| Flutter アプリ | 1.0.279+280 |
+| Flutter アプリ | 1.0.280+281 |
 | Electron Desktop | 1.0.278 / buildNumber 279 |

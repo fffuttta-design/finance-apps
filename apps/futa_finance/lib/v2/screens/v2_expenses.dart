@@ -41,7 +41,8 @@ class V2ExpensesScreen extends StatefulWidget {
 }
 
 class _V2ExpensesScreenState extends State<V2ExpensesScreen>
-    with ModeAwareMixin {
+    with ModeAwareMixin, SingleTickerProviderStateMixin {
+  TabController? _subTabController;
   final _txRepo = TransactionRepository.instance;
   final _settings = SettingsRepository();
   final _subscriptionRepo = SubscriptionRepository.instance;
@@ -63,11 +64,27 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
       '${_focused.year}-${_focused.month.toString().padLeft(2, '0')}';
 
   @override
-  void onModeChanged() => _load();
+  void onModeChanged() {
+    _rebuildSubTabController();
+    _load();
+  }
+
+  bool get _isBusiness =>
+      AppModeManager.instance.current == AppMode.business;
+
+  void _rebuildSubTabController() {
+    _subTabController?.dispose();
+    if (_isBusiness) {
+      _subTabController = TabController(length: 2, vsync: this);
+    } else {
+      _subTabController = null;
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _rebuildSubTabController();
     _load();
     _sub = _txRepo.stream.listen((list) {
       if (!mounted) return;
@@ -78,6 +95,7 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
   @override
   void dispose() {
     _sub?.cancel();
+    _subTabController?.dispose();
     super.dispose();
   }
 
@@ -355,6 +373,10 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     if (mounted) await _load();
   }
 
+  /// 外注費カテゴリ判定（大カテゴリが "0.外注費" 相当）。
+  bool _isGaichu(core.Transaction t) =>
+      t.category.major.contains('外注費');
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -363,64 +385,148 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
         child: Center(child: CircularProgressIndicator()),
       );
     }
-    final isBusiness =
-        AppModeManager.instance.current == AppMode.business;
     final expenses = _monthExpenses;
-    // 一覧には振替も載せる（合計には足さない）。
     final entries = _monthEntries;
     final total = expenses.fold<int>(0, (s, t) => s + t.amount);
-    // 固定費（毎月支出予定）の当月合計。一番上の月合計は「経費＋固定費」にする。
     final fixedTotal =
         _monthlyCharges.fold<int>(0, (s, c) => s + c.amountForMonth(_ymKey));
 
+    // 月切替バー（諸経費/外注費 共通）
+    final monthBar = V2Card(
+      padding: const EdgeInsets.symmetric(
+          horizontal: V2Spacing.lg, vertical: V2Spacing.md),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left, size: 20),
+            onPressed: () => _shiftMonth(-1),
+          ),
+          Text(
+            '${_focused.year}年${_focused.month}月',
+            style: V2Typography.h2.copyWith(color: V2Colors.textPrimary),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right, size: 20),
+            onPressed: () => _shiftMonth(1),
+          ),
+          Text('合計',
+              style: V2Typography.caption
+                  .copyWith(color: V2Colors.textSecondary)),
+          const SizedBox(width: V2Spacing.sm),
+          Expanded(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Text(
+                  formatYen(-(total + fixedTotal), withSign: true),
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: V2Colors.negative,
+                      fontFeatures: V2Typography.tabularNums)),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    // 事業モード: 諸経費/外注費 サブタブ
+    if (_isBusiness && _subTabController != null) {
+      final gaichuEntries =
+          entries.where(_isGaichu).toList();
+      final gaichuExpenses =
+          expenses.where(_isGaichu).toList();
+      final shokeihiEntries =
+          entries.where((t) => !_isGaichu(t)).toList();
+      final shokeihiExpenses =
+          expenses.where((t) => !_isGaichu(t)).toList();
+      final shokeihiTotal =
+          shokeihiExpenses.fold<int>(0, (s, t) => s + t.amount);
+      final gaichuTotal =
+          gaichuExpenses.fold<int>(0, (s, t) => s + t.amount);
+
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                V2Spacing.md, V2Spacing.xl, V2Spacing.md, 0),
+            child: monthBar,
+          ),
+          const SizedBox(height: V2Spacing.sm),
+          // サブタブバー
+          Container(
+            color: V2Colors.surface,
+            child: TabBar(
+              controller: _subTabController,
+              labelColor: widget.accent,
+              unselectedLabelColor: V2Colors.textSecondary,
+              indicatorColor: widget.accent,
+              tabs: [
+                Tab(
+                    text:
+                        '諸経費　${formatYen(shokeihiTotal + fixedTotal)}'),
+                Tab(text: '外注費　${formatYen(gaichuTotal)}'),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _subTabController,
+              children: [
+                // ── 諸経費タブ ──
+                _buildScrollBody(
+                  entries: shokeihiEntries,
+                  total: shokeihiTotal,
+                  label: '諸経費明細',
+                  showFixed: true,
+                  showCardBilling: true,
+                ),
+                // ── 外注費タブ ──
+                _buildScrollBody(
+                  entries: gaichuEntries,
+                  total: gaichuTotal,
+                  label: '外注費明細',
+                  showFixed: false,
+                  showCardBilling: false,
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    // 個人モード: 従来レイアウト（月切替バーを上部に含む）
+    return _buildScrollBody(
+      entries: entries,
+      total: total,
+      label: '支出明細',
+      showFixed: true,
+      showCardBilling: true,
+      topWidget: Padding(
+        padding: const EdgeInsets.only(bottom: V2Spacing.sm),
+        child: monthBar,
+      ),
+    );
+  }
+
+  /// スクロールコンテンツ本体。諸経費・外注費・個人モードで共用。
+  Widget _buildScrollBody({
+    required List<core.Transaction> entries,
+    required int total,
+    required String label,
+    required bool showFixed,
+    required bool showCardBilling,
+    Widget? topWidget,
+  }) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(
           vertical: V2Spacing.xl, horizontal: V2Spacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── 月切替バー + 集計サマリー ─────────────────
-          V2Card(
-            padding: const EdgeInsets.symmetric(
-                horizontal: V2Spacing.lg, vertical: V2Spacing.md),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.chevron_left, size: 20),
-                  onPressed: () => _shiftMonth(-1),
-                ),
-                Text(
-                  '${_focused.year}年${_focused.month}月',
-                  style: V2Typography.h2.copyWith(
-                      color: V2Colors.textPrimary),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.chevron_right, size: 20),
-                  onPressed: () => _shiftMonth(1),
-                ),
-                // 右側：「合計 金額」を1行で（狭い画面でも見切れないよう縮小可）。
-                Text('合計',
-                    style: V2Typography.caption
-                        .copyWith(color: V2Colors.textSecondary)),
-                const SizedBox(width: V2Spacing.sm),
-                Expanded(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                        formatYen(-(total + fixedTotal), withSign: true),
-                        style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: V2Colors.negative,
-                            fontFeatures: V2Typography.tabularNums)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: V2Spacing.sm),
-          // ── 取引一覧（経費明細）を上に ────────────────────
+          if (topWidget != null) topWidget,
+          // ── 取引一覧 ────────────────────
           V2Card(
             padding: EdgeInsets.zero,
             child: Column(
@@ -431,7 +537,6 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
                       V2Spacing.lg, V2Spacing.md, V2Spacing.lg, V2Spacing.sm),
                   child: Row(
                     children: [
-                      // タイトルをタップ → 全件一覧（並び替え・検索）へ
                       Expanded(
                         child: InkWell(
                           onTap: _openExpenseList,
@@ -444,8 +549,7 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
                                 Icon(Icons.receipt_long_outlined,
                                     size: 18, color: widget.accent),
                                 const SizedBox(width: V2Spacing.sm),
-                                Text(isBusiness ? '経費明細' : '支出明細',
-                                    style: V2Typography.h2),
+                                Text(label, style: V2Typography.h2),
                                 const SizedBox(width: 4),
                                 const Icon(Icons.chevron_right,
                                     size: 18, color: V2Colors.textMuted),
@@ -458,7 +562,6 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
                           ),
                         ),
                       ),
-                      // 追加ボタンは廃止。代わりに経費明細の合計を表示。
                       Text('-${formatYen(total)}',
                           style: TextStyle(
                               fontSize: 16,
@@ -476,7 +579,7 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
                         const Icon(Icons.inbox_outlined,
                             size: 36, color: V2Colors.textMuted),
                         const SizedBox(height: V2Spacing.sm),
-                        Text('${_focused.month}月の支出記録なし',
+                        Text('${_focused.month}月の記録なし',
                             style: V2Typography.caption.copyWith(
                                 color: V2Colors.textSecondary)),
                       ],
@@ -491,27 +594,28 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
               ],
             ),
           ),
-          if (_monthlyCharges.isNotEmpty)
+          if (showFixed && _monthlyCharges.isNotEmpty)
             const SizedBox(height: V2Spacing.lg),
-          // ── 毎月支出予定（固定費 / 変動費）を経費明細の下に ──────
-          _MonthlyChargesSection(
-            charges: _monthlyCharges,
-            onTapItem: _openSubscriptionEdit,
-            isCurrentMonth: _focused.year == DateTime.now().year &&
-                _focused.month == DateTime.now().month,
-            ym: _ymKey,
-            onInputVariable: _inputVariableActual,
-          ),
-          const SizedBox(height: V2Spacing.lg),
-          // ── クレカ引落照合セクション ─────────────────────
-          _CreditCardBillingSection(
-            cards: _payments.creditCards
-                .where((c) => !c.inactive)
-                .toList(),
-            transactions: _transactions,
-            ym: _ymKey,
-            onSaveActual: _saveCreditCardActual,
-          ),
+          if (showFixed)
+            _MonthlyChargesSection(
+              charges: _monthlyCharges,
+              onTapItem: _openSubscriptionEdit,
+              isCurrentMonth: _focused.year == DateTime.now().year &&
+                  _focused.month == DateTime.now().month,
+              ym: _ymKey,
+              onInputVariable: _inputVariableActual,
+            ),
+          if (showCardBilling) ...[
+            const SizedBox(height: V2Spacing.lg),
+            _CreditCardBillingSection(
+              cards: _payments.creditCards
+                  .where((c) => !c.inactive)
+                  .toList(),
+              transactions: _transactions,
+              ym: _ymKey,
+              onSaveActual: _saveCreditCardActual,
+            ),
+          ],
         ],
       ),
     );
