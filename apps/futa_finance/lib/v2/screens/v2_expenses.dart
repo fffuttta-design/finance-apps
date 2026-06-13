@@ -337,6 +337,24 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     if (mounted) await _load();
   }
 
+  /// クレカの実際請求金額を保存する。
+  Future<void> _saveCreditCardActual(
+      core.RegisteredCreditCard card, String ym, int? amount) async {
+    final idx = _payments.creditCards.indexWhere((c) => c.id == card.id);
+    if (idx < 0) return;
+    final m = Map<String, int>.from(card.monthlyActualBillings);
+    if (amount == null || amount <= 0) {
+      m.remove(ym);
+    } else {
+      m[ym] = amount;
+    }
+    final newCards = [..._payments.creditCards];
+    newCards[idx] = card.copyWith(monthlyActualBillings: m);
+    await _settings
+        .savePayments(_payments.copyWith(creditCards: newCards));
+    if (mounted) await _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -483,6 +501,16 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
                 _focused.month == DateTime.now().month,
             ym: _ymKey,
             onInputVariable: _inputVariableActual,
+          ),
+          const SizedBox(height: V2Spacing.lg),
+          // ── クレカ引落照合セクション ─────────────────────
+          _CreditCardBillingSection(
+            cards: _payments.creditCards
+                .where((c) => !c.inactive)
+                .toList(),
+            transactions: _transactions,
+            ym: _ymKey,
+            onSaveActual: _saveCreditCardActual,
           ),
         ],
       ),
@@ -1231,6 +1259,304 @@ class _ExpenseRowState extends State<_ExpenseRow> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════
+// クレカ引落照合セクション
+// ═════════════════════════════════════════════════
+
+/// クレカごとに「予定金額（明細合計）vs 実際金額（手入力）」を並べ、差分で棚卸しを促す。
+class _CreditCardBillingSection extends StatelessWidget {
+  final List<core.RegisteredCreditCard> cards;
+  final List<core.Transaction> transactions;
+  final String ym;
+
+  /// (card, ym, amount) → 実際金額を保存。amount=null でクリア。
+  final Future<void> Function(
+      core.RegisteredCreditCard card, String ym, int? amount) onSaveActual;
+
+  const _CreditCardBillingSection({
+    required this.cards,
+    required this.transactions,
+    required this.ym,
+    required this.onSaveActual,
+  });
+
+  /// 当月・当カードの明細合計（予定金額）。
+  int _planned(core.RegisteredCreditCard card) {
+    final parts = ym.split('-');
+    final year = int.parse(parts[0]);
+    final month = int.parse(parts[1]);
+    return transactions
+        .where((t) =>
+            t.type == core.TransactionType.expense &&
+            t.paymentMethod == card.name &&
+            t.date.year == year &&
+            t.date.month == month)
+        .fold(0, (s, t) => s + t.amount);
+  }
+
+  /// セクションに表示するカード（当月明細あり or 実際金額入力済み）。
+  List<core.RegisteredCreditCard> get _visibleCards {
+    return cards.where((c) {
+      return _planned(c) > 0 || c.monthlyActualBillings.containsKey(ym);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = _visibleCards;
+    if (visible.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: V2Spacing.sm),
+          child: Row(
+            children: [
+              const Icon(Icons.credit_card, size: 18, color: Color(0xFFDC2626)),
+              const SizedBox(width: V2Spacing.sm),
+              Text('クレカ引落照合',
+                  style: V2Typography.h2.copyWith(color: V2Colors.textPrimary)),
+            ],
+          ),
+        ),
+        V2Card(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              for (int i = 0; i < visible.length; i++) ...[
+                if (i > 0)
+                  const Divider(height: 1, color: V2Colors.divider),
+                _BillingRow(
+                  card: visible[i],
+                  planned: _planned(visible[i]),
+                  actual: visible[i].monthlyActualBillings[ym],
+                  ym: ym,
+                  onSaveActual: onSaveActual,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BillingRow extends StatelessWidget {
+  final core.RegisteredCreditCard card;
+  final int planned;
+  final int? actual;
+  final String ym;
+  final Future<void> Function(
+      core.RegisteredCreditCard card, String ym, int? amount) onSaveActual;
+
+  const _BillingRow({
+    required this.card,
+    required this.planned,
+    required this.actual,
+    required this.ym,
+    required this.onSaveActual,
+  });
+
+  Future<void> _inputActual(BuildContext context) async {
+    final ctrl = NoComposingUnderlineController(
+        text: actual != null && actual! > 0 ? formatAmount(actual!) : '');
+    int? result;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('${card.name}の実際請求額'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('予定（明細合計）: ${formatYen(planned)}',
+                style:
+                    const TextStyle(fontSize: 12, color: V2Colors.textSecondary)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              inputFormatters: [
+                HalfWidthDigitsFormatter(),
+                ThousandsSeparatorInputFormatter(),
+              ],
+              decoration: const InputDecoration(
+                labelText: 'カード会社通知の請求額（円）',
+                prefixText: '¥ ',
+                border: OutlineInputBorder(),
+                isDense: true,
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () {
+                result = -1; // クリア
+                Navigator.pop(context);
+              },
+              child: const Text('クリア')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('キャンセル')),
+          FilledButton(
+              onPressed: () {
+                result = parseAmount(ctrl.text) ?? 0;
+                Navigator.pop(context);
+              },
+              child: const Text('保存')),
+        ],
+      ),
+    );
+    if (result == null) return;
+    final amount = result! <= 0 ? null : result;
+    await onSaveActual(card, ym, amount);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final diff = actual != null ? actual! - planned : null;
+    final hasActual = actual != null && actual! > 0;
+
+    // 差分の色・ラベル
+    Color diffColor;
+    String diffLabel;
+    if (diff == null) {
+      diffColor = V2Colors.textMuted;
+      diffLabel = '未入力';
+    } else if (diff == 0) {
+      diffColor = V2Colors.positive;
+      diffLabel = '一致';
+    } else if (diff > 0) {
+      diffColor = V2Colors.negative;
+      diffLabel = '+${formatYen(diff)} 超過';
+    } else {
+      diffColor = V2Colors.warning;
+      diffLabel = '${formatYen(diff)} 未確認';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+          horizontal: V2Spacing.lg, vertical: V2Spacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // カード名
+          Row(
+            children: [
+              BrandLogo(
+                iconUrl: card.iconUrl,
+                fallbackEmoji: '💳',
+                size: 20,
+                borderRadius: 3,
+              ),
+              const SizedBox(width: V2Spacing.sm),
+              Expanded(
+                child: Text(card.name,
+                    style: V2Typography.body
+                        .copyWith(fontWeight: FontWeight.w700)),
+              ),
+              // 差分バッジ
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: diffColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                      color: diffColor.withValues(alpha: 0.4), width: 1),
+                ),
+                child: Text(diffLabel,
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: diffColor)),
+              ),
+            ],
+          ),
+          const SizedBox(height: V2Spacing.sm),
+          // 予定 / 実際 の2列
+          Row(
+            children: [
+              // 予定金額（自動）
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('予定（明細合計）',
+                        style: V2Typography.micro
+                            .copyWith(color: V2Colors.textMuted)),
+                    const SizedBox(height: 2),
+                    Text(formatYen(planned),
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: planned > 0
+                                ? V2Colors.textPrimary
+                                : V2Colors.textMuted,
+                            fontFeatures: V2Typography.tabularNums)),
+                  ],
+                ),
+              ),
+              // 実際金額（手入力）
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _inputActual(context),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text('実際（カード通知）',
+                              style: V2Typography.micro
+                                  .copyWith(color: V2Colors.textMuted)),
+                          const SizedBox(width: 3),
+                          const Icon(Icons.edit,
+                              size: 11, color: V2Colors.textMuted),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: hasActual
+                              ? const Color(0xFFFEF2F2)
+                              : V2Colors.surfaceMuted,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                              color: hasActual
+                                  ? const Color(0xFFDC2626).withValues(alpha: 0.4)
+                                  : V2Colors.border),
+                        ),
+                        child: Text(
+                          hasActual ? formatYen(actual!) : '未入力 (タップ)',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: hasActual
+                                  ? const Color(0xFFDC2626)
+                                  : V2Colors.textMuted,
+                              fontFeatures: V2Typography.tabularNums),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

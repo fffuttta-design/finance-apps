@@ -177,6 +177,11 @@ class RegisteredCreditCard {
   /// 当月利用が偶々 0 円のアクティブカードと区別するため明示設定。
   final bool inactive;
 
+  /// カード会社通知の実際の引落金額（月ごと）。
+  /// キー: "YYYY-MM"（利用月）、値: カード会社通知の請求金額（円）。
+  /// 予定金額（明細の合計）との差分で棚卸しに使う。
+  final Map<String, int> monthlyActualBillings;
+
   const RegisteredCreditCard({
     required this.id,
     required this.name,
@@ -187,6 +192,7 @@ class RegisteredCreditCard {
     this.memo,
     this.paymentDay,
     this.inactive = false,
+    this.monthlyActualBillings = const {},
   });
 
   /// 表示用の累積額（null は 0扱い）。
@@ -202,6 +208,7 @@ class RegisteredCreditCard {
         'memo': memo,
         'paymentDay': paymentDay,
         'inactive': inactive,
+        'monthlyActualBillings': monthlyActualBillings,
       };
 
   factory RegisteredCreditCard.fromJson(Map<String, dynamic> j) =>
@@ -215,6 +222,9 @@ class RegisteredCreditCard {
         memo: j['memo'] as String?,
         paymentDay: j['paymentDay'] as int?,
         inactive: j['inactive'] as bool? ?? false,
+        monthlyActualBillings: (j['monthlyActualBillings'] as Map<String, dynamic>?)
+                ?.map((k, v) => MapEntry(k, (v as num).toInt())) ??
+            const {},
       );
 
   RegisteredCreditCard copyWith({
@@ -226,6 +236,7 @@ class RegisteredCreditCard {
     String? memo,
     int? paymentDay,
     bool? inactive,
+    Map<String, int>? monthlyActualBillings,
     bool clearMemo = false,
     bool clearPaymentDay = false,
   }) =>
@@ -240,6 +251,8 @@ class RegisteredCreditCard {
         paymentDay:
             clearPaymentDay ? null : (paymentDay ?? this.paymentDay),
         inactive: inactive ?? this.inactive,
+        monthlyActualBillings:
+            monthlyActualBillings ?? this.monthlyActualBillings,
       );
 }
 
