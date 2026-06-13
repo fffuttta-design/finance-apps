@@ -20,42 +20,53 @@
   - 例: `feat(futa): v1.0.57 - ホーム画面の色調整`
 - レスポンス冒頭に **`✅ vX.Y.Z デプロイ完了`** を明記
 
-### ③ 対象デバイス全てに配信
-改修が完了したら、以下 3 環境への配信を確実に:
+### ③ 改修のたびに必ずデプロイ（例外なし）
+**コード改修が終わったら、毎回・必ず・自動でデプロイまで完了させること。**
+ユーザーに「デプロイして」と言わせない。改修完了 = デプロイ完了。
 
-| 環境 | 配信方法 | 自動 or 手動 |
+### ④ 対象デバイス全てに配信
+改修が完了したら、以下の環境への配信を確実に:
+
+| 環境 | 配信方法 | 実行者 |
 |---|---|---|
-| **Web** | `git push origin main` | GitHub Actions が自動で gh-pages 更新 |
-| **Android** | `pwsh deploy.ps1` | 手動実行。APK ビルド + GitHub Release + version.json |
-| **Windows Desktop** | **Electron版**（`apps/futa_finance/desktop`）。`desktop/Scripts/build_desktop.ps1 -Version X.Y.Z -Publish` で NSIS インストーラをビルド → Drive `FutaFinance-Desktop` へ配布（自動更新あり） | 手動実行 |
+| **Web** | `git push origin main` | Claude（push で自動） |
+| **Android (FutaFinance)** | Bash で flutter build → gh release → version.json push | Claude が直接実行 |
+| **Android (たくはる)** | Bash で flutter build → gh release → version.json push | Claude が直接実行 |
+| **Windows Desktop** | `desktop/Scripts/build_desktop.ps1 -Version X.Y.Z -Publish` | ユーザーが実行 |
 
-> ※ Windows は Flutter ネイティブ版を**退役**（日本語IMEのカーソル飛び対策で Electron 化）。`flutter build windows` 用の `windows/` と `deploy_windows.ps1` は削除済み。詳細はメモリ「FutaFinance Electronデスクトップ版」。
-
-- Web は git push で自動完了（数分で反映）
-- Android は `deploy.ps1` を実行しないとリリースされない。バージョンは pubspec.yaml から読まれる
-- Windows は将来対応
+> ※ Windows Desktop のみユーザー実行（NSIS ビルドがユーザー実機依存）。それ以外は Claude が Bash で直接実行する。
 
 ---
 
-## 配信フロー（手順）
+## FutaFinance 配信フロー（Claude が直接実行）
 
 ```bash
-# 1. pubspec.yaml の version を +1
-# 2. 改修コードを stage
+# 1. pubspec.yaml の version を +1（apps/futa_finance/pubspec.yaml）
+
+# 2. コミット & Web 配信
 git add <changed files>
-
-# 3. コミット（メッセージ冒頭に vX.Y.Z）
-git commit -m "v1.0.X - <summary>"
-
-# 4. Web 配信（自動）
+git commit -m "feat(futa): vX.Y.Z - 内容"
 git push origin main
-# → GitHub Actions が gh-pages を更新
-# → https://fffuttta-design.github.io/finance-apps/ に反映
+# → GitHub Actions が自動で Web (gh-pages) を更新
 
-# 5. Android 配信（手動、リリースしたい時のみ）
-pwsh deploy.ps1
-# → APK release ビルド + 実機インストール + GitHub Release 作成
-# → アプリ起動時の更新チェックが新版を検出
+# 3. Android APK ビルド
+cd apps/futa_finance
+flutter build apk --release --dart-define=GEMINI_API_KEY=$(cat gemini.key | tr -d '[:space:]')
+
+# 4. APK を versioned 名にコピー
+cp build/app/outputs/flutter-apk/app-release.apk build/futa-finance-vX.Y.Z.apk
+
+# 5. GitHub Release 作成（APK アップロード）
+gh release create futa-vX.Y.Z build/futa-finance-vX.Y.Z.apk \
+  --repo fffuttta-design/finance-apps \
+  --title "FutaFinance vX.Y.Z+B" \
+  --notes "リリースノート"
+
+# 6. release/futa-version.json を更新して push
+# (downloadUrl = https://github.com/fffuttta-design/finance-apps/releases/download/futa-vX.Y.Z/futa-finance-vX.Y.Z.apk)
+git add release/futa-version.json
+git commit -m "release(futa): vX.Y.Z+B - リリースノート"
+git push origin main
 ```
 
 ---
