@@ -5,7 +5,7 @@
 //     （固定オリジンにすることで Firebase/IndexedDB のオフライン永続が効く）
 //  2. Google ログインを自前 OAuth（ループバック＋PKCE）で実施し、トークンを
 //     preload 経由で Flutter に渡す（埋め込み画面は Google に弾かれるため）
-//  3. Drive リリースフォルダを見て自己更新（best-effort）
+//  3. GitHub Releases からバージョン確認・自動更新（Drive 非依存）
 const {
   app, BrowserWindow, ipcMain, shell, dialog, session,
 } = require('electron');
@@ -34,14 +34,9 @@ const SCOPES = [
 const AUTH_EP = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_EP = 'https://oauth2.googleapis.com/token';
 
-// Drive 配布フォルダ候補（自己更新用）。
-const DRIVE_CANDIDATES = [
-  'H:\\マイドライブ\\ツール開発\\FutaFinance-Desktop',
-  'G:\\マイドライブ\\ツール開発\\FutaFinance-Desktop',
-  'H:\\My Drive\\ツール開発\\FutaFinance-Desktop',
-  'G:\\My Drive\\ツール開発\\FutaFinance-Desktop',
-];
-const RELEASE_EXE_NAME = 'FutaFinance-Setup.exe'; // DriveのNSISインストーラ（固定名）
+// GitHub Releases 更新設定
+const GH_VERSION_URL =
+  'https://raw.githubusercontent.com/fffuttta-design/finance-apps/main/release/futa-windows-version.json';
 
 let mainWindow = null;
 let isQuitting = false;
@@ -369,21 +364,15 @@ async function createWindow() {
   mainWindow.loadURL(`http://127.0.0.1:${port}/`);
 }
 
-// ─────────────── 自己更新（FutaMemo方式: dir + robocopy + explorer.exe）───────────────
-// 配布はNSISではなく「展開済みフォルダ」。Driveの app\ から %LOCALAPPDATA%\FutaFinance へ
-// robocopy でコピーし、新版は explorer.exe 経由で起動する。explorer.exe で起動すると新
-// プロセスはシェル(explorer)の子になり、終了する旧アプリの道連れにならない＝
-// 「更新→落ちて戻らない」ループの根本対策。
+// ─────────────── 自己更新（GitHub Releases 方式）───────────────
+// 更新フロー:
+//  1. GitHub raw URL から futa-windows-version.json を fetch
+//  2. ローカルの build-info.json と buildNumber を比較
+//  3. 新版があればダイアログ表示
+//  4. 承認 → PS1 が Invoke-WebRequest でzipをDL → Expand-Archive → robocopy → explorer起動
 const APP_NAME = 'FutaFinance';
 const LOCAL_INSTALL_DIR = path.join(process.env.LOCALAPPDATA || '', APP_NAME);
 const LOCAL_EXE = path.join(LOCAL_INSTALL_DIR, `${APP_NAME}.exe`);
-
-function findDriveDir() {
-  for (const d of DRIVE_CANDIDATES) {
-    try { if (fs.statSync(d).isDirectory()) return d; } catch (_) {}
-  }
-  return null;
-}
 
 // このアプリ自身の版情報（build-info.json をアプリ内に同梱）。
 function readBuildInfo() {
@@ -392,20 +381,29 @@ function readBuildInfo() {
   } catch (_) { return { version: app.getVersion(), buildNumber: 0 }; }
 }
 
-// 更新元（Driveの app フォルダ）のパスを覚えておく。
-function updateSourceCfgPath() {
-  return path.join(app.getPath('userData'), 'update-source.json');
-}
-function getUpdateSourcePath() {
-  try {
-    const c = JSON.parse(fs.readFileSync(updateSourceCfgPath(), 'utf8'));
-    return typeof c.sourcePath === 'string' ? c.sourcePath : null;
-  } catch (_) { return null; }
-}
-function saveUpdateSourcePath(sourcePath) {
-  try {
-    fs.writeFileSync(updateSourceCfgPath(), JSON.stringify({ sourcePath }), 'utf8');
-  } catch (_) {}
+// GitHub raw から version JSON を fetch。
+function fetchVersionInfo() {
+  return new Promise((resolve, reject) => {
+    const url = new URL(GH_VERSION_URL);
+    const req = https.get(
+      { hostname: url.hostname, path: url.pathname + `?t=${Date.now()}`, headers: { 'Cache-Control': 'no-cache' } },
+      (res) => {
+        if (res.statusCode === 301 || res.statusCode === 302) {
+          https.get(res.headers.location, (res2) => {
+            let d = '';
+            res2.on('data', (c) => (d += c));
+            res2.on('end', () => { try { resolve(JSON.parse(d)); } catch (e) { reject(e); } });
+          }).on('error', reject);
+          return;
+        }
+        let d = '';
+        res.on('data', (c) => (d += c));
+        res.on('end', () => { try { resolve(JSON.parse(d)); } catch (e) { reject(e); } });
+      },
+    );
+    req.on('error', reject);
+    req.setTimeout(8000, () => { req.destroy(); reject(new Error('timeout')); });
+  });
 }
 
 // 進捗表示するPowerShellコンソールを新規ウィンドウで実行（✕無効化・末尾自動クローズ）。
@@ -433,45 +431,60 @@ function launchPS1(scriptLines) {
   ];
   const footer = ['', 'exit 0'];
   try {
-    fs.writeFileSync(tmpPath, bom + [...header, ...scriptLines, ...footer].join('\n'), 'utf8');
+    fs.writeFileSync(tmpPath, bom + [...header, ...scriptLines, ...footer].join('\r\n'), 'utf8');
     exec(`cmd /c start powershell.exe -ExecutionPolicy Bypass -NoProfile -File "${tmpPath}"`);
   } catch (e) { console.error('launchPS1 failed', e); }
 }
 
-// インストール/更新のPSスクリプトを組み立てる。
-// 重要: Google Drive のファイルは「オンラインのみ(未DL)」のことがあり、その状態で
-// robocopy /MIR を直接かけると読めず、ローカルのexeごと消してしまう。そこで：
-//   1) まず Drive → ローカル一時フォルダ($stage)へコピー(=実体をDLさせる, /E retries)
-//   2) $stage に FutaFinance.exe があるか検証。無ければ中断(=ローカルは壊さない)
-//   3) 検証OKなら $stage → LOCAL_INSTALL_DIR を /MIR で反映(ソースはローカルなので安全)
-//   4) explorer.exe で起動(=シェルの子→旧アプリの道連れにならない)
-function buildInstallScript(sourcePath, title, makeShortcuts) {
+// GitHub zip を DL → 展開 → robocopy → explorer.exe 起動する PS1 を組み立てる。
+function buildInstallScript(downloadUrl, title, makeShortcuts) {
   const lines = [
     'Write-Host ""',
     'Write-Host "  ' + title + '" -ForegroundColor Cyan',
-    'Write-Host "[1/3] 最新版を取得中..." -ForegroundColor Yellow',
-    'Start-Sleep -Seconds 1',
-    '$src = "' + sourcePath + '"',
-    '$stage = Join-Path $env:TEMP "FutaFinance-stage"',
-    'if (Test-Path $stage) { Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue }',
-    'robocopy "$src" "$stage" /E /R:3 /W:5 /NFL /NDL /NJH /NJS /NC /NS /NP | Out-Null',
-    'if (-not (Test-Path (Join-Path $stage "FutaFinance.exe"))) {',
-    '  Write-Host "  [エラー] 更新ファイルを取得できませんでした" -ForegroundColor Red',
-    '  Write-Host "  Google ドライブの同期（オフライン利用可）を確認してください。" -ForegroundColor Red',
+    'Write-Host "[1/3] GitHub からダウンロード中..." -ForegroundColor Yellow',
+    '$zipPath = Join-Path $env:TEMP "FutaFinance-update.zip"',
+    '$stage   = Join-Path $env:TEMP "FutaFinance-stage"',
+    'if (Test-Path $zipPath) { Remove-Item $zipPath -Force }',
+    'if (Test-Path $stage)   { Remove-Item $stage -Recurse -Force }',
+    'try {',
+    '  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12',
+    '  Invoke-WebRequest -Uri "' + downloadUrl + '" -OutFile $zipPath -UseBasicParsing',
+    '} catch {',
+    '  Write-Host "  [エラー] ダウンロードに失敗しました: $_" -ForegroundColor Red',
     '  Read-Host "  Enterキーで閉じる"; exit 1',
     '}',
-    'Write-Host "[2/3] 反映中..." -ForegroundColor Yellow',
+    'Write-Host "[2/3] 展開・反映中..." -ForegroundColor Yellow',
+    'try {',
+    '  Expand-Archive -Path $zipPath -DestinationPath $stage -Force',
+    '} catch {',
+    '  Write-Host "  [エラー] 展開に失敗しました: $_" -ForegroundColor Red',
+    '  Read-Host "  Enterキーで閉じる"; exit 1',
+    '}',
+    'if (-not (Test-Path (Join-Path $stage "FutaFinance.exe"))) {',
+    '  Write-Host "  [エラー] zipの内容が正しくありません" -ForegroundColor Red',
+    '  Read-Host "  Enterキーで閉じる"; exit 1',
+    '}',
+    'New-Item -ItemType Directory -Force -Path "' + LOCAL_INSTALL_DIR + '" | Out-Null',
     'robocopy "$stage" "' + LOCAL_INSTALL_DIR + '" /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /NC /NS /NP | Out-Null',
     'if ($LASTEXITCODE -ge 8) { Write-Host "  [エラー] 反映に失敗 (code: $LASTEXITCODE)" -ForegroundColor Red; Read-Host "Enterで閉じる"; exit 1 }',
+    'Remove-Item $zipPath -Force -ErrorAction SilentlyContinue',
     'Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue',
   ];
   if (makeShortcuts) {
     lines.push(
       '$ws = New-Object -ComObject WScript.Shell',
       '$dt = [Environment]::GetFolderPath("Desktop")',
-      '$sc = $ws.CreateShortcut((Join-Path $dt "FutaFinance.lnk")); $sc.TargetPath = "' + LOCAL_EXE + '"; $sc.Save()',
+      '$icoPath = "' + path.join(LOCAL_INSTALL_DIR, 'resources', 'icon.ico') + '"',
+      '$sc = $ws.CreateShortcut((Join-Path $dt "FutaFinance.lnk"))',
+      '$sc.TargetPath = "' + LOCAL_EXE + '"',
+      '$sc.IconLocation = "$icoPath,0"',
+      '$sc.Save()',
       '$sm = Join-Path $env:APPDATA "Microsoft\\Windows\\Start Menu\\Programs"',
-      '$sc2 = $ws.CreateShortcut((Join-Path $sm "FutaFinance.lnk")); $sc2.TargetPath = "' + LOCAL_EXE + '"; $sc2.Save()',
+      '$sc2 = $ws.CreateShortcut((Join-Path $sm "FutaFinance.lnk"))',
+      '$sc2.TargetPath = "' + LOCAL_EXE + '"',
+      '$sc2.IconLocation = "$icoPath,0"',
+      '$sc2.Save()',
+      'ie4uinit.exe -show',
     );
   }
   lines.push(
@@ -482,38 +495,57 @@ function buildInstallScript(sourcePath, title, makeShortcuts) {
   return lines;
 }
 
-// 新版を適用してから explorer.exe で起動（退避→検証→反映、進捗コンソールあり）。
-function applyUpdate(sourcePath, newVersion, newBuild) {
-  launchPS1(buildInstallScript(sourcePath,
+// zip を DL・展開・robocopy して explorer.exe で起動。
+function applyUpdate(downloadUrl, newVersion, newBuild) {
+  launchPS1(buildInstallScript(downloadUrl,
       `FutaFinance アップデート (v${newVersion} / build ${newBuild})`, false));
   isQuitting = true;
   setTimeout(() => app.exit(0), 400);
 }
 
-// Drive等から直接起動されたら、ローカル(%LOCALAPPDATA%\FutaFinance)へ入れて起動し直す。
-// 戻り値 true なら終了シーケンスに入っているので呼び出し側はそのまま return する。
+// zip以外の場所（解凍直後フォルダ等）から直接起動されたら %LOCALAPPDATA% へ入れ直す。
 async function autoInstallIfNeeded() {
   if (!app.isPackaged) return false;
   const exeDir = path.dirname(app.getPath('exe'));
   if (exeDir.toLowerCase() === LOCAL_INSTALL_DIR.toLowerCase()) return false;
 
-  // 次回更新の参照元として、今起動した場所(=Driveのappフォルダ)を保存。
-  saveUpdateSourcePath(exeDir);
-
-  // ローカルに既にあり最新なら、窓を出さず静かにローカル版を起動。
+  // ローカルに既にあり同バージョン以上なら、窓を出さず静かにローカル版を起動。
   if (fs.existsSync(LOCAL_EXE)) {
-    let driveBuild = 0; let localBuild = 0;
-    try { driveBuild = JSON.parse(fs.readFileSync(path.join(exeDir, 'version.json'), 'utf8')).buildNumber || 0; } catch (_) {}
-    try { localBuild = JSON.parse(fs.readFileSync(path.join(LOCAL_INSTALL_DIR, 'version.json'), 'utf8')).buildNumber || 0; } catch (_) {}
-    if (localBuild >= driveBuild) {
+    let srcBuild = 0; let localBuild = 0;
+    try { srcBuild = JSON.parse(fs.readFileSync(path.join(exeDir, 'build-info.json'), 'utf8')).buildNumber || 0; } catch (_) {}
+    try { localBuild = JSON.parse(fs.readFileSync(path.join(LOCAL_INSTALL_DIR, 'build-info.json'), 'utf8')).buildNumber || 0; } catch (_) {}
+    if (localBuild >= srcBuild) {
       try { app.releaseSingleInstanceLock(); } catch (_) {}
       await shell.openPath(LOCAL_EXE);
       setTimeout(() => app.exit(0), 600);
       return true;
     }
   }
-  // 初回 or Driveが新しい → 退避→検証→反映＋ショートカット作成＋explorer起動。
-  launchPS1(buildInstallScript(exeDir, 'FutaFinance インストール', true));
+  // 初回 or 現在地が新しい → robocopy でローカルへ + ショートカット作成。
+  const lines = [
+    'Write-Host "  FutaFinance インストール中..." -ForegroundColor Cyan',
+    'Write-Host "[1/2] ファイルをコピー中..." -ForegroundColor Yellow',
+    'New-Item -ItemType Directory -Force -Path "' + LOCAL_INSTALL_DIR + '" | Out-Null',
+    'robocopy "' + exeDir + '" "' + LOCAL_INSTALL_DIR + '" /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /NC /NS /NP | Out-Null',
+    'if ($LASTEXITCODE -ge 8) { Write-Host "  [エラー] コピー失敗 (code: $LASTEXITCODE)" -ForegroundColor Red; Read-Host "Enterで閉じる"; exit 1 }',
+    '$ws = New-Object -ComObject WScript.Shell',
+    '$dt = [Environment]::GetFolderPath("Desktop")',
+    '$icoPath = "' + path.join(LOCAL_INSTALL_DIR, 'resources', 'icon.ico') + '"',
+    '$sc = $ws.CreateShortcut((Join-Path $dt "FutaFinance.lnk"))',
+    '$sc.TargetPath = "' + LOCAL_EXE + '"',
+    '$sc.IconLocation = "$icoPath,0"',
+    '$sc.Save()',
+    '$sm = Join-Path $env:APPDATA "Microsoft\\Windows\\Start Menu\\Programs"',
+    '$sc2 = $ws.CreateShortcut((Join-Path $sm "FutaFinance.lnk"))',
+    '$sc2.TargetPath = "' + LOCAL_EXE + '"',
+    '$sc2.IconLocation = "$icoPath,0"',
+    '$sc2.Save()',
+    'ie4uinit.exe -show',
+    'Write-Host "[2/2] アプリを起動します..." -ForegroundColor Cyan',
+    'explorer.exe "' + LOCAL_EXE + '"',
+    'Start-Sleep -Seconds 1',
+  ];
+  launchPS1(lines);
   isQuitting = true;
   setTimeout(() => app.exit(0), 400);
   return true;
@@ -529,38 +561,21 @@ async function checkForUpdate(opts = {}) {
     }
     return;
   }
-  // 更新元(Driveのappフォルダ)。記録が無ければ Drive 候補の app\ を探す。
-  let sourcePath = getUpdateSourcePath();
-  if (!sourcePath || !fs.existsSync(path.join(sourcePath, 'version.json'))) {
-    const dir = findDriveDir();
-    if (dir && fs.existsSync(path.join(dir, 'app', 'version.json'))) {
-      sourcePath = path.join(dir, 'app');
-      saveUpdateSourcePath(sourcePath);
-    }
-  }
-  if (!sourcePath || !fs.existsSync(path.join(sourcePath, 'version.json'))) {
-    if (manual) {
-      await dialog.showMessageBox(mainWindow, {
-        type: 'warning', title: '更新確認',
-        message: '更新情報が見つかりません（Google ドライブの同期を確認してください）。',
-      });
-    }
-    return;
-  }
-  let remote; let local;
+  let remote;
   try {
-    remote = JSON.parse(fs.readFileSync(path.join(sourcePath, 'version.json'), 'utf8'));
-    local = readBuildInfo();
+    remote = await fetchVersionInfo();
   } catch (_) {
     if (manual) {
       await dialog.showMessageBox(mainWindow, {
-        type: 'warning', title: '更新確認', message: '更新情報の読込に失敗しました。',
+        type: 'warning', title: '更新確認',
+        message: '更新情報の取得に失敗しました（インターネット接続を確認してください）。',
       });
     }
     return;
   }
-  const remoteNum = remote.buildNumber || 0;
-  const localNum = local.buildNumber || 0;
+  const local = readBuildInfo();
+  const remoteNum = parseInt(remote.buildNumber, 10) || 0;
+  const localNum = parseInt(local.buildNumber, 10) || 0;
   if (remoteNum <= localNum) {
     if (manual) {
       await dialog.showMessageBox(mainWindow, {
@@ -576,11 +591,11 @@ async function checkForUpdate(opts = {}) {
     title: 'FutaFinance - アップデート',
     message: '新しいバージョンがあります',
     detail: `現在 : v${local.version}\n最新 : v${remote.version}\n\n`
-        + '今すぐ更新しますか？（進捗が表示され、自動で開き直します）',
+        + '今すぐ更新しますか？（ダウンロード後に自動で開き直します）',
     buttons: ['今すぐ更新', '後で'],
     defaultId: 0, cancelId: 1, noLink: true,
   });
-  if (response === 0) applyUpdate(sourcePath, remote.version, remoteNum);
+  if (response === 0) applyUpdate(remote.downloadUrl, remote.version, remoteNum);
 }
 
 // ─────────────────── IPC ───────────────────

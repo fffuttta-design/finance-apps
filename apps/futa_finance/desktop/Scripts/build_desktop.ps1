@@ -1,12 +1,11 @@
-# build_desktop.ps1 - Build the FutaFinance Electron desktop app (dir/unpacked + robocopy update).
-#   FutaMemo-style update model: distribute an unpacked folder, robocopy to %LOCALAPPDATA%,
-#   relaunch via explorer.exe. Stable, no NSIS.
+# build_desktop.ps1 - Build the FutaFinance Electron desktop app (dir/unpacked + GitHub release).
+#   Update model: zip win-unpacked -> GitHub Release asset, version info in release/futa-windows-version.json
 #   1. version/build from pubspec; write build-info.json (packaged into the app)
 #   2. flutter build web (offline, base-href /) -> web-dist
 #   3. oauth.json from win_oauth.key
 #   4. electron-builder --win dir -> dist/win-unpacked
-#   5. write dist/win-unpacked/version.json
-#   6. -Publish: robocopy win-unpacked -> Drive FutaFinance-Desktop\app
+#   5. write dist/win-unpacked/build-info.json
+#   6. -Publish: zip -> gh release create -> update futa-windows-version.json -> git push
 #
 # ASCII only (Windows PowerShell 5.1 mis-parses Japanese in no-BOM .ps1).
 param(
@@ -85,31 +84,54 @@ try {
   if ($LASTEXITCODE -ne 0) { throw "electron-builder failed" }
 } finally { Pop-Location }
 
-# ---- 5. write version.json into win-unpacked ----
+# ---- 5. write build-info.json into win-unpacked ----
 $unpacked = Join-Path $ProjectDir "dist\win-unpacked"
 if (-not (Test-Path (Join-Path $unpacked "FutaFinance.exe"))) { throw "win-unpacked not found" }
-[System.IO.File]::WriteAllText((Join-Path $unpacked "version.json"), $buildInfoJson, [System.Text.UTF8Encoding]::new($false))
+[System.IO.File]::WriteAllText((Join-Path $unpacked "build-info.json"), $buildInfoJson, [System.Text.UTF8Encoding]::new($false))
 Write-Host "[5/5] built unpacked app (v$Version build $Build)" -ForegroundColor Green
 Write-Host "unpacked: $unpacked"
 
-# ---- optional: publish to Drive (robocopy win-unpacked -> Drive app\) ----
+# ---- optional: publish to GitHub Releases ----
 if ($Publish) {
-  $jp1 = -join ([char]0x30DE,[char]0x30A4,[char]0x30C9,[char]0x30E9,[char]0x30A4,[char]0x30D6) # My Drive (kana)
-  $jp2 = -join ([char]0x30C4,[char]0x30FC,[char]0x30EB,[char]0x958B,[char]0x767A)               # tool dev
-  $suffix = "$jp1\$jp2\FutaFinance-Desktop"
-  $cands = @("H:\$suffix", "G:\$suffix")
-  $driveDir = $null
-  foreach ($c in $cands) { if (Test-Path (Split-Path $c -Parent)) { $driveDir = $c; break } }
-  if ($driveDir) {
-    $appDst = Join-Path $driveDir "app"
-    New-Item -ItemType Directory -Force -Path $appDst | Out-Null
-    robocopy "$unpacked" "$appDst" /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /NC /NS /NP | Out-Null
-    if ($LASTEXITCODE -ge 8) { throw "robocopy to Drive failed (code $LASTEXITCODE)" }
-    Write-Host "published to Drive: $appDst (v$Version build $Build)" -ForegroundColor Green
-  } else {
-    Write-Host "Drive folder not found; skipped publish." -ForegroundColor DarkGray
-  }
+  $RepoRoot = Split-Path (Split-Path $AppDir -Parent) -Parent   # monorepo root
+  $Tag      = "futa-win-v$Version"
+  $ZipName  = "futa-desktop-v$Version.zip"
+  $ZipPath  = Join-Path $ProjectDir "dist\$ZipName"
+  $DownloadUrl = "https://github.com/fffuttta-design/finance-apps/releases/download/$Tag/$ZipName"
+
+  Write-Host "[Publish 1/3] creating zip..." -ForegroundColor Yellow
+  if (Test-Path $ZipPath) { Remove-Item $ZipPath -Force }
+  Compress-Archive -Path "$unpacked\*" -DestinationPath $ZipPath -Force
+  Write-Host "  zip: $ZipPath"
+
+  Write-Host "[Publish 2/3] gh release create $Tag..." -ForegroundColor Yellow
+  $releaseNotes = "FutaFinance Desktop v$Version (build $Build)"
+  gh release create $Tag $ZipPath `
+    --repo fffuttta-design/finance-apps `
+    --title "FutaFinance Desktop v$Version" `
+    --notes $releaseNotes
+  if ($LASTEXITCODE -ne 0) { throw "gh release create failed" }
+
+  Write-Host "[Publish 3/3] update futa-windows-version.json + git push..." -ForegroundColor Yellow
+  $versionJsonPath = Join-Path $RepoRoot "release\futa-windows-version.json"
+  $versionJson = (@{
+    version     = $Version
+    buildNumber = "$Build"
+    downloadUrl = $DownloadUrl
+    releaseNotes = $releaseNotes
+  } | ConvertTo-Json)
+  [System.IO.File]::WriteAllText($versionJsonPath, $versionJson, [System.Text.UTF8Encoding]::new($false))
+
+  Push-Location $RepoRoot
+  try {
+    git add "release/futa-windows-version.json"
+    git commit -m "release(desktop): v$Version+$Build - $releaseNotes"
+    git push origin main
+    if ($LASTEXITCODE -ne 0) { throw "git push failed" }
+  } finally { Pop-Location }
+
+  Write-Host "published: $DownloadUrl" -ForegroundColor Green
 }
 
 Write-Host "== done ==" -ForegroundColor Cyan
-Write-Host "First-time install: run  <Drive>\FutaFinance-Desktop\app\FutaFinance.exe  once."
+Write-Host "First-time install: download the zip from GitHub Releases, extract, run FutaFinance.exe."
