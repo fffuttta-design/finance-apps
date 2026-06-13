@@ -8,8 +8,8 @@
 
 **作業開始時に必ず読むこと:**
 
-- **FutaFinance（事業・個人）** → `FutaFinance仕様書.md`
-- **たくはるファイナンス（カップル家計簿）** → `たくはるファイナンス仕様書.md`
+- **FutaFinance（事業・個人）** → `apps/futa_finance/FutaFinance仕様書.md`
+- **たくはるファイナンス（カップル家計簿）** → `apps/takuharu_finance/たくはるファイナンス仕様書.md`
 
 各アプリの仕様（データ構造・API・UI・機能・バージョン管理）が網羅されている。
 
