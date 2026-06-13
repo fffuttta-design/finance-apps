@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.76",
-    "buildNumber":  "81",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.76/takuharu-finance-v0.2.76.apk",
-    "releaseNotes":  "最近の入出金を追加順表示に修正・支出タブ同日タイブレイク追加"
+    "version":  "0.2.77",
+    "buildNumber":  "82",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.77/takuharu-finance-v0.2.77.apk",
+    "releaseNotes":  "最近の入出金・支出タブを日付降順→同日内登録時刻降順に修正"
 }
