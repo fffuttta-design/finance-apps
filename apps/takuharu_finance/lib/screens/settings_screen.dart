@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/auth_service.dart';
 import '../data/household_service.dart';
+import '../data/notify_prefs_service.dart';
 import '../data/update_flow.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
@@ -19,16 +20,28 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // サイドバーで選択中のカテゴリ（0:ふたり 1:お金 2:データ 3:アプリ）。
+  // サイドバーで選択中のカテゴリ（0:ふたり 1:お金 2:通知 3:データ 4:アプリ）。
   int _tab = 0;
+
+  /// 通知の受け取り設定の読み込み完了フラグ。
+  bool _notifyLoaded = false;
 
   /// サイドバーの項目（アイコン＋ラベル）。
   static const _navItems = <({IconData icon, String label})>[
     (icon: Icons.favorite_rounded, label: 'ふたり'),
     (icon: Icons.account_balance_wallet_rounded, label: 'お金'),
+    (icon: Icons.notifications_rounded, label: '通知'),
     (icon: Icons.storage_rounded, label: 'データ'),
     (icon: Icons.smartphone_rounded, label: 'アプリ'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    NotifyPrefsService.instance.load().then((_) {
+      if (mounted) setState(() => _notifyLoaded = true);
+    });
+  }
 
   Future<void> _addPayment() async {
     final ctrl = TextEditingController();
@@ -270,6 +283,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   _coupleTab(),
                   _moneyTab(),
+                  _notifyTab(),
                   _dataTab(),
                   _appTab(),
                 ],
@@ -474,7 +488,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// タブ③「データ」：貼り付け取り込み・変換マスタ。
+  /// タブ③「通知」：自分が受け取る通知の種類を ON/OFF。
+  /// （各自の設定。OFF にした種類は自分にだけ届かなくなる）
+  Widget _notifyTab() {
+    final myName = HouseholdService.instance
+            .memberNames[AuthService.instance.currentUser?.uid] ??
+        'じぶん';
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        _sectionTitle('通知の受け取り'),
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            '$myName が受け取る通知の種類を選べます。OFF にすると、その種類の通知は'
+            '$myName には届かなくなります（相手の受け取りには影響しません）。',
+            style: const TextStyle(fontSize: 11, color: AppColors.textSub),
+          ),
+        ),
+        if (!_notifyLoaded)
+          const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: Column(
+                children: [
+                  for (var i = 0;
+                      i < NotifyPrefsService.categories.length;
+                      i++) ...[
+                    if (i > 0)
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                    _notifySwitch(NotifyPrefsService.categories[i]),
+                  ],
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _notifySwitch(({String key, String label, String desc}) c) {
+    final on = NotifyPrefsService.instance.isOn(c.key);
+    return SwitchListTile(
+      value: on,
+      activeThumbColor: AppColors.pink,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+      title: Text(c.label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+      subtitle: Text(c.desc,
+          style: const TextStyle(fontSize: 11, color: AppColors.textSub)),
+      onChanged: (v) async {
+        await NotifyPrefsService.instance.set(c.key, v);
+        if (mounted) setState(() {});
+      },
+    );
+  }
+
+  /// タブ④「データ」：貼り付け取り込み・変換マスタ。
   Widget _dataTab() {
     return ListView(
         padding: const EdgeInsets.all(20),
