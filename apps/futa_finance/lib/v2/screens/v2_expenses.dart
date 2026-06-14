@@ -1550,13 +1550,15 @@ class _BillingRow extends StatelessWidget {
       diffLabel = '${formatYen(diff)} 未確認';
     }
 
+    final isOver = diff != null && diff > 0;
+
     return Padding(
       padding: const EdgeInsets.symmetric(
           horizontal: V2Spacing.lg, vertical: V2Spacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // カード名
+          // カード名行
           Row(
             children: [
               BrandLogo(
@@ -1567,9 +1569,18 @@ class _BillingRow extends StatelessWidget {
               ),
               const SizedBox(width: V2Spacing.sm),
               Expanded(
-                child: Text(card.name,
-                    style: V2Typography.body
-                        .copyWith(fontWeight: FontWeight.w700)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(card.name,
+                        style: V2Typography.body
+                            .copyWith(fontWeight: FontWeight.w700)),
+                    if (card.paymentDay != null)
+                      Text('引き落とし日：毎月${card.paymentDay}日',
+                          style: V2Typography.micro
+                              .copyWith(color: V2Colors.textMuted)),
+                  ],
+                ),
               ),
               // 差分バッジ
               Container(
@@ -1661,6 +1672,34 @@ class _BillingRow extends StatelessWidget {
               ),
             ],
           ),
+          // 超過警告バナー
+          if (isOver) ...[
+            const SizedBox(height: V2Spacing.sm),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFDC2626), width: 1.5),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_rounded,
+                      size: 20, color: Color(0xFFDC2626)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '明細合計より ${formatYen(diff!)} 多く請求されています！未記録の支出がある可能性があります。',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFDC2626)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
