@@ -1283,6 +1283,18 @@ class _ExpenseRowState extends State<_ExpenseRow> {
     return m != null ? s.substring(m.end).trim() : s;
   }
 
+  /// 大カテゴリ名からハッシュで安定した色を生成（HSL）。
+  Color _categoryColor() {
+    final key = _bareMajor(widget.t.category.major.trim());
+    if (key.isEmpty) return V2Colors.textSecondary;
+    int hash = 0;
+    for (final c in key.codeUnits) {
+      hash = (hash * 31 + c) & 0x7fffffff;
+    }
+    final hue = (hash % 360).toDouble();
+    return HSLColor.fromAHSL(1.0, hue, 0.55, 0.48).toColor();
+  }
+
   @override
   Widget build(BuildContext context) {
     // 振替は「支出」と区別して表示する（バッジ色・金額色・符号）。
@@ -1341,7 +1353,16 @@ class _ExpenseRowState extends State<_ExpenseRow> {
                           Text('振替',
                               style: V2Typography.micro
                                   .copyWith(color: V2Colors.info)),
-                        ] else
+                        ] else ...[
+                          Container(
+                            width: 8,
+                            height: 8,
+                            margin: const EdgeInsets.only(right: 4),
+                            decoration: BoxDecoration(
+                              color: _categoryColor(),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
                           Expanded(
                             child: Text(
                               _categoryLabel(),
@@ -1350,6 +1371,7 @@ class _ExpenseRowState extends State<_ExpenseRow> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                        ],
                       ],
                     ),
                   ],
