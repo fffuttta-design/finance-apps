@@ -109,6 +109,7 @@ if ($Publish) {
   } else {
     gh release upload $Tag $setupExe --repo fffuttta-design/finance-apps --clobber
   }
+  gh release edit $Tag --repo fffuttta-design/finance-apps --draft=false | Out-Null
   Write-Host "published to GitHub Release: $Tag" -ForegroundColor Green
 }
 
