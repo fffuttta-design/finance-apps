@@ -526,6 +526,18 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (topWidget != null) topWidget,
+          // ── クレカ引落照合 ────────────────────
+          if (showCardBilling) ...[
+            _CreditCardBillingSection(
+              cards: _payments.creditCards
+                  .where((c) => !c.inactive)
+                  .toList(),
+              transactions: _transactions,
+              ym: _ymKey,
+              onSaveActual: _saveCreditCardActual,
+            ),
+            const SizedBox(height: V2Spacing.lg),
+          ],
           // ── 取引一覧 ────────────────────
           V2Card(
             padding: EdgeInsets.zero,
@@ -605,17 +617,6 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
               ym: _ymKey,
               onInputVariable: _inputVariableActual,
             ),
-          if (showCardBilling) ...[
-            const SizedBox(height: V2Spacing.lg),
-            _CreditCardBillingSection(
-              cards: _payments.creditCards
-                  .where((c) => !c.inactive)
-                  .toList(),
-              transactions: _transactions,
-              ym: _ymKey,
-              onSaveActual: _saveCreditCardActual,
-            ),
-          ],
         ],
       ),
     );
