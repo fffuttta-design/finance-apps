@@ -93,6 +93,10 @@ class Transaction {
   /// 値はチャット投稿時に別途インクリメントされる。
   final int commentCount;
 
+  /// データの登録日時（初回保存時に自動セット）。
+  /// 既存データは null。編集保存では上書きしない（toJson に含めるが copyWith では引き継ぐ）。
+  final DateTime? createdAt;
+
   const Transaction({
     required this.id,
     required this.date,
@@ -115,6 +119,7 @@ class Transaction {
     this.paidBy,
     this.personalFor,
     this.commentCount = 0,
+    this.createdAt,
   });
 
   Map<String, dynamic> toJson() => {
@@ -139,6 +144,7 @@ class Transaction {
         'recordedBy': recordedBy,
         'paidBy': paidBy,
         'personalFor': personalFor,
+        if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
       };
 
   factory Transaction.fromJson(Map<String, dynamic> j) => Transaction(
@@ -169,6 +175,9 @@ class Transaction {
         paidBy: j['paidBy'] as String?,
         personalFor: j['personalFor'] as String?,
         commentCount: (j['commentCount'] as num?)?.toInt() ?? 0,
+        createdAt: j['createdAt'] != null
+            ? DateTime.tryParse(j['createdAt'] as String)
+            : null,
       );
 
   Transaction copyWith({
@@ -191,6 +200,8 @@ class Transaction {
     String? recordedBy,
     String? paidBy,
     String? personalFor,
+    DateTime? createdAt,
+    bool forceCreatedAt = false,
   }) =>
       Transaction(
         id: id,
@@ -214,5 +225,6 @@ class Transaction {
         paidBy: paidBy ?? this.paidBy,
         personalFor: personalFor ?? this.personalFor,
         commentCount: commentCount,
+        createdAt: forceCreatedAt ? createdAt : (createdAt ?? this.createdAt),
       );
 }

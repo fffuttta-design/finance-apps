@@ -122,7 +122,10 @@ class LocalTransactionRepository implements TransactionRepository {
   @override
   Future<void> add(Transaction t) async {
     final list = await loadAll();
-    list.add(t);
+    final toSave = t.createdAt == null
+        ? t.copyWith(createdAt: DateTime.now(), forceCreatedAt: true)
+        : t;
+    list.add(toSave);
     await _saveAll(list);
   }
 
@@ -278,7 +281,10 @@ class FirestoreTransactionRepository implements TransactionRepository {
 
   @override
   Future<void> add(Transaction t) async {
-    await _coll.doc(t.id).set(_txDoc(t));
+    final toSave = t.createdAt == null
+        ? t.copyWith(createdAt: DateTime.now(), forceCreatedAt: true)
+        : t;
+    await _coll.doc(toSave.id).set(_txDoc(toSave));
   }
 
   @override
