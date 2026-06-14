@@ -1270,11 +1270,17 @@ class _ExpenseRowState extends State<_ExpenseRow> {
   bool _hover = false;
 
   String _categoryLabel() {
-    final major = widget.t.category.major.trim();
+    final major = _bareMajor(widget.t.category.major.trim());
     final sub = widget.t.category.sub.trim();
     if (major.isEmpty && sub.isEmpty) return '未分類';
     if (sub.isEmpty) return major;
-    return sub;
+    return '$major > $sub';
+  }
+
+  /// 先頭の "N." 番号プレフィックスを除去。
+  String _bareMajor(String s) {
+    final m = RegExp(r'^\d+\.').firstMatch(s);
+    return m != null ? s.substring(m.end).trim() : s;
   }
 
   @override
@@ -1300,66 +1306,68 @@ class _ExpenseRowState extends State<_ExpenseRow> {
             border: Border.all(color: V2Colors.border),
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 日付（M/D(曜)）。土=青/日=赤。
-              SizedBox(
-                width: 58,
-                child: dateWeekdayText(widget.t.date,
-                    baseStyle: V2Typography.numericCell),
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: SizedBox(
+                  width: 58,
+                  child: dateWeekdayText(widget.t.date,
+                      baseStyle: V2Typography.numericCell),
+                ),
               ),
               const SizedBox(width: V2Spacing.sm),
-              // 中央: カテゴリバッジ＋内容（支払方法は非表示）
+              // 中央: 1行目=取引内容、2行目=カテゴリ
               Expanded(
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: isTransfer
-                            ? V2Colors.infoSoft
-                            : V2Colors.surfaceMuted,
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (isTransfer) ...[
-                            const Icon(Icons.swap_horiz,
-                                size: 11, color: V2Colors.info),
-                            const SizedBox(width: 2),
-                          ],
-                          Text(isTransfer ? '振替' : _categoryLabel(),
-                              style: V2Typography.micro.copyWith(
-                                  color:
-                                      isTransfer ? V2Colors.info : null)),
-                        ],
-                      ),
+                    Text(
+                      widget.t.description.isEmpty
+                          ? '—'
+                          : widget.t.description,
+                      style: V2Typography.body,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        widget.t.description.isEmpty
-                            ? '—'
-                            : widget.t.description,
-                        style: V2Typography.body,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        if (isTransfer) ...[
+                          const Icon(Icons.swap_horiz,
+                              size: 11, color: V2Colors.info),
+                          const SizedBox(width: 2),
+                          Text('振替',
+                              style: V2Typography.micro
+                                  .copyWith(color: V2Colors.info)),
+                        ] else
+                          Expanded(
+                            child: Text(
+                              _categoryLabel(),
+                              style: V2Typography.micro.copyWith(
+                                  color: V2Colors.textSecondary),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: V2Spacing.sm),
               // 金額（右）。振替はお金の移動なのでマイナスを付けず中立色に。
-              Text(
-                isTransfer
-                    ? formatYen(widget.t.amount)
-                    : '-${formatYen(widget.t.amount)}',
-                style: V2Typography.numericCell.copyWith(
-                    color:
-                        isTransfer ? V2Colors.textBody : V2Colors.negative,
-                    fontWeight: FontWeight.w700),
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  isTransfer
+                      ? formatYen(widget.t.amount)
+                      : '-${formatYen(widget.t.amount)}',
+                  style: V2Typography.numericCell.copyWith(
+                      color:
+                          isTransfer ? V2Colors.textBody : V2Colors.negative,
+                      fontWeight: FontWeight.w700),
+                ),
               ),
             ],
           ),
