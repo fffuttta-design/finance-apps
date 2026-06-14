@@ -30,6 +30,32 @@ class UpdateFlow {
   /// 設定画面から呼ぶ手動チェック。
   /// 自動チェックと違い、「最新です」「確認できませんでした」も明示的に伝える。
   static Future<void> checkManually(BuildContext context) async {
+    // Web はページ読み込み時点で常に最新版。CORS制限でfetchも不可なので直接案内。
+    if (kIsWeb) {
+      await showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Color(0xFF16A34A)),
+              SizedBox(width: 8),
+              Text('Web版は常に最新です'),
+            ],
+          ),
+          content: const Text(
+            'ブラウザでページを再読み込み（Ctrl+Shift+R）すると\n最新バージョンが反映されます。',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     // 確認中のスピナー
     showDialog<void>(
       context: context,
@@ -55,7 +81,26 @@ class UpdateFlow {
     Navigator.of(context, rootNavigator: true).pop();
 
     if (r.fetchFailed) {
-      _snack(context, '最新バージョンを確認できませんでした（通信エラー）');
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.error_outline, color: Color(0xFFDC2626)),
+              SizedBox(width: 8),
+              Text('確認できませんでした'),
+            ],
+          ),
+          content: const Text('通信エラーが発生しました。\nネットワーク接続を確認してください。'),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
       return;
     }
     if (!r.hasUpdate) {
@@ -70,43 +115,6 @@ class UpdateFlow {
             ],
           ),
           content: Text('現在 ${r.currentFull} が最新バージョンです。'),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
-    // Web は APK のダウンロード/インストールができないので、再読み込みを案内。
-    if (kIsWeb) {
-      await showDialog<void>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.system_update, color: _accent),
-              SizedBox(width: 8),
-              Text('新しいバージョン'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('現在: ${r.currentFull}'),
-              Text('最新: ${r.latestFull}',
-                  style: const TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              const Text(
-                'ページを再読み込み（Ctrl+Shift+R）すると最新になります。',
-                style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-              ),
-            ],
-          ),
           actions: [
             FilledButton(
               onPressed: () => Navigator.pop(context),
