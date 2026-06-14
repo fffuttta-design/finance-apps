@@ -5,10 +5,11 @@
 //     （固定オリジンにすることで Firebase/IndexedDB のオフライン永続が効く）
 //  2. Google ログインを自前 OAuth（ループバック＋PKCE）で実施し、トークンを
 //     preload 経由で Flutter に渡す（埋め込み画面は Google に弾かれるため）
-//  3. GitHub Releases からバージョン確認・自動更新（Drive 非依存）
+//  3. electron-updater で GitHub Releases から完全自動更新（NSIS）
 const {
   app, BrowserWindow, ipcMain, shell, dialog, session,
 } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -34,9 +35,6 @@ const SCOPES = [
 const AUTH_EP = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_EP = 'https://oauth2.googleapis.com/token';
 
-// GitHub Releases 更新設定
-const GH_VERSION_URL =
-  'https://raw.githubusercontent.com/fffuttta-design/finance-apps/main/release/futa-windows-version.json';
 
 let mainWindow = null;
 let isQuitting = false;
@@ -364,15 +362,10 @@ async function createWindow() {
   mainWindow.loadURL(`http://127.0.0.1:${port}/`);
 }
 
-// ─────────────── 自己更新（GitHub Releases 方式）───────────────
-// 更新フロー:
-//  1. GitHub raw URL から futa-windows-version.json を fetch
-//  2. ローカルの build-info.json と buildNumber を比較
-//  3. 新版があればダイアログ表示
-//  4. 承認 → PS1 が Invoke-WebRequest でzipをDL → Expand-Archive → robocopy → explorer起動
-const APP_NAME = 'FutaFinance';
-const LOCAL_INSTALL_DIR = path.join(process.env.LOCALAPPDATA || '', APP_NAME);
-const LOCAL_EXE = path.join(LOCAL_INSTALL_DIR, `${APP_NAME}.exe`);
+// ─────────────── 自動更新（electron-updater + GitHub Releases NSIS）───────────────
+// NSIS インストーラが %LOCALAPPDATA%\Programs\FutaFinance に配置する。
+// electron-updater が latest.yml を GitHub Releases から取得し、バックグラウンドで
+// 自動ダウンロード → アプリ終了時（または今すぐ）にサイレントインストール。
 
 // このアプリ自身の版情報（build-info.json をアプリ内に同梱）。
 function readBuildInfo() {
@@ -381,221 +374,27 @@ function readBuildInfo() {
   } catch (_) { return { version: app.getVersion(), buildNumber: 0 }; }
 }
 
-// GitHub raw から version JSON を fetch。
-function fetchVersionInfo() {
-  return new Promise((resolve, reject) => {
-    const url = new URL(GH_VERSION_URL);
-    const req = https.get(
-      { hostname: url.hostname, path: url.pathname + `?t=${Date.now()}`, headers: { 'Cache-Control': 'no-cache' } },
-      (res) => {
-        if (res.statusCode === 301 || res.statusCode === 302) {
-          https.get(res.headers.location, (res2) => {
-            let d = '';
-            res2.on('data', (c) => (d += c));
-            res2.on('end', () => { try { resolve(JSON.parse(d)); } catch (e) { reject(e); } });
-          }).on('error', reject);
-          return;
-        }
-        let d = '';
-        res.on('data', (c) => (d += c));
-        res.on('end', () => { try { resolve(JSON.parse(d)); } catch (e) { reject(e); } });
-      },
-    );
-    req.on('error', reject);
-    req.setTimeout(8000, () => { req.destroy(); reject(new Error('timeout')); });
+function setupAutoUpdater() {
+  if (!app.isPackaged) return;
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('update-downloaded', (info) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'FutaFinance - アップデート準備完了',
+      message: `v${info.version} の準備ができました`,
+      detail: '今すぐ再起動してインストールしますか？',
+      buttons: ['今すぐ再起動', '後で'],
+      defaultId: 0, cancelId: 1,
+    }).then(({ response }) => {
+      if (response === 0) autoUpdater.quitAndInstall();
+    });
   });
-}
 
-// 進捗表示するPowerShellコンソールを新規ウィンドウで実行（✕無効化・末尾自動クローズ）。
-function launchPS1(scriptLines) {
-  const tmpPath = path.join(app.getPath('temp'), `futafinance-${Date.now()}.ps1`);
-  const bom = '﻿';
-  const header = [
-    '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8',
-    '$OutputEncoding = [System.Text.Encoding]::UTF8',
-    'Add-Type @"',
-    'using System;',
-    'using System.Runtime.InteropServices;',
-    'public class FfConsole {',
-    '    [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();',
-    '    [DllImport("user32.dll")]   public static extern IntPtr GetSystemMenu(IntPtr hWnd, bool bRevert);',
-    '    [DllImport("user32.dll")]   public static extern bool RemoveMenu(IntPtr hMenu, uint nPos, uint wFlags);',
-    '}',
-    '"@',
-    '$hwnd = [FfConsole]::GetConsoleWindow()',
-    'if ($hwnd -ne [IntPtr]::Zero) {',
-    '    $hmenu = [FfConsole]::GetSystemMenu($hwnd, $false)',
-    '    [void][FfConsole]::RemoveMenu($hmenu, 0xF060, 0x00000000)',
-    '}',
-    '',
-  ];
-  const footer = ['', 'exit 0'];
-  try {
-    fs.writeFileSync(tmpPath, bom + [...header, ...scriptLines, ...footer].join('\r\n'), 'utf8');
-    exec(`cmd /c start powershell.exe -ExecutionPolicy Bypass -NoProfile -File "${tmpPath}"`);
-  } catch (e) { console.error('launchPS1 failed', e); }
-}
-
-// GitHub zip を DL → 展開 → robocopy → explorer.exe 起動する PS1 を組み立てる。
-function buildInstallScript(downloadUrl, title, makeShortcuts) {
-  const lines = [
-    'Write-Host ""',
-    'Write-Host "  ' + title + '" -ForegroundColor Cyan',
-    'Write-Host "[1/3] GitHub からダウンロード中..." -ForegroundColor Yellow',
-    '$zipPath = Join-Path $env:TEMP "FutaFinance-update.zip"',
-    '$stage   = Join-Path $env:TEMP "FutaFinance-stage"',
-    'if (Test-Path $zipPath) { Remove-Item $zipPath -Force }',
-    'if (Test-Path $stage)   { Remove-Item $stage -Recurse -Force }',
-    'try {',
-    '  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12',
-    '  Invoke-WebRequest -Uri "' + downloadUrl + '" -OutFile $zipPath -UseBasicParsing',
-    '} catch {',
-    '  Write-Host "  [エラー] ダウンロードに失敗しました: $_" -ForegroundColor Red',
-    '  Read-Host "  Enterキーで閉じる"; exit 1',
-    '}',
-    'Write-Host "[2/3] 展開・反映中..." -ForegroundColor Yellow',
-    'try {',
-    '  Expand-Archive -Path $zipPath -DestinationPath $stage -Force',
-    '} catch {',
-    '  Write-Host "  [エラー] 展開に失敗しました: $_" -ForegroundColor Red',
-    '  Read-Host "  Enterキーで閉じる"; exit 1',
-    '}',
-    'if (-not (Test-Path (Join-Path $stage "FutaFinance.exe"))) {',
-    '  Write-Host "  [エラー] zipの内容が正しくありません" -ForegroundColor Red',
-    '  Read-Host "  Enterキーで閉じる"; exit 1',
-    '}',
-    'New-Item -ItemType Directory -Force -Path "' + LOCAL_INSTALL_DIR + '" | Out-Null',
-    'robocopy "$stage" "' + LOCAL_INSTALL_DIR + '" /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /NC /NS /NP | Out-Null',
-    'if ($LASTEXITCODE -ge 8) { Write-Host "  [エラー] 反映に失敗 (code: $LASTEXITCODE)" -ForegroundColor Red; Read-Host "Enterで閉じる"; exit 1 }',
-    'Remove-Item $zipPath -Force -ErrorAction SilentlyContinue',
-    'Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue',
-  ];
-  if (makeShortcuts) {
-    lines.push(
-      '$ws = New-Object -ComObject WScript.Shell',
-      '$dt = [Environment]::GetFolderPath("Desktop")',
-      '$icoPath = "' + path.join(LOCAL_INSTALL_DIR, 'resources', 'icon.ico') + '"',
-      '$sc = $ws.CreateShortcut((Join-Path $dt "FutaFinance.lnk"))',
-      '$sc.TargetPath = "' + LOCAL_EXE + '"',
-      '$sc.IconLocation = "$icoPath,0"',
-      '$sc.Save()',
-      '$sm = Join-Path $env:APPDATA "Microsoft\\Windows\\Start Menu\\Programs"',
-      '$sc2 = $ws.CreateShortcut((Join-Path $sm "FutaFinance.lnk"))',
-      '$sc2.TargetPath = "' + LOCAL_EXE + '"',
-      '$sc2.IconLocation = "$icoPath,0"',
-      '$sc2.Save()',
-      'ie4uinit.exe -show',
-    );
-  }
-  lines.push(
-    'Write-Host "[3/3] アプリを起動します..." -ForegroundColor Cyan',
-    'explorer.exe "' + LOCAL_EXE + '"',
-    'Start-Sleep -Seconds 1',
-  );
-  return lines;
-}
-
-// zip を DL・展開・robocopy して explorer.exe で起動。
-function applyUpdate(downloadUrl, newVersion, newBuild) {
-  launchPS1(buildInstallScript(downloadUrl,
-      `FutaFinance アップデート (v${newVersion} / build ${newBuild})`, false));
-  isQuitting = true;
-  setTimeout(() => app.exit(0), 400);
-}
-
-// zip以外の場所（解凍直後フォルダ等）から直接起動されたら %LOCALAPPDATA% へ入れ直す。
-async function autoInstallIfNeeded() {
-  if (!app.isPackaged) return false;
-  const exeDir = path.dirname(app.getPath('exe'));
-  if (exeDir.toLowerCase() === LOCAL_INSTALL_DIR.toLowerCase()) return false;
-
-  // ローカルに既にあり同バージョン以上なら、窓を出さず静かにローカル版を起動。
-  if (fs.existsSync(LOCAL_EXE)) {
-    let srcBuild = 0; let localBuild = 0;
-    try { srcBuild = JSON.parse(fs.readFileSync(path.join(exeDir, 'build-info.json'), 'utf8')).buildNumber || 0; } catch (_) {}
-    try { localBuild = JSON.parse(fs.readFileSync(path.join(LOCAL_INSTALL_DIR, 'build-info.json'), 'utf8')).buildNumber || 0; } catch (_) {}
-    if (localBuild >= srcBuild) {
-      try { app.releaseSingleInstanceLock(); } catch (_) {}
-      await shell.openPath(LOCAL_EXE);
-      setTimeout(() => app.exit(0), 600);
-      return true;
-    }
-  }
-  // 初回 or 現在地が新しい → robocopy でローカルへ + ショートカット作成。
-  const lines = [
-    'Write-Host "  FutaFinance インストール中..." -ForegroundColor Cyan',
-    'Write-Host "[1/2] ファイルをコピー中..." -ForegroundColor Yellow',
-    'New-Item -ItemType Directory -Force -Path "' + LOCAL_INSTALL_DIR + '" | Out-Null',
-    'robocopy "' + exeDir + '" "' + LOCAL_INSTALL_DIR + '" /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /NC /NS /NP | Out-Null',
-    'if ($LASTEXITCODE -ge 8) { Write-Host "  [エラー] コピー失敗 (code: $LASTEXITCODE)" -ForegroundColor Red; Read-Host "Enterで閉じる"; exit 1 }',
-    '$ws = New-Object -ComObject WScript.Shell',
-    '$dt = [Environment]::GetFolderPath("Desktop")',
-    '$icoPath = "' + path.join(LOCAL_INSTALL_DIR, 'resources', 'icon.ico') + '"',
-    '$sc = $ws.CreateShortcut((Join-Path $dt "FutaFinance.lnk"))',
-    '$sc.TargetPath = "' + LOCAL_EXE + '"',
-    '$sc.IconLocation = "$icoPath,0"',
-    '$sc.Save()',
-    '$sm = Join-Path $env:APPDATA "Microsoft\\Windows\\Start Menu\\Programs"',
-    '$sc2 = $ws.CreateShortcut((Join-Path $sm "FutaFinance.lnk"))',
-    '$sc2.TargetPath = "' + LOCAL_EXE + '"',
-    '$sc2.IconLocation = "$icoPath,0"',
-    '$sc2.Save()',
-    'ie4uinit.exe -show',
-    'Write-Host "[2/2] アプリを起動します..." -ForegroundColor Cyan',
-    'explorer.exe "' + LOCAL_EXE + '"',
-    'Start-Sleep -Seconds 1',
-  ];
-  launchPS1(lines);
-  isQuitting = true;
-  setTimeout(() => app.exit(0), 400);
-  return true;
-}
-
-async function checkForUpdate(opts = {}) {
-  const manual = opts.manual === true;
-  if (!app.isPackaged) {
-    if (manual) {
-      await dialog.showMessageBox(mainWindow, {
-        type: 'info', title: '更新確認', message: '開発モードでは更新チェックは無効です。',
-      });
-    }
-    return;
-  }
-  let remote;
-  try {
-    remote = await fetchVersionInfo();
-  } catch (_) {
-    if (manual) {
-      await dialog.showMessageBox(mainWindow, {
-        type: 'warning', title: '更新確認',
-        message: '更新情報の取得に失敗しました（インターネット接続を確認してください）。',
-      });
-    }
-    return;
-  }
-  const local = readBuildInfo();
-  const remoteNum = parseInt(remote.buildNumber, 10) || 0;
-  const localNum = parseInt(local.buildNumber, 10) || 0;
-  if (remoteNum <= localNum) {
-    if (manual) {
-      await dialog.showMessageBox(mainWindow, {
-        type: 'info', title: '更新確認', message: `最新版です（v${local.version}）。`,
-      });
-    }
-    return;
-  }
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  if (!mainWindow.isVisible()) { mainWindow.show(); mainWindow.focus(); }
-  const { response } = await dialog.showMessageBox(mainWindow, {
-    type: 'info',
-    title: 'FutaFinance - アップデート',
-    message: '新しいバージョンがあります',
-    detail: `現在 : v${local.version}\n最新 : v${remote.version}\n\n`
-        + '今すぐ更新しますか？（ダウンロード後に自動で開き直します）',
-    buttons: ['今すぐ更新', '後で'],
-    defaultId: 0, cancelId: 1, noLink: true,
-  });
-  if (response === 0) applyUpdate(remote.downloadUrl, remote.version, remoteNum);
+  autoUpdater.on('error', (err) => console.warn('[update]', err.message));
 }
 
 // ─────────────────── IPC ───────────────────
@@ -609,7 +408,22 @@ ipcMain.handle('futa:signOut', () => {
   accessCache = null; accessExpiry = 0;
   return true;
 });
-ipcMain.handle('futa:checkUpdate', () => checkForUpdate({ manual: true }));
+ipcMain.handle('futa:checkUpdate', async () => {
+  if (!app.isPackaged) {
+    await dialog.showMessageBox(mainWindow, {
+      type: 'info', title: '更新確認', message: '開発モードでは更新チェックは無効です。',
+    });
+    return;
+  }
+  try {
+    await autoUpdater.checkForUpdates();
+  } catch (e) {
+    await dialog.showMessageBox(mainWindow, {
+      type: 'warning', title: '更新確認',
+      message: '更新確認に失敗しました（インターネット接続を確認してください）。',
+    });
+  }
+});
 
 // ─────────────────── 起動 ───────────────────
 // 二重起動防止。
@@ -625,18 +439,17 @@ if (!gotLock) {
   });
   app.setAppUserModelId('jp.runstrategy.futafinance.desktop');
   app.whenReady().then(async () => {
-    // Drive等から直接起動された場合は %LOCALAPPDATA% へ入れて起動し直す（安定起動）。
-    // 戻り値 true なら終了シーケンス中なのでここで終わる。
-    if (await autoInstallIfNeeded()) return;
     // Service Worker は使わない（ローカル配信なので不要）。過去に登録された
     // SW のキャッシュで更新後も古い画面が出るのを防ぐため破棄するが、
     // ウィンドウ表示を待たせないよう非同期で投げる（起動を速く）。
     session.defaultSession
         .clearStorageData({ storages: ['serviceworkers'] })
         .catch(() => {});
+    setupAutoUpdater();
     await createWindow();
-    // 起動後しばらくして更新チェック（新版があれば「今すぐ更新/後で」ダイアログ）。
-    setTimeout(() => { checkForUpdate({}).catch((e) => console.error(e)); }, 3000);
+    // 起動 3 秒後に更新チェック、以降 3 分ごとに定期チェック。
+    setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 3000);
+    setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 3 * 60 * 1000);
   });
   app.on('window-all-closed', () => { if (!isQuitting) app.quit(); });
   app.on('activate', () => { if (mainWindow === null) createWindow(); });

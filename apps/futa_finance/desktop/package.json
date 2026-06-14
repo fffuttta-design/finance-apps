@@ -1,7 +1,7 @@
 {
     "name":  "futafinance_desktop",
     "productName":  "FutaFinance",
-    "version":  "1.0.277",
+    "version":  "1.0.282",
     "description":  "FutaFinance desktop shell (Electron wrapper around the Flutter web build).",
     "main":  "main.js",
     "author":  "RunStrategy",
@@ -9,7 +9,11 @@
     "private":  true,
     "scripts":  {
                     "start":  "electron .",
-                    "build":  "electron-builder --win dir"
+                    "build":  "electron-builder --win nsis --publish never",
+                    "dist":   "electron-builder --win nsis --publish always"
+                },
+    "dependencies": {
+                    "electron-updater": "^6.8.9"
                 },
     "devDependencies":  {
                             "electron":  "^32.0.0",
@@ -36,8 +40,21 @@
                                          }
                                      ],
                   "win":  {
-                              "target":  "dir",
-                              "icon":  "assets/icon.ico"
-                          }
+                              "target":  "nsis",
+                              "icon":  "assets/icon.ico",
+                              "artifactName": "FutaFinance-setup.exe"
+                          },
+                  "nsis": {
+                              "oneClick": true,
+                              "perMachine": false,
+                              "deleteAppDataOnUninstall": false,
+                              "createDesktopShortcut": true,
+                              "createStartMenuShortcut": true
+                          },
+                  "publish":  {
+                                  "provider":  "github",
+                                  "owner":  "fffuttta-design",
+                                  "repo":  "finance-apps"
+                              }
               }
 }

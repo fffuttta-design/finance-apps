@@ -1,11 +1,13 @@
-# build_desktop.ps1 - Build the FutaFinance Electron desktop app (dir/unpacked + GitHub release).
-#   Update model: zip win-unpacked -> GitHub Release asset, version info in release/futa-windows-version.json
+# build_desktop.ps1 - Build FutaFinance Electron desktop app (NSIS + electron-updater).
+#   Update model: electron-builder publishes NSIS setup + latest.yml to GitHub Release.
+#   electron-updater in the app checks latest.yml and auto-downloads/installs silently.
 #   1. version/build from pubspec; write build-info.json (packaged into the app)
 #   2. flutter build web (offline, base-href /) -> web-dist
 #   3. oauth.json from win_oauth.key
-#   4. electron-builder --win dir -> dist/win-unpacked
-#   5. write dist/win-unpacked/build-info.json
-#   6. -Publish: zip -> gh release create -> update futa-windows-version.json -> git push
+#   4. npm install (ensure electron-updater is present)
+#   5. electron-builder --win nsis --publish always (GH_TOKEN required)
+#      -> dist/FutaFinance-setup.exe + dist/latest.yml -> GitHub Release
+#   6. safety re-upload of exe + latest.yml via gh CLI (parallel-publish bug guard)
 #
 # ASCII only (Windows PowerShell 5.1 mis-parses Japanese in no-BOM .ps1).
 param(
@@ -17,8 +19,9 @@ $ErrorActionPreference = "Stop"
 $ScriptDir  = $PSScriptRoot
 $ProjectDir = Split-Path $ScriptDir -Parent          # desktop/
 $AppDir     = Split-Path $ProjectDir -Parent          # apps/futa_finance/
+$RepoRoot   = Split-Path (Split-Path $AppDir -Parent) -Parent  # monorepo root
 
-Write-Host "== FutaFinance desktop build (dir) ==" -ForegroundColor Cyan
+Write-Host "== FutaFinance desktop build (NSIS + electron-updater) ==" -ForegroundColor Cyan
 
 # ---- 0. version + buildNumber from pubspec ----
 $pubspec = Get-Content (Join-Path $AppDir "pubspec.yaml") -Raw
@@ -39,18 +42,18 @@ $buildInfoJson = (@{ version = $Version; buildNumber = $Build; builtAt = $builtA
 
 # ---- 1. flutter build web (offline) ----
 if (-not $NoBuildWeb) {
-  Write-Host "[1/5] flutter build web (offline)..." -ForegroundColor Yellow
+  Write-Host "[1/4] flutter build web (offline)..." -ForegroundColor Yellow
   Push-Location $AppDir
   try {
     & flutter build web --release --no-web-resources-cdn --base-href "/"
     if ($LASTEXITCODE -ne 0) { throw "flutter build web failed" }
   } finally { Pop-Location }
 } else {
-  Write-Host "[1/5] skip flutter build web (-NoBuildWeb)" -ForegroundColor DarkGray
+  Write-Host "[1/4] skip flutter build web (-NoBuildWeb)" -ForegroundColor DarkGray
 }
 
-# ---- 2. copy build/web -> desktop/web-dist (strip service worker) ----
-Write-Host "[2/5] copy web build -> web-dist" -ForegroundColor Yellow
+# ---- 2. copy build/web -> desktop/web-dist ----
+Write-Host "[2/4] copy web build -> web-dist" -ForegroundColor Yellow
 $webSrc = Join-Path $AppDir "build\web"
 $webDst = Join-Path $ProjectDir "web-dist"
 if (-not (Test-Path $webSrc)) { throw "web build not found: $webSrc" }
@@ -60,7 +63,7 @@ $sw = Join-Path $webDst "flutter_service_worker.js"
 if (Test-Path $sw) { Remove-Item $sw -Force }
 
 # ---- 3. oauth.json from win_oauth.key ----
-Write-Host "[3/5] write oauth.json" -ForegroundColor Yellow
+Write-Host "[3/4] write oauth.json" -ForegroundColor Yellow
 $keyPath = Join-Path $AppDir "win_oauth.key"
 if (Test-Path $keyPath) {
   $secret = (Get-Content $keyPath -Raw).Trim()
@@ -69,69 +72,46 @@ if (Test-Path $keyPath) {
   Write-Host "  WARN: win_oauth.key not found; login will fail." -ForegroundColor Red
 }
 
-# ---- 4. electron-builder --win dir ----
+# ---- 4. npm install + electron-builder NSIS ----
 Push-Location $ProjectDir
 try {
-  if (-not (Test-Path (Join-Path $ProjectDir "node_modules"))) {
-    Write-Host "[4/5] npm install..." -ForegroundColor Yellow
-    & npm install
-    if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
+  Write-Host "[4/4] npm install..." -ForegroundColor Yellow
+  & npm install
+  if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
+
+  if ($Publish) {
+    # GH_TOKEN: gh CLI から自動取得（未設定なら gh auth token を使う）
+    if (-not $env:GH_TOKEN) {
+      $env:GH_TOKEN = (gh auth token 2>$null)
+      if (-not $env:GH_TOKEN) { throw "GH_TOKEN が未設定です。gh auth login を実行するか GH_TOKEN を設定してください。" }
+    }
+    Write-Host "      electron-builder --win nsis --publish always..." -ForegroundColor Yellow
+    & npm run dist
+    if ($LASTEXITCODE -ne 0) { throw "electron-builder failed" }
   } else {
-    Write-Host "[4/5] npm install skipped (node_modules present)" -ForegroundColor DarkGray
+    Write-Host "      electron-builder --win nsis (local only)..." -ForegroundColor Yellow
+    & npm run build
+    if ($LASTEXITCODE -ne 0) { throw "electron-builder failed" }
   }
-  Write-Host "      electron-builder (dir)..." -ForegroundColor Yellow
-  & npm run build
-  if ($LASTEXITCODE -ne 0) { throw "electron-builder failed" }
 } finally { Pop-Location }
 
-# ---- 5. write build-info.json into win-unpacked ----
-$unpacked = Join-Path $ProjectDir "dist\win-unpacked"
-if (-not (Test-Path (Join-Path $unpacked "FutaFinance.exe"))) { throw "win-unpacked not found" }
-[System.IO.File]::WriteAllText((Join-Path $unpacked "build-info.json"), $buildInfoJson, [System.Text.UTF8Encoding]::new($false))
-Write-Host "[5/5] built unpacked app (v$Version build $Build)" -ForegroundColor Green
-Write-Host "unpacked: $unpacked"
+$setupExe = Join-Path $ProjectDir "dist\FutaFinance-setup.exe"
+$latestYml = Join-Path $ProjectDir "dist\latest.yml"
+if (-not (Test-Path $setupExe)) { throw "FutaFinance-setup.exe not found in dist/" }
+Write-Host "built: $setupExe" -ForegroundColor Green
 
-# ---- optional: publish to GitHub Releases ----
+# ---- optional: safety re-upload (parallel-publish bug guard) ----
 if ($Publish) {
-  $RepoRoot = Split-Path (Split-Path $AppDir -Parent) -Parent   # monorepo root
-  $Tag      = "futa-win-v$Version"
-  $ZipName  = "futa-desktop-v$Version.zip"
-  $ZipPath  = Join-Path $ProjectDir "dist\$ZipName"
-  $DownloadUrl = "https://github.com/fffuttta-design/finance-apps/releases/download/$Tag/$ZipName"
-
-  Write-Host "[Publish 1/3] creating zip..." -ForegroundColor Yellow
-  if (Test-Path $ZipPath) { Remove-Item $ZipPath -Force }
-  Compress-Archive -Path "$unpacked\*" -DestinationPath $ZipPath -Force
-  Write-Host "  zip: $ZipPath"
-
-  Write-Host "[Publish 2/3] gh release create $Tag..." -ForegroundColor Yellow
-  $releaseNotes = "FutaFinance Desktop v$Version (build $Build)"
-  gh release create $Tag $ZipPath `
-    --repo fffuttta-design/finance-apps `
-    --title "FutaFinance Desktop v$Version" `
-    --notes $releaseNotes
-  if ($LASTEXITCODE -ne 0) { throw "gh release create failed" }
-
-  Write-Host "[Publish 3/3] update futa-windows-version.json + git push..." -ForegroundColor Yellow
-  $versionJsonPath = Join-Path $RepoRoot "release\futa-windows-version.json"
-  $versionJson = (@{
-    version     = $Version
-    buildNumber = "$Build"
-    downloadUrl = $DownloadUrl
-    releaseNotes = $releaseNotes
-  } | ConvertTo-Json)
-  [System.IO.File]::WriteAllText($versionJsonPath, $versionJson, [System.Text.UTF8Encoding]::new($false))
-
-  Push-Location $RepoRoot
-  try {
-    git add "release/futa-windows-version.json"
-    git commit -m "release(desktop): v$Version+$Build - $releaseNotes"
-    git push origin main
-    if ($LASTEXITCODE -ne 0) { throw "git push failed" }
-  } finally { Pop-Location }
-
-  Write-Host "published: $DownloadUrl" -ForegroundColor Green
+  $Tag = "futa-desktop-v$Version"
+  Write-Host "[Safety] re-upload setup.exe + latest.yml to $Tag..." -ForegroundColor Yellow
+  if (Test-Path $latestYml) {
+    gh release upload $Tag $setupExe $latestYml --repo fffuttta-design/finance-apps --clobber
+  } else {
+    gh release upload $Tag $setupExe --repo fffuttta-design/finance-apps --clobber
+  }
+  Write-Host "published to GitHub Release: $Tag" -ForegroundColor Green
 }
 
 Write-Host "== done ==" -ForegroundColor Cyan
-Write-Host "First-time install: download the zip from GitHub Releases, extract, run FutaFinance.exe."
+Write-Host "First-time install: run FutaFinance-setup.exe from GitHub Releases."
+Write-Host "After that, electron-updater handles all future updates automatically."
