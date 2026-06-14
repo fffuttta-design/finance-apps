@@ -17,9 +17,9 @@ param(
 $ErrorActionPreference = "Stop"
 
 $ScriptDir  = $PSScriptRoot
-$ProjectDir = Split-Path $ScriptDir -Parent          # desktop/
-$AppDir     = Split-Path $ProjectDir -Parent          # apps/futa_finance/
-$RepoRoot   = Split-Path (Split-Path $AppDir -Parent) -Parent  # monorepo root
+$ProjectDir = Split-Path $ScriptDir -Parent
+$AppDir     = Split-Path $ProjectDir -Parent
+$RepoRoot   = Split-Path (Split-Path $AppDir -Parent) -Parent
 
 Write-Host "== FutaFinance desktop build (NSIS + electron-updater) ==" -ForegroundColor Cyan
 
@@ -40,7 +40,7 @@ $builtAt = (Get-Date).ToUniversalTime().ToString("o")
 $buildInfoJson = (@{ version = $Version; buildNumber = $Build; builtAt = $builtAt } | ConvertTo-Json)
 [System.IO.File]::WriteAllText((Join-Path $ProjectDir "build-info.json"), $buildInfoJson, [System.Text.UTF8Encoding]::new($false))
 
-# ---- 1. flutter build web (offline) ----
+# ---- 1. flutter build web ----
 if (-not $NoBuildWeb) {
   Write-Host "[1/4] flutter build web (offline)..." -ForegroundColor Yellow
   Push-Location $AppDir
@@ -72,7 +72,7 @@ if (Test-Path $keyPath) {
   Write-Host "  WARN: win_oauth.key not found; login will fail." -ForegroundColor Red
 }
 
-# ---- 4. npm install + electron-builder NSIS ----
+# ---- 4. npm install + electron-builder ----
 Push-Location $ProjectDir
 try {
   Write-Host "[4/4] npm install..." -ForegroundColor Yellow
@@ -80,10 +80,10 @@ try {
   if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
 
   if ($Publish) {
-    # GH_TOKEN: gh CLI から自動取得（未設定なら gh auth token を使う）
     if (-not $env:GH_TOKEN) {
-      $env:GH_TOKEN = (gh auth token 2>$null)
-      if (-not $env:GH_TOKEN) { throw "GH_TOKEN が未設定です。gh auth login を実行するか GH_TOKEN を設定してください。" }
+      $ghToken = (& gh auth token 2>$null)
+      if ($ghToken) { $env:GH_TOKEN = $ghToken }
+      else { throw "GH_TOKEN not set. Run 'gh auth login' or set GH_TOKEN." }
     }
     Write-Host "      electron-builder --win nsis --publish always..." -ForegroundColor Yellow
     & npm run dist
@@ -102,7 +102,7 @@ Write-Host "built: $setupExe" -ForegroundColor Green
 
 # ---- optional: safety re-upload (parallel-publish bug guard) ----
 if ($Publish) {
-  $Tag = "futa-desktop-v$Version"
+  $Tag = "v$Version"
   Write-Host "[Safety] re-upload setup.exe + latest.yml to $Tag..." -ForegroundColor Yellow
   if (Test-Path $latestYml) {
     gh release upload $Tag $setupExe $latestYml --repo fffuttta-design/finance-apps --clobber
