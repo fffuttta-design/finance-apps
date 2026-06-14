@@ -415,14 +415,45 @@ ipcMain.handle('futa:checkUpdate', async () => {
     });
     return;
   }
-  try {
-    await autoUpdater.checkForUpdates();
-  } catch (e) {
-    await dialog.showMessageBox(mainWindow, {
-      type: 'warning', title: '更新確認',
-      message: '更新確認に失敗しました（インターネット接続を確認してください）。',
-    });
-  }
+  // checkForUpdates() は結果をイベントで非同期通知するのでPromiseで包んで待つ。
+  await new Promise((resolve) => {
+    const onNotAvailable = () => { cleanup(); resolve('latest'); };
+    const onAvailable = () => { cleanup(); resolve('available'); };
+    const onDownloaded = () => { cleanup(); resolve('downloaded'); };
+    const onError = (err) => { cleanup(); resolve('error:' + err.message); };
+    function cleanup() {
+      autoUpdater.removeListener('update-not-available', onNotAvailable);
+      autoUpdater.removeListener('update-available', onAvailable);
+      autoUpdater.removeListener('update-downloaded', onDownloaded);
+      autoUpdater.removeListener('error', onError);
+    }
+    autoUpdater.once('update-not-available', onNotAvailable);
+    autoUpdater.once('update-available', onAvailable);
+    autoUpdater.once('update-downloaded', onDownloaded);
+    autoUpdater.once('error', onError);
+    autoUpdater.checkForUpdates().catch((e) => { cleanup(); resolve('error:' + e.message); });
+  }).then(async (result) => {
+    if (result === 'latest') {
+      await dialog.showMessageBox(mainWindow, {
+        type: 'info', title: '最新です',
+        message: `現在の ${app.getVersion()} が最新バージョンです。`,
+      });
+    } else if (result === 'available') {
+      // update-available は自動DL中なので案内のみ（update-downloaded で再通知される）
+      await dialog.showMessageBox(mainWindow, {
+        type: 'info', title: '新しいバージョンがあります',
+        message: 'ダウンロード中です。完了後に再起動を促します。',
+      });
+    } else if (result === 'downloaded') {
+      // 既に update-downloaded ハンドラがダイアログを出すので何もしない
+    } else {
+      await dialog.showMessageBox(mainWindow, {
+        type: 'warning', title: '更新確認に失敗',
+        message: 'インターネット接続を確認してください。',
+        detail: result.replace('error:', ''),
+      });
+    }
+  });
 });
 
 // ─────────────────── 起動 ───────────────────
