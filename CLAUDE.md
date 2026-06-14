@@ -47,9 +47,7 @@
 | **Web** | `git push origin main` | Claude（push で自動） |
 | **Android (FutaFinance)** | Bash で flutter build → gh release → version.json push | Claude が直接実行 |
 | **Android (たくはる)** | Bash で flutter build → gh release → version.json push | Claude が直接実行 |
-| **Windows Desktop** | `desktop/Scripts/build_desktop.ps1 -Publish` | ユーザーが実行 |
-
-> ※ Windows Desktop のみユーザー実行（NSIS ビルドがユーザー実機依存）。それ以外は Claude が Bash で直接実行する。
+| **Windows Desktop** | `cd apps/futa_finance/desktop/Scripts && powershell -ExecutionPolicy Bypass -File build_desktop.ps1 -Publish` | Claude が直接実行 |
 
 ---
 
