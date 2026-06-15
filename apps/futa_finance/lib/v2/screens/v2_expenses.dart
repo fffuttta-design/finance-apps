@@ -1199,10 +1199,11 @@ class _ColHandle extends StatelessWidget {
         onHorizontalDragUpdate: (d) => onDrag(d.delta.dx),
         child: SizedBox(
           width: w,
+          height: 24,
           child: Center(
             child: Container(
                 width: 1.5,
-                height: double.infinity,
+                height: 16,
                 color: const Color(0xFFCBD5E1)),
           ),
         ),
