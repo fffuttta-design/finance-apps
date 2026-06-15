@@ -1185,19 +1185,52 @@ class _ReceiptGroupRow extends StatelessWidget {
     required this.onTap,
   });
 
+  /// 件数カウントが最多の大カテゴリを返す（同率は最初に現れたもの優先）。
+  String _dominantMajor() {
+    final counts = <String, int>{};
+    for (final t in members) {
+      final m = t.category.major.trim();
+      if (m.isNotEmpty) counts[m] = (counts[m] ?? 0) + 1;
+    }
+    if (counts.isEmpty) return '';
+    return counts.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+  }
+
+  /// 大カテゴリ名の先頭 "N." プレフィックスを除去。
+  String _bareMajor(String s) {
+    final m = RegExp(r'^\d+\.').firstMatch(s);
+    return m != null ? s.substring(m.end).trim() : s;
+  }
+
+  /// 大カテゴリ名からハッシュで安定した色を生成。
+  Color _categoryColor(String key) {
+    if (key.isEmpty) return V2Colors.textSecondary;
+    int hash = 0;
+    for (final c in key.codeUnits) {
+      hash = (hash * 31 + c) & 0x7fffffff;
+    }
+    return HSLColor.fromAHSL(1.0, (hash % 360).toDouble(), 0.55, 0.48)
+        .toColor();
+  }
+
   @override
   Widget build(BuildContext context) {
     final first = members.first;
     final store = members
         .map((t) => t.store?.trim() ?? '')
         .firstWhere((s) => s.isNotEmpty, orElse: () => '');
-    // 店舗が無ければ、カテゴリ大分類（混在時は「まとめ記録」）を見出しに。
-    final majors = members.map((t) => t.category.major.trim()).toSet();
-    final title = store.isNotEmpty
-        ? store
-        : (majors.length == 1 && majors.first.isNotEmpty
-            ? majors.first
-            : 'まとめ記録');
+    // 店舗が無ければ「まとめ記録」を見出しに。
+    final title = store.isNotEmpty ? store : 'まとめ記録';
+
+    final dominant = _dominantMajor();
+    final bareCategory = _bareMajor(dominant);
+    // カテゴリラベル：最多大カテゴリ > 小カテゴリ（全件同一のみ）
+    final subs = members.map((t) => t.category.sub.trim()).toSet();
+    final subLabel = subs.length == 1 && subs.first.isNotEmpty ? subs.first : '';
+    final categoryLabel = bareCategory.isEmpty
+        ? '未分類'
+        : (subLabel.isEmpty ? bareCategory : '$bareCategory > $subLabel');
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
@@ -1221,23 +1254,54 @@ class _ReceiptGroupRow extends StatelessWidget {
             ),
             const SizedBox(width: V2Spacing.sm),
             Expanded(
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: V2Colors.surfaceMuted,
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                    child: Text('🧾 ${members.length}件',
-                        style: V2Typography.micro),
+                  // 1行目: 件数バッジ + タイトル
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: V2Colors.surfaceMuted,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: Text('🧾 ${members.length}件',
+                            style: V2Typography.micro),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(title,
+                            style: V2Typography.body.copyWith(
+                                fontSize: 15, fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(title,
-                        style: V2Typography.body,
-                        overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 2),
+                  // 2行目: カテゴリ（最多優先）
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        margin: const EdgeInsets.only(right: 4),
+                        decoration: BoxDecoration(
+                          color: _categoryColor(dominant),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          categoryLabel,
+                          style: V2Typography.micro
+                              .copyWith(color: V2Colors.textSecondary),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
