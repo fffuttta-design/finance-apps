@@ -1550,7 +1550,7 @@ class _WideGroupRowState extends State<_WideGroupRow> {
               SizedBox(
                 width: 90,
                 child: Text(
-                  '-${formatYen(total)}',
+                  '-${formatYen(widget.total)}',
                   textAlign: TextAlign.right,
                   style: V2Typography.numericCell.copyWith(
                     color: V2Colors.negative,
