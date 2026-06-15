@@ -1200,10 +1200,10 @@ class _ExpensesTableState extends State<_ExpensesTable> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: selected ? V2Colors.primary.withValues(alpha: 0.12) : V2Colors.surfaceMuted,
+                  color: selected ? V2Colors.accent.withValues(alpha: 0.12) : V2Colors.surfaceMuted,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: selected ? V2Colors.primary : V2Colors.border,
+                    color: selected ? V2Colors.accent : V2Colors.border,
                     width: selected ? 1.5 : 1,
                   ),
                 ),
@@ -1212,7 +1212,7 @@ class _ExpensesTableState extends State<_ExpensesTable> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
-                    color: selected ? V2Colors.primary : V2Colors.textSecondary,
+                    color: selected ? V2Colors.accent : V2Colors.textSecondary,
                   ),
                 ),
               ),
