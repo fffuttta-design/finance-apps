@@ -538,6 +538,18 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
             ),
             const SizedBox(height: V2Spacing.lg),
           ],
+          // ── 毎月支出予定 ──────────────────
+          if (showFixed && _monthlyCharges.isNotEmpty) ...[
+            _MonthlyChargesSection(
+              charges: _monthlyCharges,
+              onTapItem: _openSubscriptionEdit,
+              isCurrentMonth: _focused.year == DateTime.now().year &&
+                  _focused.month == DateTime.now().month,
+              ym: _ymKey,
+              onInputVariable: _inputVariableActual,
+            ),
+            const SizedBox(height: V2Spacing.lg),
+          ],
           // ── 取引一覧 ────────────────────
           V2Card(
             padding: EdgeInsets.zero,
@@ -549,31 +561,11 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
                       V2Spacing.lg, V2Spacing.md, V2Spacing.lg, V2Spacing.sm),
                   child: Row(
                     children: [
+                      Icon(Icons.receipt_long_outlined,
+                          size: 18, color: widget.accent),
+                      const SizedBox(width: V2Spacing.sm),
                       Expanded(
-                        child: InkWell(
-                          onTap: _openExpenseList,
-                          borderRadius: BorderRadius.circular(6),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 2),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.receipt_long_outlined,
-                                    size: 18, color: widget.accent),
-                                const SizedBox(width: V2Spacing.sm),
-                                Text(label, style: V2Typography.h2),
-                                const SizedBox(width: 4),
-                                const Icon(Icons.chevron_right,
-                                    size: 18, color: V2Colors.textMuted),
-                                const Text('一覧',
-                                    style: TextStyle(
-                                        fontSize: 11,
-                                        color: V2Colors.textMuted)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+                          child: Text(label, style: V2Typography.h2)),
                       Text('-${formatYen(total)}',
                           style: TextStyle(
                               fontSize: 16,
@@ -606,17 +598,6 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
               ],
             ),
           ),
-          if (showFixed && _monthlyCharges.isNotEmpty)
-            const SizedBox(height: V2Spacing.lg),
-          if (showFixed)
-            _MonthlyChargesSection(
-              charges: _monthlyCharges,
-              onTapItem: _openSubscriptionEdit,
-              isCurrentMonth: _focused.year == DateTime.now().year &&
-                  _focused.month == DateTime.now().month,
-              ym: _ymKey,
-              onInputVariable: _inputVariableActual,
-            ),
         ],
       ),
     );
@@ -1124,11 +1105,45 @@ class _ExpensesTable extends StatefulWidget {
   State<_ExpensesTable> createState() => _ExpensesTableState();
 }
 
+/// 並び替えモード。
+enum _ExpenseSort {
+  dateDesc,   // 日付 新→旧（既定）
+  dateAsc,    // 日付 古→新
+  amountDesc, // 金額 高→低
+  amountAsc,  // 金額 低→高
+  majorAsc,   // カテゴリ順
+}
+
+extension _ExpenseSortLabel on _ExpenseSort {
+  String get label {
+    switch (this) {
+      case _ExpenseSort.dateDesc:   return '日付 新→旧';
+      case _ExpenseSort.dateAsc:    return '日付 古→新';
+      case _ExpenseSort.amountDesc: return '金額 高→低';
+      case _ExpenseSort.amountAsc:  return '金額 低→高';
+      case _ExpenseSort.majorAsc:   return 'カテゴリ順';
+    }
+  }
+}
+
 class _ExpensesTableState extends State<_ExpensesTable> {
-  /// 同じ receiptId が2件以上 → まとめ（group）、それ以外 → 単品（single）。
-  /// 並び順は元の rows の順（親はその最初の品目の位置）を保つ。
+  _ExpenseSort _sort = _ExpenseSort.dateDesc;
+
+  /// rows をソートしてから unit に変換。
   List<_Unit> get _units {
-    final rows = widget.rows;
+    final rows = List<core.Transaction>.from(widget.rows);
+    switch (_sort) {
+      case _ExpenseSort.dateDesc:
+        rows.sort((a, b) => b.date.compareTo(a.date));
+      case _ExpenseSort.dateAsc:
+        rows.sort((a, b) => a.date.compareTo(b.date));
+      case _ExpenseSort.amountDesc:
+        rows.sort((a, b) => b.amount.compareTo(a.amount));
+      case _ExpenseSort.amountAsc:
+        rows.sort((a, b) => a.amount.compareTo(b.amount));
+      case _ExpenseSort.majorAsc:
+        rows.sort((a, b) => a.category.major.compareTo(b.category.major));
+    }
     final counts = <String, int>{};
     for (final t in rows) {
       final rid = t.receiptId;
@@ -1152,6 +1167,62 @@ class _ExpensesTableState extends State<_ExpensesTable> {
     return units;
   }
 
+  /// 日付ヘッダーをタップしたときのソートトグル。
+  void _toggleDateSort() {
+    setState(() {
+      _sort = _sort == _ExpenseSort.dateDesc
+          ? _ExpenseSort.dateAsc
+          : _ExpenseSort.dateDesc;
+    });
+  }
+
+  /// 金額ヘッダーをタップしたときのソートトグル。
+  void _toggleAmountSort() {
+    setState(() {
+      _sort = _sort == _ExpenseSort.amountDesc
+          ? _ExpenseSort.amountAsc
+          : _ExpenseSort.amountDesc;
+    });
+  }
+
+  /// モバイル用：並び替えチップ行。
+  Widget _sortChips() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(V2Spacing.md, 0, V2Spacing.md, V2Spacing.sm),
+      child: Row(
+        children: _ExpenseSort.values.map((s) {
+          final selected = _sort == s;
+          return Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: GestureDetector(
+              onTap: () => setState(() => _sort = s),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: selected ? V2Colors.primary.withValues(alpha: 0.12) : V2Colors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: selected ? V2Colors.primary : V2Colors.border,
+                    width: selected ? 1.5 : 1,
+                  ),
+                ),
+                child: Text(
+                  s.label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
+                    color: selected ? V2Colors.primary : V2Colors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.sizeOf(context).width >= 700;
@@ -1160,10 +1231,15 @@ class _ExpensesTableState extends State<_ExpensesTable> {
         units: _units,
         onTapRow: widget.onTapRow,
         onTapGroup: widget.onTapGroup,
+        sort: _sort,
+        onToggleDateSort: _toggleDateSort,
+        onToggleAmountSort: _toggleAmountSort,
       );
     }
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _sortChips(),
         for (final u in _units)
           if (u.isGroup)
             _ReceiptGroupRow(
@@ -1216,11 +1292,17 @@ class _WideExpenseTable extends StatefulWidget {
   final List<_Unit> units;
   final void Function(core.Transaction) onTapRow;
   final void Function(List<core.Transaction>) onTapGroup;
+  final _ExpenseSort sort;
+  final VoidCallback onToggleDateSort;
+  final VoidCallback onToggleAmountSort;
 
   const _WideExpenseTable({
     required this.units,
     required this.onTapRow,
     required this.onTapGroup,
+    required this.sort,
+    required this.onToggleDateSort,
+    required this.onToggleAmountSort,
   });
 
   @override
@@ -1288,6 +1370,13 @@ class _WideExpenseTableState extends State<_WideExpenseTable> {
   }
 
   // ── ヘッダー行 ──────────────────────────────────
+  Widget _sortIcon(_ExpenseSort asc, _ExpenseSort desc) {
+    final s = widget.sort;
+    if (s == asc) return const Icon(Icons.arrow_upward, size: 11, color: Color(0xFF64748B));
+    if (s == desc) return const Icon(Icons.arrow_downward, size: 11, color: Color(0xFF64748B));
+    return const Icon(Icons.unfold_more, size: 11, color: Color(0xFFCBD5E1));
+  }
+
   Widget _header() {
     return Container(
       decoration: const BoxDecoration(
@@ -1296,11 +1385,18 @@ class _WideExpenseTableState extends State<_WideExpenseTable> {
       ),
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-        SizedBox(
-          width: _dateW + _hPad,
-          child: const Padding(
-            padding: EdgeInsets.only(left: _hPad),
-            child: Text('日付', style: _hStyle),
+        GestureDetector(
+          onTap: widget.onToggleDateSort,
+          child: SizedBox(
+            width: _dateW + _hPad,
+            child: Padding(
+              padding: const EdgeInsets.only(left: _hPad),
+              child: Row(children: [
+                const Text('日付', style: _hStyle),
+                const SizedBox(width: 3),
+                _sortIcon(_ExpenseSort.dateAsc, _ExpenseSort.dateDesc),
+              ]),
+            ),
           ),
         ),
         SizedBox(width: _ColHandle.w),
@@ -1312,11 +1408,18 @@ class _WideExpenseTableState extends State<_WideExpenseTable> {
         _ColHandle(onDrag: (dx) => _onDrag(2, dx)),
         SizedBox(width: _w[3], child: const Text('支払い方法', style: _hStyle, overflow: TextOverflow.ellipsis)),
         SizedBox(width: _ColHandle.w),
-        SizedBox(
-          width: _amountW + _hPad,
-          child: const Padding(
-            padding: EdgeInsets.only(right: _hPad),
-            child: Text('金額', textAlign: TextAlign.right, style: _hStyle),
+        GestureDetector(
+          onTap: widget.onToggleAmountSort,
+          child: SizedBox(
+            width: _amountW + _hPad,
+            child: Padding(
+              padding: const EdgeInsets.only(right: _hPad),
+              child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                _sortIcon(_ExpenseSort.amountAsc, _ExpenseSort.amountDesc),
+                const SizedBox(width: 3),
+                const Text('金額', textAlign: TextAlign.right, style: _hStyle),
+              ]),
+            ),
           ),
         ),
       ]),
