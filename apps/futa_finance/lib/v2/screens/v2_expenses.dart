@@ -1154,6 +1154,14 @@ class _ExpensesTableState extends State<_ExpensesTable> {
 
   @override
   Widget build(BuildContext context) {
+    final isWide = MediaQuery.sizeOf(context).width >= 700;
+    if (isWide) {
+      return _WideExpenseTable(
+        units: _units,
+        onTapRow: widget.onTapRow,
+        onTapGroup: widget.onTapGroup,
+      );
+    }
     return Column(
       children: [
         for (final u in _units)
@@ -1169,6 +1177,391 @@ class _ExpensesTableState extends State<_ExpensesTable> {
               onTap: () => widget.onTapRow(u.single!),
             ),
       ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// PC ワイド表示：表形式レイアウト（幅 ≥ 700px）
+// ─────────────────────────────────────────────────────────
+
+class _WideExpenseTable extends StatelessWidget {
+  final List<_Unit> units;
+  final void Function(core.Transaction) onTapRow;
+  final void Function(List<core.Transaction>) onTapGroup;
+
+  const _WideExpenseTable({
+    required this.units,
+    required this.onTapRow,
+    required this.onTapGroup,
+  });
+
+  /// カテゴリ名からハッシュで安定した色（共通ユーティリティ）。
+  static Color catColor(String key) {
+    if (key.isEmpty) return V2Colors.textSecondary;
+    int hash = 0;
+    for (final c in key.codeUnits) {
+      hash = (hash * 31 + c) & 0x7fffffff;
+    }
+    return HSLColor.fromAHSL(1.0, (hash % 360).toDouble(), 0.55, 0.48)
+        .toColor();
+  }
+
+  static String bareMajor(String s) {
+    final m = RegExp(r'^\d+\.').firstMatch(s);
+    return m != null ? s.substring(m.end).trim() : s;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ── ヘッダー行 ──
+        Container(
+          margin: const EdgeInsets.fromLTRB(V2Spacing.md, 0, V2Spacing.md, 4),
+          padding: const EdgeInsets.symmetric(
+              horizontal: V2Spacing.md, vertical: 6),
+          decoration: BoxDecoration(
+            color: V2Colors.surfaceMuted,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(children: [
+            SizedBox(
+                width: 72,
+                child: Text('日付',
+                    style: V2Typography.micro
+                        .copyWith(color: V2Colors.textMuted))),
+            const SizedBox(width: V2Spacing.sm),
+            Expanded(
+                flex: 2,
+                child: Text('親カテゴリ',
+                    style: V2Typography.micro
+                        .copyWith(color: V2Colors.textMuted))),
+            Expanded(
+                flex: 2,
+                child: Text('子カテゴリ',
+                    style: V2Typography.micro
+                        .copyWith(color: V2Colors.textMuted))),
+            Expanded(
+                flex: 3,
+                child: Text('タイトル',
+                    style: V2Typography.micro
+                        .copyWith(color: V2Colors.textMuted))),
+            Expanded(
+                flex: 2,
+                child: Text('支払い方法',
+                    style: V2Typography.micro
+                        .copyWith(color: V2Colors.textMuted))),
+            SizedBox(
+                width: 90,
+                child: Text('金額',
+                    textAlign: TextAlign.right,
+                    style: V2Typography.micro
+                        .copyWith(color: V2Colors.textMuted))),
+          ]),
+        ),
+        // ── データ行 ──
+        for (final u in units)
+          if (u.isGroup)
+            _WideGroupRow(
+                members: u.members!,
+                total: u.total,
+                onTap: () => onTapGroup(u.members!))
+          else
+            _WideRow(t: u.single!, onTap: () => onTapRow(u.single!)),
+      ],
+    );
+  }
+}
+
+/// ワイド表示：単品行
+class _WideRow extends StatefulWidget {
+  final core.Transaction t;
+  final VoidCallback onTap;
+  const _WideRow({required this.t, required this.onTap});
+  @override
+  State<_WideRow> createState() => _WideRowState();
+}
+
+class _WideRowState extends State<_WideRow> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.t;
+    final isTransfer = t.type == core.TransactionType.transfer;
+    final major = _WideExpenseTable.bareMajor(t.category.major.trim());
+    final sub = t.category.sub.trim();
+    final color = _WideExpenseTable.catColor(t.category.major.trim());
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(
+              V2Spacing.md, 0, V2Spacing.md, 4),
+          padding: const EdgeInsets.symmetric(
+              horizontal: V2Spacing.md, vertical: 10),
+          decoration: BoxDecoration(
+            color: _hover ? V2Colors.hover : V2Colors.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: V2Colors.border),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // 日付
+              SizedBox(
+                width: 72,
+                child: dateWeekdayText(t.date,
+                    baseStyle: V2Typography.numericCell),
+              ),
+              const SizedBox(width: V2Spacing.sm),
+              // 親カテゴリ
+              Expanded(
+                flex: 2,
+                child: isTransfer
+                    ? const SizedBox.shrink()
+                    : Row(children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          margin: const EdgeInsets.only(right: 5),
+                          decoration: BoxDecoration(
+                              color: color, shape: BoxShape.circle),
+                        ),
+                        Expanded(
+                          child: Text(
+                            major.isEmpty ? '—' : major,
+                            style: V2Typography.caption,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ]),
+              ),
+              // 子カテゴリ
+              Expanded(
+                flex: 2,
+                child: isTransfer
+                    ? Row(children: [
+                        const Icon(Icons.swap_horiz,
+                            size: 13, color: V2Colors.info),
+                        const SizedBox(width: 3),
+                        Text('振替',
+                            style: V2Typography.caption
+                                .copyWith(color: V2Colors.info)),
+                      ])
+                    : Text(
+                        sub.isEmpty ? '—' : sub,
+                        style: V2Typography.caption
+                            .copyWith(color: V2Colors.textSecondary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+              ),
+              // タイトル
+              Expanded(
+                flex: 3,
+                child: Text(
+                  t.description.isEmpty ? '—' : t.description,
+                  style: V2Typography.body
+                      .copyWith(fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              // 支払い方法
+              Expanded(
+                flex: 2,
+                child: Text(
+                  t.paymentMethod,
+                  style: V2Typography.caption
+                      .copyWith(color: V2Colors.textSecondary),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              // 金額
+              SizedBox(
+                width: 90,
+                child: Text(
+                  isTransfer
+                      ? formatYen(t.amount)
+                      : '-${formatYen(t.amount)}',
+                  textAlign: TextAlign.right,
+                  style: V2Typography.numericCell.copyWith(
+                    color: isTransfer
+                        ? V2Colors.textBody
+                        : V2Colors.negative,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// ワイド表示：グループ行（複数品目まとめ）
+class _WideGroupRow extends StatefulWidget {
+  final List<core.Transaction> members;
+  final int total;
+  final VoidCallback onTap;
+  const _WideGroupRow(
+      {required this.members, required this.total, required this.onTap});
+  @override
+  State<_WideGroupRow> createState() => _WideGroupRowState();
+}
+
+class _WideGroupRowState extends State<_WideGroupRow> {
+  bool _hover = false;
+
+  String _dominantMajor() {
+    final counts = <String, int>{};
+    for (final t in widget.members) {
+      final m = t.category.major.trim();
+      if (m.isNotEmpty) counts[m] = (counts[m] ?? 0) + 1;
+    }
+    if (counts.isEmpty) return '';
+    return counts.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final first = widget.members.first;
+    final store = widget.members
+        .map((t) => t.store?.trim() ?? '')
+        .firstWhere((s) => s.isNotEmpty, orElse: () => '');
+    final title = store.isNotEmpty ? store : 'まとめ記録';
+
+    final dominant = _dominantMajor();
+    final major = _WideExpenseTable.bareMajor(dominant);
+    final color = _WideExpenseTable.catColor(dominant);
+    final subs =
+        widget.members.map((t) => t.category.sub.trim()).toSet();
+    final sub =
+        subs.length == 1 && subs.first.isNotEmpty ? subs.first : '—';
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(
+              V2Spacing.md, 0, V2Spacing.md, 4),
+          padding: const EdgeInsets.symmetric(
+              horizontal: V2Spacing.md, vertical: 10),
+          decoration: BoxDecoration(
+            color: _hover ? V2Colors.hover : V2Colors.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: V2Colors.border),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // 日付
+              SizedBox(
+                width: 72,
+                child: dateWeekdayText(first.date,
+                    baseStyle: V2Typography.numericCell),
+              ),
+              const SizedBox(width: V2Spacing.sm),
+              // 親カテゴリ
+              Expanded(
+                flex: 2,
+                child: major.isEmpty
+                    ? const SizedBox.shrink()
+                    : Row(children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          margin: const EdgeInsets.only(right: 5),
+                          decoration: BoxDecoration(
+                              color: color, shape: BoxShape.circle),
+                        ),
+                        Expanded(
+                          child: Text(
+                            major,
+                            style: V2Typography.caption,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ]),
+              ),
+              // 子カテゴリ
+              Expanded(
+                flex: 2,
+                child: Text(
+                  sub,
+                  style: V2Typography.caption
+                      .copyWith(color: V2Colors.textSecondary),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              // タイトル（件数バッジ + 店舗名）
+              Expanded(
+                flex: 3,
+                child: Row(children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5, vertical: 1),
+                    margin: const EdgeInsets.only(right: 6),
+                    decoration: BoxDecoration(
+                      color: V2Colors.surfaceMuted,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    child: Text('🧾 ${widget.members.length}件',
+                        style: V2Typography.micro),
+                  ),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: V2Typography.body
+                          .copyWith(fontWeight: FontWeight.w600),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ]),
+              ),
+              // 支払い方法（全件同一ならそのまま、バラバラなら「複数」）
+              Expanded(
+                flex: 2,
+                child: Builder(builder: (_) {
+                  final methods = widget.members
+                      .map((t) => t.paymentMethod)
+                      .toSet();
+                  return Text(
+                    methods.length == 1 ? methods.first : '複数',
+                    style: V2Typography.caption
+                        .copyWith(color: V2Colors.textSecondary),
+                    overflow: TextOverflow.ellipsis,
+                  );
+                }),
+              ),
+              // 金額
+              SizedBox(
+                width: 90,
+                child: Text(
+                  '-${formatYen(total)}',
+                  textAlign: TextAlign.right,
+                  style: V2Typography.numericCell.copyWith(
+                    color: V2Colors.negative,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
