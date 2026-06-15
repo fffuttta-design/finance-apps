@@ -1185,7 +1185,33 @@ class _ExpensesTableState extends State<_ExpensesTable> {
 // PC ワイド表示：表形式レイアウト（幅 ≥ 700px）
 // ─────────────────────────────────────────────────────────
 
-class _WideExpenseTable extends StatelessWidget {
+/// 列ドラッグハンドル。
+class _ColHandle extends StatelessWidget {
+  final void Function(double dx) onDrag;
+  const _ColHandle({required this.onDrag});
+  static const double w = 8;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeColumn,
+      child: GestureDetector(
+        onHorizontalDragUpdate: (d) => onDrag(d.delta.dx),
+        child: SizedBox(
+          width: w,
+          child: Center(
+            child: Container(
+                width: 1.5,
+                height: double.infinity,
+                color: const Color(0xFFCBD5E1)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WideExpenseTable extends StatefulWidget {
   final List<_Unit> units;
   final void Function(core.Transaction) onTapRow;
   final void Function(List<core.Transaction>) onTapGroup;
@@ -1196,9 +1222,42 @@ class _WideExpenseTable extends StatelessWidget {
     required this.onTapGroup,
   });
 
-  /// カテゴリ名からハッシュで安定した色（共通ユーティリティ）。
-  static Color catColor(String key) {
-    if (key.isEmpty) return V2Colors.textSecondary;
+  @override
+  State<_WideExpenseTable> createState() => _WideExpenseTableState();
+}
+
+class _WideExpenseTableState extends State<_WideExpenseTable> {
+  // 親カテ / 子カテ / タイトル / 支払い方法（px）
+  List<double> _w = [120.0, 110.0, 240.0, 140.0];
+  final Set<int> _hovered = {};
+
+  static const double _dateW = 78;
+  static const double _amountW = 104;
+  static const double _hPad = 14;
+  static const double _minColW = 50;
+  static const Color _borderColor = Color(0xFFCBD5E1);
+
+  static const _hStyle = TextStyle(
+      fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8));
+
+  // ドラッグ: i列とi+1列の間のハンドル。i+1が無ければi列のみ伸縮。
+  void _onDrag(int i, double dx) {
+    setState(() {
+      final next = i + 1;
+      if (next < _w.length) {
+        final maxDelta = _w[next] - _minColW;
+        final minDelta = _minColW - _w[i];
+        final d = dx.clamp(minDelta, maxDelta);
+        _w[i] += d;
+        _w[next] -= d;
+      } else {
+        _w[i] = (_w[i] + dx).clamp(_minColW, 500.0);
+      }
+    });
+  }
+
+  static Color _catColor(String key) {
+    if (key.isEmpty) return const Color(0xFF94A3B8);
     int hash = 0;
     for (final c in key.codeUnits) {
       hash = (hash * 31 + c) & 0x7fffffff;
@@ -1207,359 +1266,251 @@ class _WideExpenseTable extends StatelessWidget {
         .toColor();
   }
 
-  static String bareMajor(String s) {
+  static String _bare(String s) {
     final m = RegExp(r'^\d+\.').firstMatch(s);
     return m != null ? s.substring(m.end).trim() : s;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // ── ヘッダー行 ──
-        Container(
-          margin: const EdgeInsets.fromLTRB(V2Spacing.md, 0, V2Spacing.md, 4),
-          padding: const EdgeInsets.symmetric(
-              horizontal: V2Spacing.md, vertical: 6),
-          decoration: BoxDecoration(
-            color: V2Colors.surfaceMuted,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(children: [
-            SizedBox(
-                width: 72,
-                child: Text('日付',
-                    style: V2Typography.micro
-                        .copyWith(color: V2Colors.textMuted))),
-            const SizedBox(width: V2Spacing.sm),
-            Expanded(
-                flex: 2,
-                child: Text('親カテゴリ',
-                    style: V2Typography.micro
-                        .copyWith(color: V2Colors.textMuted))),
-            Expanded(
-                flex: 2,
-                child: Text('子カテゴリ',
-                    style: V2Typography.micro
-                        .copyWith(color: V2Colors.textMuted))),
-            Expanded(
-                flex: 3,
-                child: Text('タイトル',
-                    style: V2Typography.micro
-                        .copyWith(color: V2Colors.textMuted))),
-            Expanded(
-                flex: 2,
-                child: Text('支払い方法',
-                    style: V2Typography.micro
-                        .copyWith(color: V2Colors.textMuted))),
-            SizedBox(
-                width: 90,
-                child: Text('金額',
-                    textAlign: TextAlign.right,
-                    style: V2Typography.micro
-                        .copyWith(color: V2Colors.textMuted))),
-          ]),
-        ),
-        // ── データ行 ──
-        for (final u in units)
-          if (u.isGroup)
-            _WideGroupRow(
-                members: u.members!,
-                total: u.total,
-                onTap: () => onTapGroup(u.members!))
-          else
-            _WideRow(t: u.single!, onTap: () => onTapRow(u.single!)),
-      ],
+  /// 背景色付きカテゴリバッジ。
+  static Widget _catBadge(String text, Color color) {
+    if (text.isEmpty) return const Text('—', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)));
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(text,
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
+          overflow: TextOverflow.ellipsis),
     );
   }
-}
 
-/// ワイド表示：単品行
-class _WideRow extends StatefulWidget {
-  final core.Transaction t;
-  final VoidCallback onTap;
-  const _WideRow({required this.t, required this.onTap});
-  @override
-  State<_WideRow> createState() => _WideRowState();
-}
+  // ── ヘッダー行 ──────────────────────────────────
+  Widget _header() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFFF1F5F9),
+        border: Border(bottom: BorderSide(color: _borderColor, width: 1.5)),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+        SizedBox(
+          width: _dateW + _hPad,
+          child: const Padding(
+            padding: EdgeInsets.only(left: _hPad),
+            child: Text('日付', style: _hStyle),
+          ),
+        ),
+        SizedBox(width: _ColHandle.w),
+        SizedBox(width: _w[0], child: const Text('親カテゴリ', style: _hStyle, overflow: TextOverflow.ellipsis)),
+        _ColHandle(onDrag: (dx) => _onDrag(0, dx)),
+        SizedBox(width: _w[1], child: const Text('子カテゴリ', style: _hStyle, overflow: TextOverflow.ellipsis)),
+        _ColHandle(onDrag: (dx) => _onDrag(1, dx)),
+        SizedBox(width: _w[2], child: const Text('タイトル', style: _hStyle, overflow: TextOverflow.ellipsis)),
+        _ColHandle(onDrag: (dx) => _onDrag(2, dx)),
+        SizedBox(width: _w[3], child: const Text('支払い方法', style: _hStyle, overflow: TextOverflow.ellipsis)),
+        SizedBox(width: _ColHandle.w),
+        SizedBox(
+          width: _amountW + _hPad,
+          child: const Padding(
+            padding: EdgeInsets.only(right: _hPad),
+            child: Text('金額', textAlign: TextAlign.right, style: _hStyle),
+          ),
+        ),
+      ]),
+    );
+  }
 
-class _WideRowState extends State<_WideRow> {
-  bool _hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = widget.t;
-    final isTransfer = t.type == core.TransactionType.transfer;
-    final major = _WideExpenseTable.bareMajor(t.category.major.trim());
-    final sub = t.category.sub.trim();
-    final color = _WideExpenseTable.catColor(t.category.major.trim());
-
+  // ── 行共通レイアウト helper ──────────────────────
+  Widget _rowLayout({
+    required int index,
+    required DateTime date,
+    required Widget majorCell,
+    required Widget subCell,
+    required Widget titleCell,
+    required Widget payCell,
+    required String amountText,
+    required bool isTransfer,
+    required VoidCallback onTap,
+  }) {
+    final isLast = index == widget.units.length - 1;
+    final hov = _hovered.contains(index);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
+      onEnter: (_) => setState(() => _hovered.add(index)),
+      onExit: (_) => setState(() => _hovered.remove(index)),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
+        onTap: onTap,
         child: Container(
-          margin: const EdgeInsets.fromLTRB(
-              V2Spacing.md, 0, V2Spacing.md, 4),
-          padding: const EdgeInsets.symmetric(
-              horizontal: V2Spacing.md, vertical: 10),
           decoration: BoxDecoration(
-            color: _hover ? V2Colors.hover : V2Colors.surface,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: V2Colors.border),
+            color: hov ? V2Colors.hover : V2Colors.surface,
+            border: isLast
+                ? null
+                : const Border(
+                    bottom: BorderSide(color: _borderColor, width: 1)),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // 日付
-              SizedBox(
-                width: 72,
-                child: dateWeekdayText(t.date,
-                    baseStyle: V2Typography.numericCell),
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            SizedBox(
+              width: _dateW + _hPad,
+              child: Padding(
+                padding: const EdgeInsets.only(left: _hPad),
+                child:
+                    dateWeekdayText(date, baseStyle: V2Typography.numericCell),
               ),
-              const SizedBox(width: V2Spacing.sm),
-              // 親カテゴリ
-              Expanded(
-                flex: 2,
-                child: isTransfer
-                    ? const SizedBox.shrink()
-                    : Row(children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          margin: const EdgeInsets.only(right: 5),
-                          decoration: BoxDecoration(
-                              color: color, shape: BoxShape.circle),
-                        ),
-                        Expanded(
-                          child: Text(
-                            major.isEmpty ? '—' : major,
-                            style: V2Typography.caption,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ]),
-              ),
-              // 子カテゴリ
-              Expanded(
-                flex: 2,
-                child: isTransfer
-                    ? Row(children: [
-                        const Icon(Icons.swap_horiz,
-                            size: 13, color: V2Colors.info),
-                        const SizedBox(width: 3),
-                        Text('振替',
-                            style: V2Typography.caption
-                                .copyWith(color: V2Colors.info)),
-                      ])
-                    : Text(
-                        sub.isEmpty ? '—' : sub,
-                        style: V2Typography.caption
-                            .copyWith(color: V2Colors.textSecondary),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-              ),
-              // タイトル
-              Expanded(
-                flex: 3,
+            ),
+            SizedBox(width: _ColHandle.w),
+            SizedBox(width: _w[0], child: majorCell),
+            SizedBox(width: _ColHandle.w),
+            SizedBox(width: _w[1], child: subCell),
+            SizedBox(width: _ColHandle.w),
+            SizedBox(width: _w[2], child: titleCell),
+            SizedBox(width: _ColHandle.w),
+            SizedBox(width: _w[3], child: payCell),
+            SizedBox(width: _ColHandle.w),
+            SizedBox(
+              width: _amountW + _hPad,
+              child: Padding(
+                padding: const EdgeInsets.only(right: _hPad),
                 child: Text(
-                  t.description.isEmpty ? '—' : t.description,
-                  style: V2Typography.body
-                      .copyWith(fontWeight: FontWeight.w600),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              // 支払い方法
-              Expanded(
-                flex: 2,
-                child: Text(
-                  t.paymentMethod,
-                  style: V2Typography.caption
-                      .copyWith(color: V2Colors.textSecondary),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              // 金額
-              SizedBox(
-                width: 90,
-                child: Text(
-                  isTransfer
-                      ? formatYen(t.amount)
-                      : '-${formatYen(t.amount)}',
+                  amountText,
                   textAlign: TextAlign.right,
                   style: V2Typography.numericCell.copyWith(
-                    color: isTransfer
-                        ? V2Colors.textBody
-                        : V2Colors.negative,
+                    color: isTransfer ? V2Colors.textBody : V2Colors.negative,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ]),
         ),
       ),
     );
   }
-}
 
-/// ワイド表示：グループ行（複数品目まとめ）
-class _WideGroupRow extends StatefulWidget {
-  final List<core.Transaction> members;
-  final int total;
-  final VoidCallback onTap;
-  const _WideGroupRow(
-      {required this.members, required this.total, required this.onTap});
-  @override
-  State<_WideGroupRow> createState() => _WideGroupRowState();
-}
+  // ── 単品行 ──────────────────────────────────────
+  Widget _singleRow(core.Transaction t, int index) {
+    final isTransfer = t.type == core.TransactionType.transfer;
+    final majorRaw = t.category.major.trim();
+    final sub = t.category.sub.trim();
+    final color = _catColor(majorRaw);
+    final bare = _bare(majorRaw);
 
-class _WideGroupRowState extends State<_WideGroupRow> {
-  bool _hover = false;
-
-  String _dominantMajor() {
-    final counts = <String, int>{};
-    for (final t in widget.members) {
-      final m = t.category.major.trim();
-      if (m.isNotEmpty) counts[m] = (counts[m] ?? 0) + 1;
-    }
-    if (counts.isEmpty) return '';
-    return counts.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+    return _rowLayout(
+      index: index,
+      date: t.date,
+      majorCell: isTransfer
+          ? const SizedBox.shrink()
+          : _catBadge(bare, color),
+      subCell: isTransfer
+          ? Row(children: [
+              const Icon(Icons.swap_horiz, size: 13, color: V2Colors.info),
+              const SizedBox(width: 3),
+              Text('振替',
+                  style:
+                      V2Typography.caption.copyWith(color: V2Colors.info)),
+            ])
+          : Text(sub.isEmpty ? '—' : sub,
+              style: V2Typography.caption
+                  .copyWith(color: V2Colors.textSecondary),
+              overflow: TextOverflow.ellipsis),
+      titleCell: Text(
+        t.description.isEmpty ? '—' : t.description,
+        style: V2Typography.body.copyWith(fontWeight: FontWeight.w600),
+        overflow: TextOverflow.ellipsis,
+      ),
+      payCell: Text(t.paymentMethod,
+          style: V2Typography.caption
+              .copyWith(color: V2Colors.textSecondary),
+          overflow: TextOverflow.ellipsis),
+      amountText: isTransfer
+          ? formatYen(t.amount)
+          : '-${formatYen(t.amount)}',
+      isTransfer: isTransfer,
+      onTap: () => widget.onTapRow(t),
+    );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final first = widget.members.first;
-    final store = widget.members
+  // ── グループ行 ────────────────────────────────────
+  Widget _groupRow(_Unit u, int index) {
+    final members = u.members!;
+    final first = members.first;
+    final store = members
         .map((t) => t.store?.trim() ?? '')
         .firstWhere((s) => s.isNotEmpty, orElse: () => '');
     final title = store.isNotEmpty ? store : 'まとめ記録';
 
-    final dominant = _dominantMajor();
-    final major = _WideExpenseTable.bareMajor(dominant);
-    final color = _WideExpenseTable.catColor(dominant);
-    final subs =
-        widget.members.map((t) => t.category.sub.trim()).toSet();
-    final sub =
-        subs.length == 1 && subs.first.isNotEmpty ? subs.first : '—';
+    final counts = <String, int>{};
+    for (final t in members) {
+      final m = t.category.major.trim();
+      if (m.isNotEmpty) counts[m] = (counts[m] ?? 0) + 1;
+    }
+    final dominant = counts.isEmpty
+        ? ''
+        : counts.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+    final color = _catColor(dominant);
+    final bare = _bare(dominant);
+    final subs = members.map((t) => t.category.sub.trim()).toSet();
+    final sub = subs.length == 1 && subs.first.isNotEmpty ? subs.first : '—';
+    final methods = members.map((t) => t.paymentMethod).toSet();
 
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
-        child: Container(
-          margin: const EdgeInsets.fromLTRB(
-              V2Spacing.md, 0, V2Spacing.md, 4),
-          padding: const EdgeInsets.symmetric(
-              horizontal: V2Spacing.md, vertical: 10),
+    return _rowLayout(
+      index: index,
+      date: first.date,
+      majorCell: _catBadge(bare, color),
+      subCell: Text(sub,
+          style: V2Typography.caption
+              .copyWith(color: V2Colors.textSecondary),
+          overflow: TextOverflow.ellipsis),
+      titleCell: Row(children: [
+        Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+          margin: const EdgeInsets.only(right: 6),
           decoration: BoxDecoration(
-            color: _hover ? V2Colors.hover : V2Colors.surface,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: V2Colors.border),
+            color: V2Colors.surfaceMuted,
+            borderRadius: BorderRadius.circular(3),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // 日付
-              SizedBox(
-                width: 72,
-                child: dateWeekdayText(first.date,
-                    baseStyle: V2Typography.numericCell),
-              ),
-              const SizedBox(width: V2Spacing.sm),
-              // 親カテゴリ
-              Expanded(
-                flex: 2,
-                child: major.isEmpty
-                    ? const SizedBox.shrink()
-                    : Row(children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          margin: const EdgeInsets.only(right: 5),
-                          decoration: BoxDecoration(
-                              color: color, shape: BoxShape.circle),
-                        ),
-                        Expanded(
-                          child: Text(
-                            major,
-                            style: V2Typography.caption,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ]),
-              ),
-              // 子カテゴリ
-              Expanded(
-                flex: 2,
-                child: Text(
-                  sub,
-                  style: V2Typography.caption
-                      .copyWith(color: V2Colors.textSecondary),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              // タイトル（件数バッジ + 店舗名）
-              Expanded(
-                flex: 3,
-                child: Row(children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 5, vertical: 1),
-                    margin: const EdgeInsets.only(right: 6),
-                    decoration: BoxDecoration(
-                      color: V2Colors.surfaceMuted,
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                    child: Text('🧾 ${widget.members.length}件',
-                        style: V2Typography.micro),
-                  ),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: V2Typography.body
-                          .copyWith(fontWeight: FontWeight.w600),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ]),
-              ),
-              // 支払い方法（全件同一ならそのまま、バラバラなら「複数」）
-              Expanded(
-                flex: 2,
-                child: Builder(builder: (_) {
-                  final methods = widget.members
-                      .map((t) => t.paymentMethod)
-                      .toSet();
-                  return Text(
-                    methods.length == 1 ? methods.first : '複数',
-                    style: V2Typography.caption
-                        .copyWith(color: V2Colors.textSecondary),
-                    overflow: TextOverflow.ellipsis,
-                  );
-                }),
-              ),
-              // 金額
-              SizedBox(
-                width: 90,
-                child: Text(
-                  '-${formatYen(widget.total)}',
-                  textAlign: TextAlign.right,
-                  style: V2Typography.numericCell.copyWith(
-                    color: V2Colors.negative,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
+          child: Text('🧾 ${members.length}件', style: V2Typography.micro),
+        ),
+        Expanded(
+          child: Text(title,
+              style:
+                  V2Typography.body.copyWith(fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis),
+        ),
+      ]),
+      payCell: Text(methods.length == 1 ? methods.first : '複数',
+          style: V2Typography.caption
+              .copyWith(color: V2Colors.textSecondary),
+          overflow: TextOverflow.ellipsis),
+      amountText: '-${formatYen(u.total)}',
+      isTransfer: false,
+      onTap: () => widget.onTapGroup(members),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: V2Spacing.md),
+      decoration: BoxDecoration(
+        border: Border.all(color: _borderColor, width: 1.5),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(9),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _header(),
+            for (int i = 0; i < widget.units.length; i++)
+              widget.units[i].isGroup
+                  ? _groupRow(widget.units[i], i)
+                  : _singleRow(widget.units[i].single!, i),
+          ],
         ),
       ),
     );
