@@ -1318,16 +1318,13 @@ class _ExpenseRowState extends State<_ExpenseRow> {
             border: Border.all(color: V2Colors.border),
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // 日付（M/D(曜)）。土=青/日=赤。
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: SizedBox(
-                  width: 58,
-                  child: dateWeekdayText(widget.t.date,
-                      baseStyle: V2Typography.numericCell),
-                ),
+              SizedBox(
+                width: 58,
+                child: dateWeekdayText(widget.t.date,
+                    baseStyle: V2Typography.numericCell),
               ),
               const SizedBox(width: V2Spacing.sm),
               // 中央: 1行目=取引内容、2行目=カテゴリ
@@ -1340,7 +1337,8 @@ class _ExpenseRowState extends State<_ExpenseRow> {
                       widget.t.description.isEmpty
                           ? '—'
                           : widget.t.description,
-                      style: V2Typography.body,
+                      style: V2Typography.body.copyWith(
+                          fontSize: 15, fontWeight: FontWeight.w600),
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
@@ -1379,17 +1377,14 @@ class _ExpenseRowState extends State<_ExpenseRow> {
               ),
               const SizedBox(width: V2Spacing.sm),
               // 金額（右）。振替はお金の移動なのでマイナスを付けず中立色に。
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  isTransfer
-                      ? formatYen(widget.t.amount)
-                      : '-${formatYen(widget.t.amount)}',
-                  style: V2Typography.numericCell.copyWith(
-                      color:
-                          isTransfer ? V2Colors.textBody : V2Colors.negative,
-                      fontWeight: FontWeight.w700),
-                ),
+              Text(
+                isTransfer
+                    ? formatYen(widget.t.amount)
+                    : '-${formatYen(widget.t.amount)}',
+                style: V2Typography.numericCell.copyWith(
+                    color:
+                        isTransfer ? V2Colors.textBody : V2Colors.negative,
+                    fontWeight: FontWeight.w700),
               ),
             ],
           ),
@@ -1631,76 +1626,87 @@ class _BillingRow extends StatelessWidget {
             ],
           ),
           const SizedBox(height: V2Spacing.sm),
-          // 予定 / 実際 の2列
-          Row(
-            children: [
-              // 予定金額（自動）
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('予定（明細合計）',
-                        style: V2Typography.micro
-                            .copyWith(color: V2Colors.textMuted)),
-                    const SizedBox(height: 2),
-                    Text(formatYen(planned),
-                        style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: planned > 0
-                                ? V2Colors.textPrimary
-                                : V2Colors.textMuted,
-                            fontFeatures: V2Typography.tabularNums)),
-                  ],
-                ),
-              ),
-              // 実際金額（手入力）
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => _inputActual(context),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text('実際（カード通知）',
-                              style: V2Typography.micro
-                                  .copyWith(color: V2Colors.textMuted)),
-                          const SizedBox(width: 3),
-                          const Icon(Icons.edit,
-                              size: 11, color: V2Colors.textMuted),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: hasActual
-                              ? const Color(0xFFFEF2F2)
-                              : V2Colors.surfaceMuted,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                              color: hasActual
-                                  ? const Color(0xFFDC2626).withValues(alpha: 0.4)
-                                  : V2Colors.border),
-                        ),
-                        child: Text(
-                          hasActual ? formatYen(actual!) : '未入力 (タップ)',
-                          style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: hasActual
-                                  ? const Color(0xFFDC2626)
-                                  : V2Colors.textMuted,
-                              fontFeatures: V2Typography.tabularNums),
-                        ),
-                      ),
-                    ],
+          // 予定 / 実際 の2列（同一スタイル）
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 予定金額（自動）
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: V2Colors.surfaceMuted,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: V2Colors.border),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('予定（明細合計）',
+                            style: V2Typography.micro
+                                .copyWith(color: V2Colors.textMuted)),
+                        const SizedBox(height: 4),
+                        Text(formatYen(planned),
+                            style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: planned > 0
+                                    ? V2Colors.textPrimary
+                                    : V2Colors.textMuted,
+                                fontFeatures: V2Typography.tabularNums)),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(width: V2Spacing.sm),
+                // 実際金額（手入力）
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _inputActual(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: hasActual
+                            ? const Color(0xFFFEF2F2)
+                            : V2Colors.surfaceMuted,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: hasActual
+                                ? const Color(0xFFDC2626).withValues(alpha: 0.4)
+                                : V2Colors.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(children: [
+                            Text('実際（カード通知）',
+                                style: V2Typography.micro
+                                    .copyWith(color: V2Colors.textMuted)),
+                            const SizedBox(width: 3),
+                            const Icon(Icons.edit,
+                                size: 11, color: V2Colors.textMuted),
+                          ]),
+                          const SizedBox(height: 4),
+                          Text(
+                            hasActual ? formatYen(actual!) : '未入力',
+                            style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: hasActual
+                                    ? const Color(0xFFDC2626)
+                                    : V2Colors.textMuted,
+                                fontFeatures: V2Typography.tabularNums),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           // 超過警告バナー
           if (isOver) ...[
