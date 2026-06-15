@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.77",
-    "buildNumber":  "82",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.77/takuharu-finance-v0.2.77.apk",
-    "releaseNotes":  "最近の入出金・支出タブを日付降順→同日内登録時刻降順に修正"
+    "version":  "0.2.78",
+    "buildNumber":  "83",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.78/takuharu-finance-v0.2.78.apk",
+    "releaseNotes":  "レシートの品目を全画面で1レシート＝親1行にまとめ表示（ホーム・カレンダーも支出タブと統一、タップで品目展開）"
 }

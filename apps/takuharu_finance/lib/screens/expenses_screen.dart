@@ -6,6 +6,7 @@ import '../data/household_service.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
+import '../widgets/receipt_group.dart';
 import '../widgets/settings_button.dart';
 import 'record_menu.dart';
 import 'subscriptions_screen.dart';
@@ -35,7 +36,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   final _searchCtrl = TextEditingController();
   String _query = '';
   _Sort _sort = _Sort.dateDesc;
-  final Set<String> _expanded = {}; // 展開中のレシート(receiptId)
 
   @override
   void dispose() {
@@ -202,28 +202,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   /// 検索・並び替え・レシートまとめを適用した行ウィジェット群。
   List<Widget> _buildList(List<core.Transaction> month) {
     final rows = _applySearchSort(month);
-    // receiptId が2件以上ある品目はまとめる
-    final counts = <String, int>{};
-    for (final t in rows) {
-      final rid = t.receiptId;
-      if (rid != null && rid.isNotEmpty) {
-        counts[rid] = (counts[rid] ?? 0) + 1;
-      }
-    }
-    final widgets = <Widget>[];
-    final seen = <String>{};
-    for (final t in rows) {
-      final rid = t.receiptId;
-      if (rid != null && rid.isNotEmpty && (counts[rid] ?? 0) >= 2) {
-        if (seen.add(rid)) {
-          final members =
-              rows.where((x) => x.receiptId == rid).toList();
-          widgets.add(_groupTile(rid, members));
-        }
-      } else {
-        widgets.add(_tile(t));
-      }
-    }
+    // receiptId が2件以上ある品目は1レシート＝親1行にまとめる（共通ウィジェット）。
+    final groups = groupByReceipt(rows);
+    final widgets = <Widget>[
+      for (final g in groups)
+        if (g.isGroup)
+          ReceiptGroupTile(members: g.members, childTileBuilder: _tile)
+        else
+          _tile(g.single!),
+    ];
     if (widgets.isEmpty) {
       widgets.add(const Padding(
         padding: EdgeInsets.symmetric(vertical: 30),
@@ -233,64 +220,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       ));
     }
     return widgets;
-  }
-
-  Widget _groupTile(String rid, List<core.Transaction> members) {
-    final expanded = _expanded.contains(rid);
-    final first = members.first;
-    final total = members.fold<int>(0, (s, t) => s + t.amount);
-    final store = members
-        .map((t) => t.store?.trim() ?? '')
-        .firstWhere((s) => s.isNotEmpty, orElse: () => 'まとめ記録');
-    return Column(
-      children: [
-        Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(22)),
-            onTap: () => setState(() => expanded
-                ? _expanded.remove(rid)
-                : _expanded.add(rid)),
-            leading: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                  color: AppColors.pinkSoft,
-                  borderRadius: BorderRadius.circular(14)),
-              child: const Icon(Icons.receipt_long_rounded,
-                  color: AppColors.pinkDark),
-            ),
-            title: Text(store,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w700, fontSize: 14)),
-            subtitle: Text('${first.date.month}/${first.date.day}　'
-                '🧾 ${members.length}件まとめ',
-                style: const TextStyle(
-                    fontSize: 11, color: AppColors.textSub)),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('-${formatYen(total)}',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                        color: AppColors.expense)),
-                Icon(expanded
-                    ? Icons.expand_less_rounded
-                    : Icons.expand_more_rounded),
-              ],
-            ),
-          ),
-        ),
-        if (expanded)
-          for (final t in members)
-            Padding(
-              padding: const EdgeInsets.only(left: 20),
-              child: _tile(t),
-            ),
-      ],
-    );
   }
 
   Widget _monthBar() => Row(

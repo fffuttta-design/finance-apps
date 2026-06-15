@@ -6,6 +6,7 @@ import '../data/household_service.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
+import '../widgets/receipt_group.dart';
 import 'add_transaction_screen.dart';
 
 /// 収支カレンダー：日ごとの支出/収入をカレンダー表示。日タップで明細。
@@ -189,37 +190,38 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         TextStyle(color: AppColors.textSub, fontSize: 13))),
           )
         else
-          ...items.map((t) {
-            final income = t.type == core.TransactionType.income;
-            final c = categoryFor(t.category.major, income: income);
-            return Card(
-              margin: const EdgeInsets.only(bottom: 6),
-              child: ListTile(
-                onTap: () => _edit(t),
-                leading: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                      color: c.color.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(12)),
-                  child: Icon(c.icon, color: c.color, size: 20),
-                ),
-                title: Text(
-                    t.description.isEmpty ? t.category.major : t.description,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 14)),
-                subtitle: Text(t.category.major,
-                    style: const TextStyle(fontSize: 11)),
-                trailing: Text(
-                    '${income ? '+' : '-'}${formatYen(t.amount)}',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color:
-                            income ? AppColors.income : AppColors.expense)),
-              ),
-            );
-          }),
+          // レシートの品目は1レシート＝親1行にまとめて表示（タップで品目展開）。
+          ...groupByReceipt(items).map((g) => g.isGroup
+              ? ReceiptGroupTile(members: g.members, childTileBuilder: _tile)
+              : _tile(g.single!)),
       ],
+    );
+  }
+
+  Widget _tile(core.Transaction t) {
+    final income = t.type == core.TransactionType.income;
+    final c = categoryFor(t.category.major, income: income);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 6),
+      child: ListTile(
+        onTap: () => _edit(t),
+        leading: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+              color: c.color.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(12)),
+          child: Icon(c.icon, color: c.color, size: 20),
+        ),
+        title: Text(t.description.isEmpty ? t.category.major : t.description,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+        subtitle:
+            Text(t.category.major, style: const TextStyle(fontSize: 11)),
+        trailing: Text('${income ? '+' : '-'}${formatYen(t.amount)}',
+            style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: income ? AppColors.income : AppColors.expense)),
+      ),
     );
   }
 }
