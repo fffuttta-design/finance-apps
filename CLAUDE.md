@@ -95,7 +95,8 @@ git push origin main
 ### Windows Desktop 配信（ユーザーが実行）
 
 デスクトップ版は **GitHub Releases** で配信する（Drive非依存）。
-更新チェック: アプリ起動時に `release/futa-windows-version.json` を GitHub raw から fetch。
+更新チェック: electron-updater が `futafinance-desktop-releases`(public) の latest.yml を参照。
+Android リリース(finance-apps)と完全分離しているため干渉しない。
 
 ```powershell
 # ユーザーの実機で実行（デスクトップアプリのビルドは Claude の Bash では不可）

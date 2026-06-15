@@ -105,11 +105,11 @@ if ($Publish) {
   $Tag = "v$Version"
   Write-Host "[Safety] re-upload setup.exe + latest.yml to $Tag..." -ForegroundColor Yellow
   if (Test-Path $latestYml) {
-    gh release upload $Tag $setupExe $latestYml --repo fffuttta-design/finance-apps --clobber
+    gh release upload $Tag $setupExe $latestYml --repo fffuttta-design/futafinance-desktop-releases --clobber
   } else {
-    gh release upload $Tag $setupExe --repo fffuttta-design/finance-apps --clobber
+    gh release upload $Tag $setupExe --repo fffuttta-design/futafinance-desktop-releases --clobber
   }
-  gh release edit $Tag --repo fffuttta-design/finance-apps --draft=false | Out-Null
+  gh release edit $Tag --repo fffuttta-design/futafinance-desktop-releases --draft=false | Out-Null
   Write-Host "published to GitHub Release: $Tag" -ForegroundColor Green
 }
 
