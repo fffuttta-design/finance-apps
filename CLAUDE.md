@@ -81,7 +81,9 @@ cp build/app/outputs/flutter-apk/app-release.apk build/futa-finance-vX.Y.Z.apk
 gh release create futa-vX.Y.Z build/futa-finance-vX.Y.Z.apk \
   --repo fffuttta-design/finance-apps \
   --title "FutaFinance vX.Y.Z+B" \
-  --notes "リリースノート"
+  --notes "リリースノート" \
+  --prerelease
+# ⚠️ --prerelease 必須: electron-updater(Windows版)がfuta-タグを latest として誤検知するのを防ぐ
 
 # 6. release/futa-version.json を更新して push
 # (downloadUrl = https://github.com/fffuttta-design/finance-apps/releases/download/futa-vX.Y.Z/futa-finance-vX.Y.Z.apk)
