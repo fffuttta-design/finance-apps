@@ -14,7 +14,9 @@ import '../utils/pwa_theme.dart';
 import '../screens/income_input_screen.dart';
 import '../screens/receipt_split_screen.dart';
 import '../screens/transfer_input_screen.dart';
+import 'layout/rich_sidebar_shell.dart';
 import 'layout/topnav_shell.dart';
+import 'screens/rich_home.dart';
 import 'screens/v2_devlab.dart';
 import 'screens/v2_expenses.dart';
 import 'screens/v2_home_topnav.dart';
@@ -132,9 +134,13 @@ class _V2RootState extends State<V2Root>
   }
 
   Widget _bodyFor(String id, {required Color accent}) {
+    // 新デザイン（リッチUI）ONのときはホーム本文を rich 版に差替える。
+    final rich = UiPreferences.instance.richUi;
     switch (id) {
       case 'home':
-        return V2HomeTopNavScreen(accent: accent);
+        return rich
+            ? RichHomeScreen(accent: accent)
+            : V2HomeTopNavScreen(accent: accent);
       // 支出: v2.1 ネイティブ実装（マネフォクラウド寄りのテーブル中心）
       case 'expenses':
         return V2ExpensesScreen(accent: accent);
@@ -225,6 +231,31 @@ class _V2RootState extends State<V2Root>
             duration: const Duration(milliseconds: 260),
             curve: Curves.easeOutCubic);
       }
+    }
+    // 新デザイン（リッチUI）かつ広い画面 → 左サイドバーのシェル。
+    // スマホ幅は従来どおり下タブのシェルを使う（本文だけ rich 版に差替え済）。
+    if (UiPreferences.instance.richUi && !isNarrow) {
+      final items = _navItems;
+      final cur = items.firstWhere((e) => e.id == _currentId,
+          orElse: () => items.first);
+      return RichSidebarShell(
+        items: items,
+        currentId: _currentId,
+        onSelect: selectTab,
+        accent: accent,
+        title: cur.label,
+        modeSwitcher: V2ModeSwitcher(onDark: false),
+        recordButton: _RecordMenuButton(
+          accent: accent,
+          mode: mode,
+          onDark: false,
+          onSelected: _openRecord,
+        ),
+        content: KeyedSubtree(
+          key: ValueKey('rich_${mode}_$_currentId'),
+          child: _bodyFor(_currentId, accent: accent),
+        ),
+      );
     }
     return V2TopNavShell(
       navAtBottom: isNarrow,

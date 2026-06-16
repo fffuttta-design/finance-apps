@@ -751,6 +751,19 @@ class _DisplayPanel extends StatelessWidget {
                 child: Column(
                   children: [
                     _SettingTile(
+                      icon: Icons.auto_awesome,
+                      iconColor: V2Colors.accent,
+                      title: '新デザイン（ベータ）',
+                      subtitle:
+                          'リッチな新しい見た目に切替えます。気に入らなければOFFに戻すと元通り。',
+                      trailing: Switch.adaptive(
+                        value: UiPreferences.instance.richUi,
+                        onChanged: (v) =>
+                            UiPreferences.instance.setRichUi(v),
+                        activeThumbColor: V2Colors.accent,
+                      ),
+                    ),
+                    _SettingTile(
                       icon: Icons.visibility_off_outlined,
                       iconColor: V2Colors.textSecondary,
                       title: '未使用のウォレット/カードを隠す',
