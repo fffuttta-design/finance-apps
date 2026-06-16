@@ -609,7 +609,7 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
 // ═════════════════════════════════════════════════
 
 /// 毎月支出予定の並び替えモード。
-enum _ChargeSort { amountDesc, amountAsc, majorAsc, majorDesc }
+enum _ChargeSort { amountDesc, amountAsc, majorAsc, majorDesc, dayAsc, dayDesc }
 
 class _MonthlyChargesSection extends StatefulWidget {
   final List<core.Subscription> charges;
@@ -653,6 +653,15 @@ class _MonthlyChargesSectionState extends State<_MonthlyChargesSection> {
       return asc ? am.compareTo(bm) : bm.compareTo(am);
     }
 
+    int byDay(core.Subscription a, core.Subscription b, bool asc) {
+      final ad = a.billingDay, bd = b.billingDay;
+      // 引落日 未設定は常に末尾へ。
+      if (ad == null && bd == null) return 0;
+      if (ad == null) return 1;
+      if (bd == null) return -1;
+      return asc ? ad.compareTo(bd) : bd.compareTo(ad);
+    }
+
     switch (_sort) {
       case _ChargeSort.amountDesc:
         l.sort((a, b) => amt(b).compareTo(amt(a)));
@@ -665,6 +674,12 @@ class _MonthlyChargesSectionState extends State<_MonthlyChargesSection> {
         break;
       case _ChargeSort.majorDesc:
         l.sort((a, b) => byMajor(a, b, false));
+        break;
+      case _ChargeSort.dayAsc:
+        l.sort((a, b) => byDay(a, b, true));
+        break;
+      case _ChargeSort.dayDesc:
+        l.sort((a, b) => byDay(a, b, false));
         break;
     }
     return l;
@@ -680,6 +695,10 @@ class _MonthlyChargesSectionState extends State<_MonthlyChargesSection> {
         return '科目↑';
       case _ChargeSort.majorDesc:
         return '科目↓';
+      case _ChargeSort.dayAsc:
+        return '引落日↑';
+      case _ChargeSort.dayDesc:
+        return '引落日↓';
     }
   }
 
@@ -721,6 +740,12 @@ class _MonthlyChargesSectionState extends State<_MonthlyChargesSection> {
                   PopupMenuItem(
                       value: _ChargeSort.amountAsc,
                       child: Text('金額が安い順')),
+                  PopupMenuItem(
+                      value: _ChargeSort.dayAsc,
+                      child: Text('引落日が早い順')),
+                  PopupMenuItem(
+                      value: _ChargeSort.dayDesc,
+                      child: Text('引落日が遅い順')),
                   PopupMenuItem(
                       value: _ChargeSort.majorAsc,
                       child: Text('会計科目 昇順')),
