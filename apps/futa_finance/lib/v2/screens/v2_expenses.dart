@@ -1,19 +1,20 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show BrowserContextMenu;
 import 'package:finance_core/finance_core.dart' as core;
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/app_mode.dart';
-import '../../data/drive_receipt_service.dart';
 import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
+import '../../screens/expense_input_screen.dart';
 import '../../screens/expense_list_screen.dart';
-import '../../screens/receipt_group_detail_screen.dart';
-import '../../screens/receipt_image_screen.dart';
-import '../../screens/transaction_detail_screen.dart';
+import '../../screens/income_input_screen.dart';
+import '../../screens/transfer_input_screen.dart';
 import '../../utils/formatters.dart';
+import '../../utils/modal_input.dart';
 import '../../utils/thousands_separator_input_formatter.dart';
 import '../../widgets/brand_logo.dart';
 import '../../widgets/date_weekday_text.dart';
@@ -84,6 +85,9 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
   @override
   void initState() {
     super.initState();
+    // Web/Electron で行を右クリックしたとき、ブラウザ標準メニューが
+    // 編集・削除メニューに被らないよう無効化する。
+    if (kIsWeb) BrowserContextMenu.disableContextMenu();
     _rebuildSubTabController();
     _load();
     _sub = _txRepo.stream.listen((list) {
@@ -169,97 +173,59 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     if (mounted) await _load();
   }
 
-  /// まとめ（複数品目）行タップ：まとめ編集画面（内訳＋まとめ編集・削除）へ。
-  Future<void> _showGroupDetail(List<core.Transaction> members) async {
-    final changed = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-          builder: (_) => ReceiptGroupDetailScreen(members: members)),
-    );
+  /// 明細の編集：種別ごとの入力画面（各項目を編集できる画面）を開く。
+  /// 詳細画面は廃止し、右クリック/長押しのコンテキストメニューからここを呼ぶ。
+  Future<void> _editTxn(core.Transaction t) async {
+    bool? changed;
+    if (t.type == core.TransactionType.transfer) {
+      // 振替は専用エディタで編集（汎用の支出エディタは振替を扱えない）。
+      changed = await showTransferInputModal(context, editing: t);
+    } else if (t.type == core.TransactionType.expense) {
+      changed =
+          await showInputSheet<bool>(context, ExpenseInputScreen(editing: t));
+    } else {
+      // 収入
+      changed =
+          await showInputSheet<bool>(context, IncomeInputScreen(editing: t));
+    }
     if (changed == true && mounted) await _load();
   }
 
-  /// 行タップ：経費・振替は詳細画面を表示（そこから編集/削除）。それ以外は明細シート。
-  Future<void> _showTxnSummary(core.Transaction t) async {
-    if (t.type == core.TransactionType.expense ||
-        t.type == core.TransactionType.transfer) {
-      final changed = await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(
-            builder: (_) => TransactionDetailScreen(transaction: t)),
-      );
-      if (changed == true && mounted) await _load();
-      return;
-    }
-    final hasReceipt = t.receiptUrl != null && t.receiptUrl!.trim().isNotEmpty;
-    showModalBottomSheet<void>(
+  /// 明細の削除：確認ダイアログ → 削除 → 再読込。
+  Future<void> _deleteTxn(core.Transaction t) async {
+    final signed = t.type == core.TransactionType.expense
+        ? '-${formatYen(t.amount)}'
+        : formatYen(t.amount);
+    final ok = await showDialog<bool>(
       context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (sheet) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${t.date.year}/${t.date.month}/${t.date.day}　'
-                '${t.description.isEmpty ? t.paymentMethod : t.description}',
-                style: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '-${formatYen(t.amount)}　/　${t.category.major}'
-                '${t.category.sub.isNotEmpty ? ' › ${t.category.sub}' : ''}　/　${t.paymentMethod}',
-                style: const TextStyle(
-                    fontSize: 12, color: Color(0xFF6B7280)),
-              ),
-              if (t.memo != null && t.memo!.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(t.memo!,
-                    style: const TextStyle(
-                        fontSize: 12, color: Color(0xFF374151))),
-              ],
-              const SizedBox(height: 16),
-              if (hasReceipt)
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () async {
-                      final raw = t.receiptUrl!.trim();
-                      final fileId = DriveReceiptService.fileIdFromUrl(raw);
-                      if (fileId != null) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) =>
-                                  ReceiptImageScreen(fileId: fileId)),
-                        );
-                        return;
-                      }
-                      final uri = Uri.tryParse(raw);
-                      if (uri != null) {
-                        await launchUrl(uri,
-                            mode: LaunchMode.externalApplication);
-                      }
-                    },
-                    icon: const Icon(Icons.receipt_long, size: 18),
-                    label: const Text('領収書を見る'),
-                  ),
-                )
-              else
-                const Text('領収書リンクは未登録です',
-                    style:
-                        TextStyle(fontSize: 12, color: Color(0xFF9CA3AF))),
-            ],
+      builder: (dctx) => AlertDialog(
+        title: const Text('この明細を削除しますか？'),
+        content: Text(
+            '「${t.description.isEmpty ? t.category.major : t.description}」'
+            ' / $signed\nこの操作は取り消せません。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626)),
+            onPressed: () => Navigator.pop(dctx, true),
+            child: const Text('削除する'),
           ),
-        ),
+        ],
       ),
     );
+    if (ok != true) return;
+    try {
+      await TransactionRepository.instance.delete(t.id);
+      if (mounted) await _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('削除に失敗しました: $e')));
+      }
+    }
   }
 
   /// 引落予定の項目タップ → その場で編集シート（設定カード）を直接開く。
@@ -592,8 +558,8 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
                 else
                   _ExpensesTable(
                     rows: entries,
-                    onTapRow: _showTxnSummary,
-                    onTapGroup: _showGroupDetail,
+                    onEditTxn: _editTxn,
+                    onDeleteTxn: _deleteTxn,
                   ),
               ],
             ),
@@ -1100,6 +1066,49 @@ class _ChargeRow extends StatelessWidget {
 // 取引一覧テーブル（マネフォクラウド寄り）
 // ═════════════════════════════════════════════════
 
+/// 明細行のコンテキストメニュー（編集 / 削除）を画面位置に表示する。
+/// PC=右クリック、スマホ=長押し の両方からここを呼ぶ。
+Future<void> _showTxnContextMenu(
+  BuildContext context,
+  Offset globalPos, {
+  required core.Transaction txn,
+  required void Function(core.Transaction) onEdit,
+  required void Function(core.Transaction) onDelete,
+}) async {
+  final overlay =
+      Overlay.of(context).context.findRenderObject() as RenderBox;
+  final selected = await showMenu<String>(
+    context: context,
+    position: RelativeRect.fromRect(
+      Rect.fromLTWH(globalPos.dx, globalPos.dy, 0, 0),
+      Offset.zero & overlay.size,
+    ),
+    items: const [
+      PopupMenuItem(
+        value: 'edit',
+        child: Row(children: [
+          Icon(Icons.edit_outlined, size: 18, color: Color(0xFF374151)),
+          SizedBox(width: 10),
+          Text('編集'),
+        ]),
+      ),
+      PopupMenuItem(
+        value: 'delete',
+        child: Row(children: [
+          Icon(Icons.delete_outline, size: 18, color: Color(0xFFDC2626)),
+          SizedBox(width: 10),
+          Text('削除', style: TextStyle(color: Color(0xFFDC2626))),
+        ]),
+      ),
+    ],
+  );
+  if (selected == 'edit') {
+    onEdit(txn);
+  } else if (selected == 'delete') {
+    onDelete(txn);
+  }
+}
+
 /// 一覧の表示単位。単品（single）か、同じレシートのまとめ（group）。
 class _Unit {
   final core.Transaction? single;
@@ -1117,13 +1126,13 @@ class _Unit {
 
 class _ExpensesTable extends StatefulWidget {
   final List<core.Transaction> rows;
-  final void Function(core.Transaction t) onTapRow;
-  // まとめ（複数品目）行タップ → まとめ編集画面（内訳＋編集・削除）へ。
-  final void Function(List<core.Transaction> members) onTapGroup;
+  // 明細の編集・削除（右クリック/長押しのコンテキストメニューから呼ぶ）。
+  final void Function(core.Transaction t) onEditTxn;
+  final void Function(core.Transaction t) onDeleteTxn;
   const _ExpensesTable({
     required this.rows,
-    required this.onTapRow,
-    required this.onTapGroup,
+    required this.onEditTxn,
+    required this.onDeleteTxn,
   });
 
   @override
@@ -1153,6 +1162,15 @@ extension _ExpenseSortLabel on _ExpenseSort {
 
 class _ExpensesTableState extends State<_ExpensesTable> {
   _ExpenseSort _sort = _ExpenseSort.dateDesc;
+
+  /// 展開中のまとめ行（receiptId）。トグルで開閉する。
+  final Set<String> _expanded = {};
+
+  void _toggleExpand(String receiptId) {
+    setState(() {
+      if (!_expanded.remove(receiptId)) _expanded.add(receiptId);
+    });
+  }
 
   /// rows をソートしてから unit に変換。
   List<_Unit> get _units {
@@ -1254,8 +1272,10 @@ class _ExpensesTableState extends State<_ExpensesTable> {
     if (isWide) {
       return _WideExpenseTable(
         units: _units,
-        onTapRow: widget.onTapRow,
-        onTapGroup: widget.onTapGroup,
+        expanded: _expanded,
+        onToggleExpand: _toggleExpand,
+        onEditTxn: widget.onEditTxn,
+        onDeleteTxn: widget.onDeleteTxn,
         sort: _sort,
         onToggleDateSort: _toggleDateSort,
         onToggleAmountSort: _toggleAmountSort,
@@ -1270,12 +1290,16 @@ class _ExpensesTableState extends State<_ExpensesTable> {
             _ReceiptGroupRow(
               members: u.members!,
               total: u.total,
-              onTap: () => widget.onTapGroup(u.members!),
+              expanded: _expanded.contains(u.receiptId),
+              onToggle: () => _toggleExpand(u.receiptId!),
+              onEditTxn: widget.onEditTxn,
+              onDeleteTxn: widget.onDeleteTxn,
             )
           else
             _ExpenseRow(
               t: u.single!,
-              onTap: () => widget.onTapRow(u.single!),
+              onEditTxn: widget.onEditTxn,
+              onDeleteTxn: widget.onDeleteTxn,
             ),
       ],
     );
@@ -1287,16 +1311,19 @@ class _ExpensesTableState extends State<_ExpensesTable> {
 // ─────────────────────────────────────────────────────────
 
 /// 列ドラッグハンドル。
+/// ⚠️ behavior:opaque を付けないと「中央の細い線」しか掴めず、ほぼ無反応になる。
+/// 全幅をヒット領域にして掴みやすくする。
 class _ColHandle extends StatelessWidget {
   final void Function(double dx) onDrag;
   const _ColHandle({required this.onDrag});
-  static const double w = 8;
+  static const double w = 12;
 
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
       cursor: SystemMouseCursors.resizeColumn,
       child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onHorizontalDragUpdate: (d) => onDrag(d.delta.dx),
         child: SizedBox(
           width: w,
@@ -1315,16 +1342,22 @@ class _ColHandle extends StatelessWidget {
 
 class _WideExpenseTable extends StatefulWidget {
   final List<_Unit> units;
-  final void Function(core.Transaction) onTapRow;
-  final void Function(List<core.Transaction>) onTapGroup;
+
+  /// 展開中のまとめ行（receiptId）。
+  final Set<String> expanded;
+  final void Function(String receiptId) onToggleExpand;
+  final void Function(core.Transaction) onEditTxn;
+  final void Function(core.Transaction) onDeleteTxn;
   final _ExpenseSort sort;
   final VoidCallback onToggleDateSort;
   final VoidCallback onToggleAmountSort;
 
   const _WideExpenseTable({
     required this.units,
-    required this.onTapRow,
-    required this.onTapGroup,
+    required this.expanded,
+    required this.onToggleExpand,
+    required this.onEditTxn,
+    required this.onDeleteTxn,
     required this.sort,
     required this.onToggleDateSort,
     required this.onToggleAmountSort,
@@ -1335,12 +1368,15 @@ class _WideExpenseTable extends StatefulWidget {
 }
 
 class _WideExpenseTableState extends State<_WideExpenseTable> {
-  // 親カテ / 子カテ / タイトル / 支払い方法（px）
-  List<double> _w = [120.0, 110.0, 240.0, 140.0];
-  final Set<int> _hovered = {};
+  // 親カテ / 子カテ / タイトル / 支払い方法 / 金額（px）。全列ドラッグで可変。
+  final List<double> _w = [120.0, 110.0, 240.0, 140.0, 104.0];
+  // ホバー中の行キー（単品=t.id、まとめ見出し='g:'+rid、内訳='m:'+t.id）。
+  final Set<String> _hovered = {};
+
+  // タイトル列の先頭に置くトグル/インデント枠の固定幅（行同士の桁を揃える）。
+  static const double _leadW = 22;
 
   static const double _dateW = 78;
-  static const double _amountW = 104;
   static const double _hPad = 14;
   static const double _minColW = 50;
   static const Color _borderColor = Color(0xFFCBD5E1);
@@ -1432,11 +1468,11 @@ class _WideExpenseTableState extends State<_WideExpenseTable> {
         SizedBox(width: _w[2], child: const Text('タイトル', style: _hStyle, overflow: TextOverflow.ellipsis)),
         _ColHandle(onDrag: (dx) => _onDrag(2, dx)),
         SizedBox(width: _w[3], child: const Text('支払い方法', style: _hStyle, overflow: TextOverflow.ellipsis)),
-        SizedBox(width: _ColHandle.w),
+        _ColHandle(onDrag: (dx) => _onDrag(3, dx)),
         GestureDetector(
           onTap: widget.onToggleAmountSort,
           child: SizedBox(
-            width: _amountW + _hPad,
+            width: _w[4] + _hPad,
             child: Padding(
               padding: const EdgeInsets.only(right: _hPad),
               child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
@@ -1451,30 +1487,57 @@ class _WideExpenseTableState extends State<_WideExpenseTable> {
     );
   }
 
+  // タイトル列先頭のリード（行の桁を揃える固定枠）。
+  Widget _chevron(bool expanded) => Icon(
+      expanded ? Icons.expand_more : Icons.chevron_right,
+      size: 18,
+      color: const Color(0xFF64748B));
+  static const Widget _leadEmpty = SizedBox.shrink();
+  static const Widget _memberMark = Padding(
+    padding: EdgeInsets.only(left: 4),
+    child: Icon(Icons.subdirectory_arrow_right,
+        size: 13, color: Color(0xFFB6C0CC)),
+  );
+
   // ── 行共通レイアウト helper ──────────────────────
   Widget _rowLayout({
-    required int index,
+    required String rowKey,
     required DateTime date,
     required Widget majorCell,
     required Widget subCell,
+    required Widget leading,
     required Widget titleCell,
     required Widget payCell,
     required String amountText,
     required bool isTransfer,
-    required VoidCallback onTap,
+    required bool isLast,
+    Color? bg,
+    VoidCallback? onTap,
+    core.Transaction? menuTxn,
   }) {
-    final isLast = index == widget.units.length - 1;
-    final hov = _hovered.contains(index);
+    final hov = _hovered.contains(rowKey);
+    void openMenu(Offset pos) {
+      if (menuTxn == null) return;
+      _showTxnContextMenu(context, pos,
+          txn: menuTxn,
+          onEdit: widget.onEditTxn,
+          onDelete: widget.onDeleteTxn);
+    }
+
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered.add(index)),
-      onExit: (_) => setState(() => _hovered.remove(index)),
+      onEnter: (_) => setState(() => _hovered.add(rowKey)),
+      onExit: (_) => setState(() => _hovered.remove(rowKey)),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
+        onSecondaryTapDown:
+            menuTxn == null ? null : (d) => openMenu(d.globalPosition),
+        onLongPressStart:
+            menuTxn == null ? null : (d) => openMenu(d.globalPosition),
         child: Container(
           decoration: BoxDecoration(
-            color: hov ? V2Colors.hover : V2Colors.surface,
+            color: hov ? V2Colors.hover : (bg ?? V2Colors.surface),
             border: isLast
                 ? null
                 : const Border(
@@ -1495,12 +1558,18 @@ class _WideExpenseTableState extends State<_WideExpenseTable> {
             SizedBox(width: _ColHandle.w),
             SizedBox(width: _w[1], child: subCell),
             SizedBox(width: _ColHandle.w),
-            SizedBox(width: _w[2], child: titleCell),
+            SizedBox(
+              width: _w[2],
+              child: Row(children: [
+                SizedBox(width: _leadW, child: leading),
+                Expanded(child: titleCell),
+              ]),
+            ),
             SizedBox(width: _ColHandle.w),
             SizedBox(width: _w[3], child: payCell),
             SizedBox(width: _ColHandle.w),
             SizedBox(
-              width: _amountW + _hPad,
+              width: _w[4] + _hPad,
               child: Padding(
                 padding: const EdgeInsets.only(right: _hPad),
                 child: Text(
@@ -1520,7 +1589,8 @@ class _WideExpenseTableState extends State<_WideExpenseTable> {
   }
 
   // ── 単品行 ──────────────────────────────────────
-  Widget _singleRow(core.Transaction t, int index) {
+  // 左クリックは何もしない。右クリック/長押しで編集・削除メニュー。
+  Widget _singleRow(core.Transaction t, {required bool isLast}) {
     final isTransfer = t.type == core.TransactionType.transfer;
     final majorRaw = t.category.major.trim();
     final sub = t.category.sub.trim();
@@ -1528,7 +1598,7 @@ class _WideExpenseTableState extends State<_WideExpenseTable> {
     final bare = _bare(majorRaw);
 
     return _rowLayout(
-      index: index,
+      rowKey: 's:${t.id}',
       date: t.date,
       majorCell: isTransfer
           ? const SizedBox.shrink()
@@ -1545,6 +1615,7 @@ class _WideExpenseTableState extends State<_WideExpenseTable> {
               style: V2Typography.caption
                   .copyWith(color: V2Colors.textSecondary),
               overflow: TextOverflow.ellipsis),
+      leading: _leadEmpty,
       titleCell: Text(
         t.description.isEmpty ? '—' : t.description,
         style: V2Typography.body.copyWith(fontWeight: FontWeight.w600),
@@ -1558,12 +1629,48 @@ class _WideExpenseTableState extends State<_WideExpenseTable> {
           ? formatYen(t.amount)
           : '-${formatYen(t.amount)}',
       isTransfer: isTransfer,
-      onTap: () => widget.onTapRow(t),
+      isLast: isLast,
+      menuTxn: t,
     );
   }
 
-  // ── グループ行 ────────────────────────────────────
-  Widget _groupRow(_Unit u, int index) {
+  // ── 内訳行（まとめを展開したときの各品目）──────────────
+  Widget _memberRow(core.Transaction t, {required bool isLast}) {
+    final sub = t.category.sub.trim();
+    final majorRaw = t.category.major.trim();
+    final color = _catColor(majorRaw);
+    final bare = _bare(majorRaw);
+
+    return _rowLayout(
+      rowKey: 'm:${t.id}',
+      date: t.date,
+      majorCell: _catBadge(bare, color),
+      subCell: Text(sub.isEmpty ? '—' : sub,
+          style: V2Typography.caption
+              .copyWith(color: V2Colors.textSecondary),
+          overflow: TextOverflow.ellipsis),
+      leading: _memberMark,
+      titleCell: Text(
+        t.description.isEmpty ? '—' : t.description,
+        style: V2Typography.body.copyWith(
+            fontWeight: FontWeight.w500, color: V2Colors.textSecondary),
+        overflow: TextOverflow.ellipsis,
+      ),
+      payCell: Text(t.paymentMethod,
+          style: V2Typography.caption
+              .copyWith(color: V2Colors.textSecondary),
+          overflow: TextOverflow.ellipsis),
+      amountText: '-${formatYen(t.amount)}',
+      isTransfer: false,
+      isLast: isLast,
+      bg: const Color(0xFFF8FAFC),
+      menuTxn: t,
+    );
+  }
+
+  // ── まとめ見出し行 ────────────────────────────────
+  // タップ（先頭トグル）で内訳を開閉。見出し自体は編集・削除しない。
+  Widget _groupHeaderRow(_Unit u, {required bool isLast}) {
     final members = u.members!;
     final first = members.first;
     final store = members
@@ -1584,32 +1691,28 @@ class _WideExpenseTableState extends State<_WideExpenseTable> {
     final subs = members.map((t) => t.category.sub.trim()).toSet();
     final sub = subs.length == 1 && subs.first.isNotEmpty ? subs.first : '—';
     final methods = members.map((t) => t.paymentMethod).toSet();
+    final isExpanded = widget.expanded.contains(u.receiptId);
 
     return _rowLayout(
-      index: index,
+      rowKey: 'g:${u.receiptId}',
       date: first.date,
       majorCell: _catBadge(bare, color),
       subCell: Text(sub,
           style: V2Typography.caption
               .copyWith(color: V2Colors.textSecondary),
           overflow: TextOverflow.ellipsis),
+      leading: _chevron(isExpanded),
       titleCell: Row(children: [
-        Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-          margin: const EdgeInsets.only(right: 6),
-          decoration: BoxDecoration(
-            color: V2Colors.surfaceMuted,
-            borderRadius: BorderRadius.circular(3),
-          ),
-          child: Text('🧾 ${members.length}件', style: V2Typography.micro),
-        ),
         Expanded(
           child: Text(title,
               style:
                   V2Typography.body.copyWith(fontWeight: FontWeight.w600),
               overflow: TextOverflow.ellipsis),
         ),
+        const SizedBox(width: 6),
+        Text('${members.length}件',
+            style: V2Typography.micro
+                .copyWith(color: V2Colors.textSecondary)),
       ]),
       payCell: Text(methods.length == 1 ? methods.first : '複数',
           style: V2Typography.caption
@@ -1617,12 +1720,27 @@ class _WideExpenseTableState extends State<_WideExpenseTable> {
           overflow: TextOverflow.ellipsis),
       amountText: '-${formatYen(u.total)}',
       isTransfer: false,
-      onTap: () => widget.onTapGroup(members),
+      isLast: isLast,
+      onTap: () => widget.onToggleExpand(u.receiptId!),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    // 行を平坦化（まとめは見出し＋展開時は内訳）。最後の行だけ下線を消す。
+    final rows = <Widget Function(bool isLast)>[];
+    for (final u in widget.units) {
+      if (u.isGroup) {
+        rows.add((isLast) => _groupHeaderRow(u, isLast: isLast));
+        if (widget.expanded.contains(u.receiptId)) {
+          for (final m in u.members!) {
+            rows.add((isLast) => _memberRow(m, isLast: isLast));
+          }
+        }
+      } else {
+        rows.add((isLast) => _singleRow(u.single!, isLast: isLast));
+      }
+    }
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: V2Spacing.md),
       decoration: BoxDecoration(
@@ -1635,10 +1753,7 @@ class _WideExpenseTableState extends State<_WideExpenseTable> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _header(),
-            for (int i = 0; i < widget.units.length; i++)
-              widget.units[i].isGroup
-                  ? _groupRow(widget.units[i], i)
-                  : _singleRow(widget.units[i].single!, i),
+            for (int i = 0; i < rows.length; i++) rows[i](i == rows.length - 1),
           ],
         ),
       ),
@@ -1646,16 +1761,23 @@ class _WideExpenseTableState extends State<_WideExpenseTable> {
   }
 }
 
-/// レシートまとめの親行（枠付きカード）。タップでまとめ編集画面（内訳＋編集・削除）へ。
+/// レシートまとめの親行（枠付きカード）。先頭トグルで内訳を開閉。
+/// 内訳の各品目を長押し/右クリックで編集・削除。
 /// 品目ごとは別取引なので、分析・集計はカテゴリ別に正しく分かれる。
 class _ReceiptGroupRow extends StatelessWidget {
   final List<core.Transaction> members;
   final int total;
-  final VoidCallback onTap;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final void Function(core.Transaction) onEditTxn;
+  final void Function(core.Transaction) onDeleteTxn;
   const _ReceiptGroupRow({
     required this.members,
     required this.total,
-    required this.onTap,
+    required this.expanded,
+    required this.onToggle,
+    required this.onEditTxn,
+    required this.onDeleteTxn,
   });
 
   /// 件数カウントが最多の大カテゴリを返す（同率は最初に現れたもの優先）。
@@ -1704,86 +1826,145 @@ class _ReceiptGroupRow extends StatelessWidget {
         ? '未分類'
         : (subLabel.isEmpty ? bareCategory : '$bareCategory > $subLabel');
 
+    return Container(
+      margin: const EdgeInsets.fromLTRB(V2Spacing.md, 0, V2Spacing.md, 8),
+      decoration: BoxDecoration(
+        color: V2Colors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: V2Colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 見出し（タップで開閉）
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onToggle,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: V2Spacing.md, vertical: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Icon(
+                    expanded ? Icons.expand_more : Icons.chevron_right,
+                    size: 20,
+                    color: const Color(0xFF64748B),
+                  ),
+                  const SizedBox(width: 2),
+                  SizedBox(
+                    width: 52,
+                    child: dateWeekdayText(first.date,
+                        baseStyle: V2Typography.numericCell),
+                  ),
+                  const SizedBox(width: V2Spacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(title,
+                                  style: V2Typography.body.copyWith(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600),
+                                  overflow: TextOverflow.ellipsis),
+                            ),
+                            const SizedBox(width: 6),
+                            Text('${members.length}件',
+                                style: V2Typography.micro.copyWith(
+                                    color: V2Colors.textSecondary)),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              margin: const EdgeInsets.only(right: 4),
+                              decoration: BoxDecoration(
+                                color: _categoryColor(dominant),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                categoryLabel,
+                                style: V2Typography.micro
+                                    .copyWith(color: V2Colors.textSecondary),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: V2Spacing.sm),
+                  Text('-${formatYen(total)}',
+                      style: V2Typography.numericCell.copyWith(
+                          color: V2Colors.negative,
+                          fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+          ),
+          // 内訳（展開時のみ）。各品目を長押し/右クリックで編集・削除。
+          if (expanded)
+            for (final m in members) _memberTile(context, m),
+        ],
+      ),
+    );
+  }
+
+  /// 内訳の1品目。
+  Widget _memberTile(BuildContext context, core.Transaction t) {
+    void openMenu(Offset pos) => _showTxnContextMenu(context, pos,
+        txn: t, onEdit: onEditTxn, onDelete: onDeleteTxn);
+    final cat = _bareMajor(t.category.major.trim());
+    final sub = t.category.sub.trim();
+    final label = cat.isEmpty
+        ? '未分類'
+        : (sub.isEmpty ? cat : '$cat > $sub');
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onTap,
+      onSecondaryTapDown: (d) => openMenu(d.globalPosition),
+      onLongPressStart: (d) => openMenu(d.globalPosition),
       child: Container(
-        margin:
-            const EdgeInsets.fromLTRB(V2Spacing.md, 0, V2Spacing.md, 8),
-        padding: const EdgeInsets.symmetric(
-            horizontal: V2Spacing.md, vertical: 10),
-        decoration: BoxDecoration(
-          color: V2Colors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: V2Colors.border),
+        decoration: const BoxDecoration(
+          color: Color(0xFFF8FAFC),
+          border: Border(top: BorderSide(color: V2Colors.border)),
         ),
+        padding: const EdgeInsets.fromLTRB(36, 8, V2Spacing.md, 8),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            SizedBox(
-              width: 58,
-              child: dateWeekdayText(first.date,
-                  baseStyle: V2Typography.numericCell),
-            ),
-            const SizedBox(width: V2Spacing.sm),
+            const Icon(Icons.subdirectory_arrow_right,
+                size: 14, color: Color(0xFFB6C0CC)),
+            const SizedBox(width: 6),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 1行目: 件数バッジ + タイトル
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: V2Colors.surfaceMuted,
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: Text('🧾 ${members.length}件',
-                            style: V2Typography.micro),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(title,
-                            style: V2Typography.body.copyWith(
-                                fontSize: 15, fontWeight: FontWeight.w600),
-                            overflow: TextOverflow.ellipsis),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  // 2行目: カテゴリ（最多優先）
-                  Row(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        margin: const EdgeInsets.only(right: 4),
-                        decoration: BoxDecoration(
-                          color: _categoryColor(dominant),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          categoryLabel,
-                          style: V2Typography.micro
-                              .copyWith(color: V2Colors.textSecondary),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
+                  Text(t.description.isEmpty ? '—' : t.description,
+                      style: V2Typography.body.copyWith(
+                          fontSize: 14, fontWeight: FontWeight.w500),
+                      overflow: TextOverflow.ellipsis),
+                  Text(label,
+                      style: V2Typography.micro
+                          .copyWith(color: V2Colors.textSecondary),
+                      overflow: TextOverflow.ellipsis),
                 ],
               ),
             ),
             const SizedBox(width: V2Spacing.sm),
-            Text('-${formatYen(total)}',
+            Text('-${formatYen(t.amount)}',
                 style: V2Typography.numericCell.copyWith(
                     color: V2Colors.negative,
-                    fontWeight: FontWeight.w700)),
+                    fontWeight: FontWeight.w600)),
           ],
         ),
       ),
@@ -1793,10 +1974,13 @@ class _ReceiptGroupRow extends StatelessWidget {
 
 class _ExpenseRow extends StatefulWidget {
   final core.Transaction t;
-  final VoidCallback onTap;
+  // 左タップは何もしない。長押し/右クリックで編集・削除メニュー。
+  final void Function(core.Transaction) onEditTxn;
+  final void Function(core.Transaction) onDeleteTxn;
   const _ExpenseRow({
     required this.t,
-    required this.onTap,
+    required this.onEditTxn,
+    required this.onDeleteTxn,
   });
 
   @override
@@ -1842,7 +2026,14 @@ class _ExpenseRowState extends State<_ExpenseRow> {
       onExit: (_) => setState(() => _hover = false),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
+        onSecondaryTapDown: (d) => _showTxnContextMenu(context, d.globalPosition,
+            txn: widget.t,
+            onEdit: widget.onEditTxn,
+            onDelete: widget.onDeleteTxn),
+        onLongPressStart: (d) => _showTxnContextMenu(context, d.globalPosition,
+            txn: widget.t,
+            onEdit: widget.onEditTxn,
+            onDelete: widget.onDeleteTxn),
         child: Container(
           // たくはる風: 1 行 = 角丸枠付きの長方形カード（左右に余白）
           margin: const EdgeInsets.fromLTRB(
