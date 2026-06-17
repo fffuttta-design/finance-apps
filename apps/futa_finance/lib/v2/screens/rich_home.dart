@@ -20,9 +20,8 @@ import '../theme/typography.dart';
 ///
 /// 既存の [TransactionRepository] などからデータを取得して描画する独立画面。
 /// 現行ホーム（V2HomeTopNavScreen）には一切手を入れず、トグルで切替える。
-/// レイアウトは画面幅で出し分け:
-/// - 広い画面（PC）: 総資産ヒーロー → KPI → [カテゴリ内訳 ｜ 最近の取引] 2カラム
-/// - 狭い画面（スマホ）: 同じ部品を縦積み
+/// 主役カード＝「今月の収支」（総資産は資産タブへ）。旧ホームの主要な数字
+/// （見込み収入・推定/実測残高・固定費）も引き継ぐ。
 class RichHomeScreen extends StatefulWidget {
   /// アクセント色（事業=青 / 個人=オレンジ）
   final Color accent;
@@ -100,26 +99,6 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
     setState(() => _month = DateTime(_month.year, _month.month + delta));
   }
 
-  // ── 計算ヘルパー（現行ホームと同じロジック）─────────────
-
-  int _bankBalanceOf(RegisteredBankAccount b) {
-    int delta = 0;
-    for (final t in _transactions) {
-      if (t.type == TransactionType.transfer) {
-        if (t.transferFromAccount == b.name) delta -= t.amount;
-        if (t.transferToAccount == b.name) delta += t.amount;
-        continue;
-      }
-      if (t.paymentMethod != b.name) continue;
-      if (t.type == TransactionType.income) {
-        delta += t.amount;
-      } else {
-        delta -= t.amount;
-      }
-    }
-    return (b.startingBalance ?? 0) + delta;
-  }
-
   int _subsTotalForMonth(DateTime m) {
     final now = DateTime.now();
     final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
@@ -150,8 +129,7 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
                   size: 40, color: V2Colors.textMuted),
               const SizedBox(height: 12),
               Text('読み込みに失敗しました\n$_error',
-                  textAlign: TextAlign.center,
-                  style: V2Typography.caption),
+                  textAlign: TextAlign.center, style: V2Typography.caption),
               const SizedBox(height: 12),
               FilledButton.icon(
                 onPressed: () {
@@ -171,10 +149,14 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
     final accent = widget.accent;
     final monthTxns = _monthTxns(_month);
 
-    // 収支
-    final income = monthTxns
-        .where((t) => t.type == TransactionType.income)
+    // 収支（見込み込みの売上・経費）
+    final incomeConfirmed = monthTxns
+        .where((t) => t.type == TransactionType.income && !t.isPending)
         .fold<int>(0, (s, t) => s + t.amount);
+    final incomePending = monthTxns
+        .where((t) => t.type == TransactionType.income && t.isPending)
+        .fold<int>(0, (s, t) => s + t.amount);
+    final income = incomeConfirmed + incomePending;
     final txExpense = monthTxns
         .where((t) => t.type == TransactionType.expense)
         .fold<int>(0, (s, t) => s + t.amount);
@@ -182,12 +164,18 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
     final expense = txExpense + subTotal;
     final net = income - expense;
 
-    // 総資産・増減
-    final banks = _payments.bankAccounts;
-    final totalAsset = banks.fold<int>(0, (s, b) => s + _bankBalanceOf(b));
+    // 推定残高 / 実測残高（旧ホームと同じ）
+    final now = DateTime.now();
+    final isCurrentMonth =
+        _month.year == now.year && _month.month == now.month;
     final snap = _snapshots.forMonth(_month.year, _month.month);
-    final hasSnap = snap != null;
-    final delta = totalAsset - (snap?.initialBalance ?? 0);
+    final initialBalance = snap?.initialBalance ?? 0;
+    final projected = initialBalance + income - expense;
+    final actual = isCurrentMonth
+        ? _payments.bankAccounts
+            .fold<int>(0, (s, b) => s + (b.displayBalance ?? 0))
+        : projected;
+    final diff = actual - projected;
 
     // カテゴリ内訳（大カテゴリ別・固定費込み）
     final byMajor = <String, int>{};
@@ -212,22 +200,28 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
     final hero = _HeroCard(
       accent: accent,
       monthLabel: '${_month.year}年${_month.month}月',
-      totalAsset: totalAsset,
+      net: net,
       income: income,
+      incomePending: incomePending,
       expense: expense,
-      hasSnap: hasSnap,
-      delta: delta,
       isBusiness: isBusiness,
       onPrev: () => _shiftMonth(-1),
       onNext: () => _shiftMonth(1),
     );
 
-    final kpiRow = _KpiRow(net: net, fixedCost: subTotal);
+    final balanceCard = _BalanceCard(
+      hasSnap: snap != null,
+      isCurrentMonth: isCurrentMonth,
+      projected: projected,
+      actual: actual,
+      diff: diff,
+      fixedCost: subTotal,
+    );
 
     final categoryCard = _CategoryCard(
-      accent: accent,
       entries: majorEntries,
       total: byMajorTotal,
+      accent: accent,
     );
 
     final recentCard = _RecentCard(
@@ -269,7 +263,7 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
               children: [
                 hero,
                 const SizedBox(height: V2Spacing.lg),
-                kpiRow,
+                balanceCard,
                 const SizedBox(height: V2Spacing.lg),
                 if (wide)
                   IntrinsicHeight(
@@ -297,28 +291,26 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
 }
 
 // ═════════════════════════════════════════════════
-// 総資産ヒーローカード（アクセント色の主役カード）
+// 今月の収支ヒーローカード（アクセント色の主役カード）
 // ═════════════════════════════════════════════════
 
 class _HeroCard extends StatelessWidget {
   final Color accent;
   final String monthLabel;
-  final int totalAsset;
+  final int net;
   final int income;
+  final int incomePending;
   final int expense;
-  final bool hasSnap;
-  final int delta;
   final bool isBusiness;
   final VoidCallback onPrev;
   final VoidCallback onNext;
   const _HeroCard({
     required this.accent,
     required this.monthLabel,
-    required this.totalAsset,
+    required this.net,
     required this.income,
+    required this.incomePending,
     required this.expense,
-    required this.hasSnap,
-    required this.delta,
     required this.isBusiness,
     required this.onPrev,
     required this.onNext,
@@ -326,9 +318,10 @@ class _HeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final onAccent = Colors.white;
+    const onAccent = Colors.white;
     final onAccentSoft = Colors.white.withValues(alpha: 0.78);
     final tileBg = Colors.white.withValues(alpha: 0.13);
+    final isBlack = net >= 0;
     return Container(
       padding: const EdgeInsets.all(V2Spacing.xl),
       decoration: BoxDecoration(
@@ -347,11 +340,25 @@ class _HeroCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text('総資産',
+              Text('今月の収支',
                   style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: onAccentSoft)),
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(isBlack ? '黒字' : '赤字',
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: onAccent)),
+              ),
               const Spacer(),
               _RoundIconButton(
                   icon: Icons.chevron_left, onTap: onPrev, color: onAccent),
@@ -368,22 +375,22 @@ class _HeroCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          Text(formatYen(totalAsset),
-              style: TextStyle(
+          Text(formatYen(net, withSign: true),
+              style: const TextStyle(
                 fontSize: 34,
                 fontWeight: FontWeight.w800,
                 letterSpacing: -0.8,
                 color: onAccent,
                 fontFeatures: V2Typography.tabularNums,
               )),
-          if (hasSnap) ...[
+          if (incomePending > 0) ...[
             const SizedBox(height: 6),
             Row(
               children: [
-                Icon(delta >= 0 ? Icons.trending_up : Icons.trending_down,
-                    size: 15, color: onAccentSoft),
+                Icon(Icons.hourglass_top, size: 14, color: onAccentSoft),
                 const SizedBox(width: 5),
-                Text('今月の増減 ${formatYen(delta, withSign: true)}',
+                Text(
+                    '${isBusiness ? '売上' : '収入'}のうち見込み ${formatYen(incomePending, withSign: true)}',
                     style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -486,55 +493,23 @@ class _RoundIconButton extends StatelessWidget {
 }
 
 // ═════════════════════════════════════════════════
-// KPI 行（今月の収支 / 固定費）
+// 残高カード（推定残高 / 実測残高 / 固定費）
 // ═════════════════════════════════════════════════
 
-class _KpiRow extends StatelessWidget {
-  final int net;
+class _BalanceCard extends StatelessWidget {
+  final bool hasSnap;
+  final bool isCurrentMonth;
+  final int projected;
+  final int actual;
+  final int diff;
   final int fixedCost;
-  const _KpiRow({required this.net, required this.fixedCost});
-
-  @override
-  Widget build(BuildContext context) {
-    final isBlack = net >= 0;
-    return Row(
-      children: [
-        Expanded(
-          child: _KpiCard(
-            icon: isBlack ? Icons.trending_up : Icons.trending_down,
-            iconColor: isBlack ? V2Colors.positive : V2Colors.negative,
-            label: '今月の収支',
-            value: formatYen(net, withSign: true),
-            valueColor: isBlack ? V2Colors.positive : V2Colors.negative,
-          ),
-        ),
-        const SizedBox(width: V2Spacing.md),
-        Expanded(
-          child: _KpiCard(
-            icon: Icons.repeat,
-            iconColor: V2Colors.textSecondary,
-            label: '固定費',
-            value: formatYen(fixedCost),
-            valueColor: V2Colors.textPrimary,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _KpiCard extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String label;
-  final String value;
-  final Color valueColor;
-  const _KpiCard({
-    required this.icon,
-    required this.iconColor,
-    required this.label,
-    required this.value,
-    required this.valueColor,
+  const _BalanceCard({
+    required this.hasSnap,
+    required this.isCurrentMonth,
+    required this.projected,
+    required this.actual,
+    required this.diff,
+    required this.fixedCost,
   });
 
   @override
@@ -546,25 +521,77 @@ class _KpiCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: V2Colors.border),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Icon(icon, size: 17, color: iconColor),
-              const SizedBox(width: 6),
-              Text(label,
-                  style: V2Typography.caption
-                      .copyWith(color: V2Colors.textSecondary)),
-            ],
+          // 推定残高
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('推定残高',
+                    style: V2Typography.caption
+                        .copyWith(color: V2Colors.textSecondary)),
+                const SizedBox(height: 4),
+                if (hasSnap)
+                  Text(formatYen(projected),
+                      style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                          color: projected >= 0
+                              ? V2Colors.positive
+                              : V2Colors.negative,
+                          fontFeatures: V2Typography.tabularNums))
+                else
+                  Text('月初残高 未記録',
+                      style: V2Typography.caption
+                          .copyWith(color: V2Colors.warning)),
+                if (hasSnap && isCurrentMonth) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                      '実測 ${formatYen(actual)} / ${diff == 0 ? '一致 ✓' : '差 ${formatYen(diff, withSign: true)}'}',
+                      style: V2Typography.micro.copyWith(
+                          color: diff == 0
+                              ? V2Colors.positive
+                              : V2Colors.warning,
+                          fontFeatures: V2Typography.tabularNums)),
+                ] else if (!hasSnap) ...[
+                  const SizedBox(height: 3),
+                  Text('資産タブで記録できます',
+                      style: V2Typography.micro
+                          .copyWith(color: V2Colors.textMuted)),
+                ],
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
-          Text(value,
-              style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: valueColor,
-                  fontFeatures: V2Typography.tabularNums)),
+          Container(width: 1, height: 38, color: V2Colors.divider),
+          // 固定費
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(left: V2Spacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.repeat,
+                          size: 15, color: V2Colors.textSecondary),
+                      const SizedBox(width: 5),
+                      Text('今月の固定費',
+                          style: V2Typography.caption
+                              .copyWith(color: V2Colors.textSecondary)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(formatYen(fixedCost),
+                      style: const TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                          color: V2Colors.textPrimary,
+                          fontFeatures: V2Typography.tabularNums)),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -575,7 +602,6 @@ class _KpiCard extends StatelessWidget {
 // カテゴリ内訳カード（横スタックバー + 凡例）
 // ═════════════════════════════════════════════════
 
-/// 内訳バー/凡例で使う色のパレット（多めのカテゴリでも回るよう循環）。
 const List<Color> _kCatPalette = [
   Color(0xFF378ADD),
   Color(0xFF1D9E75),
@@ -587,25 +613,23 @@ const List<Color> _kCatPalette = [
 const Color _kCatOther = Color(0xFFB4B2A9);
 
 class _CategoryCard extends StatelessWidget {
-  final Color accent;
   final List<MapEntry<String, int>> entries;
   final int total;
+  final Color accent;
   const _CategoryCard({
-    required this.accent,
     required this.entries,
     required this.total,
+    required this.accent,
   });
 
   @override
   Widget build(BuildContext context) {
     final top = entries.take(5).toList();
-    final restTotal =
-        entries.skip(5).fold<int>(0, (s, e) => s + e.value);
+    final restTotal = entries.skip(5).fold<int>(0, (s, e) => s + e.value);
     final segments = <({String name, int value, Color color})>[
       for (int i = 0; i < top.length; i++)
         (name: top[i].key, value: top[i].value, color: _kCatPalette[i]),
-      if (restTotal > 0)
-        (name: 'その他', value: restTotal, color: _kCatOther),
+      if (restTotal > 0) (name: 'その他', value: restTotal, color: _kCatOther),
     ];
 
     return Container(
@@ -715,8 +739,8 @@ class _RecentCard extends StatelessWidget {
                 onTap: onSeeAll,
                 borderRadius: BorderRadius.circular(6),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 4, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                   child: Row(
                     children: [
                       Text('すべて見る',

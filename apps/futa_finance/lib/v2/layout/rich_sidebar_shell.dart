@@ -131,7 +131,18 @@ class RichSidebarShell extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Expanded(child: content),
+                  // 本文は中央寄せ（最大幅）にする。資産タブ/PL/設定など
+                  // 自前で中央寄せしない画面が横に引き伸ばされるのを防ぐ。
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: ConstrainedBox(
+                        constraints:
+                            const BoxConstraints(maxWidth: 1140),
+                        child: content,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),

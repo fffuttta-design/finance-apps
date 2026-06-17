@@ -76,6 +76,25 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     return _subs.fold<int>(0, (s, sub) => s + sub.plAmountForMonth(ym, curYm));
   }
 
+  /// 指定月に計上される固定費（サブスク）の明細（名前・金額）。金額降順。
+  List<({String name, int amount})> _fixedLinesForMonth(DateTime m) {
+    final now = DateTime.now();
+    final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
+    final lines = <({String name, int amount})>[];
+    for (final sub in _subs) {
+      final amt = sub.plAmountForMonth(ym, curYm);
+      if (amt > 0) {
+        lines.add((
+          name: sub.name.trim().isEmpty ? '固定費' : sub.name,
+          amount: amt
+        ));
+      }
+    }
+    lines.sort((a, b) => b.amount.compareTo(a.amount));
+    return lines;
+  }
+
   List<core.Transaction> get _monthExpenses => _transactions
       .where((t) =>
           t.type == core.TransactionType.expense &&
@@ -115,6 +134,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     final txTotal = rows.fold<int>(0, (s, t) => s + t.amount);
     final subTotal = _subsOf(_month);
     final total = txTotal + subTotal;
+    final fixedLines = _fixedLinesForMonth(_month);
 
     // カテゴリ内訳（大カテゴリ別・固定費込み）
     final byMajor = <String, int>{};
@@ -195,6 +215,64 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 ),
               ),
               const SizedBox(height: V2Spacing.lg),
+              // 毎月の固定費（引落予定）— 旧経費タブの「毎月引落予定」を引き継ぎ
+              if (fixedLines.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(V2Spacing.lg),
+                  decoration: BoxDecoration(
+                    color: V2Colors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: V2Colors.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.repeat,
+                              size: 17, color: V2Colors.textSecondary),
+                          const SizedBox(width: 6),
+                          Text('毎月の固定費（引落予定）',
+                              style: V2Typography.h2
+                                  .copyWith(color: V2Colors.textPrimary)),
+                          const Spacer(),
+                          Text(formatYen(subTotal),
+                              style: V2Typography.bodyStrong.copyWith(
+                                  color: V2Colors.textPrimary,
+                                  fontFeatures: V2Typography.tabularNums)),
+                        ],
+                      ),
+                      const SizedBox(height: V2Spacing.sm),
+                      for (int i = 0; i < fixedLines.length; i++) ...[
+                        if (i > 0)
+                          const Divider(height: 1, color: V2Colors.divider),
+                        Padding(
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 9),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.subscriptions_outlined,
+                                  size: 16, color: V2Colors.textMuted),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(fixedLines[i].name,
+                                    style: V2Typography.body,
+                                    overflow: TextOverflow.ellipsis),
+                              ),
+                              Text(formatYen(fixedLines[i].amount),
+                                  style: V2Typography.caption.copyWith(
+                                      color: V2Colors.textSecondary,
+                                      fontFeatures:
+                                          V2Typography.tabularNums)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: V2Spacing.lg),
+              ],
               // カテゴリ内訳
               if (majorEntries.isNotEmpty) ...[
                 Container(
