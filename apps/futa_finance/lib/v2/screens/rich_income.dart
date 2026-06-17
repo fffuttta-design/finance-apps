@@ -71,14 +71,6 @@ class _RichIncomeScreenState extends State<RichIncomeScreen>
       .toList()
     ..sort((a, b) => b.date.compareTo(a.date));
 
-  Future<void> _openInput() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const IncomeInputScreen()),
-    );
-    if (mounted) await _load();
-  }
-
   Future<void> _editTxn(core.Transaction t) async {
     final changed = await Navigator.push<bool>(
       context,
@@ -112,21 +104,9 @@ class _RichIncomeScreenState extends State<RichIncomeScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  Text(isBusiness ? '売上' : '収入',
-                      style: V2Typography.h1
-                          .copyWith(color: V2Colors.textPrimary)),
-                  const Spacer(),
-                  FilledButton.icon(
-                    onPressed: _openInput,
-                    icon: const Icon(Icons.add, size: 18),
-                    label: Text(isBusiness ? '売上を追加' : '収入を追加'),
-                    style: FilledButton.styleFrom(
-                        backgroundColor: widget.accent),
-                  ),
-                ],
-              ),
+              Text(isBusiness ? '売上' : '収入',
+                  style:
+                      V2Typography.h1.copyWith(color: V2Colors.textPrimary)),
               const SizedBox(height: V2Spacing.lg),
               // サマリーカード
               Container(

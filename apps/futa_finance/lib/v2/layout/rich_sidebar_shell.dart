@@ -99,11 +99,8 @@ class RichSidebarShell extends StatelessWidget {
                       ],
                     ),
                   ),
-                  // 記録ボタン
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
-                    child: recordButton,
-                  ),
+                  // 記録ボタンはトップバー右上へ移設（サイドバー下部からは撤去）。
+                  const SizedBox(height: 12),
                 ],
               ),
             ),
@@ -127,7 +124,10 @@ class RichSidebarShell extends StatelessWidget {
                             style: V2Typography.h1
                                 .copyWith(color: V2Colors.textPrimary)),
                         const Spacer(),
+                        // モード切替（事業/個人）→ 記録ボタンの順で右上に並べる。
                         modeSwitcher,
+                        const SizedBox(width: 12),
+                        recordButton,
                       ],
                     ),
                   ),

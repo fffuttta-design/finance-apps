@@ -6,7 +6,6 @@ import 'package:finance_core/finance_core.dart' as core;
 import '../../data/app_mode.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
-import '../../screens/expense_input_screen.dart';
 import '../../screens/expense_list_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
 import '../../utils/formatters.dart';
@@ -106,14 +105,6 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
       .toList()
     ..sort((a, b) => b.date.compareTo(a.date));
 
-  Future<void> _add() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const ExpenseInputScreen()),
-    );
-    if (mounted) await _load();
-  }
-
   Future<void> _edit(core.Transaction t) async {
     final changed = await Navigator.push<bool>(
       context,
@@ -162,20 +153,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  Text(isBusiness ? '経費' : '支出',
-                      style: V2Typography.h1
-                          .copyWith(color: V2Colors.textPrimary)),
-                  const Spacer(),
-                  FilledButton.icon(
-                    onPressed: _add,
-                    icon: const Icon(Icons.add, size: 18),
-                    label: Text(isBusiness ? '経費を追加' : '支出を追加'),
-                    style: FilledButton.styleFrom(backgroundColor: accent),
-                  ),
-                ],
-              ),
+              Text(isBusiness ? '経費' : '支出',
+                  style:
+                      V2Typography.h1.copyWith(color: V2Colors.textPrimary)),
               const SizedBox(height: V2Spacing.lg),
               // サマリー
               Container(
@@ -218,7 +198,35 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 ),
               ),
               const SizedBox(height: V2Spacing.lg),
-              // 毎月の固定費（引落予定）— 旧経費タブの「毎月引落予定」を引き継ぎ
+              // カテゴリ内訳（一番上）
+              if (majorEntries.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(V2Spacing.lg),
+                  decoration: BoxDecoration(
+                    color: V2Colors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: V2Colors.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text('カテゴリ内訳',
+                          style: V2Typography.h2
+                              .copyWith(color: V2Colors.textPrimary)),
+                      const SizedBox(height: V2Spacing.md),
+                      for (final e in majorEntries.take(8))
+                        _CatBar(
+                          name: e.key,
+                          value: e.value,
+                          ratio: total == 0 ? 0 : e.value / total,
+                          accent: accent,
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: V2Spacing.lg),
+              ],
+              // 毎月の固定費（引落予定）— カテゴリの下
               if (fixedLines.isNotEmpty) ...[
                 Container(
                   padding: const EdgeInsets.all(V2Spacing.lg),
@@ -275,34 +283,6 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                           ),
                         ),
                       ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: V2Spacing.lg),
-              ],
-              // カテゴリ内訳
-              if (majorEntries.isNotEmpty) ...[
-                Container(
-                  padding: const EdgeInsets.all(V2Spacing.lg),
-                  decoration: BoxDecoration(
-                    color: V2Colors.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: V2Colors.border),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text('カテゴリ内訳',
-                          style: V2Typography.h2
-                              .copyWith(color: V2Colors.textPrimary)),
-                      const SizedBox(height: V2Spacing.md),
-                      for (final e in majorEntries.take(8))
-                        _CatBar(
-                          name: e.key,
-                          value: e.value,
-                          ratio: total == 0 ? 0 : e.value / total,
-                          accent: accent,
-                        ),
                     ],
                   ),
                 ),
