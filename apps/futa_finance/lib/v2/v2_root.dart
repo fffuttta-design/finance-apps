@@ -16,7 +16,10 @@ import '../screens/receipt_split_screen.dart';
 import '../screens/transfer_input_screen.dart';
 import 'layout/rich_sidebar_shell.dart';
 import 'layout/topnav_shell.dart';
+import 'screens/rich_expenses.dart';
 import 'screens/rich_home.dart';
+import 'screens/rich_income.dart';
+import 'screens/rich_report.dart';
 import 'screens/v2_devlab.dart';
 import 'screens/v2_expenses.dart';
 import 'screens/v2_home_topnav.dart';
@@ -143,15 +146,21 @@ class _V2RootState extends State<V2Root>
             : V2HomeTopNavScreen(accent: accent);
       // 支出: v2.1 ネイティブ実装（マネフォクラウド寄りのテーブル中心）
       case 'expenses':
-        return V2ExpensesScreen(accent: accent);
+        return rich
+            ? RichExpensesScreen(accent: accent)
+            : V2ExpensesScreen(accent: accent);
       // 収入: v2.1 ネイティブ実装（見込み/確定の状態バッジ付きテーブル）
       case 'income':
-        return V2IncomeScreen(accent: accent);
+        return rich
+            ? RichIncomeScreen(accent: accent)
+            : V2IncomeScreen(accent: accent);
       // 資産タブは廃止。口座/カードはホームの総資産や支出の「ウォレット一覧」から。
       // クレカタブも廃止。カード一覧は支出タブ上部の「ウォレット一覧」ボタンから開く。
       // 集計: v2.1 ネイティブ実装（会計風 PL 月次表 + v1 集計画面へのリンク）
       case 'report':
-        return V2ReportScreen(accent: accent);
+        return rich
+            ? RichReportScreen(accent: accent)
+            : V2ReportScreen(accent: accent);
       // 資産: 総資産（口座/カード/月初残高）。ホームから移動。
       case 'assets':
         return V2HomeTopNavScreen(accent: accent, assetsOnly: true);
