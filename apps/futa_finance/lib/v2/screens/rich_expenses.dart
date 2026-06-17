@@ -10,6 +10,7 @@ import '../../screens/expense_input_screen.dart';
 import '../../screens/expense_list_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
 import '../../utils/formatters.dart';
+import '../../widgets/brand_logo.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
@@ -76,18 +77,20 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     return _subs.fold<int>(0, (s, sub) => s + sub.plAmountForMonth(ym, curYm));
   }
 
-  /// 指定月に計上される固定費（サブスク）の明細（名前・金額）。金額降順。
-  List<({String name, int amount})> _fixedLinesForMonth(DateTime m) {
+  /// 指定月に計上される固定費（サブスク）の明細（名前・金額・アイコン）。金額降順。
+  List<({String name, int amount, String? iconUrl})> _fixedLinesForMonth(
+      DateTime m) {
     final now = DateTime.now();
     final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
-    final lines = <({String name, int amount})>[];
+    final lines = <({String name, int amount, String? iconUrl})>[];
     for (final sub in _subs) {
       final amt = sub.plAmountForMonth(ym, curYm);
       if (amt > 0) {
         lines.add((
           name: sub.name.trim().isEmpty ? '固定費' : sub.name,
-          amount: amt
+          amount: amt,
+          iconUrl: sub.iconUrl,
         ));
       }
     }
@@ -251,8 +254,12 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                               const EdgeInsets.symmetric(vertical: 9),
                           child: Row(
                             children: [
-                              const Icon(Icons.subscriptions_outlined,
-                                  size: 16, color: V2Colors.textMuted),
+                              BrandLogo(
+                                iconUrl: fixedLines[i].iconUrl,
+                                fallbackIcon: Icons.subscriptions_outlined,
+                                size: 20,
+                                borderRadius: 5,
+                              ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(fixedLines[i].name,

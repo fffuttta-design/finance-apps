@@ -163,7 +163,18 @@ class _V2RootState extends State<V2Root>
         return V2ReportScreen(accent: accent);
       // 資産: 総資産（口座/カード/月初残高）。ホームから移動。
       case 'assets':
-        return V2HomeTopNavScreen(accent: accent, assetsOnly: true);
+        // 資産は単一カラムなので、リッチ時は細めに中央寄せ（横伸び防止）。
+        final assets =
+            V2HomeTopNavScreen(accent: accent, assetsOnly: true);
+        return rich
+            ? Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 720),
+                  child: assets,
+                ),
+              )
+            : assets;
       // 設定: v2.1 ネイティブ（マスター/ディテール、左メニュー + 右パネル）
       case 'settings':
         return V2SettingsScreen(accent: accent);

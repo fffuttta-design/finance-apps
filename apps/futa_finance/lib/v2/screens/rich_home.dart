@@ -177,14 +177,32 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
         : projected;
     final diff = actual - projected;
 
-    // カテゴリ内訳（大カテゴリ別・固定費込み）
+    // カテゴリ内訳（大カテゴリ別・固定費込み）＋ドリルダウン用の明細。
     final byMajor = <String, int>{};
+    final txnsByMajor = <String, List<Transaction>>{};
     for (final t in monthTxns) {
       if (t.type != TransactionType.expense) continue;
       final major =
           t.category.major.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
       if (major.isEmpty) continue;
       byMajor[major] = (byMajor[major] ?? 0) + t.amount;
+      (txnsByMajor[major] ??= []).add(t);
+    }
+    // 固定費（サブスク）当月分の明細（名前・金額）。
+    final fixedLines = <({String name, int amount})>[];
+    {
+      final nowYm =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}';
+      final ym =
+          '${_month.year}-${_month.month.toString().padLeft(2, '0')}';
+      for (final sub in _subs) {
+        final amt = sub.plAmountForMonth(ym, nowYm);
+        if (amt > 0) {
+          fixedLines.add(
+              (name: sub.name.trim().isEmpty ? '固定費' : sub.name, amount: amt));
+        }
+      }
+      fixedLines.sort((a, b) => b.amount.compareTo(a.amount));
     }
     if (subTotal > 0) {
       byMajor['固定費・サブスク'] = (byMajor['固定費・サブスク'] ?? 0) + subTotal;
@@ -222,6 +240,8 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
       entries: majorEntries,
       total: byMajorTotal,
       accent: accent,
+      txnsByMajor: txnsByMajor,
+      fixedLines: fixedLines,
     );
 
     final recentCard = _RecentCard(
@@ -319,8 +339,10 @@ class _HeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const onAccent = Colors.white;
-    final onAccentSoft = Colors.white.withValues(alpha: 0.78);
-    final tileBg = Colors.white.withValues(alpha: 0.13);
+    // ラベルは少し明るめの白に（背景との同化を防ぐ）。
+    final onAccentSoft = Colors.white.withValues(alpha: 0.88);
+    // サブタイルは黒を薄く重ねて「背景より暗い面」にし、白文字を際立たせる。
+    final tileBg = Colors.black.withValues(alpha: 0.18);
     final isBlack = net >= 0;
     return Container(
       padding: const EdgeInsets.all(V2Spacing.xl),
@@ -612,20 +634,37 @@ const List<Color> _kCatPalette = [
 ];
 const Color _kCatOther = Color(0xFFB4B2A9);
 
-class _CategoryCard extends StatelessWidget {
+const String _kFixedCostKey = '固定費・サブスク';
+
+class _CategoryCard extends StatefulWidget {
   final List<MapEntry<String, int>> entries;
   final int total;
   final Color accent;
+  final Map<String, List<Transaction>> txnsByMajor;
+  final List<({String name, int amount})> fixedLines;
   const _CategoryCard({
     required this.entries,
     required this.total,
     required this.accent,
+    required this.txnsByMajor,
+    required this.fixedLines,
   });
 
   @override
+  State<_CategoryCard> createState() => _CategoryCardState();
+}
+
+class _CategoryCardState extends State<_CategoryCard> {
+  String? _open;
+
+  @override
   Widget build(BuildContext context) {
+    final entries = widget.entries;
+    final total = widget.total;
+    // 凡例＝上位5＋「その他」。色はパレットを循環。
     final top = entries.take(5).toList();
-    final restTotal = entries.skip(5).fold<int>(0, (s, e) => s + e.value);
+    final rest = entries.skip(5).toList();
+    final restTotal = rest.fold<int>(0, (s, e) => s + e.value);
     final segments = <({String name, int value, Color color})>[
       for (int i = 0; i < top.length; i++)
         (name: top[i].key, value: top[i].value, color: _kCatPalette[i]),
@@ -665,38 +704,114 @@ class _CategoryCard extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: V2Spacing.lg),
-            for (final s in segments)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 9,
-                      height: 9,
-                      decoration: BoxDecoration(
-                        color: s.color,
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(s.name,
-                          style: V2Typography.body,
-                          overflow: TextOverflow.ellipsis),
-                    ),
-                    Text(formatYen(s.value),
-                        style: V2Typography.caption.copyWith(
-                            color: V2Colors.textSecondary,
-                            fontFeatures: V2Typography.tabularNums)),
-                  ],
-                ),
-              ),
+            const SizedBox(height: V2Spacing.sm),
+            for (final s in segments) _legendRow(s, rest),
           ],
         ],
       ),
     );
   }
+
+  Widget _legendRow(
+      ({String name, int value, Color color}) s,
+      List<MapEntry<String, int>> rest) {
+    final isOther = s.name == 'その他';
+    final open = _open == s.name;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: () => setState(() => _open = open ? null : s.name),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                Container(
+                  width: 9,
+                  height: 9,
+                  decoration: BoxDecoration(
+                    color: s.color,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(s.name,
+                      style: V2Typography.body,
+                      overflow: TextOverflow.ellipsis),
+                ),
+                Text(formatYen(s.value),
+                    style: V2Typography.caption.copyWith(
+                        color: V2Colors.textSecondary,
+                        fontFeatures: V2Typography.tabularNums)),
+                const SizedBox(width: 4),
+                Icon(open ? Icons.expand_less : Icons.expand_more,
+                    size: 18, color: V2Colors.textMuted),
+              ],
+            ),
+          ),
+        ),
+        if (open)
+          Padding(
+            padding: const EdgeInsets.only(left: 19, bottom: 6),
+            child: Column(children: _detailRows(s.name, isOther, rest)),
+          ),
+      ],
+    );
+  }
+
+  List<Widget> _detailRows(
+      String name, bool isOther, List<MapEntry<String, int>> rest) {
+    // 「その他」＝残りのカテゴリ合計を一覧。
+    if (isOther) {
+      if (rest.isEmpty) return [_noDetail()];
+      return [for (final e in rest) _amountRow(e.key, e.value)];
+    }
+    // 固定費＝各サブスクの名前・金額。
+    if (name == _kFixedCostKey) {
+      if (widget.fixedLines.isEmpty) return [_noDetail()];
+      return [for (final f in widget.fixedLines) _amountRow(f.name, f.amount)];
+    }
+    // 通常カテゴリ＝そのカテゴリの取引明細。
+    final txns = widget.txnsByMajor[name] ?? const <Transaction>[];
+    if (txns.isEmpty) return [_noDetail()];
+    return [
+      for (final t in txns)
+        _amountRow(
+            t.description.trim().isEmpty
+                ? formatMonthDay(t.date)
+                : '${formatMonthDay(t.date)}  ${t.description.trim()}',
+            t.amount),
+    ];
+  }
+
+  Widget _amountRow(String label, int amount) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(label,
+                  style: V2Typography.caption
+                      .copyWith(color: V2Colors.textSecondary),
+                  overflow: TextOverflow.ellipsis),
+            ),
+            Text(formatYen(amount),
+                style: V2Typography.caption.copyWith(
+                    color: V2Colors.textSecondary,
+                    fontFeatures: V2Typography.tabularNums)),
+          ],
+        ),
+      );
+
+  Widget _noDetail() => Align(
+        alignment: Alignment.centerLeft,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Text('明細なし',
+              style: V2Typography.caption.copyWith(color: V2Colors.textMuted)),
+        ),
+      );
 }
 
 // ═════════════════════════════════════════════════
