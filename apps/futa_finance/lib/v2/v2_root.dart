@@ -14,11 +14,11 @@ import '../utils/pwa_theme.dart';
 import '../screens/income_input_screen.dart';
 import '../screens/receipt_split_screen.dart';
 import '../screens/transfer_input_screen.dart';
+import 'layout/rich_sidebar_shell.dart';
 import 'layout/topnav_shell.dart';
 import 'screens/rich_expenses.dart';
 import 'screens/rich_home.dart';
 import 'screens/rich_income.dart';
-import 'screens/rich_report.dart';
 import 'screens/v2_devlab.dart';
 import 'screens/v2_expenses.dart';
 import 'screens/v2_home_topnav.dart';
@@ -136,11 +136,9 @@ class _V2RootState extends State<V2Root>
   }
 
   Widget _bodyFor(String id, {required Color accent}) {
-    // 新デザイン（リッチUI）は「スマホ幅のときだけ」適用する。
-    // PC（広い画面）は従来デザインのまま（二村フィードバック 2026-06-17）。
-    // トグル OFF ならスマホも従来に戻る（＝スマホも切り戻し可）。
-    final rich = UiPreferences.instance.richUi &&
-        MediaQuery.sizeOf(context).width < 700;
+    // 新デザイン（リッチUI）ONのとき本文を rich 版に差替える（PC/スマホ共通）。
+    // ただし業績タブは詳細PL（V2ReportScreen）を維持する（PLを消さない）。
+    final rich = UiPreferences.instance.richUi;
     switch (id) {
       case 'home':
         return rich
@@ -160,9 +158,9 @@ class _V2RootState extends State<V2Root>
       // クレカタブも廃止。カード一覧は支出タブ上部の「ウォレット一覧」ボタンから開く。
       // 集計: v2.1 ネイティブ実装（会計風 PL 月次表 + v1 集計画面へのリンク）
       case 'report':
-        return rich
-            ? RichReportScreen(accent: accent)
-            : V2ReportScreen(accent: accent);
+        // 業績は詳細PL（損益計算書）を常に維持。ダッシュボード化で
+        // PL が消えないよう、リッチ時も従来の V2ReportScreen を使う。
+        return V2ReportScreen(accent: accent);
       // 資産: 総資産（口座/カード/月初残高）。ホームから移動。
       case 'assets':
         return V2HomeTopNavScreen(accent: accent, assetsOnly: true);
@@ -243,8 +241,31 @@ class _V2RootState extends State<V2Root>
             curve: Curves.easeOutCubic);
       }
     }
-    // PC（広い画面）は常に従来の上タブシェル。リッチUIはスマホ幅の本文だけに適用。
-    // （左サイドバー版は将来の Next.js リデザイン用に rich_sidebar_shell.dart へ温存）
+    // 新デザイン（リッチUI）かつ広い画面 → 左サイドバーのダッシュボードシェル。
+    // スマホ幅は従来どおり下タブのシェルを使う（本文だけ rich 版に差替え済）。
+    if (UiPreferences.instance.richUi && !isNarrow) {
+      final items = _navItems;
+      final cur = items.firstWhere((e) => e.id == _currentId,
+          orElse: () => items.first);
+      return RichSidebarShell(
+        items: items,
+        currentId: _currentId,
+        onSelect: selectTab,
+        accent: accent,
+        title: cur.label,
+        modeSwitcher: V2ModeSwitcher(onDark: false),
+        recordButton: _RecordMenuButton(
+          accent: accent,
+          mode: mode,
+          onDark: false,
+          onSelected: _openRecord,
+        ),
+        content: KeyedSubtree(
+          key: ValueKey('rich_${mode}_$_currentId'),
+          child: _bodyFor(_currentId, accent: accent),
+        ),
+      );
+    }
     return V2TopNavShell(
       navAtBottom: isNarrow,
       bottomNav: isNarrow
