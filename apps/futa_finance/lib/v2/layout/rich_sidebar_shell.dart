@@ -125,7 +125,8 @@ class RichSidebarShell extends StatelessWidget {
                                 .copyWith(color: V2Colors.textPrimary)),
                         const Spacer(),
                         // モード切替（事業/個人）→ 記録ボタンの順で右上に並べる。
-                        modeSwitcher,
+                        // セグメントが潰れないよう十分な幅を確保する。
+                        SizedBox(width: 168, child: modeSwitcher),
                         const SizedBox(width: 12),
                         recordButton,
                       ],

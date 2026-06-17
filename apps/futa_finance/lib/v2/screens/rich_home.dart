@@ -245,6 +245,7 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
     );
 
     final recentCard = _RecentCard(
+      accent: accent,
       isBusiness: isBusiness,
       month: _month,
       txns: recentTop,
@@ -339,10 +340,11 @@ class _HeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const onAccent = Colors.white;
-    // ラベルは少し明るめの白に（背景との同化を防ぐ）。
     final onAccentSoft = Colors.white.withValues(alpha: 0.88);
-    // サブタイルは黒を薄く重ねて「背景より暗い面」にし、白文字を際立たせる。
-    final tileBg = Colors.black.withValues(alpha: 0.18);
+    // サブタイルは「背景より明るい（ほぼ白）面」にして、数字をアクセント色で出す。
+    // 濃くするより薄くした方が見やすい、という方針。
+    final tileBg = Colors.white.withValues(alpha: 0.94);
+    const tileLabel = Color(0xFF5B6472); // 白タイル上で読みやすい落ち着いたグレー
     final isBlack = net >= 0;
     return Container(
       padding: const EdgeInsets.all(V2Spacing.xl),
@@ -429,8 +431,8 @@ class _HeroCard extends StatelessWidget {
                   bg: tileBg,
                   label: isBusiness ? '今月の売上' : '今月の収入',
                   value: formatYen(income),
-                  onAccent: onAccent,
-                  onAccentSoft: onAccentSoft,
+                  valueColor: accent,
+                  labelColor: tileLabel,
                 ),
               ),
               const SizedBox(width: V2Spacing.md),
@@ -439,8 +441,8 @@ class _HeroCard extends StatelessWidget {
                   bg: tileBg,
                   label: isBusiness ? '今月の経費' : '今月の支出',
                   value: formatYen(expense),
-                  onAccent: onAccent,
-                  onAccentSoft: onAccentSoft,
+                  valueColor: accent,
+                  labelColor: tileLabel,
                 ),
               ),
             ],
@@ -455,14 +457,14 @@ class _HeroSubTile extends StatelessWidget {
   final Color bg;
   final String label;
   final String value;
-  final Color onAccent;
-  final Color onAccentSoft;
+  final Color valueColor;
+  final Color labelColor;
   const _HeroSubTile({
     required this.bg,
     required this.label,
     required this.value,
-    required this.onAccent,
-    required this.onAccentSoft,
+    required this.valueColor,
+    required this.labelColor,
   });
 
   @override
@@ -480,13 +482,13 @@ class _HeroSubTile extends StatelessWidget {
               style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: onAccentSoft)),
+                  color: labelColor)),
           const SizedBox(height: 3),
           Text(value,
               style: TextStyle(
                   fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: onAccent,
+                  fontWeight: FontWeight.w800,
+                  color: valueColor,
                   fontFeatures: V2Typography.tabularNums)),
         ],
       ),
@@ -819,12 +821,14 @@ class _CategoryCardState extends State<_CategoryCard> {
 // ═════════════════════════════════════════════════
 
 class _RecentCard extends StatelessWidget {
+  final Color accent;
   final bool isBusiness;
   final DateTime month;
   final List<Transaction> txns;
   final void Function(Transaction) onTapTxn;
   final VoidCallback onSeeAll;
   const _RecentCard({
+    required this.accent,
     required this.isBusiness,
     required this.month,
     required this.txns,
@@ -859,10 +863,8 @@ class _RecentCard extends StatelessWidget {
                   child: Row(
                     children: [
                       Text('すべて見る',
-                          style: V2Typography.caption
-                              .copyWith(color: V2Colors.accent)),
-                      const Icon(Icons.chevron_right,
-                          size: 16, color: V2Colors.accent),
+                          style: V2Typography.caption.copyWith(color: accent)),
+                      Icon(Icons.chevron_right, size: 16, color: accent),
                     ],
                   ),
                 ),

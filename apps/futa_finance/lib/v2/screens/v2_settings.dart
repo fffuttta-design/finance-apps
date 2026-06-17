@@ -33,7 +33,13 @@ import '../widgets/v2_card.dart';
 /// - 各 v1 エディタは将来順次 v2.1 ネイティブで書き直す
 class V2SettingsScreen extends StatefulWidget {
   final Color accent;
-  const V2SettingsScreen({super.key, required this.accent});
+
+  /// true のとき、広い画面でも左メニュー＋右パネルの2ペインにせず、
+  /// 常にカード一覧→タップでパネルの1カラム表示にする。
+  /// 新デザイン（リッチUI）でサイドバーが二重になるのを避けるため。
+  final bool singlePane;
+  const V2SettingsScreen(
+      {super.key, required this.accent, this.singlePane = false});
 
   @override
   State<V2SettingsScreen> createState() => _V2SettingsScreenState();
@@ -143,7 +149,8 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, c) {
       // 広い画面：左メニュー＋右パネルのマスター/ディテール。
-      if (c.maxWidth >= 900) {
+      // ただし singlePane（リッチUI）のときは2ペインにせず1カラムにする。
+      if (!widget.singlePane && c.maxWidth >= 900) {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: V2Spacing.xl),
           child: Row(

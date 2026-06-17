@@ -177,7 +177,16 @@ class _V2RootState extends State<V2Root>
             : assets;
       // 設定: v2.1 ネイティブ（マスター/ディテール、左メニュー + 右パネル）
       case 'settings':
-        return V2SettingsScreen(accent: accent);
+        // リッチ時は二重サイドバーを避け、1カラム（カード一覧→パネル）に。
+        return rich
+            ? Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 820),
+                  child: V2SettingsScreen(accent: accent, singlePane: true),
+                ),
+              )
+            : V2SettingsScreen(accent: accent);
       // 開発中: v2.1 風バナー + v1 DevLab を埋め込み（事業モード専用）
       case 'devLab':
         return V2DevLabScreen(accent: accent);

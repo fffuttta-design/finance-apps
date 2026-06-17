@@ -326,9 +326,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                               children: [
                                 Text('一覧',
                                     style: V2Typography.caption
-                                        .copyWith(color: V2Colors.accent)),
-                                const Icon(Icons.chevron_right,
-                                    size: 16, color: V2Colors.accent),
+                                        .copyWith(color: accent)),
+                                Icon(Icons.chevron_right,
+                                    size: 16, color: accent),
                               ],
                             ),
                           ),
