@@ -161,19 +161,20 @@ class _V2RootState extends State<V2Root>
         // 業績は詳細PL（損益計算書）を常に維持。ダッシュボード化で
         // PL が消えないよう、リッチ時も従来の V2ReportScreen を使う。
         // リッチ時はサイド見切れ防止に中央寄せ＋左右余白を付ける。
-        final report = V2ReportScreen(accent: accent);
+        // リッチ時は他タブと同じ密度に揃える（中央寄せ・最大幅960・上部に
+        // ダッシュボード帯を表示）。PL（詳細表）はそのまま下に残す。
         return rich
             ? Align(
                 alignment: Alignment.topCenter,
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1080),
+                  constraints: const BoxConstraints(maxWidth: 960),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: report,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: V2ReportScreen(accent: accent, richBand: true),
                   ),
                 ),
               )
-            : report;
+            : V2ReportScreen(accent: accent);
       // 資産: 総資産（口座/カード/月初残高）。ホームから移動。
       case 'assets':
         // 資産は単一カラムなので、リッチ時は細めに中央寄せ（横伸び防止）。
