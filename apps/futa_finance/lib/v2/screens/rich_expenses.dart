@@ -146,23 +146,23 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(
-          vertical: V2Spacing.xl, horizontal: V2Spacing.lg),
+          vertical: V2Spacing.lg, horizontal: V2Spacing.md),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1100),
+          constraints: const BoxConstraints(maxWidth: 960),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(isBusiness ? '経費' : '支出',
                   style:
                       V2Typography.h1.copyWith(color: V2Colors.textPrimary)),
-              const SizedBox(height: V2Spacing.lg),
+              const SizedBox(height: V2Spacing.md),
               // サマリー
               Container(
-                padding: const EdgeInsets.all(V2Spacing.xl),
+                padding: const EdgeInsets.all(V2Spacing.lg),
                 decoration: BoxDecoration(
                   color: V2Colors.surface,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: V2Colors.border),
                 ),
                 child: Column(
@@ -184,7 +184,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                     const SizedBox(height: 6),
                     Text(formatYen(total),
                         style: TextStyle(
-                            fontSize: 30,
+                            fontSize: 25,
                             fontWeight: FontWeight.w800,
                             color: V2Colors.textPrimary,
                             fontFeatures: V2Typography.tabularNums)),
@@ -197,14 +197,14 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                   ],
                 ),
               ),
-              const SizedBox(height: V2Spacing.lg),
+              const SizedBox(height: V2Spacing.md),
               // カテゴリ内訳（一番上）
               if (majorEntries.isNotEmpty) ...[
                 Container(
-                  padding: const EdgeInsets.all(V2Spacing.lg),
+                  padding: const EdgeInsets.all(V2Spacing.md),
                   decoration: BoxDecoration(
                     color: V2Colors.surface,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: V2Colors.border),
                   ),
                   child: Column(
@@ -224,15 +224,15 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                     ],
                   ),
                 ),
-                const SizedBox(height: V2Spacing.lg),
+                const SizedBox(height: V2Spacing.md),
               ],
               // 毎月の固定費（引落予定）— カテゴリの下
               if (fixedLines.isNotEmpty) ...[
                 Container(
-                  padding: const EdgeInsets.all(V2Spacing.lg),
+                  padding: const EdgeInsets.all(V2Spacing.md),
                   decoration: BoxDecoration(
                     color: V2Colors.surface,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: V2Colors.border),
                   ),
                   child: Column(
@@ -286,14 +286,14 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                     ],
                   ),
                 ),
-                const SizedBox(height: V2Spacing.lg),
+                const SizedBox(height: V2Spacing.md),
               ],
               // 明細
               Container(
-                padding: const EdgeInsets.all(V2Spacing.lg),
+                padding: const EdgeInsets.all(V2Spacing.md),
                 decoration: BoxDecoration(
                   color: V2Colors.surface,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: V2Colors.border),
                 ),
                 child: Column(
@@ -477,21 +477,21 @@ class _ExpenseRow extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 7),
         child: Row(
           children: [
             Container(
-              width: 34,
-              height: 34,
+              width: 30,
+              height: 30,
               decoration: BoxDecoration(
                 color: V2Colors.negative.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(9),
               ),
               alignment: Alignment.center,
               child: const Icon(Icons.receipt_long_outlined,
-                  size: 18, color: V2Colors.negative),
+                  size: 16, color: V2Colors.negative),
             ),
-            const SizedBox(width: V2Spacing.md),
+            const SizedBox(width: V2Spacing.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

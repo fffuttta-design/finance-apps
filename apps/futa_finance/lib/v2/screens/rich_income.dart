@@ -97,23 +97,23 @@ class _RichIncomeScreenState extends State<RichIncomeScreen>
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(
-          vertical: V2Spacing.xl, horizontal: V2Spacing.lg),
+          vertical: V2Spacing.lg, horizontal: V2Spacing.md),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1100),
+          constraints: const BoxConstraints(maxWidth: 960),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(isBusiness ? '売上' : '収入',
                   style:
                       V2Typography.h1.copyWith(color: V2Colors.textPrimary)),
-              const SizedBox(height: V2Spacing.lg),
+              const SizedBox(height: V2Spacing.md),
               // サマリーカード
               Container(
-                padding: const EdgeInsets.all(V2Spacing.xl),
+                padding: const EdgeInsets.all(V2Spacing.lg),
                 decoration: BoxDecoration(
                   color: V2Colors.surface,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: V2Colors.border),
                 ),
                 child: Column(
@@ -135,7 +135,7 @@ class _RichIncomeScreenState extends State<RichIncomeScreen>
                     const SizedBox(height: 6),
                     Text(formatYen(total),
                         style: TextStyle(
-                            fontSize: 30,
+                            fontSize: 25,
                             fontWeight: FontWeight.w800,
                             color: V2Colors.positive,
                             fontFeatures: V2Typography.tabularNums)),
@@ -162,13 +162,13 @@ class _RichIncomeScreenState extends State<RichIncomeScreen>
                   ],
                 ),
               ),
-              const SizedBox(height: V2Spacing.lg),
+              const SizedBox(height: V2Spacing.md),
               // 明細
               Container(
-                padding: const EdgeInsets.all(V2Spacing.lg),
+                padding: const EdgeInsets.all(V2Spacing.md),
                 decoration: BoxDecoration(
                   color: V2Colors.surface,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: V2Colors.border),
                 ),
                 child: Column(
@@ -312,20 +312,20 @@ class _IncomeRow extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 7),
         child: Row(
           children: [
             Container(
-              width: 34,
-              height: 34,
+              width: 30,
+              height: 30,
               decoration: BoxDecoration(
                 color: soft.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(9),
               ),
               alignment: Alignment.center,
-              child: Icon(Icons.south_west, size: 18, color: color),
+              child: Icon(Icons.south_west, size: 16, color: color),
             ),
-            const SizedBox(width: V2Spacing.md),
+            const SizedBox(width: V2Spacing.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

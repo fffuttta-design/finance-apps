@@ -273,19 +273,19 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(
-          vertical: V2Spacing.xl, horizontal: V2Spacing.lg),
+          vertical: V2Spacing.lg, horizontal: V2Spacing.md),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1100),
+          constraints: const BoxConstraints(maxWidth: 960),
           child: LayoutBuilder(builder: (ctx, c) {
-            final wide = c.maxWidth >= 880;
+            final wide = c.maxWidth >= 820;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 hero,
-                const SizedBox(height: V2Spacing.lg),
+                const SizedBox(height: V2Spacing.md),
                 balanceCard,
-                const SizedBox(height: V2Spacing.lg),
+                const SizedBox(height: V2Spacing.md),
                 if (wide)
                   IntrinsicHeight(
                     child: Row(
@@ -299,7 +299,7 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
                   )
                 else ...[
                   categoryCard,
-                  const SizedBox(height: V2Spacing.lg),
+                  const SizedBox(height: V2Spacing.md),
                   recentCard,
                 ],
               ],
@@ -347,15 +347,15 @@ class _HeroCard extends StatelessWidget {
     const tileLabel = Color(0xFF5B6472); // 白タイル上で読みやすい落ち着いたグレー
     final isBlack = net >= 0;
     return Container(
-      padding: const EdgeInsets.all(V2Spacing.xl),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: accent,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: accent.withValues(alpha: 0.28),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: accent.withValues(alpha: 0.22),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -398,12 +398,12 @@ class _HeroCard extends StatelessWidget {
                   icon: Icons.chevron_right, onTap: onNext, color: onAccent),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(formatYen(net, withSign: true),
               style: const TextStyle(
-                fontSize: 34,
+                fontSize: 27,
                 fontWeight: FontWeight.w800,
-                letterSpacing: -0.8,
+                letterSpacing: -0.6,
                 color: onAccent,
                 fontFeatures: V2Typography.tabularNums,
               )),
@@ -423,7 +423,7 @@ class _HeroCard extends StatelessWidget {
               ],
             ),
           ],
-          const SizedBox(height: V2Spacing.lg),
+          const SizedBox(height: V2Spacing.md),
           Row(
             children: [
               Expanded(
@@ -470,10 +470,10 @@ class _HeroSubTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,10 +483,10 @@ class _HeroSubTile extends StatelessWidget {
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                   color: labelColor)),
-          const SizedBox(height: 3),
+          const SizedBox(height: 2),
           Text(value,
               style: TextStyle(
-                  fontSize: 17,
+                  fontSize: 15,
                   fontWeight: FontWeight.w800,
                   color: valueColor,
                   fontFeatures: V2Typography.tabularNums)),
@@ -539,7 +539,7 @@ class _BalanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(V2Spacing.lg),
+      padding: const EdgeInsets.all(V2Spacing.md),
       decoration: BoxDecoration(
         color: V2Colors.surface,
         borderRadius: BorderRadius.circular(16),
@@ -559,7 +559,7 @@ class _BalanceCard extends StatelessWidget {
                 if (hasSnap)
                   Text(formatYen(projected),
                       style: TextStyle(
-                          fontSize: 19,
+                          fontSize: 17,
                           fontWeight: FontWeight.w800,
                           color: projected >= 0
                               ? V2Colors.positive
@@ -674,10 +674,10 @@ class _CategoryCardState extends State<_CategoryCard> {
     ];
 
     return Container(
-      padding: const EdgeInsets.all(V2Spacing.lg),
+      padding: const EdgeInsets.all(V2Spacing.md),
       decoration: BoxDecoration(
         color: V2Colors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: V2Colors.border),
       ),
       child: Column(
@@ -685,7 +685,7 @@ class _CategoryCardState extends State<_CategoryCard> {
         children: [
           Text('カテゴリ内訳',
               style: V2Typography.h2.copyWith(color: V2Colors.textPrimary)),
-          const SizedBox(height: V2Spacing.lg),
+          const SizedBox(height: V2Spacing.md),
           if (segments.isEmpty || total == 0)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -839,10 +839,10 @@ class _RecentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(V2Spacing.lg),
+      padding: const EdgeInsets.all(V2Spacing.md),
       decoration: BoxDecoration(
         color: V2Colors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: V2Colors.border),
       ),
       child: Column(
@@ -923,20 +923,20 @@ class _TxnRow extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 7),
         child: Row(
           children: [
             Container(
-              width: 34,
-              height: 34,
+              width: 30,
+              height: 30,
               decoration: BoxDecoration(
                 color: tint.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(9),
               ),
               alignment: Alignment.center,
-              child: Icon(icon, size: 18, color: tint),
+              child: Icon(icon, size: 16, color: tint),
             ),
-            const SizedBox(width: V2Spacing.md),
+            const SizedBox(width: V2Spacing.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
