@@ -14,7 +14,6 @@ import '../utils/pwa_theme.dart';
 import '../screens/income_input_screen.dart';
 import '../screens/receipt_split_screen.dart';
 import '../screens/transfer_input_screen.dart';
-import 'layout/rich_sidebar_shell.dart';
 import 'layout/topnav_shell.dart';
 import 'screens/rich_expenses.dart';
 import 'screens/rich_home.dart';
@@ -137,8 +136,11 @@ class _V2RootState extends State<V2Root>
   }
 
   Widget _bodyFor(String id, {required Color accent}) {
-    // 新デザイン（リッチUI）ONのときはホーム本文を rich 版に差替える。
-    final rich = UiPreferences.instance.richUi;
+    // 新デザイン（リッチUI）は「スマホ幅のときだけ」適用する。
+    // PC（広い画面）は従来デザインのまま（二村フィードバック 2026-06-17）。
+    // トグル OFF ならスマホも従来に戻る（＝スマホも切り戻し可）。
+    final rich = UiPreferences.instance.richUi &&
+        MediaQuery.sizeOf(context).width < 700;
     switch (id) {
       case 'home':
         return rich
@@ -241,31 +243,8 @@ class _V2RootState extends State<V2Root>
             curve: Curves.easeOutCubic);
       }
     }
-    // 新デザイン（リッチUI）かつ広い画面 → 左サイドバーのシェル。
-    // スマホ幅は従来どおり下タブのシェルを使う（本文だけ rich 版に差替え済）。
-    if (UiPreferences.instance.richUi && !isNarrow) {
-      final items = _navItems;
-      final cur = items.firstWhere((e) => e.id == _currentId,
-          orElse: () => items.first);
-      return RichSidebarShell(
-        items: items,
-        currentId: _currentId,
-        onSelect: selectTab,
-        accent: accent,
-        title: cur.label,
-        modeSwitcher: V2ModeSwitcher(onDark: false),
-        recordButton: _RecordMenuButton(
-          accent: accent,
-          mode: mode,
-          onDark: false,
-          onSelected: _openRecord,
-        ),
-        content: KeyedSubtree(
-          key: ValueKey('rich_${mode}_$_currentId'),
-          child: _bodyFor(_currentId, accent: accent),
-        ),
-      );
-    }
+    // PC（広い画面）は常に従来の上タブシェル。リッチUIはスマホ幅の本文だけに適用。
+    // （左サイドバー版は将来の Next.js リデザイン用に rich_sidebar_shell.dart へ温存）
     return V2TopNavShell(
       navAtBottom: isNarrow,
       bottomNav: isNarrow

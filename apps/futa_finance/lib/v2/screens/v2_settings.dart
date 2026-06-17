@@ -753,9 +753,9 @@ class _DisplayPanel extends StatelessWidget {
                     _SettingTile(
                       icon: Icons.auto_awesome,
                       iconColor: V2Colors.accent,
-                      title: '新デザイン（ベータ）',
+                      title: '新デザイン（ベータ・スマホ向け）',
                       subtitle:
-                          'リッチな新しい見た目に切替えます。気に入らなければOFFに戻すと元通り。',
+                          'スマホ表示をリッチな新デザインに切替えます。PCは従来のまま。OFFで元通り。',
                       trailing: Switch.adaptive(
                         value: UiPreferences.instance.richUi,
                         onChanged: (v) =>
