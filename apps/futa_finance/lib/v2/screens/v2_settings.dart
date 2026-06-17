@@ -760,9 +760,9 @@ class _DisplayPanel extends StatelessWidget {
                     _SettingTile(
                       icon: Icons.auto_awesome,
                       iconColor: V2Colors.accent,
-                      title: '新デザイン（ベータ）',
+                      title: '新デザイン',
                       subtitle:
-                          'リッチなダッシュボード型の新デザインに切替えます。OFFで元通り。',
+                          'リッチなダッシュボード型の新デザイン（既定ON）。OFFで従来デザインに戻せます。',
                       trailing: Switch.adaptive(
                         value: UiPreferences.instance.richUi,
                         onChanged: (v) =>

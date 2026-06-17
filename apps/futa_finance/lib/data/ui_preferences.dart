@@ -53,7 +53,8 @@ class UiPreferences extends ChangeNotifier {
   /// 既定 OFF。ON にすると現行UIの代わりに rich_* 系の新デザインを使う。
   /// 気に入らなければ OFF に戻すだけで即・元通り（切り戻し用フラグ）。
   static const _kRichUi = 'futa.ui.rich';
-  bool _richUi = false;
+  // 既定 ON（2026-06-17〜）。明示的に OFF にした端末だけ従来デザインのまま。
+  bool _richUi = true;
 
   /// 新デザイン（リッチUI・ベータ）が有効か。既定 false。
   bool get richUi => _richUi;
@@ -141,8 +142,8 @@ class UiPreferences extends ChangeNotifier {
     // ホーム総資産カラム幅
     final w = prefs.getDouble(_kHomeAssetWidth) ?? homeAssetWidthDefault;
     _homeAssetWidth = w.clamp(homeAssetWidthMin, homeAssetWidthMax);
-    // 新デザイン（リッチUI）フラグ。未設定は false（現行UIのまま）。
-    _richUi = prefs.getBool(_kRichUi) ?? false;
+    // 新デザイン（リッチUI）フラグ。未設定は true（既定ON）。
+    _richUi = prefs.getBool(_kRichUi) ?? true;
     _loaded = true;
     notifyListeners();
   }
