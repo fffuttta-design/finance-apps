@@ -211,9 +211,23 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
       ..sort((a, b) => b.value.compareTo(a.value));
     final byMajorTotal = byMajor.values.fold<int>(0, (s, v) => s + v);
 
-    // 最近の取引（当月・日付降順・最大8件）
+    // 最近の取引（当月・日付降順）。同じレシート（receiptId 2件以上）は
+    // 1行にまとめ（②レシートまとめ）、先頭から最大8単位を表示。
     final recent = [...monthTxns]..sort((a, b) => b.date.compareTo(a.date));
-    final recentTop = recent.take(8).toList();
+    final recentUnits = _groupByReceipt(recent).take(8).toList();
+
+    // ① 支払方法別の内訳（経費・固定費込み・金額降順）。
+    final byMethod = <String, int>{};
+    for (final t in monthTxns) {
+      if (t.type != TransactionType.expense) continue;
+      byMethod[t.paymentMethod] = (byMethod[t.paymentMethod] ?? 0) + t.amount;
+    }
+    if (subTotal > 0) {
+      byMethod['固定費・サブスク'] =
+          (byMethod['固定費・サブスク'] ?? 0) + subTotal;
+    }
+    final methodEntries = byMethod.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
 
     final hero = _HeroCard(
       accent: accent,
@@ -248,7 +262,7 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
       accent: accent,
       isBusiness: isBusiness,
       month: _month,
-      txns: recentTop,
+      units: recentUnits,
       onTapTxn: (t) async {
         final changed = await Navigator.push<bool>(
           context,
@@ -285,6 +299,11 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
                 hero,
                 const SizedBox(height: V2Spacing.md),
                 balanceCard,
+                if (methodEntries.isNotEmpty) ...[
+                  const SizedBox(height: V2Spacing.md),
+                  _MethodBreakdownCard(
+                      entries: methodEntries, accent: accent),
+                ],
                 const SizedBox(height: V2Spacing.md),
                 if (wide)
                   IntrinsicHeight(
@@ -608,7 +627,7 @@ class _BalanceCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(formatYen(fixedCost),
                       style: const TextStyle(
-                          fontSize: 19,
+                          fontSize: 17,
                           fontWeight: FontWeight.w800,
                           color: V2Colors.textPrimary,
                           fontFeatures: V2Typography.tabularNums)),
@@ -824,14 +843,14 @@ class _RecentCard extends StatelessWidget {
   final Color accent;
   final bool isBusiness;
   final DateTime month;
-  final List<Transaction> txns;
+  final List<_RecentUnit> units;
   final void Function(Transaction) onTapTxn;
   final VoidCallback onSeeAll;
   const _RecentCard({
     required this.accent,
     required this.isBusiness,
     required this.month,
-    required this.txns,
+    required this.units,
     required this.onTapTxn,
     required this.onSeeAll,
   });
@@ -872,7 +891,7 @@ class _RecentCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: V2Spacing.sm),
-          if (txns.isEmpty)
+          if (units.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Text('取引記録はまだありません',
@@ -880,10 +899,262 @@ class _RecentCard extends StatelessWidget {
                       .copyWith(color: V2Colors.textSecondary)),
             )
           else
-            for (int i = 0; i < txns.length; i++) ...[
+            for (int i = 0; i < units.length; i++) ...[
               if (i > 0) const Divider(height: 1, color: V2Colors.divider),
-              _TxnRow(t: txns[i], onTap: () => onTapTxn(txns[i])),
+              if (units[i].isGroup)
+                _ReceiptGroupRow(
+                    members: units[i].members!, onTapMember: onTapTxn)
+              else
+                _TxnRow(
+                    t: units[i].single!,
+                    onTap: () => onTapTxn(units[i].single!)),
             ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 最近の取引の表示単位：単品（single）か、同じレシートのまとめ（group）。
+class _RecentUnit {
+  final Transaction? single;
+  final List<Transaction>? members;
+  const _RecentUnit.single(this.single) : members = null;
+  const _RecentUnit.group(this.members) : single = null;
+  bool get isGroup => members != null;
+}
+
+/// 同じ receiptId が2件以上 → まとめ（group）、それ以外 → 単品（single）。
+/// 並び順は渡された行の順を保つ。
+List<_RecentUnit> _groupByReceipt(List<Transaction> rows) {
+  final counts = <String, int>{};
+  for (final t in rows) {
+    final rid = t.receiptId;
+    if (rid != null && rid.isNotEmpty) counts[rid] = (counts[rid] ?? 0) + 1;
+  }
+  final units = <_RecentUnit>[];
+  final seen = <String>{};
+  for (final t in rows) {
+    final rid = t.receiptId;
+    if (rid != null && rid.isNotEmpty && (counts[rid] ?? 0) >= 2) {
+      if (seen.add(rid)) {
+        units.add(_RecentUnit.group(
+            rows.where((x) => x.receiptId == rid).toList()));
+      }
+    } else {
+      units.add(_RecentUnit.single(t));
+    }
+  }
+  return units;
+}
+
+/// レシートまとめ行：合計を1行で表示し、タップで品目を展開。
+class _ReceiptGroupRow extends StatefulWidget {
+  final List<Transaction> members;
+  final void Function(Transaction) onTapMember;
+  const _ReceiptGroupRow(
+      {required this.members, required this.onTapMember});
+
+  @override
+  State<_ReceiptGroupRow> createState() => _ReceiptGroupRowState();
+}
+
+class _ReceiptGroupRowState extends State<_ReceiptGroupRow> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final members = widget.members;
+    final total = members.fold<int>(0, (s, t) => s + t.amount);
+    final first = members.first;
+    final storeRaw = first.store?.trim() ?? '';
+    final store = storeRaw.isNotEmpty
+        ? storeRaw
+        : (first.description.trim().isNotEmpty
+            ? first.description.trim()
+            : first.paymentMethod);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: () => setState(() => _open = !_open),
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 7),
+            child: Row(
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: V2Colors.negative.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.receipt_long,
+                      size: 16, color: V2Colors.negative),
+                ),
+                const SizedBox(width: V2Spacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('$store ほか',
+                          style: V2Typography.bodyStrong,
+                          overflow: TextOverflow.ellipsis, maxLines: 1),
+                      const SizedBox(height: 2),
+                      Text(
+                          '${formatMonthDay(first.date)} · ${members.length}件まとめ・${first.paymentMethod}',
+                          style: V2Typography.micro
+                              .copyWith(color: V2Colors.textMuted),
+                          overflow: TextOverflow.ellipsis, maxLines: 1),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: V2Spacing.sm),
+                Text('-${formatYen(total)}',
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: V2Colors.negative,
+                        fontFeatures: V2Typography.tabularNums)),
+                const SizedBox(width: 2),
+                Icon(_open ? Icons.expand_less : Icons.expand_more,
+                    size: 18, color: V2Colors.textMuted),
+              ],
+            ),
+          ),
+        ),
+        if (_open)
+          Padding(
+            padding: const EdgeInsets.only(left: 38, bottom: 6),
+            child: Column(
+              children: [
+                for (final t in members)
+                  InkWell(
+                    onTap: () => widget.onTapMember(t),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 5),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                                t.description.trim().isEmpty
+                                    ? (t.category.sub.trim().isEmpty
+                                        ? '品目'
+                                        : t.category.sub.trim())
+                                    : t.description.trim(),
+                                style: V2Typography.caption.copyWith(
+                                    color: V2Colors.textSecondary),
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                          Text('-${formatYen(t.amount)}',
+                              style: V2Typography.caption.copyWith(
+                                  color: V2Colors.textSecondary,
+                                  fontWeight: FontWeight.w600,
+                                  fontFeatures: V2Typography.tabularNums)),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// ① 支払方法別の内訳カード（既定は折りたたみ＝コンパクト）。
+class _MethodBreakdownCard extends StatefulWidget {
+  final List<MapEntry<String, int>> entries;
+  final Color accent;
+  const _MethodBreakdownCard(
+      {required this.entries, required this.accent});
+
+  @override
+  State<_MethodBreakdownCard> createState() => _MethodBreakdownCardState();
+}
+
+class _MethodBreakdownCardState extends State<_MethodBreakdownCard> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = widget.entries.fold<int>(0, (s, e) => s + e.value);
+    return Container(
+      decoration: BoxDecoration(
+        color: V2Colors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: V2Colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _open = !_open),
+            borderRadius: BorderRadius.circular(14),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: V2Spacing.md, vertical: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.account_balance_wallet_outlined,
+                      size: 17, color: V2Colors.textSecondary),
+                  const SizedBox(width: 8),
+                  Text('支払方法別の内訳',
+                      style: V2Typography.bodyStrong
+                          .copyWith(color: V2Colors.textPrimary)),
+                  const Spacer(),
+                  Text(formatYen(total),
+                      style: V2Typography.caption.copyWith(
+                          color: V2Colors.textSecondary,
+                          fontFeatures: V2Typography.tabularNums)),
+                  const SizedBox(width: 4),
+                  Icon(_open ? Icons.expand_less : Icons.expand_more,
+                      size: 18, color: V2Colors.textMuted),
+                ],
+              ),
+            ),
+          ),
+          if (_open)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                  V2Spacing.md, 0, V2Spacing.md, V2Spacing.sm),
+              child: Column(
+                children: [
+                  for (final e in widget.entries) ...[
+                    const Divider(height: 1, color: V2Colors.divider),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              color: widget.accent.withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(e.key,
+                                style: V2Typography.body,
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                          Text(formatYen(e.value),
+                              style: V2Typography.caption.copyWith(
+                                  color: V2Colors.textSecondary,
+                                  fontFeatures: V2Typography.tabularNums)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
         ],
       ),
     );
