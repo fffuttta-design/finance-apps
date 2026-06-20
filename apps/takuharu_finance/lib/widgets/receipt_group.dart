@@ -77,16 +77,7 @@ class _ReceiptGroupTileState extends State<ReceiptGroupTile> {
   Future<void> _openMenu() async {
     final r = await showReceiptActionsSheet(context, widget.members);
     if (!mounted) return;
-    switch (r) {
-      case ReceiptActionResult.changed:
-        widget.onChanged?.call();
-        break;
-      case ReceiptActionResult.expand:
-        setState(() => _expanded = true);
-        break;
-      case ReceiptActionResult.none:
-        break;
-    }
+    if (r == ReceiptActionResult.changed) widget.onChanged?.call();
   }
 
   @override
@@ -120,7 +111,7 @@ class _ReceiptGroupTileState extends State<ReceiptGroupTile> {
                     const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
             subtitle: Text(
                 '${first.date.month}/${first.date.day}　'
-                '🧾 ${members.length}件まとめ　・長押しで編集',
+                '🧾 ${members.length}件まとめ',
                 style:
                     const TextStyle(fontSize: 11, color: AppColors.textSub)),
             trailing: Row(

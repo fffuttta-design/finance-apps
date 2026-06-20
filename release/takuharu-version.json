@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.79",
-    "buildNumber":  "84",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.79/takuharu-finance-v0.2.79.apk",
-    "releaseNotes":  "まとめレシートを長押しで編集・削除／明細からあとで個人の食費わくに入れられる／登録画面の個人の食費わくを目立つ位置に"
+    "version":  "0.2.80",
+    "buildNumber":  "85",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.80/takuharu-finance-v0.2.80.apk",
+    "releaseNotes":  "まとめレシートの編集を1画面に統合（⋮→レシートを編集／全体も品目ごともまとめて直せる）。長押しの案内文を削除"
 }
