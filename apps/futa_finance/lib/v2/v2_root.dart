@@ -286,6 +286,7 @@ class _V2RootState extends State<V2Root>
         currentId: _currentId,
         onSelect: selectTab,
         accent: accent,
+        personal: mode == AppMode.personal,
         title: cur.label,
         modeSwitcher: V2ModeSwitcher(onDark: false),
         recordButton: _RecordMenuButton(

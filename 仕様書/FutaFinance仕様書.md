@@ -389,6 +389,11 @@ class MonthlySnapshot {
 
 **個人モード**: 開発中タブは「明細取込」のみ表示
 
+**モード別の配色（リッチUI・PC幅サイドバー）**: アクセント色は事業=ネイビー / 個人=オレンジ。
+v1.0.312〜、**個人モードはサイドバー背景もオレンジ基調**（`V2Colors.sidebarPersonal` 系）に切替わり、
+事業=ネイビー（`V2Colors.sidebar`）と対になる。`RichSidebarShell(personal: …)` で出し分け。
+（スマホ幅は下タブのため対象外）
+
 ---
 
 ## 10. 設定パネル（V2SettingsScreen）

@@ -16,6 +16,9 @@ class RichSidebarShell extends StatelessWidget {
   final void Function(String id) onSelect;
   final Color accent;
 
+  /// 個人モードかどうか（true ならサイドバーをオレンジ基調にする）。
+  final bool personal;
+
   /// トップバー左に出す現在タブのタイトル。
   final String title;
 
@@ -34,6 +37,7 @@ class RichSidebarShell extends StatelessWidget {
     required this.currentId,
     required this.onSelect,
     required this.accent,
+    this.personal = false,
     required this.title,
     required this.modeSwitcher,
     required this.recordButton,
@@ -42,6 +46,16 @@ class RichSidebarShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 個人モードはオレンジ基調、事業モードは従来のネイビー。
+    final sidebarBg =
+        personal ? V2Colors.sidebarPersonal : V2Colors.sidebar;
+    final sidebarText =
+        personal ? V2Colors.sidebarPersonalText : V2Colors.sidebarText;
+    final sidebarMuted = personal
+        ? V2Colors.sidebarPersonalTextMuted
+        : V2Colors.sidebarTextMuted;
+    final sidebarHover =
+        personal ? V2Colors.sidebarPersonalHover : V2Colors.sidebarHover;
     return Scaffold(
       backgroundColor: V2Colors.bg,
       body: SafeArea(
@@ -51,7 +65,7 @@ class RichSidebarShell extends StatelessWidget {
             // ── サイドバー ──
             Container(
               width: V2Spacing.sidebarWidth,
-              color: V2Colors.sidebar,
+              color: sidebarBg,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -75,9 +89,9 @@ class RichSidebarShell extends StatelessWidget {
                                   fontWeight: FontWeight.w700)),
                         ),
                         const SizedBox(width: 10),
-                        const Text('Finance',
+                        Text('Finance',
                             style: TextStyle(
-                                color: V2Colors.sidebarText,
+                                color: sidebarText,
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700)),
                       ],
@@ -94,6 +108,9 @@ class RichSidebarShell extends StatelessWidget {
                             item: it,
                             selected: it.id == currentId,
                             accent: accent,
+                            mutedColor: sidebarMuted,
+                            hoverColor: sidebarHover,
+                            personal: personal,
                             onTap: () => onSelect(it.id),
                           ),
                       ],
@@ -158,11 +175,17 @@ class _SidebarItem extends StatefulWidget {
   final V2NavItem item;
   final bool selected;
   final Color accent;
+  final Color mutedColor;
+  final Color hoverColor;
+  final bool personal;
   final VoidCallback onTap;
   const _SidebarItem({
     required this.item,
     required this.selected,
     required this.accent,
+    required this.mutedColor,
+    required this.hoverColor,
+    required this.personal,
     required this.onTap,
   });
 
@@ -176,10 +199,11 @@ class _SidebarItemState extends State<_SidebarItem> {
   @override
   Widget build(BuildContext context) {
     final selected = widget.selected;
+    // 個人モード（オレンジ地）は選択ハイライトをやや強めにして視認性を確保。
     final bg = selected
-        ? widget.accent.withValues(alpha: 0.22)
-        : (_hover ? V2Colors.sidebarHover : Colors.transparent);
-    final fg = selected ? Colors.white : V2Colors.sidebarTextMuted;
+        ? widget.accent.withValues(alpha: widget.personal ? 0.42 : 0.22)
+        : (_hover ? widget.hoverColor : Colors.transparent);
+    final fg = selected ? Colors.white : widget.mutedColor;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: MouseRegion(

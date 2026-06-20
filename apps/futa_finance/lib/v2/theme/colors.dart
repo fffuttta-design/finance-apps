@@ -35,6 +35,20 @@ class V2Colors {
   /// サイドバー内の区切り線
   static const sidebarDivider = Color(0xFF345C8E);
 
+  // ── 個人モードのサイドバー（オレンジ基調）──────────
+  /// 個人モードのサイドバー背景（深いオレンジ＝orange-800）。
+  /// 事業モードのネイビーと対になる暖色。
+  static const sidebarPersonal = Color(0xFF9A3412);
+
+  /// 個人モードのサイドバー文字（暖かい白）
+  static const sidebarPersonalText = Color(0xFFFDEAD9);
+
+  /// 個人モードのサイドバーのミュート文字
+  static const sidebarPersonalTextMuted = Color(0xFFE9B894);
+
+  /// 個人モードのサイドバーのホバー背景（少し明るいオレンジ）
+  static const sidebarPersonalHover = Color(0xFFB04A22);
+
   /// トップバー背景
   static const topbar = Color(0xFFFFFFFF);
 
