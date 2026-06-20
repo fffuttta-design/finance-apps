@@ -3,6 +3,7 @@ import 'package:finance_core/finance_core.dart' as core;
 
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
+import 'receipt_actions.dart';
 
 /// 取引リストを「レシート(receiptId)単位」でまとめるためのエントリ。
 /// - [single] != null … 単独取引（まとめ対象でない）
@@ -55,11 +56,15 @@ class ReceiptGroupTile extends StatefulWidget {
   final Widget Function(core.Transaction) childTileBuilder;
   final double childIndent;
 
+  /// まとめて編集／削除でデータが変わったときに呼ばれる（一覧の再読み込み用）。
+  final VoidCallback? onChanged;
+
   const ReceiptGroupTile({
     super.key,
     required this.members,
     required this.childTileBuilder,
     this.childIndent = 20,
+    this.onChanged,
   });
 
   @override
@@ -68,6 +73,21 @@ class ReceiptGroupTile extends StatefulWidget {
 
 class _ReceiptGroupTileState extends State<ReceiptGroupTile> {
   bool _expanded = false;
+
+  Future<void> _openMenu() async {
+    final r = await showReceiptActionsSheet(context, widget.members);
+    if (!mounted) return;
+    switch (r) {
+      case ReceiptActionResult.changed:
+        widget.onChanged?.call();
+        break;
+      case ReceiptActionResult.expand:
+        setState(() => _expanded = true);
+        break;
+      case ReceiptActionResult.none:
+        break;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,6 +105,7 @@ class _ReceiptGroupTileState extends State<ReceiptGroupTile> {
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
             onTap: () => setState(() => _expanded = !_expanded),
+            onLongPress: _openMenu,
             leading: Container(
               width: 42,
               height: 42,
@@ -99,7 +120,7 @@ class _ReceiptGroupTileState extends State<ReceiptGroupTile> {
                     const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
             subtitle: Text(
                 '${first.date.month}/${first.date.day}　'
-                '🧾 ${members.length}件まとめ',
+                '🧾 ${members.length}件まとめ　・長押しで編集',
                 style:
                     const TextStyle(fontSize: 11, color: AppColors.textSub)),
             trailing: Row(
@@ -110,6 +131,16 @@ class _ReceiptGroupTileState extends State<ReceiptGroupTile> {
                         fontWeight: FontWeight.w800,
                         fontSize: 15,
                         color: AppColors.expense)),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  icon: const Icon(Icons.more_vert_rounded,
+                      size: 20, color: AppColors.textSub),
+                  tooltip: '編集メニュー',
+                  onPressed: _openMenu,
+                ),
+                const SizedBox(width: 2),
                 Icon(_expanded
                     ? Icons.expand_less_rounded
                     : Icons.expand_more_rounded),

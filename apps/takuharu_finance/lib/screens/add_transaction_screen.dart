@@ -508,6 +508,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 _addCatChip(),
               ],
             ),
+            // 個人の食費わく（カテゴリが「食費」のときだけ表示）。
+            // カテゴリのすぐ下に、目立つ形で出す（探さなくても気づく位置）。
+            if (_canPersonalFood) ...[
+              const SizedBox(height: 18),
+              _section('個人の食費わく'),
+              _personalFoodToggle(),
+            ],
             const SizedBox(height: 18),
             // 支払元（登録した口座/クレカから選択。残高がそこから増減する）
             _section('支払元'),
@@ -533,11 +540,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   _personChip(e.key, e.value),
               ],
             ),
-            // 個人の食費わく（カテゴリが「食費」のときだけ表示）
-            if (_canPersonalFood) ...[
-              const SizedBox(height: 18),
-              _personalFoodToggle(),
-            ],
             const SizedBox(height: 18),
             // くわしい情報（画像）。手入力でも写真を1枚ぶら下げられる。
             _section('くわしい情報（画像）'),
@@ -745,40 +747,58 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     final limit = _paidBy != null
         ? HouseholdService.instance.personalFoodBudgetFor(_paidBy!)
         : HouseholdService.defaultPersonalFoodBudget;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      decoration: BoxDecoration(
-        color: _personalFood ? AppColors.pink.withValues(alpha: 0.10) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _personalFood ? AppColors.pink : AppColors.divider,
-          width: _personalFood ? 1.6 : 1,
+    // 探さなくても気づくよう、OFFでもピンクの枠で目立たせる。
+    return GestureDetector(
+      onTap: () => setState(() => _personalFood = !_personalFood),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: _personalFood
+              ? AppColors.pink.withValues(alpha: 0.12)
+              : AppColors.pink.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: _personalFood
+                ? AppColors.pink
+                : AppColors.pink.withValues(alpha: 0.45),
+            width: _personalFood ? 1.8 : 1.4,
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.lunch_dining_rounded,
-              size: 20, color: AppColors.pinkDark),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('個人の食費わくから',
-                    style: TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w700)),
-                Text('$whoName の月${formatYen(limit)}わくから引きます',
-                    style: const TextStyle(
-                        fontSize: 11, color: AppColors.textSub)),
-              ],
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: AppColors.pink.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.lunch_dining_rounded,
+                  size: 22, color: AppColors.pinkDark),
             ),
-          ),
-          Switch(
-            value: _personalFood,
-            activeThumbColor: AppColors.pink,
-            onChanged: (v) => setState(() => _personalFood = v),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('🍙 個人の食費わくから引く',
+                      style: TextStyle(
+                          fontSize: 14.5, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 2),
+                  Text('$whoName の月${formatYen(limit)}わくから引きます',
+                      style: const TextStyle(
+                          fontSize: 11.5, color: AppColors.textSub)),
+                ],
+              ),
+            ),
+            Switch(
+              value: _personalFood,
+              activeThumbColor: AppColors.pink,
+              onChanged: (v) => setState(() => _personalFood = v),
+            ),
+          ],
+        ),
       ),
     );
   }

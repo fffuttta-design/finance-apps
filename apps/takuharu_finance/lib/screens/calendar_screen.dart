@@ -192,7 +192,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
         else
           // レシートの品目は1レシート＝親1行にまとめて表示（タップで品目展開）。
           ...groupByReceipt(items).map((g) => g.isGroup
-              ? ReceiptGroupTile(members: g.members, childTileBuilder: _tile)
+              ? ReceiptGroupTile(
+                  members: g.members,
+                  childTileBuilder: _tile,
+                  onChanged: () {
+                    if (mounted) setState(() {});
+                  })
               : _tile(g.single!)),
       ],
     );

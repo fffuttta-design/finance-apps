@@ -285,7 +285,12 @@ class _HomeScreenState extends State<HomeScreen> {
           // 追加した順で最新5件（取引日でなく登録順なので、古い日付を後から追加しても必ず出る）。
           // レシートの品目は1レシート＝親1行にまとめてから5件を数える。
           ...groupByReceipt(recentAll).take(5).map((g) => g.isGroup
-              ? ReceiptGroupTile(members: g.members, childTileBuilder: _txTile)
+              ? ReceiptGroupTile(
+                  members: g.members,
+                  childTileBuilder: _txTile,
+                  onChanged: () {
+                    if (mounted) setState(() {});
+                  })
               : _txTile(g.single!)),
           const SizedBox(height: 4),
           InkWell(

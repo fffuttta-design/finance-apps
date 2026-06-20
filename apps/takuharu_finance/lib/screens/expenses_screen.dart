@@ -207,7 +207,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final widgets = <Widget>[
       for (final g in groups)
         if (g.isGroup)
-          ReceiptGroupTile(members: g.members, childTileBuilder: _tile)
+          ReceiptGroupTile(
+              members: g.members,
+              childTileBuilder: _tile,
+              onChanged: () {
+                if (mounted) setState(() {});
+              })
         else
           _tile(g.single!),
     ];

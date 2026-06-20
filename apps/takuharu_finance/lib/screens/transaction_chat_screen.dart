@@ -343,11 +343,8 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
           if (t.paymentMethod.isNotEmpty) _infoRow('支払元', t.paymentMethod),
           if (t.memo != null && t.memo!.trim().isNotEmpty)
             _infoRow('メモ', t.memo!.trim()),
-          // 個人の食費わくを使った記録は、その旨をはっきり表示。
-          if (t.personalFor != null) ...[
-            const SizedBox(height: 10),
-            _personalFoodTag(t.personalFor!),
-          ],
+          // 個人の食費わく（食費の支出なら、あとから付け外しできる）。
+          _personalFoodSection(t),
           if (t.receiptUrl != null && t.receiptUrl!.trim().isNotEmpty) ...[
             const SizedBox(height: 12),
             SizedBox(
@@ -439,6 +436,150 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
         ],
       ),
     );
+  }
+
+  /// 個人の食費わくセクション。
+  /// - すでに付いている → タグ＋「変更／はずす」
+  /// - 食費の支出でまだ付いていない → 「個人の食費わくに入れる」ボタン
+  /// - それ以外 → 何も出さない
+  Widget _personalFoodSection(core.Transaction t) {
+    final isFoodExpense =
+        t.type == core.TransactionType.expense && t.category.major == '食費';
+    final assigned = t.personalFor != null;
+    if (!assigned && !isFoodExpense) return const SizedBox.shrink();
+
+    if (assigned) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 10),
+          _personalFoodTag(t.personalFor!),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              _smallAction(
+                  '相手のわくに変更', Icons.swap_horiz_rounded, _changePersonalFor),
+              const SizedBox(width: 4),
+              _smallAction('はずす', Icons.close_rounded, () => _setPersonalFor(null),
+                  danger: true),
+            ],
+          ),
+        ],
+      );
+    }
+
+    // 食費の支出でまだ付いていない → 入れるボタン。
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: _assignPersonalFor,
+          icon: const Icon(Icons.lunch_dining_rounded, size: 18),
+          label: const Text('個人の食費わくに入れる'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.pinkDark,
+            side: const BorderSide(color: AppColors.pink, width: 1.4),
+            backgroundColor: AppColors.pink.withValues(alpha: 0.06),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _smallAction(String label, IconData icon, VoidCallback onTap,
+      {bool danger = false}) {
+    final color = danger ? AppColors.expense : AppColors.pinkDark;
+    return TextButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 16, color: color),
+      label: Text(label, style: TextStyle(fontSize: 12, color: color)),
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+  }
+
+  /// 「個人の食費わくに入れる」：誰のわくか決めて付ける。
+  Future<void> _assignPersonalFor() async {
+    final uid = await _pickMember(
+        initial: _t.paidBy ?? _t.recordedBy ?? _myUid);
+    if (uid == null) return;
+    await _setPersonalFor(uid);
+  }
+
+  /// 付いている個人わくを別の人へ変更する。
+  Future<void> _changePersonalFor() async {
+    final uid = await _pickMember(initial: _t.personalFor);
+    if (uid == null) return;
+    await _setPersonalFor(uid);
+  }
+
+  /// メンバーを選ぶ（1人なら即その人）。
+  Future<String?> _pickMember({String? initial}) async {
+    final names = HouseholdService.instance.memberNames;
+    if (names.isEmpty) return null;
+    if (names.length == 1) return names.keys.first;
+    return showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Text('だれの食費わくから？',
+                  style:
+                      TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+            ),
+            for (final e in names.entries)
+              ListTile(
+                leading: Text(
+                    HouseholdService.instance.memberIcons[e.key] ?? '🙂',
+                    style: const TextStyle(fontSize: 20)),
+                title: Text(e.value,
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+                trailing: e.key == initial
+                    ? const Icon(Icons.check_rounded, color: AppColors.pink)
+                    : null,
+                onTap: () => Navigator.pop(ctx, e.key),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 個人わくを設定／解除して保存する（uid=null で解除）。
+  Future<void> _setPersonalFor(String? uid) async {
+    final hid = HouseholdService.instance.householdId;
+    if (hid == null) return;
+    final updated =
+        _t.copyWith(personalFor: uid, clearPersonalFor: uid == null);
+    try {
+      await TxRepository.instance.update(hid, updated, _myUid);
+      _changed = true;
+      if (mounted) setState(() => _t = updated);
+      if (mounted) {
+        final msg = uid == null
+            ? '個人の食費わくから外しました'
+            : '${HouseholdService.instance.memberNames[uid] ?? '個人'} の食費わくに入れました';
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('保存に失敗しました')));
+      }
+    }
   }
 
   /// 「個人の食費わく」を使った記録に付ける目印タグ。

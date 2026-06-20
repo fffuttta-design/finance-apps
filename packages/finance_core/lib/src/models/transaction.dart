@@ -200,6 +200,9 @@ class Transaction {
     String? recordedBy,
     String? paidBy,
     String? personalFor,
+    /// true にすると personalFor を null に戻す（個人わくの解除）。
+    /// copyWith は通常 null を「変更なし」と解釈するため、明示クリア用に用意。
+    bool clearPersonalFor = false,
     DateTime? createdAt,
     bool forceCreatedAt = false,
   }) =>
@@ -223,7 +226,7 @@ class Transaction {
         isPending: isPending ?? this.isPending,
         recordedBy: recordedBy ?? this.recordedBy,
         paidBy: paidBy ?? this.paidBy,
-        personalFor: personalFor ?? this.personalFor,
+        personalFor: clearPersonalFor ? null : (personalFor ?? this.personalFor),
         commentCount: commentCount,
         createdAt: forceCreatedAt ? createdAt : (createdAt ?? this.createdAt),
       );
