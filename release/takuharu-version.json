@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.81",
-    "buildNumber":  "86",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.81/takuharu-finance-v0.2.81.apk",
-    "releaseNotes":  "レシート編集画面で店名・日付も編集できるように（店名は全品目に反映）。⋮メニューの説明文を削除"
+    "version":  "0.2.82",
+    "buildNumber":  "87",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.82/takuharu-finance-v0.2.82.apk",
+    "releaseNotes":  "レシート読み取りで記録するときも店名を編集できるように（保存時に全品目へ反映）"
 }

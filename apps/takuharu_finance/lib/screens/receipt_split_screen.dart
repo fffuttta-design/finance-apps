@@ -52,6 +52,7 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
   String? _payment = _defaultPayment; // 支払元（既定はワンバンク）
   List<Account> _accounts = []; // 登録済みの口座/クレカ
   final _items = <_Item>[];
+  late final TextEditingController _storeCtrl; // 店名（読み取り結果を編集できる）
   bool _saving = false;
 
   /// レシート記録の既定の支払元。手入力画面と揃える。
@@ -64,6 +65,7 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
     super.initState();
     final r = widget.result;
     _date = r.date ?? DateTime.now();
+    _storeCtrl = TextEditingController(text: r.store ?? '');
     _payer = AuthService.instance.currentUser?.uid;
     for (final it in r.items) {
       _items.add(_Item(it.name, it.price, it.category ?? r.category));
@@ -83,6 +85,7 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
 
   @override
   void dispose() {
+    _storeCtrl.dispose();
     for (final i in _items) {
       i.dispose();
     }
@@ -164,7 +167,8 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
     }
     final receiptId =
         widget.receiptId ?? DateTime.now().microsecondsSinceEpoch.toString();
-    final store = widget.result.store;
+    final storeText = _storeCtrl.text.trim();
+    final store = storeText.isEmpty ? null : storeText;
     final txns = <core.Transaction>[];
     for (final i in _items) {
       final price = int.tryParse(i.price.text) ?? 0;
@@ -211,7 +215,6 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final store = widget.result.store;
     return Scaffold(
       appBar: AppBar(title: const Text('品目ごとに記録')),
       body: SafeArea(
@@ -224,17 +227,24 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                 padding: const EdgeInsets.all(12),
                 child: Column(
                   children: [
-                    if (store != null && store.isNotEmpty)
-                      Row(children: [
-                        const Icon(Icons.storefront_rounded,
-                            size: 18, color: AppColors.pinkDark),
-                        const SizedBox(width: 8),
-                        Text(store,
-                            style:
-                                const TextStyle(fontWeight: FontWeight.w700)),
-                      ]),
-                    if (store != null && store.isNotEmpty)
-                      const SizedBox(height: 8),
+                    // 店名（読み取り結果を編集できる）
+                    Row(children: [
+                      const Icon(Icons.storefront_rounded,
+                          size: 18, color: AppColors.pinkDark),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _storeCtrl,
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            border: InputBorder.none,
+                            hintText: '店名（任意）',
+                          ),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(height: 8),
                     InkWell(
                       onTap: _pickDate,
                       child: Row(children: [
