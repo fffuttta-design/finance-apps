@@ -92,18 +92,29 @@ git commit -m "release(futa): vX.Y.Z+B - リリースノート"
 git push origin main
 ```
 
-### Windows Desktop 配信（ユーザーが実行）
+### Windows Desktop 配信（Claude が直接実行できる）
 
 デスクトップ版は **GitHub Releases** で配信する（Drive非依存）。
 更新チェック: electron-updater が `futafinance-desktop-releases`(public) の latest.yml を参照。
 Android リリース(finance-apps)と完全分離しているため干渉しない。
 
+**⚠️ 旧注記「Claude の Bash では不可」は誤り（2026-06-20 実証で訂正）。**
+この環境では Claude のシェルから直接ビルド＆publish できる（node/npm・gh認証・win_oauth.key 完備）。
+構成は Electron が Flutter web 版を包むだけなので、ビルドは全部コマンドライン。
+
 ```powershell
-# ユーザーの実機で実行（デスクトップアプリのビルドは Claude の Bash では不可）
+# Claude が PowerShell ツールで直接実行（バックグラウンド推奨・数分かかる）
+$env:GH_TOKEN = (gh auth token)
 cd C:\dev\CoreBusinessTools\finance-apps\apps\futa_finance\desktop\Scripts
 .\build_desktop.ps1 -Publish
-# → zip 作成 → gh release create futa-win-vX.Y.Z → futa-windows-version.json 更新 → git push
+# → flutter build web → web-dist へコピー → electron-builder(NSIS) → latest.yml と
+#   FutaFinance-setup.exe を futafinance-desktop-releases の v<pubspec版> へ publish
 ```
+
+> ⚠️ **PowerShell の罠**: スクリプト実行時に `2>&1 | Tee-Object` など stderr をパイプ合流させると、
+> `flutter build web` が stderr に出す情報行（"Wasm dry run succeeded"）を `$ErrorActionPreference="Stop"`
+> が致命的エラー扱いして中断する。**stderr を合流させず素のまま実行**すること（PowerShellツールは
+> stderr を別途captureするので合流不要）。
 
 初回インストール手順（他PC）:
 1. GitHub Releases から `futa-desktop-vX.Y.Z.zip` をダウンロード
