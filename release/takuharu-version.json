@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.80",
-    "buildNumber":  "85",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.80/takuharu-finance-v0.2.80.apk",
-    "releaseNotes":  "まとめレシートの編集を1画面に統合（⋮→レシートを編集／全体も品目ごともまとめて直せる）。長押しの案内文を削除"
+    "version":  "0.2.81",
+    "buildNumber":  "86",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.81/takuharu-finance-v0.2.81.apk",
+    "releaseNotes":  "レシート編集画面で店名・日付も編集できるように（店名は全品目に反映）。⋮メニューの説明文を削除"
 }

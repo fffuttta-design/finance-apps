@@ -67,7 +67,6 @@ Future<ReceiptActionResult> showReceiptActionsSheet(
             leading: const Icon(Icons.edit_rounded, color: AppColors.pinkDark),
             title: const Text('レシートを編集',
                 style: TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: const Text('全体（日付・支払元・だれ）も品目ごとも、1画面でまとめて直す'),
             onTap: () => Navigator.pop(ctx, 'edit'),
           ),
           const Divider(height: 1),

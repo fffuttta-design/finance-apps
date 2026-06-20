@@ -61,6 +61,7 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
   String? _receiptId;
   String? _receiptUrl;
   String? _store;
+  late final TextEditingController _storeCtrl;
 
   Map<String, String> get _members => HouseholdService.instance.memberNames;
 
@@ -78,6 +79,7 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
     _store = widget.members
         .map((t) => t.store?.trim() ?? '')
         .firstWhere((s) => s.isNotEmpty, orElse: () => '');
+    _storeCtrl = TextEditingController(text: _store ?? '');
     for (final m in widget.members) {
       _items.add(_EItem(
         txId: m.id,
@@ -98,6 +100,7 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
 
   @override
   void dispose() {
+    _storeCtrl.dispose();
     for (final i in _items) {
       i.dispose();
     }
@@ -177,6 +180,8 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
       return;
     }
 
+    final storeVal = _storeCtrl.text.trim();
+    final store = storeVal.isEmpty ? null : storeVal;
     final keepIds = <String>{};
     final updates = <core.Transaction>[];
     final adds = <core.Transaction>[];
@@ -194,6 +199,7 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
           date: _date,
           paymentMethod: _payment,
           paidBy: _payer,
+          store: store,
           category: core.Category(major: cat, sub: ''),
           description: name,
           amount: price,
@@ -209,7 +215,7 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
           paymentMethod: _payment ?? '',
           description: name,
           amount: price,
-          store: (_store != null && _store!.isNotEmpty) ? _store : null,
+          store: store,
           receiptId: _receiptId,
           receiptUrl: _receiptUrl,
           paidBy: _payer,
@@ -280,26 +286,54 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (_store != null && _store!.isNotEmpty) ...[
-                      Row(children: [
-                        const Icon(Icons.storefront_rounded,
-                            size: 18, color: AppColors.pinkDark),
-                        const SizedBox(width: 8),
-                        Text(_store!,
-                            style:
-                                const TextStyle(fontWeight: FontWeight.w700)),
-                      ]),
-                      const SizedBox(height: 8),
-                    ],
+                    // 店名（編集可）
+                    Row(children: [
+                      const Icon(Icons.storefront_rounded,
+                          size: 18, color: AppColors.pinkDark),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _storeCtrl,
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            border: InputBorder.none,
+                            hintText: '店名（任意）',
+                          ),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(height: 10),
+                    // 日付（タップで変更できると分かる見た目に）
+                    const Text('日付',
+                        style:
+                            TextStyle(fontSize: 12, color: AppColors.textSub)),
+                    const SizedBox(height: 6),
                     InkWell(
                       onTap: _pickDate,
-                      child: Row(children: [
-                        const Icon(Icons.calendar_today_rounded,
-                            size: 18, color: AppColors.pinkDark),
-                        const SizedBox(width: 8),
-                        Text('${_date.year}年${_date.month}月${_date.day}日'),
-                      ]),
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.divider),
+                        ),
+                        child: Row(children: [
+                          const Icon(Icons.calendar_today_rounded,
+                              size: 18, color: AppColors.pinkDark),
+                          const SizedBox(width: 8),
+                          Text('${_date.year}年${_date.month}月${_date.day}日',
+                              style: const TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w600)),
+                          const Spacer(),
+                          const Icon(Icons.edit_calendar_rounded,
+                              size: 18, color: AppColors.pinkDark),
+                        ]),
+                      ),
                     ),
                     if (_members.length >= 2) ...[
                       const SizedBox(height: 10),
