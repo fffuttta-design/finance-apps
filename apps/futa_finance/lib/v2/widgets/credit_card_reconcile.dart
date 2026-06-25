@@ -786,22 +786,49 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
       }
       return;
     }
-    // UTF-8 で厳密に読めなければ Shift-JIS とみなす（カード明細は大半 Shift-JIS）。
-    String content;
-    try {
-      content = utf8.decode(bytes);
-    } catch (_) {
-      try {
-        content = shiftJis.decode(bytes);
-      } catch (_) {
-        content = latin1.decode(bytes);
-      }
-    }
+    final content = _decodeCsvBytes(bytes);
     final lines = _parseCardCsv(content, _year);
     if (!mounted) return;
     if (lines.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('明細を読み取れませんでした（対応していないCSV様式かもしれません）')));
+      // 何が読めなかったか分かるよう、デコード結果の先頭を見せる固定ダイアログ。
+      final preview = content
+          .split('\n')
+          .where((l) => l.trim().isNotEmpty)
+          .take(4)
+          .join('\n');
+      await showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('CSVを読み取れませんでした'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('${res.files.first.name}（${bytes.length}バイト）',
+                    style: const TextStyle(
+                        fontSize: 12, color: V2Colors.textSecondary)),
+                const SizedBox(height: 8),
+                const Text('読み取った先頭行（文字化けしていたらエンコーディングの問題です）:',
+                    style: TextStyle(fontSize: 12)),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  color: const Color(0xFFF1F5F9),
+                  child: Text(preview.isEmpty ? '(空)' : preview,
+                      style: const TextStyle(
+                          fontSize: 11, fontFamily: 'monospace')),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('閉じる')),
+          ],
+        ),
+      );
       return;
     }
     _setPasted(lines);
@@ -1698,6 +1725,23 @@ List<_StmtLine> _parseCardCsv(String content, int year) {
     out.add(_StmtLine(date, name.isEmpty ? '明細' : name, amt));
   }
   return out;
+}
+
+/// CSVバイト列を文字列にデコードする。
+/// UTF-8 として「文字化け（U+FFFD）なく」読めればそれを採用。読めなければ
+/// Shift-JIS（カード明細の大半）→ 最後の保険で Latin-1 の順で試す。
+String _decodeCsvBytes(List<int> bytes) {
+  // UTF-8（厳密）。例外なく＆置換文字を含まなければ採用。
+  try {
+    final u = utf8.decode(bytes);
+    if (!u.contains('�')) return u;
+  } catch (_) {}
+  // Shift-JIS（cp932相当）。日本のカード明細はほぼこれ。
+  try {
+    final s = shiftJis.decode(bytes);
+    if (s.trim().isNotEmpty) return s;
+  } catch (_) {}
+  return latin1.decode(bytes, allowInvalid: true);
 }
 
 /// CSVの1行をダブルクオート対応で分割。
