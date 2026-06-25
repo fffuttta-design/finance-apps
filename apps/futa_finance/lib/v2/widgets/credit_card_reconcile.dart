@@ -6,7 +6,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
+import '../../data/app_mode.dart';
 import '../../data/backup_repository.dart';
+import '../../data/settings_repository.dart';
+import '../../data/store_category_classifier.dart';
 import '../../data/transaction_repository.dart';
 import '../../screens/card_csv_import_screen.dart';
 import '../../utils/formatters.dart';
@@ -394,11 +397,22 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
   /// 荒療治（CSVで置き換え）の実行中フラグ。
   bool _replacing = false;
 
+  /// 記録漏れ行のインライン編集状態（明細行ごと：店名・科目）。
+  final Map<_StmtLine, _LineEdit> _edits = {};
+
+  /// カテゴリ候補（現モード・休眠除く）。
+  List<String> _majors = [];
+  Map<String, List<String>> _catMenu = {};
+
+  /// AIが科目を推定中。
+  bool _proposing = false;
+
   @override
   void initState() {
     super.initState();
     _actual = widget.card.monthlyActualBillings[widget.ym];
     _load();
+    _loadCats();
     _sub = _txRepo.stream.listen((list) {
       if (!mounted) return;
       setState(() => _all = list);
@@ -408,7 +422,210 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
   @override
   void dispose() {
     _sub?.cancel();
+    for (final e in _edits.values) {
+      e.dispose();
+    }
     super.dispose();
+  }
+
+  /// カテゴリ候補を読み込む（ドロップダウン＋AI推定用）。
+  Future<void> _loadCats() async {
+    try {
+      final cfg = await SettingsRepository().loadCategories();
+      final menu = <String, List<String>>{};
+      final majors = <String>[];
+      for (final m in cfg.majors) {
+        if (m.inactive) continue;
+        menu[m.name] = m.subs;
+        majors.add(m.name);
+      }
+      if (!mounted) return;
+      setState(() {
+        _catMenu = menu;
+        _majors = majors;
+      });
+    } catch (_) {}
+  }
+
+  /// CSV/貼り付け明細をセットし、行ごとの編集状態を作って科目をAI提案する。
+  void _setPasted(List<_StmtLine> lines) {
+    for (final e in _edits.values) {
+      e.dispose();
+    }
+    _edits.clear();
+    for (final l in lines) {
+      _edits[l] = _LineEdit(name: l.name);
+    }
+    _setPasted(lines);
+    _propose();
+  }
+
+  /// 記録漏れ行の店名から会計科目をAIで一括提案する。
+  Future<void> _propose() async {
+    if (_pasted.isEmpty || _catMenu.isEmpty) return;
+    setState(() => _proposing = true);
+    final lines = List<_StmtLine>.from(_pasted);
+    final names = [for (final l in lines) _edits[l]?.nameCtrl.text ?? l.name];
+    List<Map<String, String>?> cats;
+    try {
+      cats = await StoreCategoryClassifier.instance.classify(names, _catMenu);
+    } catch (_) {
+      cats = List<Map<String, String>?>.filled(names.length, null);
+    }
+    if (!mounted) return;
+    setState(() {
+      for (var i = 0; i < lines.length && i < cats.length; i++) {
+        final c = cats[i];
+        final e = _edits[lines[i]];
+        if (c != null && e != null) {
+          e.major = c['major'];
+          e.sub = c['sub'] ?? '';
+        }
+      }
+      _proposing = false;
+    });
+  }
+
+  /// 記録漏れ1件を、編集後の店名・科目で支出として追加する。
+  Future<void> _addMissing(_StmtLine line) async {
+    final e = _edits[line];
+    final name = (e?.nameCtrl.text ?? line.name).trim();
+    if (name.isEmpty) return;
+    final minDate = AppModeManager.instance.current.minDate;
+    final date = line.date ?? DateTime(_year, _month);
+    if (date.isBefore(minDate)) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              '${minDate.year}年${minDate.month}月より前は登録できません')));
+      return;
+    }
+    final tx = core.Transaction(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      date: date,
+      type: core.TransactionType.expense,
+      category: core.Category(major: e?.major ?? '未分類', sub: e?.sub ?? ''),
+      paymentMethod: widget.card.name,
+      description: name,
+      amount: line.amount,
+      store: name,
+    );
+    await _txRepo.add(tx);
+    await _load();
+  }
+
+  /// 記録漏れをまとめて追加する。
+  Future<void> _addAllMissing(List<_StmtLine> missing) async {
+    if (missing.isEmpty) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('記録漏れをまとめて追加'),
+        content: Text('編集後の店名・科目で ${missing.length}件を追加します。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('追加する')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    for (final l in missing) {
+      await _addMissing(l);
+    }
+  }
+
+  /// 記録漏れ1行のインライン編集UI（店名編集＋科目ドロップダウン＋追加）。
+  Widget _missingEditRow(_StmtLine line) {
+    final e = _edits.putIfAbsent(line, () => _LineEdit(name: line.name));
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(V2Spacing.md, 8, V2Spacing.md, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SizedBox(
+                width: 34,
+                child: Text(
+                    line.date != null
+                        ? '${line.date!.month}/${line.date!.day}'
+                        : '—',
+                    style: V2Typography.micro
+                        .copyWith(color: V2Colors.textSecondary)),
+              ),
+              // 店名（編集可）
+              Expanded(
+                child: TextField(
+                  controller: e.nameCtrl,
+                  onChanged: (_) => setState(() {}),
+                  style: V2Typography.body,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(formatYen(line.amount),
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: V2Colors.negative,
+                      fontFeatures: V2Typography.tabularNums)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const SizedBox(width: 34),
+              // 科目（AI提案・変更可）
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: _majors.contains(e.major) ? e.major : null,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    prefixIcon: Icon(Icons.auto_awesome, size: 15),
+                    prefixIconConstraints:
+                        BoxConstraints(minWidth: 30, minHeight: 0),
+                    hintText: '科目（未分類）',
+                    border: OutlineInputBorder(),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  ),
+                  style:
+                      const TextStyle(fontSize: 13, color: Color(0xFF111827)),
+                  items: [
+                    for (final m in _majors)
+                      DropdownMenuItem(value: m, child: Text(m)),
+                  ],
+                  onChanged: (v) => setState(() {
+                    e.major = v;
+                    e.sub = '';
+                  }),
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFDC2626),
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  minimumSize: const Size(0, 38),
+                ),
+                onPressed: () => _addMissing(line),
+                child: const Text('追加', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _load() async {
@@ -550,7 +767,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
           content: Text('金額を読み取れる明細が見つかりませんでした')));
       return;
     }
-    setState(() => _pasted = lines);
+    _setPasted(lines);
   }
 
   /// カード明細CSVを選択 → Shift-JIS/UTF-8 を判定して解析 → 突合用にセット。
@@ -587,7 +804,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
           content: Text('明細を読み取れませんでした（対応していないCSV様式かもしれません）')));
       return;
     }
-    setState(() => _pasted = lines);
+    _setPasted(lines);
   }
 
   /// CSV期間ラベル（"5/1〜5/31" など。日付不明なら "全期間"）。
@@ -613,6 +830,10 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
       ),
     );
     if (done == true && mounted) {
+      for (final e in _edits.values) {
+        e.dispose();
+      }
+      _edits.clear();
       setState(() => _pasted = []);
       await _load();
     }
@@ -806,7 +1027,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
         ),
       ));
 
-      // 記録漏れ（明細にあるが記録に無い）→ 追加で埋める
+      // 記録漏れ（明細にあるが記録に無い）→ その場で店名・科目を直して追加
       if (missing.isNotEmpty) {
         children.add(const SizedBox(height: V2Spacing.sm));
         children.add(Row(children: [
@@ -818,7 +1039,29 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
                 style: V2Typography.caption.copyWith(
                     color: V2Colors.negative, fontWeight: FontWeight.w700)),
           ),
+          if (_proposing)
+            const Padding(
+              padding: EdgeInsets.only(left: 6),
+              child: SizedBox(
+                  width: 13,
+                  height: 13,
+                  child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else
+            TextButton.icon(
+              onPressed: _propose,
+              icon: const Icon(Icons.auto_awesome, size: 15),
+              label: const Text('AIで科目提案', style: TextStyle(fontSize: 11)),
+              style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 6)),
+            ),
         ]));
+        children.add(Padding(
+          padding: const EdgeInsets.only(left: 22, bottom: 4),
+          child: Text('店名を直し、科目を選んで「追加」。AIが科目を提案します。',
+              style: V2Typography.micro.copyWith(color: V2Colors.textMuted)),
+        ));
         children.add(const SizedBox(height: 6));
         children.add(Container(
           decoration: BoxDecoration(
@@ -830,13 +1073,21 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
             children: [
               for (int i = 0; i < missing.length; i++) ...[
                 if (i > 0) const Divider(height: 1, color: V2Colors.divider),
-                _MissingLineRow(
-                  line: missing[i],
-                  onAdd: () => widget.onAddAdjustment(missing[i].amount,
-                      description: missing[i].name, date: missing[i].date),
-                ),
+                _missingEditRow(missing[i]),
               ],
             ],
+          ),
+        ));
+        // 記録漏れをまとめて追加
+        children.add(const SizedBox(height: 8));
+        children.add(SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: () => _addAllMissing(missing),
+            icon: const Icon(Icons.playlist_add_check, size: 18),
+            label: Text('記録漏れ ${missing.length}件をまとめて追加'),
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626)),
           ),
         ));
       }
@@ -1342,6 +1593,16 @@ class _StmtLine {
   const _StmtLine(this.date, this.name, this.amount);
 }
 
+/// 記録漏れ行のインライン編集状態（編集後の店名・会計科目）。
+class _LineEdit {
+  final TextEditingController nameCtrl;
+  String? major;
+  String sub = '';
+  _LineEdit({required String name})
+      : nameCtrl = TextEditingController(text: name);
+  void dispose() => nameCtrl.dispose();
+}
+
 /// カード明細テキストを行ごとに解析する。
 /// 各行から金額（末尾の数字／¥付き）と日付・店名を推定。金額が取れない行は無視。
 List<_StmtLine> _parseStatement(String text, int year) {
@@ -1390,57 +1651,6 @@ List<_StmtLine> _parseStatement(String text, int year) {
 }
 
 /// 突合の「記録漏れ」1行（明細にあるが記録に無い）。[追加]で支出登録へ。
-class _MissingLineRow extends StatelessWidget {
-  final _StmtLine line;
-  final VoidCallback onAdd;
-  const _MissingLineRow({required this.line, required this.onAdd});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-          horizontal: V2Spacing.md, vertical: 6),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 38,
-            child: Text(
-                line.date != null
-                    ? '${line.date!.month}/${line.date!.day}'
-                    : '—',
-                style: V2Typography.micro
-                    .copyWith(color: V2Colors.textSecondary)),
-          ),
-          Expanded(
-            child: Text(line.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: V2Typography.body),
-          ),
-          const SizedBox(width: V2Spacing.sm),
-          Text(formatYen(line.amount),
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: V2Colors.negative,
-                  fontFeatures: V2Typography.tabularNums)),
-          const SizedBox(width: V2Spacing.sm),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
-              visualDensity: VisualDensity.compact,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              minimumSize: const Size(0, 32),
-            ),
-            onPressed: onAdd,
-            child: const Text('追加', style: TextStyle(fontSize: 12)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // ── カード明細CSVの解析（金額のみで突合するため金額列の確実な取得を最優先） ──
 
 /// カード明細CSVを解析して明細行リストにする。
