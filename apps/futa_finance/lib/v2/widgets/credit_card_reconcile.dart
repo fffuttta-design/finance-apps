@@ -714,6 +714,61 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
     }
   }
 
+  /// 【荒療治・CSV不要】この月・このカードの取引をまとめて初期化（削除）する。
+  /// 「全部消してから明細を正として入れ直す」運用の最初の一歩。実行前に自動バックアップ。
+  Future<void> _initializeMonth(List<core.Transaction> txns) async {
+    if (txns.isEmpty) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('$_month月の${widget.card.name}を初期化しますか？'),
+        content: Text(
+            '「${widget.card.name}」払いの$_year年$_month月の取引 ${txns.length}件を'
+            'すべて削除します。\n\n'
+            'この操作は元に戻せません。実行直前に自動バックアップを取ります。\n'
+            '削除後、正しい明細をCSV取り込みや手入力で入れ直してください。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style:
+                FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+            child: Text('${txns.length}件を削除'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    setState(() => _replacing = true);
+    try {
+      try {
+        await BackupRepository.instance
+            .savePreImportSnapshot(reason: 'pre-card-init');
+      } catch (_) {}
+      var deleted = 0;
+      for (final t in txns) {
+        try {
+          await _txRepo.delete(t.id);
+          deleted++;
+        } catch (_) {}
+      }
+      if (!mounted) return;
+      setState(() => _replacing = false);
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('初期化完了：$deleted件を削除しました')));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _replacing = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('初期化に失敗しました: $e')));
+    }
+  }
+
   /// 明細コピペ／CSV → 突合UI（ボタン＋結果）。
   Widget _statementSection() {
     final children = <Widget>[
@@ -1075,6 +1130,33 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
                             .copyWith(color: V2Colors.textSecondary)),
                   ],
                 ),
+                // 荒療治：この月のこのカード取引を丸ごと初期化（削除）。
+                // CSV無しでも使える独立ボタン。明細があるときだけ表示。
+                if (txns.isNotEmpty) ...[
+                  const SizedBox(height: V2Spacing.sm),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _replacing ? null : () => _initializeMonth(txns),
+                      icon: _replacing
+                          ? const SizedBox(
+                              width: 15,
+                              height: 15,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.delete_sweep_outlined, size: 18),
+                      label: Text(_replacing
+                          ? '初期化中…'
+                          : '$_month月の${widget.card.name}を初期化（${txns.length}件を削除）'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFDC2626),
+                        side: const BorderSide(color: Color(0xFFFCA5A5)),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 11),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: V2Spacing.sm),
                 if (txns.isEmpty)
                   Padding(
