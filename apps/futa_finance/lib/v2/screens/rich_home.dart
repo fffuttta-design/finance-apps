@@ -1066,7 +1066,7 @@ class _ReceiptGroupRowState extends State<_ReceiptGroupRow> {
   }
 }
 
-/// ① 支払方法別の内訳カード（既定は折りたたみ＝コンパクト）。
+/// ① 支払方法別の内訳カード（既定は展開＝中身が見える状態）。
 class _MethodBreakdownCard extends StatefulWidget {
   final List<MapEntry<String, int>> entries;
   final Color accent;
@@ -1078,7 +1078,7 @@ class _MethodBreakdownCard extends StatefulWidget {
 }
 
 class _MethodBreakdownCardState extends State<_MethodBreakdownCard> {
-  bool _open = false;
+  bool _open = true;
 
   @override
   Widget build(BuildContext context) {
