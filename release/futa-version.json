@@ -1,1 +1,1 @@
-{"version":"1.0.320","buildNumber":"321","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.320/futa-finance-v1.0.320.apk","releaseNotes":"支出明細一覧をリッチ化：支払方法をアイコン付きで表示、カテゴリを「大›小」表示、色付きバッジと左アクセントで見やすくしました。"}
+{"version":"1.0.321","buildNumber":"322","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.321/futa-finance-v1.0.321.apk","releaseNotes":"クレカ棚卸しに「CSVで置き換え（荒療治）」を追加：指定カード・指定期間の取引をCSV明細で丸ごと置き換え、科目は店名からAIが推定。実行前に自動バックアップ。"}
