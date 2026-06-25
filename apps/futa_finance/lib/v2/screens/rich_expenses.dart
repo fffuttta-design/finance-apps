@@ -29,7 +29,7 @@ class RichExpensesScreen extends StatefulWidget {
 }
 
 class _RichExpensesScreenState extends State<RichExpensesScreen>
-    with ModeAwareMixin {
+    with ModeAwareMixin, SingleTickerProviderStateMixin {
   final _txRepo = TransactionRepository.instance;
   final _settings = SettingsRepository();
 
@@ -39,17 +39,35 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   core.PaymentMethodsConfig _payments = core.PaymentMethodsConfig.empty();
   bool _loading = true;
 
+  /// 事業モードの諸経費/制作原価サブタブ（個人モードは null）。
+  TabController? _subTab;
+
   late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
 
   String get _ymKey =>
       '${_month.year}-${_month.month.toString().padLeft(2, '0')}';
 
+  bool get _isBusiness =>
+      AppModeManager.instance.current == AppMode.business;
+
+  /// 制作原価（外注費）判定。
+  bool _isGaichu(core.Transaction t) => t.category.major.contains('外注費');
+
+  void _rebuildSubTab() {
+    _subTab?.dispose();
+    _subTab = _isBusiness ? TabController(length: 2, vsync: this) : null;
+  }
+
   @override
-  void onModeChanged() => _load();
+  void onModeChanged() {
+    _rebuildSubTab();
+    _load();
+  }
 
   @override
   void initState() {
     super.initState();
+    _rebuildSubTab();
     _load();
     _sub = _txRepo.stream.listen((list) {
       if (!mounted) return;
@@ -60,6 +78,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   @override
   void dispose() {
     _sub?.cancel();
+    _subTab?.dispose();
     super.dispose();
   }
 
@@ -230,13 +249,83 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
         child: Center(child: CircularProgressIndicator()),
       );
     }
-    final isBusiness = AppModeManager.instance.current == AppMode.business;
+    // 事業モード: 諸経費 / 制作原価（外注費）サブタブ
+    if (_isBusiness && _subTab != null) {
+      final all = _monthExpenses;
+      final gaichu = all.where(_isGaichu).toList();
+      final keihi = all.where((t) => !_isGaichu(t)).toList();
+      final keihiTotal =
+          keihi.fold<int>(0, (s, t) => s + t.amount) + _subsOf(_month);
+      final gaichuTotal = gaichu.fold<int>(0, (s, t) => s + t.amount);
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    V2Spacing.md, V2Spacing.lg, V2Spacing.md, V2Spacing.sm),
+                child: Text('経費',
+                    style:
+                        V2Typography.h1.copyWith(color: V2Colors.textPrimary)),
+              ),
+              TabBar(
+                controller: _subTab,
+                labelColor: widget.accent,
+                unselectedLabelColor: V2Colors.textSecondary,
+                indicatorColor: widget.accent,
+                tabs: [
+                  Tab(text: '諸経費　${formatYen(keihiTotal)}'),
+                  Tab(text: '制作原価　${formatYen(gaichuTotal)}'),
+                ],
+              ),
+              Expanded(
+                child: TabBarView(
+                  controller: _subTab,
+                  children: [
+                    _buildBody(
+                        rows: keihi,
+                        showFixedAndCard: true,
+                        title: null,
+                        detailLabel: '経費明細'),
+                    _buildBody(
+                        rows: gaichu,
+                        showFixedAndCard: false,
+                        title: null,
+                        detailLabel: '制作原価明細'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    // 個人モード（従来レイアウト）
+    return _buildBody(
+        rows: _monthExpenses,
+        showFixedAndCard: true,
+        title: '支出',
+        detailLabel: '支出明細');
+  }
+
+  /// 支出本文（タブ共用）。title が null ならタイトル見出しは出さない（タブ側で表示済）。
+  /// showFixedAndCard=false（制作原価タブ）では固定費・クレカ照合を出さない。
+  Widget _buildBody({
+    required List<core.Transaction> rows,
+    required bool showFixedAndCard,
+    required String? title,
+    required String detailLabel,
+  }) {
     final accent = widget.accent;
-    final rows = _monthExpenses;
+    final summaryLabel = detailLabel.replaceAll('明細', '');
     final txTotal = rows.fold<int>(0, (s, t) => s + t.amount);
-    final subTotal = _subsOf(_month);
+    final subTotal = showFixedAndCard ? _subsOf(_month) : 0;
     final total = txTotal + subTotal;
-    final fixedLines = _fixedLinesForMonth(_month);
+    final fixedLines = showFixedAndCard
+        ? _fixedLinesForMonth(_month)
+        : <({String name, int amount, String? iconUrl})>[];
 
     // カテゴリ内訳（大カテゴリ別・固定費込み）
     final byMajor = <String, int>{};
@@ -261,10 +350,12 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(isBusiness ? '経費' : '支出',
-                  style:
-                      V2Typography.h1.copyWith(color: V2Colors.textPrimary)),
-              const SizedBox(height: V2Spacing.md),
+              if (title != null) ...[
+                Text(title,
+                    style:
+                        V2Typography.h1.copyWith(color: V2Colors.textPrimary)),
+                const SizedBox(height: V2Spacing.md),
+              ],
               // サマリー
               Container(
                 padding: const EdgeInsets.all(V2Spacing.lg),
@@ -278,7 +369,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                   children: [
                     Row(
                       children: [
-                        Text('${_month.month}月の${isBusiness ? '経費' : '支出'}合計',
+                        Text('${_month.month}月の$summaryLabel合計',
                             style: V2Typography.caption
                                 .copyWith(color: V2Colors.textSecondary)),
                         const Spacer(),
@@ -307,16 +398,17 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
               ),
               const SizedBox(height: V2Spacing.md),
               // クレカ引落照合・棚卸し（支出合計のすぐ下・目立つ位置）
-              CreditCardBillingSection(
-                cards: _payments.creditCards
-                    .where((c) => !c.inactive)
-                    .toList(),
-                transactions: _transactions,
-                ym: _ymKey,
-                onOpenReconcile: _openCardReconcile,
-              ),
-              if (_hasReconcileCards)
-                const SizedBox(height: V2Spacing.md),
+              if (showFixedAndCard) ...[
+                CreditCardBillingSection(
+                  cards: _payments.creditCards
+                      .where((c) => !c.inactive)
+                      .toList(),
+                  transactions: _transactions,
+                  ym: _ymKey,
+                  onOpenReconcile: _openCardReconcile,
+                ),
+                if (_hasReconcileCards) const SizedBox(height: V2Spacing.md),
+              ],
               // カテゴリ内訳
               if (majorEntries.isNotEmpty) ...[
                 Container(
@@ -420,7 +512,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                   children: [
                     Row(
                       children: [
-                        Text(isBusiness ? '経費明細' : '支出明細',
+                        Text(detailLabel,
                             style: V2Typography.h2
                                 .copyWith(color: V2Colors.textPrimary)),
                         const Spacer(),
@@ -430,7 +522,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                               context,
                               MaterialPageRoute(
                                 builder: (_) => ExpenseListScreen(
-                                  title: isBusiness ? '経費明細一覧' : '支出明細一覧',
+                                  title: '$detailLabel一覧',
                                   month: _month,
                                 ),
                               ),
