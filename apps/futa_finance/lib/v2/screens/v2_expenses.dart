@@ -351,7 +351,9 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
       onSaveActual: (amount) => _saveCreditCardActual(card, ym, amount),
       onEditTxn: _editTxn,
       onDeleteTxn: _deleteTxn,
-      onAddAdjustment: (amount) => _addCardAdjustment(card, amount),
+      onAddAdjustment: (amount, {description, date}) => _addCardAdjustment(
+          card, amount,
+          description: description, date: date),
     );
     // シートを閉じたら最新状態へ（実際額・調整取引の反映）。
     if (mounted) await _load();
@@ -361,16 +363,17 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
   /// 記録漏れの支出を埋める想定で、支払方法＝当カード／日付＝表示月末を
   /// プリフィルした支出入力画面を開く。
   Future<void> _addCardAdjustment(
-      core.RegisteredCreditCard card, int amount) async {
-    // 表示月の末日（明細合計に当月として計上されるように）。
-    final lastDay = DateTime(_focused.year, _focused.month + 1, 0);
+      core.RegisteredCreditCard card, int amount,
+      {String? description, DateTime? date}) async {
+    // 既定は表示月の末日（明細合計に当月として計上されるように）。
+    final fallbackDate = DateTime(_focused.year, _focused.month + 1, 0);
     final changed = await showInputSheet<bool>(
       context,
       ExpenseInputScreen(
         initialPaymentMethod: card.name,
         initialAmount: amount > 0 ? amount : null,
-        initialDate: lastDay,
-        initialDescription: 'クレカ差額調整',
+        initialDate: date ?? fallbackDate,
+        initialDescription: description ?? 'クレカ差額調整',
       ),
     );
     if (changed == true && mounted) await _load();

@@ -197,7 +197,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
       onSaveActual: (amount) => _saveCreditCardActual(card, ym, amount),
       onEditTxn: _edit,
       onDeleteTxn: _deleteTxn,
-      onAddAdjustment: (amount) => _addCardAdjustment(card, amount),
+      onAddAdjustment: (amount, {description, date}) => _addCardAdjustment(
+          card, amount,
+          description: description, date: date),
     );
     if (mounted) await _load();
   }
@@ -205,15 +207,16 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   /// 差額ぶんの「調整取引」を追加する（記録漏れ補完）。
   /// 支払方法＝当カード／日付＝表示月末をプリフィルした支出入力を開く。
   Future<void> _addCardAdjustment(
-      core.RegisteredCreditCard card, int amount) async {
-    final lastDay = DateTime(_month.year, _month.month + 1, 0);
+      core.RegisteredCreditCard card, int amount,
+      {String? description, DateTime? date}) async {
+    final fallbackDate = DateTime(_month.year, _month.month + 1, 0);
     final changed = await showInputSheet<bool>(
       context,
       ExpenseInputScreen(
         initialPaymentMethod: card.name,
         initialAmount: amount > 0 ? amount : null,
-        initialDate: lastDay,
-        initialDescription: 'クレカ差額調整',
+        initialDate: date ?? fallbackDate,
+        initialDescription: description ?? 'クレカ差額調整',
       ),
     );
     if (changed == true && mounted) await _load();

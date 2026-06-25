@@ -105,7 +105,8 @@ class CreditCardBillingSection extends StatelessWidget {
 ///
 /// [onSaveActual] 実際請求額の保存（null でクリア）。
 /// [onEditTxn] / [onDeleteTxn] 明細の編集・削除。
-/// [onAddAdjustment] 差額ぶんの調整取引を追加。
+/// [onAddAdjustment] 支出を追加（差額ぶん／明細コピペ突合の記録漏れ補完で使用）。
+///   description/date を渡すと支出入力にプリフィルする。
 Future<void> showCardReconcileSheet(
   BuildContext context, {
   required core.RegisteredCreditCard card,
@@ -113,7 +114,8 @@ Future<void> showCardReconcileSheet(
   required Future<void> Function(int? amount) onSaveActual,
   required Future<void> Function(core.Transaction t) onEditTxn,
   required Future<void> Function(core.Transaction t) onDeleteTxn,
-  required Future<void> Function(int amount) onAddAdjustment,
+  required Future<void> Function(int amount, {String? description, DateTime? date})
+      onAddAdjustment,
 }) async {
   await showInputSheet<bool>(
     context,
@@ -357,8 +359,9 @@ class _CardReconcileSheet extends StatefulWidget {
   /// 明細行 → 取引を削除。
   final Future<void> Function(core.Transaction t) onDeleteTxn;
 
-  /// 差額ぶんの調整取引を追加。
-  final Future<void> Function(int amount) onAddAdjustment;
+  /// 支出を追加（差額ぶん／突合の記録漏れ補完）。description/date でプリフィル。
+  final Future<void> Function(int amount, {String? description, DateTime? date})
+      onAddAdjustment;
 
   const _CardReconcileSheet({
     required this.card,
@@ -379,6 +382,9 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
   List<core.Transaction> _all = [];
   int? _actual;
   bool _loading = true;
+
+  /// 貼り付けたカード明細（突合用）。空なら突合UIは出さない。
+  List<_StmtLine> _pasted = [];
 
   @override
   void initState() {
@@ -483,6 +489,214 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
     await widget.onSaveActual(amount);
     if (mounted) setState(() => _actual = amount);
   }
+
+  /// カード明細をコピペ → 解析して突合用にセット。
+  Future<void> _pasteStatement() async {
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('カード明細を貼り付け'),
+        content: SizedBox(
+          width: 460,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                  'カード会社サイトの利用明細をコピーして貼り付けてください。\n'
+                  '（1行＝1明細。日付・店名・金額が混ざっていてもOK。金額だけ拾います）',
+                  style:
+                      TextStyle(fontSize: 11, color: V2Colors.textSecondary)),
+              const SizedBox(height: 10),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                maxLines: 10,
+                minLines: 6,
+                decoration: const InputDecoration(
+                  hintText: '2026/06/15  Amazon.co.jp  3,980\n'
+                      '06/18  スターバックス  ¥540 …',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('突合する')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final lines = _parseStatement(ctrl.text, _year);
+    if (!mounted) return;
+    if (lines.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('金額を読み取れる明細が見つかりませんでした')));
+      return;
+    }
+    setState(() => _pasted = lines);
+  }
+
+  /// 明細コピペ → 突合UI（ボタン＋結果）。
+  Widget _statementSection(List<core.Transaction> recorded) {
+    final children = <Widget>[
+      SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: _pasteStatement,
+          icon: const Icon(Icons.content_paste, size: 18),
+          label: Text(_pasted.isEmpty ? 'カード明細を貼り付けて突合' : '明細を貼り付け直す'),
+        ),
+      ),
+    ];
+
+    if (_pasted.isNotEmpty) {
+      // 金額で突合（記録1件は1回まで）。
+      final used = <int>{};
+      final missing = <_StmtLine>[]; // 明細にあり・記録なし＝記録漏れ
+      int matchedCount = 0;
+      for (final line in _pasted) {
+        int found = -1;
+        for (int i = 0; i < recorded.length; i++) {
+          if (used.contains(i)) continue;
+          if (recorded[i].amount == line.amount) {
+            found = i;
+            break;
+          }
+        }
+        if (found >= 0) {
+          used.add(found);
+          matchedCount++;
+        } else {
+          missing.add(line);
+        }
+      }
+      final extra = <core.Transaction>[]; // 記録あり・明細なし＝要確認
+      for (int i = 0; i < recorded.length; i++) {
+        if (!used.contains(i)) extra.add(recorded[i]);
+      }
+      final pastedTotal = _pasted.fold<int>(0, (s, l) => s + l.amount);
+      final missingTotal = missing.fold<int>(0, (s, l) => s + l.amount);
+
+      children.add(const SizedBox(height: V2Spacing.md));
+      // サマリー
+      children.add(Container(
+        padding: const EdgeInsets.all(V2Spacing.md),
+        decoration: BoxDecoration(
+          color: V2Colors.surfaceMuted,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: V2Colors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('貼り付け ${_pasted.length}件 / ${formatYen(pastedTotal)}',
+                style: V2Typography.caption
+                    .copyWith(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Wrap(spacing: 8, runSpacing: 4, children: [
+              _chip('一致 $matchedCount件', V2Colors.positive),
+              _chip('記録漏れ ${missing.length}件', V2Colors.negative),
+              _chip('要確認 ${extra.length}件', V2Colors.warning),
+            ]),
+          ],
+        ),
+      ));
+
+      // 記録漏れ（明細にあるが記録に無い）→ 追加で埋める
+      if (missing.isNotEmpty) {
+        children.add(const SizedBox(height: V2Spacing.sm));
+        children.add(Row(children: [
+          const Icon(Icons.error_outline,
+              size: 16, color: V2Colors.negative),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text('記録漏れ（明細にあるが未記録）合計 ${formatYen(missingTotal)}',
+                style: V2Typography.caption.copyWith(
+                    color: V2Colors.negative, fontWeight: FontWeight.w700)),
+          ),
+        ]));
+        children.add(const SizedBox(height: 6));
+        children.add(Container(
+          decoration: BoxDecoration(
+            color: V2Colors.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFFCA5A5)),
+          ),
+          child: Column(
+            children: [
+              for (int i = 0; i < missing.length; i++) ...[
+                if (i > 0) const Divider(height: 1, color: V2Colors.divider),
+                _MissingLineRow(
+                  line: missing[i],
+                  onAdd: () => widget.onAddAdjustment(missing[i].amount,
+                      description: missing[i].name, date: missing[i].date),
+                ),
+              ],
+            ],
+          ),
+        ));
+      }
+
+      // 要確認（記録にあるが明細に無い）→ 二重計上等の確認
+      if (extra.isNotEmpty) {
+        children.add(const SizedBox(height: V2Spacing.sm));
+        children.add(Row(children: [
+          const Icon(Icons.help_outline, size: 16, color: V2Colors.warning),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text('要確認（記録にあるが明細に無い）',
+                style: V2Typography.caption.copyWith(
+                    color: const Color(0xFF92400E),
+                    fontWeight: FontWeight.w700)),
+          ),
+        ]));
+        children.add(const SizedBox(height: 6));
+        children.add(Container(
+          decoration: BoxDecoration(
+            color: V2Colors.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFFCD34D)),
+          ),
+          child: Column(
+            children: [
+              for (int i = 0; i < extra.length; i++) ...[
+                if (i > 0) const Divider(height: 1, color: V2Colors.divider),
+                _ReconcileTxnRow(
+                  txn: extra[i],
+                  onEdit: () => widget.onEditTxn(extra[i]),
+                  onDelete: () => widget.onDeleteTxn(extra[i]),
+                ),
+              ],
+            ],
+          ),
+        ));
+      }
+    }
+
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
+  }
+
+  Widget _chip(String label, Color color) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: color.withValues(alpha: 0.4)),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -601,6 +815,11 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
                       ],
                     ),
                   ),
+                const SizedBox(height: V2Spacing.lg),
+                // 明細コピペ → 突合（記録漏れを炙り出す）
+                Text('明細コピペで突合', style: V2Typography.h2),
+                const SizedBox(height: V2Spacing.sm),
+                _statementSection(txns),
                 const SizedBox(height: V2Spacing.lg),
                 Row(
                   children: [
@@ -884,6 +1103,117 @@ class _ReconcileTxnRow extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════
+// 明細コピペの解析・突合
+// ═════════════════════════════════════════════════
+
+/// 貼り付けたカード明細の1行（日付・店名・金額）。
+class _StmtLine {
+  final DateTime? date;
+  final String name;
+  final int amount;
+  const _StmtLine(this.date, this.name, this.amount);
+}
+
+/// カード明細テキストを行ごとに解析する。
+/// 各行から金額（末尾の数字／¥付き）と日付・店名を推定。金額が取れない行は無視。
+List<_StmtLine> _parseStatement(String text, int year) {
+  // 末尾の金額（¥/\/￥ や 円 を許容、3桁区切りカンマ可）。
+  final amountRe = RegExp(r'[¥\\￥]?\s*([0-9][0-9,]*)\s*円?\s*$');
+  // 日付（YYYY/MM/DD / MM/DD / YYYY年MM月DD日 等）。
+  final dateRe =
+      RegExp(r'(\d{1,4})\s*[/\-.年]\s*(\d{1,2})(?:\s*[/\-.月]\s*(\d{1,2}))?');
+  // 合計・残高など明細でない行を除外。
+  final skipRe = RegExp(
+      r'(合計|小計|お支払|支払金額|請求(額|金額)|ご利用可能|利用可能|繰越|残高|キャッシング|手数料合計|お引き落とし|前回|今回)');
+
+  final out = <_StmtLine>[];
+  for (final raw in text.split('\n')) {
+    final line = raw.trim();
+    if (line.isEmpty) continue;
+    if (skipRe.hasMatch(line)) continue;
+    final am = amountRe.firstMatch(line);
+    if (am == null) continue;
+    final amt = int.tryParse(am.group(1)!.replaceAll(',', '')) ?? 0;
+    if (amt <= 0) continue;
+
+    DateTime? date;
+    final dm = dateRe.firstMatch(line);
+    if (dm != null) {
+      final g1 = int.parse(dm.group(1)!);
+      final g2 = int.parse(dm.group(2)!);
+      if (dm.group(3) != null) {
+        // YYYY/MM/DD（2桁年は2000年代へ）
+        final y = g1 < 100 ? 2000 + g1 : g1;
+        date = DateTime(y, g2, int.parse(dm.group(3)!));
+      } else {
+        // MM/DD（年は明細の対象年）
+        date = DateTime(year, g1, g2);
+      }
+    }
+
+    var name = line;
+    if (dm != null) name = name.replaceFirst(dm.group(0)!, ' ');
+    name = name.replaceFirst(am.group(0)!, ' ').trim();
+    // 余分な区切り文字を整理
+    name = name.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
+    out.add(_StmtLine(date, name.isEmpty ? '明細' : name, amt));
+  }
+  return out;
+}
+
+/// 突合の「記録漏れ」1行（明細にあるが記録に無い）。[追加]で支出登録へ。
+class _MissingLineRow extends StatelessWidget {
+  final _StmtLine line;
+  final VoidCallback onAdd;
+  const _MissingLineRow({required this.line, required this.onAdd});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+          horizontal: V2Spacing.md, vertical: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 38,
+            child: Text(
+                line.date != null
+                    ? '${line.date!.month}/${line.date!.day}'
+                    : '—',
+                style: V2Typography.micro
+                    .copyWith(color: V2Colors.textSecondary)),
+          ),
+          Expanded(
+            child: Text(line.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: V2Typography.body),
+          ),
+          const SizedBox(width: V2Spacing.sm),
+          Text(formatYen(line.amount),
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: V2Colors.negative,
+                  fontFeatures: V2Typography.tabularNums)),
+          const SizedBox(width: V2Spacing.sm),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              minimumSize: const Size(0, 32),
+            ),
+            onPressed: onAdd,
+            child: const Text('追加', style: TextStyle(fontSize: 12)),
+          ),
+        ],
       ),
     );
   }
