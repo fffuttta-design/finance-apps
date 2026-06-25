@@ -6,6 +6,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
+import '../../data/app_mode.dart';
+import '../../data/backup_repository.dart';
+import '../../data/settings_repository.dart';
+import '../../data/store_category_classifier.dart';
 import '../../data/transaction_repository.dart';
 import '../../utils/formatters.dart';
 import '../../utils/modal_input.dart';
@@ -389,6 +393,9 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
   /// 貼り付けたカード明細（突合用）。空なら突合UIは出さない。
   List<_StmtLine> _pasted = [];
 
+  /// 荒療治（CSVで置き換え）の実行中フラグ。
+  bool _replacing = false;
+
   @override
   void initState() {
     super.initState();
@@ -585,6 +592,128 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
     setState(() => _pasted = lines);
   }
 
+  /// CSV期間ラベル（"5/1〜5/31" など。日付不明なら "全期間"）。
+  String _rangeLabel(DateTime? lo, DateTime? hi) {
+    if (lo == null || hi == null) return '全期間';
+    return '${lo.month}/${lo.day}〜${hi.month}/${hi.day}';
+  }
+
+  /// 【荒療治】CSVの内容を正として、このカードの取引を置き換える。
+  /// 1) 実行前に自動バックアップ
+  /// 2) CSV期間内（lo〜hi）の既存カード取引を削除
+  /// 3) CSVの各行を新規取引として取り込み（科目は店名からAI推定）
+  Future<void> _replaceFromCsv(
+      List<core.Transaction> existing, DateTime? lo, DateTime? hi) async {
+    // 確認ダイアログ。
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('CSVで置き換えますか？'),
+        content: Text(
+            '「${widget.card.name}」のCSV期間内（${_rangeLabel(lo, hi)}）の'
+            '既存取引 ${existing.length}件を削除し、CSVの ${_pasted.length}件を'
+            '新規に取り込みます（科目は店名からAI推定）。\n\n'
+            'この操作は元に戻せません。実行直前に自動バックアップを取ります。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style:
+                FilledButton.styleFrom(backgroundColor: const Color(0xFFEA580C)),
+            child: const Text('置き換える'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    setState(() => _replacing = true);
+    try {
+      // 1) バックアップ。
+      try {
+        await BackupRepository.instance
+            .savePreImportSnapshot(reason: 'pre-card-reset');
+      } catch (_) {/* バックアップ失敗でも続行はするが、原則成功する */}
+
+      // 2) 現モードのカテゴリ一覧を用意（AI推定用）。
+      final cfg = await SettingsRepository().loadCategories();
+      final catMenu = <String, List<String>>{};
+      for (final m in cfg.majors) {
+        if (m.inactive) continue;
+        catMenu[m.name] = m.subs;
+      }
+
+      // 3) 店名からAIで科目を一括推定。
+      final stores = _pasted.map((l) => l.name).toList();
+      List<Map<String, String>?> cats;
+      try {
+        cats = await StoreCategoryClassifier.instance.classify(stores, catMenu);
+      } catch (_) {
+        cats = List<Map<String, String>?>.filled(stores.length, null);
+      }
+
+      // 4) 既存取引を削除。
+      var deleted = 0;
+      for (final t in existing) {
+        try {
+          await _txRepo.delete(t.id);
+          deleted++;
+        } catch (_) {}
+      }
+
+      // 5) CSV各行を新規取引として追加。
+      final minDate = AppModeManager.instance.current.minDate;
+      final ymFirst =
+          DateTime(int.parse(widget.ym.split('-')[0]), int.parse(widget.ym.split('-')[1]));
+      final baseId = DateTime.now().microsecondsSinceEpoch;
+      var added = 0, skipped = 0;
+      for (var i = 0; i < _pasted.length; i++) {
+        final l = _pasted[i];
+        final date = l.date ?? ymFirst;
+        if (date.isBefore(minDate)) {
+          skipped++;
+          continue;
+        }
+        final c = cats.length > i ? cats[i] : null;
+        final tx = core.Transaction(
+          id: '$baseId-$i',
+          date: date,
+          type: core.TransactionType.expense,
+          category: core.Category(
+            major: c?['major'] ?? '未分類',
+            sub: c?['sub'] ?? '',
+          ),
+          paymentMethod: widget.card.name,
+          description: l.name,
+          amount: l.amount,
+          store: l.name,
+        );
+        try {
+          await _txRepo.add(tx);
+          added++;
+        } catch (_) {}
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _replacing = false;
+        _pasted = [];
+      });
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('置き換え完了：$deleted件を削除・$added件を取り込みました'
+              '${skipped > 0 ? '（カットオフ前の$skipped件はスキップ）' : ''}')));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _replacing = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('置き換えに失敗しました: $e')));
+    }
+  }
+
   /// 明細コピペ／CSV → 突合UI（ボタン＋結果）。
   Widget _statementSection() {
     final children = <Widget>[
@@ -674,6 +803,55 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
               _chip('記録漏れ ${missing.length}件', V2Colors.negative),
               _chip('要確認 ${extra.length}件', V2Colors.warning),
             ]),
+          ],
+        ),
+      ));
+
+      // ── 荒療治: この明細でカード取引を丸ごと置き換える ──
+      // 棚卸しのコストが高すぎる時の最終手段。CSV期間の既存カード取引を削除し、
+      // CSVの各行を新規取引として取り込む（科目は店名からAI推定）。
+      children.add(const SizedBox(height: V2Spacing.sm));
+      children.add(Container(
+        padding: const EdgeInsets.all(V2Spacing.sm),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF7ED),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFFDBA74)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('荒療治：この明細を正として置き換える',
+                style: V2Typography.caption.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF9A3412))),
+            const SizedBox(height: 2),
+            Text(
+                'CSVの期間内（${_rangeLabel(lo, hi)}）の「${widget.card.name}」既存取引を削除し、'
+                'CSV ${_pasted.length}件を新規取り込み（科目は店名からAI推定）。実行前に自動バックアップ。',
+                style: V2Typography.caption
+                    .copyWith(color: const Color(0xFF9A3412), fontSize: 11)),
+            const SizedBox(height: 6),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _replacing
+                    ? null
+                    : () => _replaceFromCsv(pool, lo, hi),
+                icon: _replacing
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.sync_problem, size: 18),
+                label: Text(_replacing
+                    ? '置き換え中…'
+                    : 'CSVで置き換える（既存${pool.length}件を削除）'),
+                style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFEA580C)),
+              ),
+            ),
           ],
         ),
       ));
