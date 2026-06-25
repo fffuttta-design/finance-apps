@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:charset/charset.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
@@ -545,29 +548,93 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
     setState(() => _pasted = lines);
   }
 
-  /// 明細コピペ → 突合UI（ボタン＋結果）。
-  Widget _statementSection(List<core.Transaction> recorded) {
+  /// カード明細CSVを選択 → Shift-JIS/UTF-8 を判定して解析 → 突合用にセット。
+  Future<void> _importCsv() async {
+    final res = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['csv'],
+      withData: true,
+    );
+    if (res == null || res.files.isEmpty) return;
+    final bytes = res.files.first.bytes;
+    if (bytes == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('ファイルを読み込めませんでした')));
+      }
+      return;
+    }
+    // UTF-8 で厳密に読めなければ Shift-JIS とみなす（カード明細は大半 Shift-JIS）。
+    String content;
+    try {
+      content = utf8.decode(bytes);
+    } catch (_) {
+      try {
+        content = shiftJis.decode(bytes);
+      } catch (_) {
+        content = latin1.decode(bytes);
+      }
+    }
+    final lines = _parseCardCsv(content, _year);
+    if (!mounted) return;
+    if (lines.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('明細を読み取れませんでした（対応していないCSV様式かもしれません）')));
+      return;
+    }
+    setState(() => _pasted = lines);
+  }
+
+  /// 明細コピペ／CSV → 突合UI（ボタン＋結果）。
+  Widget _statementSection() {
     final children = <Widget>[
-      SizedBox(
-        width: double.infinity,
-        child: OutlinedButton.icon(
-          onPressed: _pasteStatement,
-          icon: const Icon(Icons.content_paste, size: 18),
-          label: Text(_pasted.isEmpty ? 'カード明細を貼り付けて突合' : '明細を貼り付け直す'),
-        ),
+      Row(
+        children: [
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: _importCsv,
+              icon: const Icon(Icons.upload_file, size: 18),
+              label: Text(_pasted.isEmpty ? 'CSVを読み込んで突合' : 'CSVを読み込み直す'),
+            ),
+          ),
+          const SizedBox(width: V2Spacing.sm),
+          OutlinedButton.icon(
+            onPressed: _pasteStatement,
+            icon: const Icon(Icons.content_paste, size: 18),
+            label: const Text('貼り付け'),
+          ),
+        ],
       ),
     ];
 
     if (_pasted.isNotEmpty) {
+      // 突合対象 = このカード払いの取引のうち「貼り付け明細がカバーする期間」のもの。
+      // （請求月と利用月はズレるため、表示中の月では絞らない。明細の日付範囲±2日で照合）
+      DateTime? minD, maxD;
+      for (final l in _pasted) {
+        if (l.date == null) continue;
+        if (minD == null || l.date!.isBefore(minD)) minD = l.date;
+        if (maxD == null || l.date!.isAfter(maxD)) maxD = l.date;
+      }
+      final lo = minD?.subtract(const Duration(days: 2));
+      final hi = maxD?.add(const Duration(days: 2));
+      final pool = _all.where((t) {
+        if (t.type != core.TransactionType.expense) return false;
+        if (t.paymentMethod != widget.card.name) return false;
+        if (lo != null && t.date.isBefore(lo)) return false;
+        if (hi != null && t.date.isAfter(hi)) return false;
+        return true;
+      }).toList();
+
       // 金額で突合（記録1件は1回まで）。
       final used = <int>{};
       final missing = <_StmtLine>[]; // 明細にあり・記録なし＝記録漏れ
       int matchedCount = 0;
       for (final line in _pasted) {
         int found = -1;
-        for (int i = 0; i < recorded.length; i++) {
+        for (int i = 0; i < pool.length; i++) {
           if (used.contains(i)) continue;
-          if (recorded[i].amount == line.amount) {
+          if (pool[i].amount == line.amount) {
             found = i;
             break;
           }
@@ -580,8 +647,8 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
         }
       }
       final extra = <core.Transaction>[]; // 記録あり・明細なし＝要確認
-      for (int i = 0; i < recorded.length; i++) {
-        if (!used.contains(i)) extra.add(recorded[i]);
+      for (int i = 0; i < pool.length; i++) {
+        if (!used.contains(i)) extra.add(pool[i]);
       }
       final pastedTotal = _pasted.fold<int>(0, (s, l) => s + l.amount);
       final missingTotal = missing.fold<int>(0, (s, l) => s + l.amount);
@@ -819,7 +886,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
                 // 明細コピペ → 突合（記録漏れを炙り出す）
                 Text('明細コピペで突合', style: V2Typography.h2),
                 const SizedBox(height: V2Spacing.sm),
-                _statementSection(txns),
+                _statementSection(),
                 const SizedBox(height: V2Spacing.lg),
                 Row(
                   children: [
@@ -1217,4 +1284,103 @@ class _MissingLineRow extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── カード明細CSVの解析（金額のみで突合するため金額列の確実な取得を最優先） ──
+
+/// カード明細CSVを解析して明細行リストにする。
+/// 対応様式: ① Orico「ご利用明細」(ヘッダに「ご利用日」「ご利用金額」)
+///          ② 三井住友 等(1列目=yyyy/mm/dd, 2列目=店名, 3列目=金額)
+List<_StmtLine> _parseCardCsv(String content, int year) {
+  final rows =
+      const LineSplitter().convert(content).map(_splitCsvLine).toList();
+
+  // ── 様式①: 「ご利用日」「ご利用金額」ヘッダを持つ ──
+  final headerIdx = rows.indexWhere((c) =>
+      c.any((x) => x.contains('ご利用日')) &&
+      c.any((x) => x.contains('ご利用金額')));
+  if (headerIdx >= 0) {
+    final header = rows[headerIdx];
+    var amountCol = header.indexWhere((x) => x.contains('ご利用金額'));
+    var nameCol =
+        header.indexWhere((x) => x.contains('店名') || x.contains('商品名'));
+    if (amountCol < 0) amountCol = 8;
+    if (nameCol < 0) nameCol = 1;
+    final out = <_StmtLine>[];
+    for (int i = headerIdx + 1; i < rows.length; i++) {
+      final c = rows[i];
+      if (c.isEmpty) continue;
+      final date = _parseAnyDate(c[0], year);
+      if (date == null) continue;
+      if (amountCol >= c.length) continue;
+      final amt = _yen(c[amountCol]);
+      if (amt <= 0) continue;
+      final name = nameCol < c.length ? c[nameCol].trim() : '';
+      out.add(_StmtLine(date, name.isEmpty ? '明細' : name, amt));
+    }
+    if (out.isNotEmpty) return out;
+  }
+
+  // ── 様式②: 1列目=日付 / 2列目=店名 / 3列目=金額 ──
+  final out = <_StmtLine>[];
+  for (final c in rows) {
+    if (c.length < 3) continue;
+    final date = _parseAnyDate(c[0], year);
+    if (date == null) continue;
+    final amt = _yen(c[2]);
+    if (amt <= 0) continue;
+    final name = c[1].trim();
+    out.add(_StmtLine(date, name.isEmpty ? '明細' : name, amt));
+  }
+  return out;
+}
+
+/// CSVの1行をダブルクオート対応で分割。
+List<String> _splitCsvLine(String line) {
+  final out = <String>[];
+  final sb = StringBuffer();
+  var inQ = false;
+  for (int i = 0; i < line.length; i++) {
+    final ch = line[i];
+    if (ch == '"') {
+      if (inQ && i + 1 < line.length && line[i + 1] == '"') {
+        sb.write('"');
+        i++;
+      } else {
+        inQ = !inQ;
+      }
+    } else if (ch == ',' && !inQ) {
+      out.add(sb.toString());
+      sb.clear();
+    } else {
+      sb.write(ch);
+    }
+  }
+  out.add(sb.toString());
+  return out;
+}
+
+/// 金額セルから数字だけ抜いて整数化（¥ \ ￥ , 円 " 等を除去）。
+int _yen(String s) {
+  final digits = s.replaceAll(RegExp(r'[^0-9]'), '');
+  if (digits.isEmpty) return 0;
+  return int.tryParse(digits) ?? 0;
+}
+
+/// 日付セルを解析（yyyy/mm/dd・yyyy-mm-dd・yyyy年m月d日・mm/dd）。
+DateTime? _parseAnyDate(String s, int year) {
+  final t = s.trim();
+  var m = RegExp(r'^(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})').firstMatch(t);
+  if (m != null) {
+    return DateTime(int.parse(m[1]!), int.parse(m[2]!), int.parse(m[3]!));
+  }
+  m = RegExp(r'^(\d{4})年(\d{1,2})月(\d{1,2})日').firstMatch(t);
+  if (m != null) {
+    return DateTime(int.parse(m[1]!), int.parse(m[2]!), int.parse(m[3]!));
+  }
+  m = RegExp(r'^(\d{1,2})[/\-](\d{1,2})$').firstMatch(t);
+  if (m != null) {
+    return DateTime(year, int.parse(m[1]!), int.parse(m[2]!));
+  }
+  return null;
 }
