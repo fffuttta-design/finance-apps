@@ -1,1 +1,1 @@
-{"version":"1.0.322","buildNumber":"323","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.322/futa-finance-v1.0.322.apk","releaseNotes":"ホームの「支払方法別の内訳」カードを既定で展開した状態で表示するようにしました。"}
+{"version":"1.0.323","buildNumber":"324","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.323/futa-finance-v1.0.323.apk","releaseNotes":"クレカ棚卸しに「この月を初期化（カード×月の取引を一括削除）」ボタンを追加しました。CSV不要・実行前に自動バックアップ。"}
