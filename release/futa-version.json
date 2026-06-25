@@ -1,1 +1,1 @@
-{"version":"1.0.319","buildNumber":"320","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.319/futa-finance-v1.0.319.apk","releaseNotes":"請求書PDFの一括取り込みを追加（開発中タブ「取込」）。複数の売上/支払請求書PDFをAIが読み取り、取引先・日付・金額を抽出→確認・修正してまとめて記帳できます。売上=収入/支払・外注=支出。"}
+{"version":"1.0.320","buildNumber":"321","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.320/futa-finance-v1.0.320.apk","releaseNotes":"支出明細一覧をリッチ化：支払方法をアイコン付きで表示、カテゴリを「大›小」表示、色付きバッジと左アクセントで見やすくしました。"}
