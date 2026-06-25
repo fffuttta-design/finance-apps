@@ -1,6 +1,6 @@
 # FutaFinance 仕様書
 
-> **最終更新: 2026-06-25 / v1.0.313+314**
+> **最終更新: 2026-06-25 / v1.0.314+315**
 > 変更があるたびにこのファイルを編集してバージョンを更新すること。
 
 ---
@@ -394,8 +394,10 @@ class MonthlySnapshot {
 クレカごとに「**予定（明細合計）**＝当月そのカード払いで記録した支出の合計」と
 「**実際（カード通知）**＝月末に実際に引き落とされた請求額（手入力）」を並べ、差額で棚卸しを促す。
 
+- 実装は共有ウィジェット `lib/v2/widgets/credit_card_reconcile.dart`（`CreditCardBillingSection` ＋
+  `showCardReconcileSheet()`）。**モバイル幅（`v2_expenses`）と PC幅リッチUI（`rich_expenses`・支出合計のすぐ下）の両方**で表示（v1.0.314〜）。
 - `RegisteredCreditCard.monthlyActualBillings`（月キー `YYYY-MM` → 実際請求額・円）に保存。
-- 一覧の各カード行をタップ → **棚卸しシート**（`_CardReconcileSheet`）を開く（v1.0.313〜）。
+- 一覧の各カード行をタップ → **棚卸しシート**を開く（v1.0.313〜）。
   - そのカード払いの**当月明細を一覧**表示。各行タップで取引を編集、ゴミ箱で削除。
   - **実際請求額を入力**（予定との差額を即時計算）。
   - 差額 > 0（実際が多い＝記録漏れの疑い）: **「差額ぶんを支出として記録」**ボタンで、
@@ -583,5 +585,5 @@ class AppModeManager extends ChangeNotifier {
 
 | 種別 | バージョン |
 |---|---|
-| Flutter アプリ | 1.0.313+314 |
+| Flutter アプリ | 1.0.314+315 |
 | Electron Desktop | 1.0.278 / buildNumber 279 |

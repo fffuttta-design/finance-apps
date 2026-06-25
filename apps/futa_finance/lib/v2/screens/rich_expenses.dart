@@ -4,15 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../../data/app_mode.dart';
+import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
+import '../../screens/expense_input_screen.dart';
 import '../../screens/expense_list_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
 import '../../utils/formatters.dart';
+import '../../utils/modal_input.dart';
 import '../../widgets/brand_logo.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
+import '../widgets/credit_card_reconcile.dart';
 
 /// 新デザイン（リッチUI）の経費／支出タブ。
 /// 月サマリー → カテゴリ内訳 → 明細リスト。既存 V2ExpensesScreen は温存。
@@ -27,13 +31,18 @@ class RichExpensesScreen extends StatefulWidget {
 class _RichExpensesScreenState extends State<RichExpensesScreen>
     with ModeAwareMixin {
   final _txRepo = TransactionRepository.instance;
+  final _settings = SettingsRepository();
 
   StreamSubscription<List<core.Transaction>>? _sub;
   List<core.Transaction> _transactions = [];
   List<core.Subscription> _subs = [];
+  core.PaymentMethodsConfig _payments = core.PaymentMethodsConfig.empty();
   bool _loading = true;
 
   late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+
+  String get _ymKey =>
+      '${_month.year}-${_month.month.toString().padLeft(2, '0')}';
 
   @override
   void onModeChanged() => _load();
@@ -57,12 +66,32 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   Future<void> _load() async {
     final txns = await _txRepo.loadAll();
     final subs = await SubscriptionRepository.instance.load();
+    final payments = await _settings.loadPayments();
     if (!mounted) return;
     setState(() {
       _transactions = txns;
       _subs = subs.subscriptions;
+      _payments = payments;
       _loading = false;
     });
+  }
+
+  /// クレカ照合に表示するカードが当月あるか（無ければセクション余白を出さない）。
+  bool get _hasReconcileCards {
+    final ym = _ymKey;
+    for (final c in _payments.creditCards) {
+      if (c.inactive) continue;
+      if (c.monthlyActualBillings.containsKey(ym)) return true;
+      final planned = _transactions
+          .where((t) =>
+              t.type == core.TransactionType.expense &&
+              t.paymentMethod == c.name &&
+              t.date.year == _month.year &&
+              t.date.month == _month.month)
+          .fold<int>(0, (s, t) => s + t.amount);
+      if (planned > 0) return true;
+    }
+    return false;
   }
 
   void _shiftMonth(int delta) {
@@ -110,6 +139,82 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
       context,
       MaterialPageRoute(
           builder: (_) => TransactionDetailScreen(transaction: t)),
+    );
+    if (changed == true && mounted) await _load();
+  }
+
+  /// 明細の削除（確認 → 削除 → 再読込）。
+  Future<void> _deleteTxn(core.Transaction t) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: const Text('この明細を削除しますか？'),
+        content: Text(
+            '「${t.description.isEmpty ? t.category.major : t.description}」'
+            ' / -${formatYen(t.amount)}\nこの操作は取り消せません。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626)),
+            onPressed: () => Navigator.pop(dctx, true),
+            child: const Text('削除する'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await _txRepo.delete(t.id);
+    if (mounted) await _load();
+  }
+
+  /// クレカの実際請求金額を保存する。
+  Future<void> _saveCreditCardActual(
+      core.RegisteredCreditCard card, String ym, int? amount) async {
+    final idx = _payments.creditCards.indexWhere((c) => c.id == card.id);
+    if (idx < 0) return;
+    final m = Map<String, int>.from(card.monthlyActualBillings);
+    if (amount == null || amount <= 0) {
+      m.remove(ym);
+    } else {
+      m[ym] = amount;
+    }
+    final newCards = [..._payments.creditCards];
+    newCards[idx] = card.copyWith(monthlyActualBillings: m);
+    await _settings.savePayments(_payments.copyWith(creditCards: newCards));
+    if (mounted) await _load();
+  }
+
+  /// クレカ引落の棚卸しシートを開く。
+  Future<void> _openCardReconcile(core.RegisteredCreditCard card) async {
+    final ym = _ymKey;
+    await showCardReconcileSheet(
+      context,
+      card: card,
+      ym: ym,
+      onSaveActual: (amount) => _saveCreditCardActual(card, ym, amount),
+      onEditTxn: _edit,
+      onDeleteTxn: _deleteTxn,
+      onAddAdjustment: (amount) => _addCardAdjustment(card, amount),
+    );
+    if (mounted) await _load();
+  }
+
+  /// 差額ぶんの「調整取引」を追加する（記録漏れ補完）。
+  /// 支払方法＝当カード／日付＝表示月末をプリフィルした支出入力を開く。
+  Future<void> _addCardAdjustment(
+      core.RegisteredCreditCard card, int amount) async {
+    final lastDay = DateTime(_month.year, _month.month + 1, 0);
+    final changed = await showInputSheet<bool>(
+      context,
+      ExpenseInputScreen(
+        initialPaymentMethod: card.name,
+        initialAmount: amount > 0 ? amount : null,
+        initialDate: lastDay,
+        initialDescription: 'クレカ差額調整',
+      ),
     );
     if (changed == true && mounted) await _load();
   }
@@ -198,7 +303,18 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 ),
               ),
               const SizedBox(height: V2Spacing.md),
-              // カテゴリ内訳（一番上）
+              // クレカ引落照合・棚卸し（支出合計のすぐ下・目立つ位置）
+              CreditCardBillingSection(
+                cards: _payments.creditCards
+                    .where((c) => !c.inactive)
+                    .toList(),
+                transactions: _transactions,
+                ym: _ymKey,
+                onOpenReconcile: _openCardReconcile,
+              ),
+              if (_hasReconcileCards)
+                const SizedBox(height: V2Spacing.md),
+              // カテゴリ内訳
               if (majorEntries.isNotEmpty) ...[
                 Container(
                   padding: const EdgeInsets.all(V2Spacing.md),
