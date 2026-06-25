@@ -345,16 +345,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     );
   }
 
-  /// カテゴリ表示ラベル（概要タブと同じ：小カテゴリ優先・無ければ大）。
-  String _catLabel(core.Category c) {
-    final major = c.major.trim();
-    final sub = c.sub.trim();
-    if (major.isEmpty && sub.isEmpty) return '未分類';
-    if (sub.isEmpty) return major;
-    return sub;
-  }
-
-  /// ミュートなグレーバッジ（概要タブと同じ見た目）。
+  /// ミュートなグレーバッジ（まとめ件数などに使う）。
   Widget _badge(String label) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
@@ -398,8 +389,9 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
           fontWeight: FontWeight.w700,
           color: Color(0xFF475569)));
 
-  /// 白カード（角丸・枠付き・左右余白）。概要タブの行デザインに合わせる。
-  Widget _card({required Widget child, VoidCallback? onTap}) {
+  /// 白カード（角丸・枠付き・左右余白）。左端にカテゴリ色のアクセントバーを付ける。
+  Widget _card(
+      {required Widget child, VoidCallback? onTap, Color? accent}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
       child: Material(
@@ -409,49 +401,174 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFFE5E7EB)),
             ),
-            child: child,
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(width: 4, color: accent ?? const Color(0xFFE5E7EB)),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+                      child: child,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 
-  /// 単品行（1取引）。白カード：日付｜カテゴリ/振替バッジ＋内容｜金額。
+  /// 大カテゴリ名から安定した色を作る（バッジ・アクセントの色付けに使う）。
+  Color _catColor(String major) {
+    final m = major.trim();
+    if (m.isEmpty) return const Color(0xFF9CA3AF);
+    var h = 0;
+    for (final c in m.codeUnits) {
+      h = (h * 31 + c) & 0x7fffffff;
+    }
+    return HSLColor.fromAHSL(1, (h % 360).toDouble(), 0.5, 0.45).toColor();
+  }
+
+  /// カテゴリバッジ：「大カテゴリ › 小カテゴリ」を色付きで表示。
+  Widget _catBadge(core.Category c, Color color) {
+    final major = c.major.trim();
+    final sub = c.sub.trim();
+    final label = (major.isEmpty && sub.isEmpty)
+        ? '未分類'
+        : (sub.isEmpty ? major : '$major › $sub');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: color.withValues(alpha: 0.30)),
+      ),
+      child: Text(label,
+          style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: HSLColor.fromColor(color)
+                  .withLightness(0.32)
+                  .toColor())),
+    );
+  }
+
+  /// 支払方法に合うアイコンを推定する。
+  IconData _paymentIcon(String method) {
+    final s = method.toLowerCase();
+    if (method.contains('現金')) return Icons.payments_outlined;
+    if (method.contains('カード') ||
+        method.contains('クレカ') ||
+        method.contains('オリコ') ||
+        s.contains('card') ||
+        s.contains('visa') ||
+        s.contains('orico')) {
+      return Icons.credit_card;
+    }
+    if (method.contains('銀行') ||
+        method.contains('振込') ||
+        method.contains('引落') ||
+        s.contains('bank')) {
+      return Icons.account_balance_outlined;
+    }
+    if (s.contains('suica') ||
+        s.contains('paypay') ||
+        s.contains('quicpay') ||
+        s.contains('id') ||
+        method.contains('電子') ||
+        method.contains('チャージ')) {
+      return Icons.contactless_outlined;
+    }
+    return Icons.payment_outlined;
+  }
+
+  /// 支払方法チップ（アイコン＋名称）。空なら何も出さない。
+  Widget _paymentChip(String method) {
+    final m = method.trim();
+    if (m.isEmpty) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(_paymentIcon(m), size: 12, color: const Color(0xFF64748B)),
+          const SizedBox(width: 3),
+          Text(m,
+              style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF64748B))),
+        ],
+      ),
+    );
+  }
+
+  /// 日付（曜日付き）。行の左側に縦並びで表示。
+  Widget _dateCol(DateTime d) => SizedBox(
+        width: 52,
+        child: dateWeekdayText(d,
+            baseStyle: const TextStyle(
+                fontSize: 12,
+                fontFamily: 'monospace',
+                color: Color(0xFF6B7280))),
+      );
+
+  /// 単品行（1取引）。白カード：日付｜内容＋（カテゴリ/支払方法）｜金額。
   Widget _singleRow(core.Transaction t) {
     final isTransfer = t.type == core.TransactionType.transfer;
+    final accent =
+        isTransfer ? const Color(0xFF0EA5E9) : _catColor(t.category.major);
+    // 振替は「振替元 → 振替先」を支払方法の代わりに表示する。
+    final payLabel = isTransfer
+        ? [t.transferFromAccount, t.transferToAccount]
+            .where((s) => (s ?? '').trim().isNotEmpty)
+            .join(' → ')
+        : t.paymentMethod;
     return _card(
       onTap: () => _editRow(t),
+      accent: accent,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          SizedBox(
-            width: 58,
-            child: dateWeekdayText(t.date,
-                baseStyle: const TextStyle(
-                    fontSize: 12,
-                    fontFamily: 'monospace',
-                    color: Color(0xFF6B7280))),
-          ),
-          const SizedBox(width: 8),
+          _dateCol(t.date),
+          const SizedBox(width: 10),
           Expanded(
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                isTransfer ? _transferBadge() : _badge(_catLabel(t.category)),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    t.description.isEmpty ? '—' : t.description,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF111827)),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                Text(
+                  t.description.isEmpty ? '—' : t.description,
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF111827)),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+                const SizedBox(height: 5),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    isTransfer
+                        ? _transferBadge()
+                        : _catBadge(t.category, accent),
+                    _paymentChip(payLabel),
+                  ],
                 ),
               ],
             ),
@@ -471,31 +588,43 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
         .map((t) => t.store?.trim() ?? '')
         .firstWhere((s) => s.isNotEmpty, orElse: () => '');
     final title = store.isNotEmpty ? store : 'まとめ記録';
+    final accent = _catColor(first.category.major);
     return _card(
       onTap: () => _showGroupDetail(m),
+      accent: accent,
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          SizedBox(
-            width: 58,
-            child: dateWeekdayText(first.date,
-                baseStyle: const TextStyle(
-                    fontSize: 12,
-                    fontFamily: 'monospace',
-                    color: Color(0xFF6B7280))),
-          ),
-          const SizedBox(width: 8),
+          _dateCol(first.date),
+          const SizedBox(width: 10),
           Expanded(
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _badge('🧾 ${m.length}件まとめ'),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(title,
-                      style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF111827)),
-                      overflow: TextOverflow.ellipsis),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(title,
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF111827)),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _badge('🧾 ${m.length}件まとめ'),
+                    _catBadge(first.category, accent),
+                    _paymentChip(first.paymentMethod),
+                  ],
                 ),
               ],
             ),
