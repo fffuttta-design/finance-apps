@@ -637,10 +637,11 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
     final icons = HouseholdService.instance.memberIcons;
     final name = names[m.uid] ?? 'パートナー';
     final icon = icons[m.uid];
-    final time = m.createdAt != null
-        ? '${m.createdAt!.hour.toString().padLeft(2, '0')}:'
-            '${m.createdAt!.minute.toString().padLeft(2, '0')}'
-        : '';
+    // createdAt はサーバー時刻。自分の送信直後だけ確定待ちで null になるので、
+    // その間は端末の現在時刻で埋めて、送った瞬間から時刻が出るようにする。
+    final at = m.createdAt ?? DateTime.now();
+    final time = '${at.hour.toString().padLeft(2, '0')}:'
+        '${at.minute.toString().padLeft(2, '0')}';
     final avatar = CircleAvatar(
       radius: 16,
       backgroundColor: AppColors.pinkSoft,

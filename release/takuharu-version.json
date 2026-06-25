@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.82",
-    "buildNumber":  "87",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.82/takuharu-finance-v0.2.82.apk",
-    "releaseNotes":  "レシート読み取りで記録するときも店名を編集できるように（保存時に全品目へ反映）"
+    "version":  "0.2.83",
+    "buildNumber":  "88",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.83/takuharu-finance-v0.2.83.apk",
+    "releaseNotes":  "チャットで自分が送信した直後から送信時刻が表示されるように改善"
 }
