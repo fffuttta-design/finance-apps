@@ -6,11 +6,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
-import '../../data/app_mode.dart';
 import '../../data/backup_repository.dart';
-import '../../data/settings_repository.dart';
-import '../../data/store_category_classifier.dart';
 import '../../data/transaction_repository.dart';
+import '../../screens/card_csv_import_screen.dart';
 import '../../utils/formatters.dart';
 import '../../utils/modal_input.dart';
 import '../../utils/thousands_separator_input_formatter.dart';
@@ -598,119 +596,25 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
     return '${lo.month}/${lo.day}〜${hi.month}/${hi.day}';
   }
 
-  /// 【荒療治】CSVの内容を正として、このカードの取引を置き換える。
-  /// 1) 実行前に自動バックアップ
-  /// 2) CSV期間内（lo〜hi）の既存カード取引を削除
-  /// 3) CSVの各行を新規取引として取り込み（科目は店名からAI推定）
-  Future<void> _replaceFromCsv(
-      List<core.Transaction> existing, DateTime? lo, DateTime? hi) async {
-    // 確認ダイアログ。
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('CSVで置き換えますか？'),
-        content: Text(
-            '「${widget.card.name}」のCSV期間内（${_rangeLabel(lo, hi)}）の'
-            '既存取引 ${existing.length}件を削除し、CSVの ${_pasted.length}件を'
-            '新規に取り込みます（科目は店名からAI推定）。\n\n'
-            'この操作は元に戻せません。実行直前に自動バックアップを取ります。'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('キャンセル')),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style:
-                FilledButton.styleFrom(backgroundColor: const Color(0xFFEA580C)),
-            child: const Text('置き換える'),
-          ),
-        ],
+  /// 【荒療治】CSV明細を「正」として取り込むプレビュー画面へ遷移する。
+  /// プレビューで店名の編集・AIによる科目提案・下書き保存を行い、確定で
+  /// CSV期間内の既存カード取引を削除→編集後の内容で一括記帳する。
+  Future<void> _openCsvImport() async {
+    final lines = [
+      for (final l in _pasted) CardCsvLine(l.date, l.name, l.amount),
+    ];
+    final done = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => CardCsvImportScreen(
+          card: widget.card,
+          ym: widget.ym,
+          lines: lines,
+        ),
       ),
     );
-    if (ok != true) return;
-
-    setState(() => _replacing = true);
-    try {
-      // 1) バックアップ。
-      try {
-        await BackupRepository.instance
-            .savePreImportSnapshot(reason: 'pre-card-reset');
-      } catch (_) {/* バックアップ失敗でも続行はするが、原則成功する */}
-
-      // 2) 現モードのカテゴリ一覧を用意（AI推定用）。
-      final cfg = await SettingsRepository().loadCategories();
-      final catMenu = <String, List<String>>{};
-      for (final m in cfg.majors) {
-        if (m.inactive) continue;
-        catMenu[m.name] = m.subs;
-      }
-
-      // 3) 店名からAIで科目を一括推定。
-      final stores = _pasted.map((l) => l.name).toList();
-      List<Map<String, String>?> cats;
-      try {
-        cats = await StoreCategoryClassifier.instance.classify(stores, catMenu);
-      } catch (_) {
-        cats = List<Map<String, String>?>.filled(stores.length, null);
-      }
-
-      // 4) 既存取引を削除。
-      var deleted = 0;
-      for (final t in existing) {
-        try {
-          await _txRepo.delete(t.id);
-          deleted++;
-        } catch (_) {}
-      }
-
-      // 5) CSV各行を新規取引として追加。
-      final minDate = AppModeManager.instance.current.minDate;
-      final ymFirst =
-          DateTime(int.parse(widget.ym.split('-')[0]), int.parse(widget.ym.split('-')[1]));
-      final baseId = DateTime.now().microsecondsSinceEpoch;
-      var added = 0, skipped = 0;
-      for (var i = 0; i < _pasted.length; i++) {
-        final l = _pasted[i];
-        final date = l.date ?? ymFirst;
-        if (date.isBefore(minDate)) {
-          skipped++;
-          continue;
-        }
-        final c = cats.length > i ? cats[i] : null;
-        final tx = core.Transaction(
-          id: '$baseId-$i',
-          date: date,
-          type: core.TransactionType.expense,
-          category: core.Category(
-            major: c?['major'] ?? '未分類',
-            sub: c?['sub'] ?? '',
-          ),
-          paymentMethod: widget.card.name,
-          description: l.name,
-          amount: l.amount,
-          store: l.name,
-        );
-        try {
-          await _txRepo.add(tx);
-          added++;
-        } catch (_) {}
-      }
-
-      if (!mounted) return;
-      setState(() {
-        _replacing = false;
-        _pasted = [];
-      });
+    if (done == true && mounted) {
+      setState(() => _pasted = []);
       await _load();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('置き換え完了：$deleted件を削除・$added件を取り込みました'
-              '${skipped > 0 ? '（カットオフ前の$skipped件はスキップ）' : ''}')));
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _replacing = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('置き換えに失敗しました: $e')));
     }
   }
 
@@ -890,19 +794,10 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: _replacing
-                    ? null
-                    : () => _replaceFromCsv(pool, lo, hi),
-                icon: _replacing
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.sync_problem, size: 18),
-                label: Text(_replacing
-                    ? '置き換え中…'
-                    : 'CSVで置き換える（既存${pool.length}件を削除）'),
+                onPressed: () => _openCsvImport(),
+                icon: const Icon(Icons.sync_problem, size: 18),
+                label: Text(
+                    'CSVで置き換える（プレビュー・既存${pool.length}件を削除）'),
                 style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFFEA580C)),
               ),
