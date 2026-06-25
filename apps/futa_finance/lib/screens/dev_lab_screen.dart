@@ -10,6 +10,7 @@ import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/app_mode.dart';
 import '../data/budget_item.dart';
+import '../data/invoice_extractor.dart';
 import '../data/budget_item_repository.dart';
 import '../data/liability.dart';
 import '../data/liability_repository.dart';
@@ -21,6 +22,7 @@ import '../data/subscription_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
+import 'invoice_import_screen.dart';
 import 'paste_import_screen.dart';
 
 /// 🧪 開発中ラボ（事業モード専用）
@@ -250,6 +252,54 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
             padding: const EdgeInsets.symmetric(vertical: 14),
           ),
         ),
+        const SizedBox(height: 28),
+        const Divider(height: 1),
+        const SizedBox(height: 28),
+        const Icon(Icons.picture_as_pdf_outlined,
+            size: 48, color: Color(0xFF1A237E)),
+        const SizedBox(height: 12),
+        const Text('請求書PDF 一括取り込み',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        const Text(
+          '売上・支払（外注）の請求書PDFを複数選んで、AIが取引先・日付・金額を'
+          '読み取ります。内容を確認・修正してまとめて記帳できます。\n\n'
+          '※ 売上請求書 → 収入 / 支払・外注請求書 → 支出 として記帳。\n'
+          '※ 現在のモード（事業/個人）に「追加」されます（既存データは消えません）。',
+          style: TextStyle(fontSize: 12, color: Color(0xFF6B7280), height: 1.6),
+        ),
+        const SizedBox(height: 20),
+        if (InvoiceExtractor.available)
+          FilledButton.icon(
+            onPressed: () async {
+              final added = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const InvoiceImportScreen()),
+              );
+              if (added == true && mounted) await _load();
+            },
+            icon: const Icon(Icons.picture_as_pdf, size: 18),
+            label: const Text('請求書PDFを取り込む'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF1A237E),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          )
+        else
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF3C7),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text(
+              'この機能はAIキーが組み込まれたアプリ（Android / Windows版）でご利用ください。'
+              'Web版では使えません。',
+              style: TextStyle(fontSize: 12, color: Color(0xFF92400E)),
+            ),
+          ),
       ],
     );
   }
