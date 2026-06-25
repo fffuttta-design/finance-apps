@@ -1,8 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../data/checklist_repository.dart';
 import '../widgets/centered_body.dart';
+
+/// チェックリストのURLを外部ブラウザで開く。スキーム無しは https:// を補う。
+Future<void> _openChecklistUrl(String raw) async {
+  var url = raw.trim();
+  if (url.isEmpty) return;
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = 'https://$url';
+  }
+  final uri = Uri.tryParse(url);
+  if (uri == null) return;
+  await launchUrl(uri, mode: LaunchMode.externalApplication);
+}
 
 /// 月末締めチェックリストのCRUD画面。
 /// - メイン項目（親）を並べ替え可能
@@ -386,12 +399,17 @@ class _ChecklistEditorScreenState extends State<ChecklistEditorScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (item.url != null)
-                        Text(item.url!,
-                            style: const TextStyle(
-                                fontSize: 10,
-                                color: Color(0xFF3B82F6)),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis),
+                        InkWell(
+                          onTap: () => _openChecklistUrl(item.url!),
+                          child: Text(item.url!,
+                              style: const TextStyle(
+                                  fontSize: 10,
+                                  color: Color(0xFF3B82F6),
+                                  decoration: TextDecoration.underline,
+                                  decorationColor: Color(0xFF3B82F6)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ),
                       if (item.memo != null)
                         Text(item.memo!,
                             style: const TextStyle(
@@ -496,11 +514,17 @@ class _ChecklistEditorScreenState extends State<ChecklistEditorScreen> {
                         fontWeight: FontWeight.w500,
                         color: Color(0xFF111827))),
                 if (child.url != null)
-                  Text(child.url!,
-                      style: const TextStyle(
-                          fontSize: 10, color: Color(0xFF3B82F6)),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
+                  InkWell(
+                    onTap: () => _openChecklistUrl(child.url!),
+                    child: Text(child.url!,
+                        style: const TextStyle(
+                            fontSize: 10,
+                            color: Color(0xFF3B82F6),
+                            decoration: TextDecoration.underline,
+                            decorationColor: Color(0xFF3B82F6)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                  ),
                 if (child.memo != null)
                   Text(child.memo!,
                       style: const TextStyle(
