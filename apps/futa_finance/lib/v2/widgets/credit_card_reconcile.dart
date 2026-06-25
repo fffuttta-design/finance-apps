@@ -437,7 +437,8 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
       for (final m in cfg.majors) {
         if (m.inactive) continue;
         menu[m.name] = m.subs;
-        majors.add(m.name);
+        // 大カテゴリ名の重複はドロップダウンの assert を誘発するので一意化。
+        if (!majors.contains(m.name)) majors.add(m.name);
       }
       if (!mounted) return;
       setState(() {
