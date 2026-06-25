@@ -1,1 +1,1 @@
-{"version":"1.0.324","buildNumber":"325","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.324/futa-finance-v1.0.324.apk","releaseNotes":"クレカCSV取り込みプレビュー画面を追加：店名をその場で編集でき、取り込み前にAIが会計科目を提案。下書き保存・復元・削除にも対応。"}
+{"version":"1.0.325","buildNumber":"326","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.325/futa-finance-v1.0.325.apk","releaseNotes":"クレカ棚卸しの「記録漏れ」リストで、店名をその場で編集でき、会計科目をAIが提案してから追加できるようにしました（1件ずつ／まとめて追加対応）。"}
