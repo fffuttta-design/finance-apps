@@ -1,1 +1,1 @@
-{"version":"1.0.323","buildNumber":"324","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.323/futa-finance-v1.0.323.apk","releaseNotes":"クレカ棚卸しに「この月を初期化（カード×月の取引を一括削除）」ボタンを追加しました。CSV不要・実行前に自動バックアップ。"}
+{"version":"1.0.324","buildNumber":"325","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.324/futa-finance-v1.0.324.apk","releaseNotes":"クレカCSV取り込みプレビュー画面を追加：店名をその場で編集でき、取り込み前にAIが会計科目を提案。下書き保存・復元・削除にも対応。"}
