@@ -82,6 +82,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
   bool get _isIncome => _type == core.TransactionType.income;
 
+  /// ログイン中の自分の uid。
+  String? get _myUid => AuthService.instance.currentUser?.uid;
+
   /// 新規記録の既定の支払元。
   static const _defaultPayment = 'ワンバンク';
 
@@ -108,7 +111,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _memoCtrl.text = e.description;
       _paidBy = e.paidBy ?? e.recordedBy ?? myUid;
       _payment = e.paymentMethod.isEmpty ? null : e.paymentMethod;
-      _personalFood = e.personalFor != null;
+      // 個人わくは「自分のわく」だけ扱う。相手のわくに入っている記録は
+      // トグルOFF表示にし、保存時も相手のわくを勝手に奪わない（下の _resolvePersonalFor）。
+      _personalFood = e.personalFor == myUid;
       _receiptId = e.receiptId;
       _receiptUrl = e.receiptUrl;
     } else {
@@ -207,8 +212,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       paidBy: _paidBy,
       // 備考（レシートの品目リスト等）。編集時は既存を維持。
       memo: widget.editing?.memo ?? widget.initialMemo,
-      // 「食費」で個人わくONのときだけ、だれの個人わくから引くか記録。
-      personalFor: (_canPersonalFood && _personalFood) ? _paidBy : null,
+      // 個人わくは常に「自分（ログイン中）のわく」。相手のわくには入れない。
+      personalFor: _resolvePersonalFor(),
       // レシート/くわしい情報の画像参照。手入力で添付した画像もここに乗る。
       // 裏のDrive保存が先に終わっていればキャッシュURLを付与。
       receiptId: _receiptId,
@@ -231,6 +236,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         _toast('保存に失敗しました');
       }
     }
+  }
+
+  /// 保存する personalFor を決める。
+  /// - 食費でトグルON → 自分（ログイン中）のわく。
+  /// - トグルOFFでも、相手のわくに入っている記録はそのまま維持（勝手に外さない）。
+  /// - それ以外 → null（自分のわくから外す／元々付いていない）。
+  String? _resolvePersonalFor() {
+    final existing = widget.editing?.personalFor;
+    if (_canPersonalFood && _personalFood) return _myUid;
+    // 相手のわくは触らない（自分の操作で相手の集計を壊さないため）。
+    if (existing != null && existing != _myUid) return existing;
+    return null;
   }
 
   /// 「くわしい情報」画像を添付する。
@@ -740,15 +757,20 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
   }
 
-  /// 「この食費を個人わくから引く」トグル。ONなら「だれ」の人の月8,000円わくから引く。
+  /// 「この食費を個人わくから引く」トグル。ONならログイン中の自分の月8,000円わくから引く。
+  /// 相手のわくには入れられない（常に自分のわく）。
   Widget _personalFoodToggle() {
     final names = HouseholdService.instance.memberNames;
-    final whoName = (_paidBy != null ? names[_paidBy] : null) ?? '本人';
-    final limit = _paidBy != null
-        ? HouseholdService.instance.personalFoodBudgetFor(_paidBy!)
+    final whoName = (_myUid != null ? names[_myUid] : null) ?? '自分';
+    final limit = _myUid != null
+        ? HouseholdService.instance.personalFoodBudgetFor(_myUid!)
         : HouseholdService.defaultPersonalFoodBudget;
+    // この記録が「相手の」個人わくに入っている場合の注意書き（自分の操作では外れない）。
+    final existing = widget.editing?.personalFor;
+    final inPartnerBudget = existing != null && existing != _myUid;
+    final partnerName = inPartnerBudget ? (names[existing] ?? '相手') : null;
     // 探さなくても気づくよう、OFFでもピンクの枠で目立たせる。
-    return GestureDetector(
+    final toggle = GestureDetector(
       onTap: () => setState(() => _personalFood = !_personalFood),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
@@ -800,6 +822,27 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           ],
         ),
       ),
+    );
+    if (!inPartnerBudget) return toggle;
+    // 相手のわくに入っている記録は、自分の操作では外れないことを明記。
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        toggle,
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            const Icon(Icons.info_outline_rounded,
+                size: 14, color: AppColors.textSub),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text('今は $partnerName の個人わくに入っています（このトグルは自分のわく用です）',
+                  style: const TextStyle(
+                      fontSize: 11, color: AppColors.textSub)),
+            ),
+          ],
+        ),
+      ],
     );
   }
 

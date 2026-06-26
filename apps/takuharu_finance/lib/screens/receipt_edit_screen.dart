@@ -65,6 +65,24 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
 
   Map<String, String> get _members => HouseholdService.instance.memberNames;
 
+  /// 食費の品目が1つでもあるか（一括トグルの表示判定）。
+  bool get _hasFoodItem => _items.any((i) => i.category == '食費');
+
+  /// 食費の品目が「すべて」個人わくONになっているか（一括トグルの状態）。
+  bool get _allFoodPersonal =>
+      _hasFoodItem &&
+      _items.where((i) => i.category == '食費').every((i) => i.personalFood);
+
+  /// 食費の品目をまとめて個人わくON/OFFする（一括設定）。
+  void _toggleAllFoodPersonal() {
+    final target = !_allFoodPersonal;
+    setState(() {
+      for (final i in _items) {
+        if (i.category == '食費') i.personalFood = target;
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -87,7 +105,9 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
         n: m.description,
         p: m.amount,
         category: m.category.major,
-        personalFood: m.personalFor != null,
+        // 個人わくは「自分のわく」だけ扱う。相手のわくに入っている品目はOFF表示にし、
+        // 保存時も相手のわくを勝手に奪わない（下の _save 参照）。
+        personalFood: m.personalFor == AuthService.instance.currentUser?.uid,
       ));
     }
     final hid = HouseholdService.instance.householdId;
@@ -192,7 +212,12 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
       // 空・0円の品目は「消した」とみなす（既存なら削除、新規なら無視）。
       if (price <= 0 || name.isEmpty) continue;
       final cat = i.category ?? 'その他';
-      final pf = (cat == '食費' && i.personalFood) ? _payer : null;
+      // 個人わくは常に「自分（ログイン中）のわく」。相手のわくには入れない。
+      // トグルOFFでも、相手のわくに入っている既存品目はそのまま維持する。
+      final existingPf = i.source?.personalFor;
+      final pf = (cat == '食費' && i.personalFood)
+          ? uid
+          : (existingPf != null && existingPf != uid ? existingPf : null);
       if (i.txId != null && i.source != null) {
         keepIds.add(i.txId!);
         updates.add(i.source!.copyWith(
@@ -401,6 +426,11 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
                         color: AppColors.expense)),
               ],
             ),
+            // 食費が含まれるレシートは、まとめて個人わくに入れられる一括トグル。
+            if (_hasFoodItem) ...[
+              const SizedBox(height: 8),
+              _bulkPersonalFoodToggle(),
+            ],
             const SizedBox(height: 8),
             for (int i = 0; i < _items.length; i++) _itemCard(i),
             const SizedBox(height: 4),
@@ -419,6 +449,51 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
               onPressed: _saving ? null : _save,
               style: FilledButton.styleFrom(backgroundColor: AppColors.pink),
               child: Text(_saving ? '保存中…' : '保存する ♡'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 食費の品目をまとめて個人の食費わくに入れる一括トグル。
+  /// 個別カードのトグルと連動（全部ONなら点灯）。
+  Widget _bulkPersonalFoodToggle() {
+    final on = _allFoodPersonal;
+    return GestureDetector(
+      onTap: _toggleAllFoodPersonal,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: on
+              ? AppColors.pink.withValues(alpha: 0.12)
+              : AppColors.pink.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color:
+                on ? AppColors.pink : AppColors.pink.withValues(alpha: 0.45),
+            width: on ? 1.8 : 1.4,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+                on
+                    ? Icons.check_circle_rounded
+                    : Icons.lunch_dining_rounded,
+                size: 20,
+                color: AppColors.pinkDark),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text('🍙 食費を全部 個人の食費わくに入れる',
+                  style:
+                      TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800)),
+            ),
+            Switch(
+              value: on,
+              activeThumbColor: AppColors.pink,
+              onChanged: (_) => _toggleAllFoodPersonal(),
             ),
           ],
         ),

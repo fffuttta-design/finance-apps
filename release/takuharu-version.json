@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.83",
-    "buildNumber":  "88",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.83/takuharu-finance-v0.2.83.apk",
-    "releaseNotes":  "チャットで自分が送信した直後から送信時刻が表示されるように改善"
+    "version":  "0.2.84",
+    "buildNumber":  "89",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.84/takuharu-finance-v0.2.84.apk",
+    "releaseNotes":  "レシート品目画面に「食費を全部 個人の食費わくに入れる」一括トグルを追加。個人の食費わくは常に自分のわくに（相手のわくには入れられないように）。明細画面の個人わくは表示だけにして、設定は編集画面でまとめて行うようにしました。"
 }

@@ -95,6 +95,24 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
   int get _total => _items.fold<int>(
       0, (s, i) => s + (int.tryParse(i.price.text) ?? 0));
 
+  /// 食費の品目が1つでもあるか（一括トグルの表示判定）。
+  bool get _hasFoodItem => _items.any((i) => i.category == '食費');
+
+  /// 食費の品目が「すべて」個人わくONになっているか（一括トグルの状態）。
+  bool get _allFoodPersonal =>
+      _hasFoodItem &&
+      _items.where((i) => i.category == '食費').every((i) => i.personalFood);
+
+  /// 食費の品目をまとめて個人わくON/OFFする（一括設定）。
+  void _toggleAllFoodPersonal() {
+    final target = !_allFoodPersonal;
+    setState(() {
+      for (final i in _items) {
+        if (i.category == '食費') i.personalFood = target;
+      }
+    });
+  }
+
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -189,8 +207,9 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
         receiptUrl: widget.receiptUrl ??
             DriveReceiptService.instance.urlFor(receiptId),
         paidBy: _payer,
-        // 「食費」で個人わくONの品目は、払った人の個人食費わくから引く。
-        personalFor: (cat == '食費' && i.personalFood) ? _payer : null,
+        // 「食費」で個人わくONの品目は、ログイン中の自分の個人食費わくから引く。
+        // （相手のわくには入れられない＝常に自分のわく）
+        personalFor: (cat == '食費' && i.personalFood) ? uid : null,
       ));
     }
     if (txns.isEmpty) {
@@ -321,6 +340,11 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                         color: AppColors.expense)),
               ],
             ),
+            // 食費が含まれるレシートは、まとめて個人わくに入れられる一括トグル。
+            if (_hasFoodItem) ...[
+              const SizedBox(height: 8),
+              _bulkPersonalFoodToggle(),
+            ],
             const SizedBox(height: 8),
             for (int i = 0; i < _items.length; i++) _itemCard(i),
             const SizedBox(height: 4),
@@ -340,6 +364,51 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
               style:
                   FilledButton.styleFrom(backgroundColor: AppColors.expense),
               child: Text(_saving ? '保存中…' : '${_items.length}件をきろくする ♡'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 食費の品目をまとめて個人の食費わくに入れる一括トグル。
+  /// 個別カードのトグルと連動（全部ONなら点灯）。
+  Widget _bulkPersonalFoodToggle() {
+    final on = _allFoodPersonal;
+    return GestureDetector(
+      onTap: _toggleAllFoodPersonal,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: on
+              ? AppColors.pink.withValues(alpha: 0.12)
+              : AppColors.pink.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color:
+                on ? AppColors.pink : AppColors.pink.withValues(alpha: 0.45),
+            width: on ? 1.8 : 1.4,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+                on
+                    ? Icons.check_circle_rounded
+                    : Icons.lunch_dining_rounded,
+                size: 20,
+                color: AppColors.pinkDark),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text('🍙 食費を全部 個人の食費わくに入れる',
+                  style:
+                      TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800)),
+            ),
+            Switch(
+              value: on,
+              activeThumbColor: AppColors.pink,
+              onChanged: (_) => _toggleAllFoodPersonal(),
             ),
           ],
         ),
