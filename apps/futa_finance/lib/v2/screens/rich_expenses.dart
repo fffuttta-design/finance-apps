@@ -424,8 +424,21 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 ),
                 if (_hasReconcileCards) const SizedBox(height: V2Spacing.md),
               ],
-              // カテゴリ内訳
+              // カテゴリ内訳（見出しはカード外・クレカ引落照合と同じスタイル）
               if (majorEntries.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.only(bottom: V2Spacing.sm),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.donut_small_outlined,
+                          size: 18, color: V2Colors.textSecondary),
+                      const SizedBox(width: V2Spacing.sm),
+                      Text('カテゴリ内訳',
+                          style: V2Typography.h2
+                              .copyWith(color: V2Colors.textPrimary)),
+                    ],
+                  ),
+                ),
                 Container(
                   padding: const EdgeInsets.all(V2Spacing.md),
                   decoration: BoxDecoration(
@@ -436,29 +449,30 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text('カテゴリ内訳',
-                          style: V2Typography.h2
-                              .copyWith(color: V2Colors.textPrimary)),
-                      const SizedBox(height: V2Spacing.md),
                       for (final e in majorEntries.take(8))
                         _CatBar(
                           name: e.key,
                           value: e.value,
                           ratio: total == 0 ? 0 : e.value / total,
                           accent: accent,
+                          // 展開時の内訳はホームと同じシンプルな1行（日付＋名前＋金額）。
                           details: e.key == '固定費・サブスク'
                               ? [
                                   for (final f in fixedLines)
-                                    _FixedDetailRow(
-                                        name: f.name,
+                                    _CatDetailRow(
+                                        label: f.name,
                                         amount: f.amount,
-                                        iconUrl: f.iconUrl,
                                         onTap: () => _editSubscription(f.id)),
                                 ]
                               : [
                                   for (final t
                                       in (txnsByMajor[e.key] ?? const []))
-                                    _ExpenseRow(t: t, onTap: () => _edit(t)),
+                                    _CatDetailRow(
+                                        label: t.description.trim().isEmpty
+                                            ? formatMonthDay(t.date)
+                                            : '${formatMonthDay(t.date)}  ${t.description.trim()}',
+                                        amount: t.amount,
+                                        onTap: () => _edit(t)),
                                 ],
                         ),
                     ],
@@ -466,8 +480,26 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 ),
                 const SizedBox(height: V2Spacing.md),
               ],
-              // 毎月の固定費（引落予定）— カテゴリの下
+              // 毎月の固定費（引落予定）— 見出しはカード外・クレカ引落照合と同じスタイル
               if (fixedLines.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.only(bottom: V2Spacing.sm),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.repeat,
+                          size: 18, color: V2Colors.textSecondary),
+                      const SizedBox(width: V2Spacing.sm),
+                      Text('毎月の固定費（引落予定）',
+                          style: V2Typography.h2
+                              .copyWith(color: V2Colors.textPrimary)),
+                      const Spacer(),
+                      Text(formatYen(subTotal),
+                          style: V2Typography.bodyStrong.copyWith(
+                              color: V2Colors.textPrimary,
+                              fontFeatures: V2Typography.tabularNums)),
+                    ],
+                  ),
+                ),
                 Container(
                   padding: const EdgeInsets.all(V2Spacing.md),
                   decoration: BoxDecoration(
@@ -478,22 +510,6 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.repeat,
-                              size: 17, color: V2Colors.textSecondary),
-                          const SizedBox(width: 6),
-                          Text('毎月の固定費（引落予定）',
-                              style: V2Typography.h2
-                                  .copyWith(color: V2Colors.textPrimary)),
-                          const Spacer(),
-                          Text(formatYen(subTotal),
-                              style: V2Typography.bodyStrong.copyWith(
-                                  color: V2Colors.textPrimary,
-                                  fontFeatures: V2Typography.tabularNums)),
-                        ],
-                      ),
-                      const SizedBox(height: V2Spacing.sm),
                       for (int i = 0; i < fixedLines.length; i++) ...[
                         if (i > 0)
                           const Divider(height: 1, color: V2Colors.divider),
@@ -720,44 +736,34 @@ class _CatBarState extends State<_CatBar> {
   }
 }
 
-/// 固定費（引落予定）の内訳1行。タップで編集へ。
-class _FixedDetailRow extends StatelessWidget {
-  final String name;
+/// カテゴリ内訳の展開内訳1行（ホームと同じシンプルな見た目）。任意でタップ編集。
+class _CatDetailRow extends StatelessWidget {
+  final String label;
   final int amount;
-  final String? iconUrl;
   final VoidCallback? onTap;
-  const _FixedDetailRow(
-      {required this.name, required this.amount, this.iconUrl, this.onTap});
+  const _CatDetailRow(
+      {required this.label, required this.amount, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(6),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
         child: Row(
           children: [
-            BrandLogo(
-              iconUrl: iconUrl,
-              fallbackIcon: Icons.subscriptions_outlined,
-              size: 20,
-              borderRadius: 5,
-            ),
-            const SizedBox(width: 10),
             Expanded(
-              child: Text(name,
-                  style: V2Typography.body, overflow: TextOverflow.ellipsis),
+              child: Text(label,
+                  style: V2Typography.caption
+                      .copyWith(color: V2Colors.textSecondary),
+                  overflow: TextOverflow.ellipsis),
             ),
+            const SizedBox(width: 8),
             Text(formatYen(amount),
                 style: V2Typography.caption.copyWith(
                     color: V2Colors.textSecondary,
                     fontFeatures: V2Typography.tabularNums)),
-            if (onTap != null) ...[
-              const SizedBox(width: 4),
-              const Icon(Icons.chevron_right,
-                  size: 16, color: V2Colors.textMuted),
-            ],
           ],
         ),
       ),
@@ -864,17 +870,17 @@ class _ExpenseRow extends StatelessWidget {
         ? t.description.trim()
         : (sub.isNotEmpty ? sub : (major.isNotEmpty ? major : '未分類'));
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Material(
         color: V2Colors.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           child: Container(
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(color: V2Colors.border),
             ),
             child: IntrinsicHeight(
@@ -884,12 +890,12 @@ class _ExpenseRow extends StatelessWidget {
                   Container(width: 4, color: accent),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                      padding: const EdgeInsets.fromLTRB(12, 7, 12, 7),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           SizedBox(
-                            width: 44,
+                            width: 40,
                             child: Text(formatMonthDay(t.date),
                                 style: V2Typography.micro.copyWith(
                                     color: V2Colors.textSecondary,
@@ -902,13 +908,14 @@ class _ExpenseRow extends StatelessWidget {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(title,
-                                    style: V2Typography.bodyStrong,
+                                    style: V2Typography.body.copyWith(
+                                        fontWeight: FontWeight.w600),
                                     overflow: TextOverflow.ellipsis,
                                     maxLines: 1),
-                                const SizedBox(height: 5),
+                                const SizedBox(height: 3),
                                 Wrap(
                                   spacing: 6,
-                                  runSpacing: 4,
+                                  runSpacing: 3,
                                   crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
                                     _richCatBadge(t.category, accent),
