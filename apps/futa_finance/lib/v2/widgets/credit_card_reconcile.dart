@@ -586,14 +586,20 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
     await _load();
   }
 
-  /// 記録漏れをまとめて追加する。
+  /// チェックの付いた記録漏れだけをまとめて追加する。
   Future<void> _addAllMissing(List<_StmtLine> missing) async {
-    if (missing.isEmpty) return;
+    final targets =
+        missing.where((l) => _edits[l]?.included ?? true).toList();
+    if (targets.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('チェックが付いた行がありません')));
+      return;
+    }
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('記録漏れをまとめて追加'),
-        content: Text('編集後の店名・科目で ${missing.length}件を追加します。'),
+        title: const Text('チェックした記録漏れを追加'),
+        content: Text('編集後の店名・科目で ${targets.length}件を追加します。'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -605,7 +611,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
       ),
     );
     if (ok != true) return;
-    for (final l in missing) {
+    for (final l in targets) {
       await _addMissing(l);
     }
   }
@@ -613,15 +619,27 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
   /// 記録漏れ1行のインライン編集UI（店名編集＋科目ドロップダウン＋追加）。
   Widget _missingEditRow(_StmtLine line) {
     final e = _edits.putIfAbsent(line, () => _LineEdit(name: line.name));
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(V2Spacing.md, 8, V2Spacing.md, 8),
+    return Opacity(
+      opacity: e.included ? 1 : 0.4,
+      child: Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, V2Spacing.md, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
+              // 取り込みチェック（既定ON）。外すと一括追加の対象から外れる。
               SizedBox(
-                width: 34,
+                width: 30,
+                child: Checkbox(
+                  value: e.included,
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  onChanged: (v) => setState(() => e.included = v ?? true),
+                ),
+              ),
+              SizedBox(
+                width: 30,
                 child: Text(
                     line.date != null
                         ? '${line.date!.month}/${line.date!.day}'
@@ -655,7 +673,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
           const SizedBox(height: 6),
           Row(
             children: [
-              const SizedBox(width: 34),
+              const SizedBox(width: 60),
               // 大カテゴリ（AI提案・変更可）
               Expanded(
                 child: DropdownButtonFormField<String>(
@@ -702,7 +720,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
             const SizedBox(height: 6),
             Row(
               children: [
-                const SizedBox(width: 34),
+                const SizedBox(width: 60),
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     initialValue:
@@ -742,6 +760,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
             ),
           ],
         ],
+      ),
       ),
     );
   }
@@ -1240,8 +1259,36 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
         ]));
         children.add(Padding(
           padding: const EdgeInsets.only(left: 22, bottom: 4),
-          child: Text('店名を直し、科目を選んで「追加」。過去の確定データ＋AIが科目を提案（同じ店名は連動）。',
+          child: Text('チェックを入れた行だけ取り込みます。店名・科目を直して「追加」。過去の確定データ＋AIが科目を提案（同じ店名は連動）。',
               style: V2Typography.micro.copyWith(color: V2Colors.textMuted)),
+        ));
+        // 全選択/全解除
+        final checkedNow =
+            missing.where((l) => _edits[l]?.included ?? true).length;
+        children.add(Padding(
+          padding: const EdgeInsets.only(left: 8, right: 4),
+          child: Row(
+            children: [
+              Text('取り込み対象 $checkedNow / ${missing.length}',
+                  style: V2Typography.micro
+                      .copyWith(color: V2Colors.textSecondary)),
+              const Spacer(),
+              TextButton(
+                  onPressed: () => setState(() {
+                        for (final l in missing) {
+                          _edits[l]?.included = true;
+                        }
+                      }),
+                  child: const Text('全選択', style: TextStyle(fontSize: 11))),
+              TextButton(
+                  onPressed: () => setState(() {
+                        for (final l in missing) {
+                          _edits[l]?.included = false;
+                        }
+                      }),
+                  child: const Text('全解除', style: TextStyle(fontSize: 11))),
+            ],
+          ),
         ));
         children.add(const SizedBox(height: 6));
         children.add(Container(
@@ -1266,7 +1313,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
           child: FilledButton.icon(
             onPressed: () => _addAllMissing(missing),
             icon: const Icon(Icons.playlist_add_check, size: 18),
-            label: Text('記録漏れ ${missing.length}件をまとめて追加'),
+            label: Text('チェックした $checkedNow件を追加'),
             style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFFDC2626)),
           ),
@@ -1810,11 +1857,12 @@ class _StmtLine {
   const _StmtLine(this.date, this.name, this.amount);
 }
 
-/// 記録漏れ行のインライン編集状態（編集後の店名・会計科目）。
+/// 記録漏れ行のインライン編集状態（編集後の店名・会計科目・取り込みチェック）。
 class _LineEdit {
   final TextEditingController nameCtrl;
   String? major;
   String sub = '';
+  bool included = true; // 取り込み対象（既定ON）
   _LineEdit({required String name})
       : nameCtrl = TextEditingController(text: name);
   void dispose() => nameCtrl.dispose();

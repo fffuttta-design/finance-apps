@@ -327,13 +327,15 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
         ? _fixedLinesForMonth(_month)
         : <({String name, int amount, String? iconUrl})>[];
 
-    // カテゴリ内訳（大カテゴリ別・固定費込み）
+    // カテゴリ内訳（大カテゴリ別・固定費込み）＋ドリルダウン用の取引一覧。
     final byMajor = <String, int>{};
+    final txnsByMajor = <String, List<core.Transaction>>{};
     for (final t in rows) {
       final major =
           t.category.major.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
       if (major.isEmpty) continue;
       byMajor[major] = (byMajor[major] ?? 0) + t.amount;
+      (txnsByMajor[major] ??= []).add(t);
     }
     if (subTotal > 0) {
       byMajor['固定費・サブスク'] = (byMajor['固定費・サブスク'] ?? 0) + subTotal;
@@ -431,6 +433,19 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                           value: e.value,
                           ratio: total == 0 ? 0 : e.value / total,
                           accent: accent,
+                          details: e.key == '固定費・サブスク'
+                              ? [
+                                  for (final f in fixedLines)
+                                    _FixedDetailRow(
+                                        name: f.name,
+                                        amount: f.amount,
+                                        iconUrl: f.iconUrl),
+                                ]
+                              : [
+                                  for (final t
+                                      in (txnsByMajor[e.key] ?? const []))
+                                    _ExpenseRow(t: t, onTap: () => _edit(t)),
+                                ],
                         ),
                     ],
                   ),
@@ -499,79 +514,66 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 ),
                 const SizedBox(height: V2Spacing.md),
               ],
-              // 明細
-              Container(
-                padding: const EdgeInsets.all(V2Spacing.md),
-                decoration: BoxDecoration(
-                  color: V2Colors.surface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: V2Colors.border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Text(detailLabel,
-                            style: V2Typography.h2
-                                .copyWith(color: V2Colors.textPrimary)),
-                        const Spacer(),
-                        InkWell(
-                          onTap: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ExpenseListScreen(
-                                  title: '$detailLabel一覧',
-                                  month: _month,
-                                ),
-                              ),
-                            );
-                            await _load();
-                          },
-                          borderRadius: BorderRadius.circular(6),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 4, vertical: 2),
-                            child: Row(
-                              children: [
-                                Text('一覧',
-                                    style: V2Typography.caption
-                                        .copyWith(color: accent)),
-                                Icon(Icons.chevron_right,
-                                    size: 16, color: accent),
-                              ],
-                            ),
+              // 明細（左アクセント＋大›小バッジ＋支払チップの独立カード）
+              Row(
+                children: [
+                  Text(detailLabel,
+                      style: V2Typography.h2
+                          .copyWith(color: V2Colors.textPrimary)),
+                  const Spacer(),
+                  InkWell(
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ExpenseListScreen(
+                            title: '$detailLabel一覧',
+                            month: _month,
                           ),
                         ),
+                      );
+                      await _load();
+                    },
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 2),
+                      child: Row(
+                        children: [
+                          Text('一覧',
+                              style: V2Typography.caption
+                                  .copyWith(color: accent)),
+                          Icon(Icons.chevron_right, size: 16, color: accent),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: V2Spacing.sm),
+              if (rows.isEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  decoration: BoxDecoration(
+                    color: V2Colors.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: V2Colors.border),
+                  ),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        const Icon(Icons.inbox_outlined,
+                            size: 36, color: V2Colors.textMuted),
+                        const SizedBox(height: 8),
+                        Text('${_month.month}月の記録はまだありません',
+                            style: V2Typography.caption
+                                .copyWith(color: V2Colors.textSecondary)),
                       ],
                     ),
-                    const SizedBox(height: V2Spacing.sm),
-                    if (rows.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 40),
-                        child: Center(
-                          child: Column(
-                            children: [
-                              const Icon(Icons.inbox_outlined,
-                                  size: 36, color: V2Colors.textMuted),
-                              const SizedBox(height: 8),
-                              Text('${_month.month}月の記録はまだありません',
-                                  style: V2Typography.caption.copyWith(
-                                      color: V2Colors.textSecondary)),
-                            ],
-                          ),
-                        ),
-                      )
-                    else
-                      for (int i = 0; i < rows.length; i++) ...[
-                        if (i > 0)
-                          const Divider(height: 1, color: V2Colors.divider),
-                        _ExpenseRow(t: rows[i], onTap: () => _edit(rows[i])),
-                      ],
-                  ],
-                ),
-              ),
+                  ),
+                )
+              else
+                for (final t in rows) _ExpenseRow(t: t, onTap: () => _edit(t)),
             ],
           ),
         ),
@@ -613,56 +615,208 @@ class _MiniStepper extends StatelessWidget {
   }
 }
 
-class _CatBar extends StatelessWidget {
+class _CatBar extends StatefulWidget {
   final String name;
   final int value;
   final double ratio;
   final Color accent;
+
+  /// 展開時に表示する内訳（取引行など）。空ならタップで展開しない。
+  final List<Widget> details;
   const _CatBar({
     required this.name,
     required this.value,
     required this.ratio,
     required this.accent,
+    this.details = const [],
   });
+
+  @override
+  State<_CatBar> createState() => _CatBarState();
+}
+
+class _CatBarState extends State<_CatBar> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final canExpand = widget.details.isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: canExpand ? () => setState(() => _open = !_open) : null,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 7),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    if (canExpand)
+                      Icon(_open ? Icons.expand_less : Icons.expand_more,
+                          size: 18, color: V2Colors.textMuted),
+                    if (canExpand) const SizedBox(width: 2),
+                    Expanded(
+                      child: Text(widget.name,
+                          style: V2Typography.body,
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('${(widget.ratio * 100).round()}%',
+                        style: V2Typography.micro
+                            .copyWith(color: V2Colors.textMuted)),
+                    const SizedBox(width: 10),
+                    Text(formatYen(widget.value),
+                        style: V2Typography.caption.copyWith(
+                            color: V2Colors.textSecondary,
+                            fontFeatures: V2Typography.tabularNums)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: widget.ratio.clamp(0.0, 1.0),
+                    minHeight: 8,
+                    backgroundColor: V2Colors.surfaceMuted,
+                    valueColor: AlwaysStoppedAnimation(widget.accent),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_open)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 4),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: widget.details),
+          ),
+      ],
+    );
+  }
+}
+
+/// 固定費（引落予定）の内訳1行。
+class _FixedDetailRow extends StatelessWidget {
+  final String name;
+  final int amount;
+  final String? iconUrl;
+  const _FixedDetailRow(
+      {required this.name, required this.amount, this.iconUrl});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
-      child: Column(
+      padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
+      child: Row(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(name,
-                    style: V2Typography.body,
-                    overflow: TextOverflow.ellipsis),
-              ),
-              const SizedBox(width: 8),
-              Text('${(ratio * 100).round()}%',
-                  style: V2Typography.micro
-                      .copyWith(color: V2Colors.textMuted)),
-              const SizedBox(width: 10),
-              Text(formatYen(value),
-                  style: V2Typography.caption.copyWith(
-                      color: V2Colors.textSecondary,
-                      fontFeatures: V2Typography.tabularNums)),
-            ],
+          BrandLogo(
+            iconUrl: iconUrl,
+            fallbackIcon: Icons.subscriptions_outlined,
+            size: 20,
+            borderRadius: 5,
           ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: ratio.clamp(0.0, 1.0),
-              minHeight: 8,
-              backgroundColor: V2Colors.surfaceMuted,
-              valueColor: AlwaysStoppedAnimation(accent),
-            ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(name,
+                style: V2Typography.body, overflow: TextOverflow.ellipsis),
           ),
+          Text(formatYen(amount),
+              style: V2Typography.caption.copyWith(
+                  color: V2Colors.textSecondary,
+                  fontFeatures: V2Typography.tabularNums)),
         ],
       ),
     );
   }
+}
+
+// ── 明細行のリッチ表示（左アクセント＋大›小バッジ＋支払チップ） ──
+
+/// 大カテゴリ名から安定した色を作る。
+Color _richCatColor(String major) {
+  final m = major.trim();
+  if (m.isEmpty) return const Color(0xFF9CA3AF);
+  var h = 0;
+  for (final c in m.codeUnits) {
+    h = (h * 31 + c) & 0x7fffffff;
+  }
+  return HSLColor.fromAHSL(1, (h % 360).toDouble(), 0.5, 0.45).toColor();
+}
+
+/// 支払方法に合うアイコン。
+IconData _richPaymentIcon(String method) {
+  final s = method.toLowerCase();
+  if (method.contains('現金')) return Icons.payments_outlined;
+  if (method.contains('カード') ||
+      method.contains('クレカ') ||
+      method.contains('オリコ') ||
+      s.contains('card') ||
+      s.contains('visa')) {
+    return Icons.credit_card;
+  }
+  if (method.contains('銀行') ||
+      method.contains('振込') ||
+      method.contains('引落')) {
+    return Icons.account_balance_outlined;
+  }
+  if (s.contains('suica') ||
+      s.contains('paypay') ||
+      method.contains('電子') ||
+      method.contains('チャージ')) {
+    return Icons.contactless_outlined;
+  }
+  return Icons.payment_outlined;
+}
+
+/// 「大カテゴリ › 小カテゴリ」の色付きバッジ。
+Widget _richCatBadge(core.Category c, Color color) {
+  final major = c.major.trim();
+  final sub = c.sub.trim();
+  final label = (major.isEmpty && sub.isEmpty)
+      ? '未分類'
+      : (sub.isEmpty ? major : '$major › $sub');
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.10),
+      borderRadius: BorderRadius.circular(5),
+      border: Border.all(color: color.withValues(alpha: 0.30)),
+    ),
+    child: Text(label,
+        style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: HSLColor.fromColor(color).withLightness(0.32).toColor())),
+  );
+}
+
+/// 支払方法チップ（アイコン＋名称）。
+Widget _richPaymentChip(String method) {
+  final m = method.trim();
+  if (m.isEmpty) return const SizedBox.shrink();
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF1F5F9),
+      borderRadius: BorderRadius.circular(5),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(_richPaymentIcon(m), size: 12, color: const Color(0xFF64748B)),
+        const SizedBox(width: 3),
+        Text(m,
+            style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF64748B))),
+      ],
+    ),
+  );
 }
 
 class _ExpenseRow extends StatelessWidget {
@@ -670,62 +824,84 @@ class _ExpenseRow extends StatelessWidget {
   final VoidCallback onTap;
   const _ExpenseRow({required this.t, required this.onTap});
 
-  String _categoryLabel() {
-    final major = t.category.major
-        .replaceFirst(RegExp(r'^\s*\d+\.\s*'), '')
-        .trim();
-    final sub = t.category.sub.trim();
-    if (sub.isNotEmpty) return sub;
-    if (major.isNotEmpty) return major;
-    return '未分類';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final title =
-        t.description.trim().isNotEmpty ? t.description.trim() : _categoryLabel();
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 7),
-        child: Row(
-          children: [
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                color: V2Colors.negative.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(9),
-              ),
-              alignment: Alignment.center,
-              child: const Icon(Icons.receipt_long_outlined,
-                  size: 16, color: V2Colors.negative),
+    final accent = _richCatColor(t.category.major);
+    final sub = t.category.sub.trim();
+    final major = t.category.major.trim();
+    final title = t.description.trim().isNotEmpty
+        ? t.description.trim()
+        : (sub.isNotEmpty ? sub : (major.isNotEmpty ? major : '未分類'));
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: V2Colors.surface,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: V2Colors.border),
             ),
-            const SizedBox(width: V2Spacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(title,
-                      style: V2Typography.bodyStrong,
-                      overflow: TextOverflow.ellipsis, maxLines: 1),
-                  const SizedBox(height: 2),
-                  Text('${formatMonthDay(t.date)} · ${_categoryLabel()}・${t.paymentMethod}',
-                      style: V2Typography.micro
-                          .copyWith(color: V2Colors.textMuted),
-                      overflow: TextOverflow.ellipsis, maxLines: 1),
+                  Container(width: 4, color: accent),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 44,
+                            child: Text(formatMonthDay(t.date),
+                                style: V2Typography.micro.copyWith(
+                                    color: V2Colors.textSecondary,
+                                    fontFeatures: V2Typography.tabularNums)),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(title,
+                                    style: V2Typography.bodyStrong,
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1),
+                                const SizedBox(height: 5),
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    _richCatBadge(t.category, accent),
+                                    _richPaymentChip(t.paymentMethod),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text('-${formatYen(t.amount)}',
+                              style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: V2Colors.negative,
+                                  fontFeatures: V2Typography.tabularNums)),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
-            const SizedBox(width: V2Spacing.sm),
-            Text('-${formatYen(t.amount)}',
-                style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: V2Colors.negative,
-                    fontFeatures: V2Typography.tabularNums)),
-          ],
+          ),
         ),
       ),
     );
