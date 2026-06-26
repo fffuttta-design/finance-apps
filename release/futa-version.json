@@ -1,1 +1,1 @@
-{"version":"1.0.329","buildNumber":"330","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.329/futa-finance-v1.0.329.apk","releaseNotes":"カード明細CSVを「貼り付け」から確実に取り込めるよう強化しました（CSVの中身を全選択コピーして貼り付けるだけでOK）。"}
+{"version":"1.0.330","buildNumber":"331","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.330/futa-finance-v1.0.330.apk","releaseNotes":"カード明細CSV/貼り付けが無反応だった不具合を修正しました（解析成功直後にクラッシュしていた問題の解消）。これでCSVが取り込めます。"}
