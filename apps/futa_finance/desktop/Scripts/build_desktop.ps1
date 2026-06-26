@@ -45,7 +45,19 @@ if (-not $NoBuildWeb) {
   Write-Host "[1/4] flutter build web (offline)..." -ForegroundColor Yellow
   Push-Location $AppDir
   try {
-    & flutter build web --release --no-web-resources-cdn --base-href "/"
+    # Inject Gemini API key so receipt OCR / CSV category AI works on the
+    # desktop app (the open-web gh-pages build intentionally omits it).
+    # gemini.key is gitignored. Low-risk key (no billing / free tier).
+    $defineArgs = @()
+    $geminiKeyPath = Join-Path $AppDir "gemini.key"
+    if (Test-Path $geminiKeyPath) {
+      $geminiKey = ((Get-Content $geminiKeyPath -Raw)).Trim()
+      if ($geminiKey) { $defineArgs += "--dart-define=GEMINI_API_KEY=$geminiKey" }
+      Write-Host "      (gemini.key injected for AI features)" -ForegroundColor DarkGray
+    } else {
+      Write-Host "      (no gemini.key; AI features disabled)" -ForegroundColor DarkGray
+    }
+    & flutter build web --release --no-web-resources-cdn --base-href "/" @defineArgs
     if ($LASTEXITCODE -ne 0) { throw "flutter build web failed" }
   } finally { Pop-Location }
 } else {

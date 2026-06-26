@@ -560,11 +560,11 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
                     style: V2Typography.micro
                         .copyWith(color: V2Colors.textSecondary)),
               ),
-              // 店名（編集可）
+              // 店名（編集可）。1文字ごとの setState は全行再描画で激重になるため
+              // しない（値は controller が保持し、追加時に読む）。
               Expanded(
                 child: TextField(
                   controller: e.nameCtrl,
-                  onChanged: (_) => setState(() {}),
                   style: V2Typography.body,
                   decoration: const InputDecoration(
                     isDense: true,
@@ -587,7 +587,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
           Row(
             children: [
               const SizedBox(width: 34),
-              // 科目（AI提案・変更可）
+              // 大カテゴリ（AI提案・変更可）
               Expanded(
                 child: DropdownButtonFormField<String>(
                   initialValue: _majors.contains(e.major) ? e.major : null,
@@ -597,7 +597,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
                     prefixIcon: Icon(Icons.auto_awesome, size: 15),
                     prefixIconConstraints:
                         BoxConstraints(minWidth: 30, minHeight: 0),
-                    hintText: '科目（未分類）',
+                    hintText: '大カテゴリ（未分類）',
                     border: OutlineInputBorder(),
                     contentPadding:
                         EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -627,6 +627,47 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
               ),
             ],
           ),
+          // 小カテゴリ（大カテゴリに小カテゴリがある時だけ表示）
+          if (e.major != null && (_catMenu[e.major]?.isNotEmpty ?? false)) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const SizedBox(width: 34),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue:
+                        (_catMenu[e.major]?.contains(e.sub) ?? false) &&
+                                e.sub.isNotEmpty
+                            ? e.sub
+                            : null,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      prefixIcon: Icon(Icons.subdirectory_arrow_right,
+                          size: 15, color: V2Colors.textMuted),
+                      prefixIconConstraints:
+                          BoxConstraints(minWidth: 30, minHeight: 0),
+                      hintText: '小カテゴリ（任意）',
+                      border: OutlineInputBorder(),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    ),
+                    style: const TextStyle(
+                        fontSize: 13, color: Color(0xFF111827)),
+                    items: [
+                      const DropdownMenuItem(value: '', child: Text('（なし）')),
+                      for (final s in _catMenu[e.major]!)
+                        DropdownMenuItem(value: s, child: Text(s)),
+                    ],
+                    onChanged: (v) => setState(() => e.sub = v ?? ''),
+                  ),
+                ),
+                // 追加ボタンと幅を合わせるためのダミー余白。
+                const SizedBox(width: 8),
+                const SizedBox(width: 56),
+              ],
+            ),
+          ],
         ],
       ),
     );
