@@ -1,1 +1,1 @@
-{"version":"1.0.334","buildNumber":"335","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.334/futa-finance-v1.0.334.apk","releaseNotes":"支出タブを改善：カテゴリ内訳を項目タップで展開して明細表示、支出明細をリッチなカード表示に刷新。CSV取り込みはチェックボックスで取り込むものだけ選べるようにしました。"}
+{"version":"1.0.335","buildNumber":"336","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.335/futa-finance-v1.0.335.apk","releaseNotes":"毎月の固定費の各行をタップでその固定費の編集画面へ。カード払いの固定費（サブスク）をクレカ引落照合の合計に反映するようにしました。"}
