@@ -43,13 +43,13 @@ class CardCsvLine {
 /// - 「取り込む」で CSV期間内のそのカードの既存取引を削除 → 編集後の内容で一括記帳。
 ///   実行前に自動バックアップ。
 class CardCsvImportScreen extends StatefulWidget {
-  final core.RegisteredCreditCard card;
+  final String cardName;
   final String ym; // "YYYY-MM"
   final List<CardCsvLine> lines;
 
   const CardCsvImportScreen({
     super.key,
-    required this.card,
+    required this.cardName,
     required this.ym,
     required this.lines,
   });
@@ -130,7 +130,7 @@ class _CardCsvImportScreenState extends State<CardCsvImportScreen> {
 
     // 下書きがあれば復元するか確認。なければAIで科目提案。
     final hasDraft =
-        await CardImportDraftRepository.instance.exists(widget.card.name, widget.ym);
+        await CardImportDraftRepository.instance.exists(widget.cardName, widget.ym);
     if (!mounted) return;
     if (hasDraft) {
       final restore = await showDialog<bool>(
@@ -183,7 +183,7 @@ class _CardCsvImportScreenState extends State<CardCsvImportScreen> {
 
   Future<void> _saveDraft() async {
     final draft = CardImportDraft(
-      card: widget.card.name,
+      card: widget.cardName,
       ym: widget.ym,
       rows: [
         for (final r in _rows)
@@ -206,7 +206,7 @@ class _CardCsvImportScreenState extends State<CardCsvImportScreen> {
 
   Future<void> _restoreDraft() async {
     final d = await CardImportDraftRepository.instance
-        .load(widget.card.name, widget.ym);
+        .load(widget.cardName, widget.ym);
     if (d == null) return;
     for (final r in _rows) {
       r.dispose();
@@ -229,7 +229,7 @@ class _CardCsvImportScreenState extends State<CardCsvImportScreen> {
 
   Future<void> _deleteDraft() async {
     await CardImportDraftRepository.instance
-        .delete(widget.card.name, widget.ym);
+        .delete(widget.cardName, widget.ym);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('下書きを削除しました')));
@@ -264,7 +264,7 @@ class _CardCsvImportScreenState extends State<CardCsvImportScreen> {
     final existing = all.where((t) {
       if (t.type != core.TransactionType.expense) return false;
       // このカード名＋汎用クレカ表記（昔の手入力）も置換対象にする。
-      if (!isCreditDeleteTarget(t.paymentMethod, widget.card.name)) return false;
+      if (!isCreditDeleteTarget(t.paymentMethod, widget.cardName)) return false;
       if (lo != null && t.date.isBefore(lo)) return false;
       if (hi != null && t.date.isAfter(hi)) return false;
       return true;
@@ -276,7 +276,7 @@ class _CardCsvImportScreenState extends State<CardCsvImportScreen> {
       builder: (_) => AlertDialog(
         title: const Text('この内容で取り込みますか？'),
         content: Text(
-            '「${widget.card.name}」のCSV期間内の既存取引 ${existing.length}件を削除し、'
+            '「${widget.cardName}」のCSV期間内の既存取引 ${existing.length}件を削除し、'
             '編集後の ${valid.length}件を新規に取り込みます。\n\n'
             'この操作は元に戻せません。実行直前に自動バックアップを取ります。'),
         actions: [
@@ -326,7 +326,7 @@ class _CardCsvImportScreenState extends State<CardCsvImportScreen> {
           date: date,
           type: core.TransactionType.expense,
           category: core.Category(major: r.major ?? '未分類', sub: r.sub),
-          paymentMethod: widget.card.name,
+          paymentMethod: widget.cardName,
           description: name,
           amount: r.amount,
           store: name,
@@ -339,7 +339,7 @@ class _CardCsvImportScreenState extends State<CardCsvImportScreen> {
 
       // 取り込んだら下書きは不要。
       await CardImportDraftRepository.instance
-          .delete(widget.card.name, widget.ym);
+          .delete(widget.cardName, widget.ym);
 
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -358,7 +358,7 @@ class _CardCsvImportScreenState extends State<CardCsvImportScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('CSV取り込み（$_month月・${widget.card.name}）',
+        title: Text('CSV取り込み（$_month月・${widget.cardName}）',
             style: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,

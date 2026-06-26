@@ -28,59 +28,137 @@ import '../theme/typography.dart';
 // モバイル幅(v2_expenses)とリッチUI(rich_expenses)の両方から使う。
 // ═════════════════════════════════════════════════
 
-/// クレカごとに「予定金額（明細合計）vs 実際金額（手入力）」を並べ、差分で棚卸しを促す。
-/// 行をタップすると棚卸しシート（明細確認＋差額の調整）が開く。
+/// 照合の対象ウォレット（カード／銀行／現金／電子マネーを共通に扱う器）。
+class ReconcileWallet {
+  final String name;
+  final String? iconUrl;
+  final IconData fallbackIcon;
+
+  /// 荒療治（CSV置換・初期化）はカードのみ。現金/PayPay/銀行は簡易（予定vs実際＋突合）。
+  final bool isCard;
+
+  /// 副題（例「引き落とし日：毎月27日」「銀行口座」「電子マネー」）。
+  final String? subtitle;
+
+  const ReconcileWallet({
+    required this.name,
+    this.iconUrl,
+    this.fallbackIcon = Icons.account_balance_wallet_outlined,
+    this.isCard = false,
+    this.subtitle,
+  });
+}
+
+/// 全ウォレット（クレジット・現金・PayPay・銀行）で「予定（記録した明細合計）vs
+/// 実際（手入力）」を並べ、差分で棚卸しを促す。行タップで照合シートを開く。
 class CreditCardBillingSection extends StatelessWidget {
   final List<core.RegisteredCreditCard> cards;
+  final List<core.RegisteredBankAccount> bankAccounts;
   final List<core.Transaction> transactions;
 
-  /// このカード払いの固定費（サブスク）も予定に含めるため受け取る。
+  /// このウォレット払いの固定費（サブスク）も予定に含めるため受け取る。
   final List<core.Subscription> subscriptions;
   final String ym;
 
-  /// 行タップ → 棚卸しシートを開く。
-  final void Function(core.RegisteredCreditCard card) onOpenReconcile;
+  /// 行タップ → 照合シートを開く。
+  final void Function(ReconcileWallet wallet) onOpenReconcile;
 
   const CreditCardBillingSection({
     super.key,
     required this.cards,
+    this.bankAccounts = const [],
     required this.transactions,
     this.subscriptions = const [],
     required this.ym,
     required this.onOpenReconcile,
   });
 
-  /// 当月・当カードの明細合計（予定金額）。取引＋このカード払いの固定費（サブスク）。
-  int _planned(core.RegisteredCreditCard card) {
+  /// 当月・当ウォレットの明細合計（予定金額）。取引＋このウォレット払いの固定費。
+  int _planned(String name) {
     final parts = ym.split('-');
     final year = int.parse(parts[0]);
     final month = int.parse(parts[1]);
     final txSum = transactions
         .where((t) =>
             t.type == core.TransactionType.expense &&
-            t.paymentMethod == card.name &&
+            t.paymentMethod == name &&
             t.date.year == year &&
             t.date.month == month)
         .fold(0, (s, t) => s + t.amount);
     final now = DateTime.now();
     final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     final subSum = subscriptions
-        .where((s) => (s.paymentMethod ?? '') == card.name)
+        .where((s) => (s.paymentMethod ?? '') == name)
         .fold(0, (s, sub) => s + sub.plAmountForMonth(ym, curYm));
     return txSum + subSum;
   }
 
-  /// セクションに表示するカード（当月明細あり or 実際金額入力済み）。
-  List<core.RegisteredCreditCard> get _visibleCards {
-    return cards.where((c) {
-      return _planned(c) > 0 || c.monthlyActualBillings.containsKey(ym);
-    }).toList();
+  static IconData _iconForAccount(core.AccountType t) {
+    switch (t) {
+      case core.AccountType.cash:
+        return Icons.payments_outlined;
+      case core.AccountType.emoney:
+        return Icons.contactless_outlined;
+      case core.AccountType.bank:
+        return Icons.account_balance_outlined;
+    }
+  }
+
+  static String _labelForAccount(core.AccountType t) {
+    switch (t) {
+      case core.AccountType.cash:
+        return '現金';
+      case core.AccountType.emoney:
+        return '電子マネー';
+      case core.AccountType.bank:
+        return '銀行口座';
+    }
+  }
+
+  /// 表示する全ウォレット行（予定>0 or 実際入力済み）。カードを先に並べる。
+  List<({ReconcileWallet wallet, int planned, int? actual})> get _rows {
+    final out = <({ReconcileWallet wallet, int planned, int? actual})>[];
+    for (final c in cards) {
+      final planned = _planned(c.name);
+      final actual = c.monthlyActualBillings[ym];
+      if (planned <= 0 && actual == null) continue;
+      out.add((
+        wallet: ReconcileWallet(
+          name: c.name,
+          iconUrl: c.iconUrl,
+          fallbackIcon: Icons.credit_card,
+          isCard: true,
+          subtitle: c.paymentDay != null
+              ? '引き落とし日：毎月${c.paymentDay}日'
+              : 'クレジットカード',
+        ),
+        planned: planned,
+        actual: actual,
+      ));
+    }
+    for (final b in bankAccounts) {
+      final planned = _planned(b.name);
+      final actual = b.monthlyActualBillings[ym];
+      if (planned <= 0 && actual == null) continue;
+      out.add((
+        wallet: ReconcileWallet(
+          name: b.name,
+          iconUrl: b.iconUrl,
+          fallbackIcon: _iconForAccount(b.accountType),
+          isCard: false,
+          subtitle: _labelForAccount(b.accountType),
+        ),
+        planned: planned,
+        actual: actual,
+      ));
+    }
+    return out;
   }
 
   @override
   Widget build(BuildContext context) {
-    final visible = _visibleCards;
-    if (visible.isEmpty) return const SizedBox.shrink();
+    final rows = _rows;
+    if (rows.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -89,9 +167,10 @@ class CreditCardBillingSection extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: V2Spacing.sm),
           child: Row(
             children: [
-              const Icon(Icons.credit_card, size: 18, color: Color(0xFFDC2626)),
+              const Icon(Icons.account_balance_wallet_outlined,
+                  size: 18, color: Color(0xFFDC2626)),
               const SizedBox(width: V2Spacing.sm),
-              Text('クレカ引落照合',
+              Text('ウォレット照合',
                   style: V2Typography.h2.copyWith(color: V2Colors.textPrimary)),
             ],
           ),
@@ -104,12 +183,12 @@ class CreditCardBillingSection extends StatelessWidget {
           ),
           child: Column(
             children: [
-              for (int i = 0; i < visible.length; i++) ...[
+              for (int i = 0; i < rows.length; i++) ...[
                 if (i > 0) const Divider(height: 1, color: V2Colors.divider),
                 _BillingRow(
-                  card: visible[i],
-                  planned: _planned(visible[i]),
-                  actual: visible[i].monthlyActualBillings[ym],
+                  wallet: rows[i].wallet,
+                  planned: rows[i].planned,
+                  actual: rows[i].actual,
                   onOpenReconcile: onOpenReconcile,
                 ),
               ],
@@ -129,7 +208,8 @@ class CreditCardBillingSection extends StatelessWidget {
 ///   description/date を渡すと支出入力にプリフィルする。
 Future<void> showCardReconcileSheet(
   BuildContext context, {
-  required core.RegisteredCreditCard card,
+  required ReconcileWallet wallet,
+  required int? initialActual,
   required String ym,
   required Future<void> Function(int? amount) onSaveActual,
   required Future<void> Function(core.Transaction t) onEditTxn,
@@ -140,7 +220,8 @@ Future<void> showCardReconcileSheet(
   await showInputSheet<bool>(
     context,
     _CardReconcileSheet(
-      card: card,
+      wallet: wallet,
+      initialActual: initialActual,
       ym: ym,
       onSaveActual: onSaveActual,
       onEditTxn: onEditTxn,
@@ -151,15 +232,15 @@ Future<void> showCardReconcileSheet(
 }
 
 class _BillingRow extends StatelessWidget {
-  final core.RegisteredCreditCard card;
+  final ReconcileWallet wallet;
   final int planned;
   final int? actual;
 
-  /// 行タップ → 棚卸しシートを開く。
-  final void Function(core.RegisteredCreditCard card) onOpenReconcile;
+  /// 行タップ → 照合シートを開く。
+  final void Function(ReconcileWallet wallet) onOpenReconcile;
 
   const _BillingRow({
-    required this.card,
+    required this.wallet,
     required this.planned,
     required this.actual,
     required this.onOpenReconcile,
@@ -190,19 +271,19 @@ class _BillingRow extends StatelessWidget {
     final isOver = diff != null && diff > 0;
 
     return InkWell(
-      onTap: () => onOpenReconcile(card),
+      onTap: () => onOpenReconcile(wallet),
       child: Padding(
         padding: const EdgeInsets.symmetric(
             horizontal: V2Spacing.lg, vertical: V2Spacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // カード名行
+            // ウォレット名行
             Row(
               children: [
                 BrandLogo(
-                  iconUrl: card.iconUrl,
-                  fallbackEmoji: '💳',
+                  iconUrl: wallet.iconUrl,
+                  fallbackIcon: wallet.fallbackIcon,
                   size: 20,
                   borderRadius: 3,
                 ),
@@ -211,11 +292,11 @@ class _BillingRow extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(card.name,
+                      Text(wallet.name,
                           style: V2Typography.body
                               .copyWith(fontWeight: FontWeight.w700)),
-                      if (card.paymentDay != null)
-                        Text('引き落とし日：毎月${card.paymentDay}日',
+                      if (wallet.subtitle != null)
+                        Text(wallet.subtitle!,
                             style: V2Typography.micro
                                 .copyWith(color: V2Colors.textMuted)),
                     ],
@@ -367,7 +448,10 @@ class _BillingRow extends StatelessWidget {
 /// - 実際請求額を入力
 /// - 差額ぶんを「調整取引」としてその場で追加（記録漏れ補完）
 class _CardReconcileSheet extends StatefulWidget {
-  final core.RegisteredCreditCard card;
+  final ReconcileWallet wallet;
+
+  /// 実際額の初期値（このウォレットのその月の手入力値）。
+  final int? initialActual;
   final String ym;
 
   /// 実際請求額を保存（null でクリア）。
@@ -384,7 +468,8 @@ class _CardReconcileSheet extends StatefulWidget {
       onAddAdjustment;
 
   const _CardReconcileSheet({
-    required this.card,
+    required this.wallet,
+    required this.initialActual,
     required this.ym,
     required this.onSaveActual,
     required this.onEditTxn,
@@ -425,7 +510,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
   @override
   void initState() {
     super.initState();
-    _actual = widget.card.monthlyActualBillings[widget.ym];
+    _actual = widget.initialActual;
     _load();
     _loadCats();
     _sub = _txRepo.stream.listen((list) {
@@ -591,7 +676,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
       date: date,
       type: core.TransactionType.expense,
       category: core.Category(major: e?.major ?? '未分類', sub: e?.sub ?? ''),
-      paymentMethod: widget.card.name,
+      paymentMethod: widget.wallet.name,
       description: name,
       amount: line.amount,
       store: name,
@@ -801,7 +886,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
     return _all
         .where((t) =>
             t.type == core.TransactionType.expense &&
-            t.paymentMethod == widget.card.name &&
+            t.paymentMethod == widget.wallet.name &&
             t.date.year == _year &&
             t.date.month == _month)
         .toList()
@@ -814,7 +899,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
     final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     final out = <({String name, int amount})>[];
     for (final s in _subs) {
-      if ((s.paymentMethod ?? '') != widget.card.name) continue;
+      if ((s.paymentMethod ?? '') != widget.wallet.name) continue;
       final amt = s.plAmountForMonth(widget.ym, curYm);
       if (amt > 0) {
         out.add((name: s.name.trim().isEmpty ? '固定費' : s.name, amount: amt));
@@ -829,7 +914,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
     return _all
         .where((t) =>
             t.type == core.TransactionType.expense &&
-            isCreditDeleteTarget(t.paymentMethod, widget.card.name) &&
+            isCreditDeleteTarget(t.paymentMethod, widget.wallet.name) &&
             t.date.year == _year &&
             t.date.month == _month)
         .toList()
@@ -848,7 +933,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
     await showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('${widget.card.name}の実際請求額'),
+        title: Text('${widget.wallet.name}の実際請求額'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1041,7 +1126,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
     final done = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => CardCsvImportScreen(
-          card: widget.card,
+          cardName: widget.wallet.name,
           ym: widget.ym,
           lines: lines,
         ),
@@ -1165,7 +1250,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
       final hi = maxD?.add(const Duration(days: 2));
       final pool = _all.where((t) {
         if (t.type != core.TransactionType.expense) return false;
-        if (t.paymentMethod != widget.card.name) return false;
+        if (t.paymentMethod != widget.wallet.name) return false;
         if (lo != null && t.date.isBefore(lo)) return false;
         if (hi != null && t.date.isAfter(hi)) return false;
         return true;
@@ -1241,45 +1326,47 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
         ),
       ));
 
-      // ── 荒療治: この明細でカード取引を丸ごと置き換える ──
+      // ── 荒療治: この明細でカード取引を丸ごと置き換える（カードのみ） ──
       // 棚卸しのコストが高すぎる時の最終手段。CSV期間の既存カード取引を削除し、
       // CSVの各行を新規取引として取り込む（科目は店名からAI推定）。
-      children.add(const SizedBox(height: V2Spacing.sm));
-      children.add(Container(
-        padding: const EdgeInsets.all(V2Spacing.sm),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFF7ED),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFFDBA74)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('荒療治：この明細を正として置き換える',
-                style: V2Typography.caption.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF9A3412))),
-            const SizedBox(height: 2),
-            Text(
-                'CSVの期間内（${_rangeLabel(lo, hi)}）の「${widget.card.name}」既存取引を削除し、'
-                'CSV ${_pasted.length}件を新規取り込み（科目は店名からAI推定）。実行前に自動バックアップ。',
-                style: V2Typography.caption
-                    .copyWith(color: const Color(0xFF9A3412), fontSize: 11)),
-            const SizedBox(height: 6),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () => _openCsvImport(),
-                icon: const Icon(Icons.sync_problem, size: 18),
-                label: Text(
-                    'CSVで置き換える（プレビュー・既存${pool.length}件を削除）'),
-                style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFEA580C)),
+      if (widget.wallet.isCard) {
+        children.add(const SizedBox(height: V2Spacing.sm));
+        children.add(Container(
+          padding: const EdgeInsets.all(V2Spacing.sm),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF7ED),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFFDBA74)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('荒療治：この明細を正として置き換える',
+                  style: V2Typography.caption.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF9A3412))),
+              const SizedBox(height: 2),
+              Text(
+                  'CSVの期間内（${_rangeLabel(lo, hi)}）の「${widget.wallet.name}」既存取引を削除し、'
+                  'CSV ${_pasted.length}件を新規取り込み（科目は店名からAI推定）。実行前に自動バックアップ。',
+                  style: V2Typography.caption
+                      .copyWith(color: const Color(0xFF9A3412), fontSize: 11)),
+              const SizedBox(height: 6),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => _openCsvImport(),
+                  icon: const Icon(Icons.sync_problem, size: 18),
+                  label: Text(
+                      'CSVで置き換える（プレビュー・既存${pool.length}件を削除）'),
+                  style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFEA580C)),
+                ),
               ),
-            ),
-          ],
-        ),
-      ));
+            ],
+          ),
+        ));
+      }
 
       // 記録漏れ（明細にあるが記録に無い）→ その場で店名・科目を直して追加
       if (missing.isNotEmpty) {
@@ -1504,15 +1591,15 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
                 Row(
                   children: [
                     BrandLogo(
-                      iconUrl: widget.card.iconUrl,
-                      fallbackEmoji: '💳',
+                      iconUrl: widget.wallet.iconUrl,
+                      fallbackIcon: widget.wallet.fallbackIcon,
                       size: 24,
                       borderRadius: 4,
                     ),
                     const SizedBox(width: V2Spacing.sm),
                     Expanded(
                         child:
-                            Text(widget.card.name, style: V2Typography.h2)),
+                            Text(widget.wallet.name, style: V2Typography.h2)),
                   ],
                 ),
                 const SizedBox(height: V2Spacing.md),
@@ -1594,8 +1681,8 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
                   ],
                 ),
                 // 荒療治：この月のクレカ取引（このカード名＋汎用クレカ表記）を初期化。
-                // CSV無しでも使える独立ボタン。対象があるときだけ表示。
-                if (delTargets.isNotEmpty) ...[
+                // CSV無しでも使える独立ボタン。カードのみ・対象があるときだけ表示。
+                if (widget.wallet.isCard && delTargets.isNotEmpty) ...[
                   const SizedBox(height: V2Spacing.sm),
                   SizedBox(
                     width: double.infinity,

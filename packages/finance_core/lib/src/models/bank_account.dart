@@ -80,6 +80,10 @@ class RegisteredBankAccount {
   /// UI 設定で「未使用を隠す」が ON の時に表示から除外される。
   final bool inactive;
 
+  /// 月ごとの「実際に使った/引き落とされた額」（円）。キー: "YYYY-MM"。
+  /// ウォレット照合（予定＝記録した明細合計 vs 実際）の手入力値。カードと同じ用途。
+  final Map<String, int> monthlyActualBillings;
+
   const RegisteredBankAccount({
     required this.id,
     required this.name,
@@ -90,6 +94,7 @@ class RegisteredBankAccount {
     this.iconUrl,
     this.memo,
     this.inactive = false,
+    this.monthlyActualBillings = const {},
   });
 
   /// 表示用の現在残高（currentBalance > startingBalance の優先順）。
@@ -105,6 +110,7 @@ class RegisteredBankAccount {
         'iconUrl': iconUrl,
         'memo': memo,
         'inactive': inactive,
+        'monthlyActualBillings': monthlyActualBillings,
       };
 
   factory RegisteredBankAccount.fromJson(Map<String, dynamic> j) =>
@@ -121,6 +127,10 @@ class RegisteredBankAccount {
         iconUrl: j['iconUrl'] as String?,
         memo: j['memo'] as String?,
         inactive: j['inactive'] as bool? ?? false,
+        monthlyActualBillings:
+            (j['monthlyActualBillings'] as Map<String, dynamic>?)
+                    ?.map((k, v) => MapEntry(k, (v as num).toInt())) ??
+                const {},
       );
 
   RegisteredBankAccount copyWith({
@@ -132,6 +142,7 @@ class RegisteredBankAccount {
     String? iconUrl,
     String? memo,
     bool? inactive,
+    Map<String, int>? monthlyActualBillings,
     bool clearMemo = false,
   }) =>
       RegisteredBankAccount(
@@ -144,6 +155,8 @@ class RegisteredBankAccount {
         iconUrl: iconUrl ?? this.iconUrl,
         memo: clearMemo ? null : (memo ?? this.memo),
         inactive: inactive ?? this.inactive,
+        monthlyActualBillings:
+            monthlyActualBillings ?? this.monthlyActualBillings,
       );
 }
 

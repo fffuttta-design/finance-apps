@@ -322,58 +322,77 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     if (mounted) await _load();
   }
 
-  /// クレカの実際請求金額を保存する。
-  Future<void> _saveCreditCardActual(
-      core.RegisteredCreditCard card, String ym, int? amount) async {
-    final idx = _payments.creditCards.indexWhere((c) => c.id == card.id);
-    if (idx < 0) return;
-    final m = Map<String, int>.from(card.monthlyActualBillings);
-    if (amount == null || amount <= 0) {
-      m.remove(ym);
-    } else {
-      m[ym] = amount;
+  /// ウォレット名から、その月の「実際額」を引く（カード/銀行どちらでも）。
+  int? _initialActualFor(String name, String ym) {
+    for (final c in _payments.creditCards) {
+      if (c.name == name) return c.monthlyActualBillings[ym];
     }
-    final newCards = [..._payments.creditCards];
-    newCards[idx] = card.copyWith(monthlyActualBillings: m);
-    await _settings
-        .savePayments(_payments.copyWith(creditCards: newCards));
-    if (mounted) await _load();
+    for (final b in _payments.bankAccounts) {
+      if (b.name == name) return b.monthlyActualBillings[ym];
+    }
+    return null;
   }
 
-  /// クレカ引落の棚卸しシートを開く。
-  /// そのカード払いの当月明細を確認し、差額ぶんの調整取引を追加できる。
-  Future<void> _openCardReconcile(core.RegisteredCreditCard card) async {
+  /// ウォレット（カード/銀行/現金/電子マネー）の実際額を保存する。
+  Future<void> _saveWalletActual(String name, String ym, int? amount) async {
+    Map<String, int> upd(Map<String, int> m) {
+      final n = Map<String, int>.from(m);
+      if (amount == null || amount <= 0) {
+        n.remove(ym);
+      } else {
+        n[ym] = amount;
+      }
+      return n;
+    }
+
+    final cIdx = _payments.creditCards.indexWhere((c) => c.name == name);
+    if (cIdx >= 0) {
+      final cards = [..._payments.creditCards];
+      cards[cIdx] = cards[cIdx].copyWith(
+          monthlyActualBillings: upd(cards[cIdx].monthlyActualBillings));
+      await _settings.savePayments(_payments.copyWith(creditCards: cards));
+      if (mounted) await _load();
+      return;
+    }
+    final bIdx = _payments.bankAccounts.indexWhere((b) => b.name == name);
+    if (bIdx >= 0) {
+      final banks = [..._payments.bankAccounts];
+      banks[bIdx] = banks[bIdx].copyWith(
+          monthlyActualBillings: upd(banks[bIdx].monthlyActualBillings));
+      await _settings.savePayments(_payments.copyWith(bankAccounts: banks));
+      if (mounted) await _load();
+    }
+  }
+
+  /// ウォレット照合シートを開く。
+  Future<void> _openCardReconcile(ReconcileWallet wallet) async {
     final ym = _ymKey;
     await showCardReconcileSheet(
       context,
-      card: card,
+      wallet: wallet,
+      initialActual: _initialActualFor(wallet.name, ym),
       ym: ym,
-      onSaveActual: (amount) => _saveCreditCardActual(card, ym, amount),
+      onSaveActual: (amount) => _saveWalletActual(wallet.name, ym, amount),
       onEditTxn: _editTxn,
       onDeleteTxn: _deleteTxn,
       onAddAdjustment: (amount, {description, date}) => _addCardAdjustment(
-          card, amount,
+          wallet.name, amount,
           description: description, date: date),
     );
-    // シートを閉じたら最新状態へ（実際額・調整取引の反映）。
     if (mounted) await _load();
   }
 
-  /// 差額ぶんの「調整取引」を追加する。
-  /// 記録漏れの支出を埋める想定で、支払方法＝当カード／日付＝表示月末を
-  /// プリフィルした支出入力画面を開く。
-  Future<void> _addCardAdjustment(
-      core.RegisteredCreditCard card, int amount,
+  /// 差額ぶんの「調整取引」を追加する。支払方法＝当ウォレット。
+  Future<void> _addCardAdjustment(String walletName, int amount,
       {String? description, DateTime? date}) async {
-    // 既定は表示月の末日（明細合計に当月として計上されるように）。
     final fallbackDate = DateTime(_focused.year, _focused.month + 1, 0);
     final changed = await showInputSheet<bool>(
       context,
       ExpenseInputScreen(
-        initialPaymentMethod: card.name,
+        initialPaymentMethod: walletName,
         initialAmount: amount > 0 ? amount : null,
         initialDate: date ?? fallbackDate,
-        initialDescription: description ?? 'クレカ差額調整',
+        initialDescription: description ?? '差額調整',
       ),
     );
     if (changed == true && mounted) await _load();
@@ -538,7 +557,11 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
               cards: _payments.creditCards
                   .where((c) => !c.inactive)
                   .toList(),
+              bankAccounts: _payments.bankAccounts
+                  .where((b) => !b.inactive)
+                  .toList(),
               transactions: _transactions,
+              subscriptions: _subscriptions.subscriptions,
               ym: _ymKey,
               onOpenReconcile: _openCardReconcile,
             ),
