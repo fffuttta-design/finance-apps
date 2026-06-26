@@ -1,1 +1,1 @@
-{"version":"1.0.327","buildNumber":"328","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.327/futa-finance-v1.0.327.apk","releaseNotes":"Windows(Electron)版でカード明細CSVが取り込めなかった問題を修正しました（ファイル選択をブラウザ標準の方式に切り替え）。"}
+{"version":"1.0.328","buildNumber":"329","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.328/futa-finance-v1.0.328.apk","releaseNotes":"カード明細CSVが取り込めず0件になる根本原因を修正しました（ヘッダー行に依存しない解析に変更）。オリコ等の明細が正しく取り込めます。"}
