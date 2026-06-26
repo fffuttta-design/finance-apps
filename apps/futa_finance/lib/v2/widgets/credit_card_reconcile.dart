@@ -2,12 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:charset/charset.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../../data/app_mode.dart';
 import '../../data/backup_repository.dart';
+import '../../data/csv_picker.dart';
 import '../../data/settings_repository.dart';
 import '../../data/store_category_classifier.dart';
 import '../../data/transaction_repository.dart';
@@ -773,20 +773,10 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
 
   /// カード明細CSVを選択 → Shift-JIS/UTF-8 を判定して解析 → 突合用にセット。
   Future<void> _importCsv() async {
-    final res = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['csv'],
-      withData: true,
-    );
-    if (res == null || res.files.isEmpty) return;
-    final bytes = res.files.first.bytes;
-    if (bytes == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('ファイルを読み込めませんでした')));
-      }
-      return;
-    }
+    final picked = await pickCsvFile();
+    if (!mounted) return;
+    if (picked == null) return; // キャンセル or 取得失敗
+    final bytes = picked.bytes;
     final content = _decodeCsvBytes(bytes);
     final lines = _parseCardCsv(content, _year);
     if (!mounted) return;
@@ -806,7 +796,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('${res.files.first.name}（${bytes.length}バイト）',
+                Text('${picked.name}（${bytes.length}バイト）',
                     style: const TextStyle(
                         fontSize: 12, color: V2Colors.textSecondary)),
                 const SizedBox(height: 8),
