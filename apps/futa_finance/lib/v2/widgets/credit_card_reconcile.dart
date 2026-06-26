@@ -464,30 +464,99 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
     _propose();
   }
 
-  /// 記録漏れ行の店名から会計科目をAIで一括提案する。
-  Future<void> _propose() async {
-    if (_pasted.isEmpty || _catMenu.isEmpty) return;
-    setState(() => _proposing = true);
-    final lines = List<_StmtLine>.from(_pasted);
-    final names = [for (final l in lines) _edits[l]?.nameCtrl.text ?? l.name];
-    List<Map<String, String>?> cats;
-    try {
-      cats = await StoreCategoryClassifier.instance.classify(names, _catMenu);
-    } catch (_) {
-      cats = List<Map<String, String>?>.filled(names.length, null);
+  /// 過去の確定取引から「店名（完全一致）→ 最頻の会計科目」の学習マップを作る。
+  /// 店名は store と description の両方をキーにする（取込分はstore、手入力分はdescに入る）。
+  Map<String, ({String major, String sub})> _buildHistoryCategoryMap() {
+    final counts = <String, Map<String, int>>{};
+    for (final t in _all) {
+      if (t.type != core.TransactionType.expense) continue;
+      final major = t.category.major.trim();
+      if (major.isEmpty || major == '未分類') continue;
+      final catKey = '$major${t.category.sub.trim()}';
+      final names = <String>{};
+      final s = t.store?.trim() ?? '';
+      final d = t.description.trim();
+      if (s.isNotEmpty) names.add(s);
+      if (d.isNotEmpty) names.add(d);
+      for (final n in names) {
+        (counts[n] ??= {})[catKey] = ((counts[n]![catKey]) ?? 0) + 1;
+      }
     }
-    if (!mounted) return;
+    final map = <String, ({String major, String sub})>{};
+    counts.forEach((name, cc) {
+      final best = cc.entries.reduce((a, b) => b.value > a.value ? b : a);
+      final parts = best.key.split('');
+      map[name] = (major: parts[0], sub: parts.length > 1 ? parts[1] : '');
+    });
+    return map;
+  }
+
+  /// 記録漏れ行の科目を提案する。
+  /// ① 過去の確定データ（店名完全一致）から最頻科目を採用（無料・一瞬・Web版でも効く）
+  /// ② 履歴に無い店だけ AI（Gemini）に聞く（キーがある時のみ）
+  Future<void> _propose() async {
+    if (_pasted.isEmpty) return;
+    final lines = List<_StmtLine>.from(_pasted);
+    final hist = _buildHistoryCategoryMap();
+    final needAi = <int>[]; // 履歴に無くAIに聞く行のindex
     setState(() {
-      for (var i = 0; i < lines.length && i < cats.length; i++) {
-        final c = cats[i];
+      _proposing = true;
+      for (var i = 0; i < lines.length; i++) {
         final e = _edits[lines[i]];
-        if (c != null && e != null) {
-          e.major = c['major'];
-          e.sub = c['sub'] ?? '';
+        if (e == null) continue;
+        final name = e.nameCtrl.text.trim();
+        final h = hist[name];
+        if (h != null) {
+          e.major = h.major;
+          e.sub = h.sub;
+        } else {
+          needAi.add(i);
         }
       }
-      _proposing = false;
     });
+    DebugLog.add(
+        'propose: 履歴一致=${lines.length - needAi.length}件 / AI対象=${needAi.length}件');
+
+    if (needAi.isNotEmpty &&
+        _catMenu.isNotEmpty &&
+        StoreCategoryClassifier.available) {
+      final names = [
+        for (final i in needAi) _edits[lines[i]]?.nameCtrl.text ?? lines[i].name
+      ];
+      List<Map<String, String>?> cats;
+      try {
+        cats = await StoreCategoryClassifier.instance.classify(names, _catMenu);
+      } catch (_) {
+        cats = List<Map<String, String>?>.filled(names.length, null);
+      }
+      if (!mounted) return;
+      setState(() {
+        for (var k = 0; k < needAi.length && k < cats.length; k++) {
+          final c = cats[k];
+          final e = _edits[lines[needAi[k]]];
+          if (c != null && e != null) {
+            e.major = c['major'];
+            e.sub = c['sub'] ?? '';
+          }
+        }
+      });
+      DebugLog.add('propose: AI提案完了');
+    }
+    if (!mounted) return;
+    setState(() => _proposing = false);
+  }
+
+  /// 同バッチ内で、同じ店名（完全一致）の他の行にも科目を反映する。
+  void _applySameNameCategory(_StmtLine src, String? major, String sub) {
+    final name = _edits[src]?.nameCtrl.text.trim();
+    if (name == null || name.isEmpty) return;
+    for (final entry in _edits.entries) {
+      if (identical(entry.key, src)) continue;
+      if (entry.value.nameCtrl.text.trim() == name) {
+        entry.value.major = major;
+        entry.value.sub = sub;
+      }
+    }
   }
 
   /// 記録漏れ1件を、編集後の店名・科目で支出として追加する。
@@ -611,6 +680,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
                   onChanged: (v) => setState(() {
                     e.major = v;
                     e.sub = '';
+                    _applySameNameCategory(line, v, '');
                   }),
                 ),
               ),
@@ -659,7 +729,10 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
                       for (final s in _catMenu[e.major]!)
                         DropdownMenuItem(value: s, child: Text(s)),
                     ],
-                    onChanged: (v) => setState(() => e.sub = v ?? ''),
+                    onChanged: (v) => setState(() {
+                      e.sub = v ?? '';
+                      _applySameNameCategory(line, e.major, e.sub);
+                    }),
                   ),
                 ),
                 // 追加ボタンと幅を合わせるためのダミー余白。
@@ -1167,7 +1240,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
         ]));
         children.add(Padding(
           padding: const EdgeInsets.only(left: 22, bottom: 4),
-          child: Text('店名を直し、科目を選んで「追加」。AIが科目を提案します。',
+          child: Text('店名を直し、科目を選んで「追加」。過去の確定データ＋AIが科目を提案（同じ店名は連動）。',
               style: V2Typography.micro.copyWith(color: V2Colors.textMuted)),
         ));
         children.add(const SizedBox(height: 6));
