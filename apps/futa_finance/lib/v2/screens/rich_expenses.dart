@@ -40,6 +40,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   core.PaymentMethodsConfig _payments = core.PaymentMethodsConfig.empty();
   bool _loading = true;
 
+  /// 支出合計カードの内訳を展開しているか。
+  bool _summaryOpen = false;
+
   /// 事業モードの諸経費/制作原価サブタブ（個人モードは null）。
   TabController? _subTab;
 
@@ -126,6 +129,27 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   }
 
   /// 指定月に計上される固定費（サブスク）の明細（名前・金額・アイコン）。金額降順。
+  /// サマリー展開の1行（ラベル＋金額）。
+  Widget _summaryLine(String label, int amount) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(label,
+                  style: V2Typography.caption
+                      .copyWith(color: V2Colors.textSecondary),
+                  overflow: TextOverflow.ellipsis),
+            ),
+            const SizedBox(width: 8),
+            Text(formatYen(amount),
+                style: V2Typography.caption.copyWith(
+                    color: V2Colors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                    fontFeatures: V2Typography.tabularNums)),
+          ],
+        ),
+      );
+
   List<({String id, String name, int amount, String? iconUrl})>
       _fixedLinesForMonth(DateTime m) {
     final now = DateTime.now();
@@ -355,6 +379,29 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     final majorEntries = byMajor.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
+    // 支払方法別（取引＋固定費）。サマリーの展開で「どの財布から出たか」を表示。
+    final byPayment = <String, int>{};
+    for (final t in rows) {
+      final pm =
+          t.paymentMethod.trim().isEmpty ? '未設定' : t.paymentMethod.trim();
+      byPayment[pm] = (byPayment[pm] ?? 0) + t.amount;
+    }
+    if (showFixedAndCard) {
+      final now = DateTime.now();
+      final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+      final ym = '${_month.year}-${_month.month.toString().padLeft(2, '0')}';
+      for (final s in _subs) {
+        final amt = s.plAmountForMonth(ym, curYm);
+        if (amt <= 0) continue;
+        final pm = (s.paymentMethod ?? '').trim().isEmpty
+            ? '未設定'
+            : s.paymentMethod!.trim();
+        byPayment[pm] = (byPayment[pm] ?? 0) + amt;
+      }
+    }
+    final paymentEntries = byPayment.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(
           vertical: V2Spacing.lg, horizontal: V2Spacing.md),
@@ -370,43 +417,94 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                         V2Typography.h1.copyWith(color: V2Colors.textPrimary)),
                 const SizedBox(height: V2Spacing.md),
               ],
-              // サマリー
+              // サマリー（タップで内訳を展開）
               Container(
-                padding: const EdgeInsets.all(V2Spacing.lg),
                 decoration: BoxDecoration(
                   color: V2Colors.surface,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: V2Colors.border),
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Row(
-                      children: [
-                        Text('${_month.month}月の$summaryLabel合計',
-                            style: V2Typography.caption
-                                .copyWith(color: V2Colors.textSecondary)),
-                        const Spacer(),
-                        _MiniStepper(
-                          label: '${_month.year}年${_month.month}月',
-                          onPrev: () => _shiftMonth(-1),
-                          onNext: () => _shiftMonth(1),
+                    InkWell(
+                      onTap: () =>
+                          setState(() => _summaryOpen = !_summaryOpen),
+                      borderRadius: BorderRadius.circular(14),
+                      child: Padding(
+                        padding: const EdgeInsets.all(V2Spacing.lg),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text('${_month.month}月の$summaryLabel合計',
+                                    style: V2Typography.caption.copyWith(
+                                        color: V2Colors.textSecondary)),
+                                const Spacer(),
+                                _MiniStepper(
+                                  label: '${_month.year}年${_month.month}月',
+                                  onPrev: () => _shiftMonth(-1),
+                                  onNext: () => _shiftMonth(1),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(formatYen(total),
+                                style: TextStyle(
+                                    fontSize: 25,
+                                    fontWeight: FontWeight.w800,
+                                    color: V2Colors.textPrimary,
+                                    fontFeatures: V2Typography.tabularNums)),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                      '明細 ${rows.length}件'
+                                      '${subTotal > 0 ? ' ＋ 固定費 ${formatYen(subTotal)}' : ''}',
+                                      style: V2Typography.micro.copyWith(
+                                          color: V2Colors.textMuted)),
+                                ),
+                                Text(_summaryOpen ? '内訳を閉じる' : '内訳を見る',
+                                    style: V2Typography.micro
+                                        .copyWith(color: widget.accent)),
+                                Icon(
+                                    _summaryOpen
+                                        ? Icons.expand_less
+                                        : Icons.expand_more,
+                                    size: 16,
+                                    color: widget.accent),
+                              ],
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(formatYen(total),
-                        style: TextStyle(
-                            fontSize: 25,
-                            fontWeight: FontWeight.w800,
-                            color: V2Colors.textPrimary,
-                            fontFeatures: V2Typography.tabularNums)),
-                    const SizedBox(height: 6),
-                    Text(
-                        '明細 ${rows.length}件'
-                        '${subTotal > 0 ? ' ＋ 固定費 ${formatYen(subTotal)}' : ''}',
-                        style: V2Typography.micro
-                            .copyWith(color: V2Colors.textMuted)),
+                    if (_summaryOpen) ...[
+                      const Divider(height: 1, color: V2Colors.divider),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(V2Spacing.lg, 12,
+                            V2Spacing.lg, V2Spacing.lg),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // 変動費 / 固定費
+                            _summaryLine('変動費（明細）', txTotal),
+                            if (subTotal > 0)
+                              _summaryLine('固定費（サブスク）', subTotal),
+                            const SizedBox(height: 10),
+                            Text('支払方法別',
+                                style: V2Typography.micro.copyWith(
+                                    color: V2Colors.textMuted,
+                                    fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 4),
+                            for (final e in paymentEntries)
+                              _summaryLine(e.key, e.value),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
