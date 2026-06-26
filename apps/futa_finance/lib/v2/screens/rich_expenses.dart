@@ -9,6 +9,7 @@ import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
 import '../../screens/expense_input_screen.dart';
 import '../../screens/expense_list_screen.dart';
+import '../../screens/subscription_list_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
 import '../../utils/formatters.dart';
 import '../../utils/modal_input.dart';
@@ -125,16 +126,17 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   }
 
   /// 指定月に計上される固定費（サブスク）の明細（名前・金額・アイコン）。金額降順。
-  List<({String name, int amount, String? iconUrl})> _fixedLinesForMonth(
-      DateTime m) {
+  List<({String id, String name, int amount, String? iconUrl})>
+      _fixedLinesForMonth(DateTime m) {
     final now = DateTime.now();
     final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
-    final lines = <({String name, int amount, String? iconUrl})>[];
+    final lines = <({String id, String name, int amount, String? iconUrl})>[];
     for (final sub in _subs) {
       final amt = sub.plAmountForMonth(ym, curYm);
       if (amt > 0) {
         lines.add((
+          id: sub.id,
           name: sub.name.trim().isEmpty ? '固定費' : sub.name,
           amount: amt,
           iconUrl: sub.iconUrl,
@@ -143,6 +145,16 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     }
     lines.sort((a, b) => b.amount.compareTo(a.amount));
     return lines;
+  }
+
+  /// 固定費（サブスク）の編集画面をディープリンクで開く。
+  Future<void> _editSubscription(String id) async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+          builder: (_) => SubscriptionListScreen(initialEditId: id)),
+    );
+    if (mounted) await _load();
   }
 
   List<core.Transaction> get _monthExpenses => _transactions
@@ -325,7 +337,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     final total = txTotal + subTotal;
     final fixedLines = showFixedAndCard
         ? _fixedLinesForMonth(_month)
-        : <({String name, int amount, String? iconUrl})>[];
+        : <({String id, String name, int amount, String? iconUrl})>[];
 
     // カテゴリ内訳（大カテゴリ別・固定費込み）＋ドリルダウン用の取引一覧。
     final byMajor = <String, int>{};
@@ -406,6 +418,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                       .where((c) => !c.inactive)
                       .toList(),
                   transactions: _transactions,
+                  subscriptions: _subs,
                   ym: _ymKey,
                   onOpenReconcile: _openCardReconcile,
                 ),
@@ -439,7 +452,8 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                                     _FixedDetailRow(
                                         name: f.name,
                                         amount: f.amount,
-                                        iconUrl: f.iconUrl),
+                                        iconUrl: f.iconUrl,
+                                        onTap: () => _editSubscription(f.id)),
                                 ]
                               : [
                                   for (final t
@@ -483,29 +497,36 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                       for (int i = 0; i < fixedLines.length; i++) ...[
                         if (i > 0)
                           const Divider(height: 1, color: V2Colors.divider),
-                        Padding(
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 9),
-                          child: Row(
-                            children: [
-                              BrandLogo(
-                                iconUrl: fixedLines[i].iconUrl,
-                                fallbackIcon: Icons.subscriptions_outlined,
-                                size: 20,
-                                borderRadius: 5,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(fixedLines[i].name,
-                                    style: V2Typography.body,
-                                    overflow: TextOverflow.ellipsis),
-                              ),
-                              Text(formatYen(fixedLines[i].amount),
-                                  style: V2Typography.caption.copyWith(
-                                      color: V2Colors.textSecondary,
-                                      fontFeatures:
-                                          V2Typography.tabularNums)),
-                            ],
+                        InkWell(
+                          onTap: () => _editSubscription(fixedLines[i].id),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 9),
+                            child: Row(
+                              children: [
+                                BrandLogo(
+                                  iconUrl: fixedLines[i].iconUrl,
+                                  fallbackIcon: Icons.subscriptions_outlined,
+                                  size: 20,
+                                  borderRadius: 5,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(fixedLines[i].name,
+                                      style: V2Typography.body,
+                                      overflow: TextOverflow.ellipsis),
+                                ),
+                                Text(formatYen(fixedLines[i].amount),
+                                    style: V2Typography.caption.copyWith(
+                                        color: V2Colors.textSecondary,
+                                        fontFeatures:
+                                            V2Typography.tabularNums)),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.chevron_right,
+                                    size: 16, color: V2Colors.textMuted),
+                              ],
+                            ),
                           ),
                         ),
                       ],
@@ -699,36 +720,46 @@ class _CatBarState extends State<_CatBar> {
   }
 }
 
-/// 固定費（引落予定）の内訳1行。
+/// 固定費（引落予定）の内訳1行。タップで編集へ。
 class _FixedDetailRow extends StatelessWidget {
   final String name;
   final int amount;
   final String? iconUrl;
+  final VoidCallback? onTap;
   const _FixedDetailRow(
-      {required this.name, required this.amount, this.iconUrl});
+      {required this.name, required this.amount, this.iconUrl, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
-      child: Row(
-        children: [
-          BrandLogo(
-            iconUrl: iconUrl,
-            fallbackIcon: Icons.subscriptions_outlined,
-            size: 20,
-            borderRadius: 5,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(name,
-                style: V2Typography.body, overflow: TextOverflow.ellipsis),
-          ),
-          Text(formatYen(amount),
-              style: V2Typography.caption.copyWith(
-                  color: V2Colors.textSecondary,
-                  fontFeatures: V2Typography.tabularNums)),
-        ],
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
+        child: Row(
+          children: [
+            BrandLogo(
+              iconUrl: iconUrl,
+              fallbackIcon: Icons.subscriptions_outlined,
+              size: 20,
+              borderRadius: 5,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(name,
+                  style: V2Typography.body, overflow: TextOverflow.ellipsis),
+            ),
+            Text(formatYen(amount),
+                style: V2Typography.caption.copyWith(
+                    color: V2Colors.textSecondary,
+                    fontFeatures: V2Typography.tabularNums)),
+            if (onTap != null) ...[
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right,
+                  size: 16, color: V2Colors.textMuted),
+            ],
+          ],
+        ),
       ),
     );
   }

@@ -11,6 +11,7 @@ import '../../data/csv_picker.dart';
 import '../../data/debug_log.dart';
 import '../../data/settings_repository.dart';
 import '../../data/store_category_classifier.dart';
+import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
 import '../../screens/card_csv_import_screen.dart';
 import '../../utils/formatters.dart';
@@ -32,6 +33,9 @@ import '../theme/typography.dart';
 class CreditCardBillingSection extends StatelessWidget {
   final List<core.RegisteredCreditCard> cards;
   final List<core.Transaction> transactions;
+
+  /// このカード払いの固定費（サブスク）も予定に含めるため受け取る。
+  final List<core.Subscription> subscriptions;
   final String ym;
 
   /// 行タップ → 棚卸しシートを開く。
@@ -41,22 +45,29 @@ class CreditCardBillingSection extends StatelessWidget {
     super.key,
     required this.cards,
     required this.transactions,
+    this.subscriptions = const [],
     required this.ym,
     required this.onOpenReconcile,
   });
 
-  /// 当月・当カードの明細合計（予定金額）。
+  /// 当月・当カードの明細合計（予定金額）。取引＋このカード払いの固定費（サブスク）。
   int _planned(core.RegisteredCreditCard card) {
     final parts = ym.split('-');
     final year = int.parse(parts[0]);
     final month = int.parse(parts[1]);
-    return transactions
+    final txSum = transactions
         .where((t) =>
             t.type == core.TransactionType.expense &&
             t.paymentMethod == card.name &&
             t.date.year == year &&
             t.date.month == month)
         .fold(0, (s, t) => s + t.amount);
+    final now = DateTime.now();
+    final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final subSum = subscriptions
+        .where((s) => (s.paymentMethod ?? '') == card.name)
+        .fold(0, (s, sub) => s + sub.plAmountForMonth(ym, curYm));
+    return txSum + subSum;
   }
 
   /// セクションに表示するカード（当月明細あり or 実際金額入力済み）。
@@ -389,6 +400,9 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
   final _txRepo = TransactionRepository.instance;
   StreamSubscription<List<core.Transaction>>? _sub;
   List<core.Transaction> _all = [];
+
+  /// このカード払いの固定費（サブスク）。予定・突合に含める。
+  List<core.Subscription> _subs = [];
   int? _actual;
   bool _loading = true;
 
@@ -767,9 +781,14 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
 
   Future<void> _load() async {
     final txns = await _txRepo.loadAll();
+    List<core.Subscription> subs = const [];
+    try {
+      subs = (await SubscriptionRepository.instance.load()).subscriptions;
+    } catch (_) {}
     if (!mounted) return;
     setState(() {
       _all = txns;
+      _subs = subs;
       _loading = false;
     });
   }
@@ -789,6 +808,21 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
       ..sort((a, b) => b.date.compareTo(a.date));
   }
 
+  /// このカード払いの固定費（当月・金額>0）。予定と突合に含める。
+  List<({String name, int amount})> get _cardSubs {
+    final now = DateTime.now();
+    final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final out = <({String name, int amount})>[];
+    for (final s in _subs) {
+      if ((s.paymentMethod ?? '') != widget.card.name) continue;
+      final amt = s.plAmountForMonth(widget.ym, curYm);
+      if (amt > 0) {
+        out.add((name: s.name.trim().isEmpty ? '固定費' : s.name, amount: amt));
+      }
+    }
+    return out;
+  }
+
   /// 初期化の削除対象（当月・このカード名＋汎用クレカ表記の支出）。
   /// 昔の手入力で支払方法を「クレカ」等にしていた分も拾う。
   List<core.Transaction> get _deleteTargetsThisMonth {
@@ -802,7 +836,9 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
       ..sort((a, b) => b.date.compareTo(a.date));
   }
 
-  int get _planned => _cardTxns.fold(0, (s, t) => s + t.amount);
+  int get _planned =>
+      _cardTxns.fold(0, (s, t) => s + t.amount) +
+      _cardSubs.fold(0, (s, x) => s + x.amount);
 
   /// 実際請求額を入力。
   Future<void> _inputActual() async {
@@ -1137,6 +1173,10 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
 
       // 金額で突合（記録1件は1回まで）。
       final used = <int>{};
+      // このカード払いの固定費（サブスク）の金額。CSVに同額があれば「記録済み」
+      // として吸収し、二重計上（記録漏れ誤検出）を防ぐ。
+      final subAmounts = _cardSubs.map((x) => x.amount).toList();
+      final subUsed = <int>{};
       final missing = <_StmtLine>[]; // 明細にあり・記録なし＝記録漏れ
       int matchedCount = 0;
       for (final line in _pasted) {
@@ -1150,6 +1190,20 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
         }
         if (found >= 0) {
           used.add(found);
+          matchedCount++;
+          continue;
+        }
+        // 取引で一致しなければ、このカードの固定費（サブスク）と金額照合。
+        int subFound = -1;
+        for (int i = 0; i < subAmounts.length; i++) {
+          if (subUsed.contains(i)) continue;
+          if (subAmounts[i] == line.amount) {
+            subFound = i;
+            break;
+          }
+        }
+        if (subFound >= 0) {
+          subUsed.add(subFound);
           matchedCount++;
         } else {
           missing.add(line);
@@ -1599,6 +1653,58 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
                       ],
                     ),
                   ),
+                // このカード払いの固定費（サブスク）。予定に含めているので明示。
+                if (_cardSubs.isNotEmpty) ...[
+                  const SizedBox(height: V2Spacing.md),
+                  Row(children: [
+                    const Icon(Icons.repeat,
+                        size: 15, color: V2Colors.textSecondary),
+                    const SizedBox(width: 6),
+                    Text('このカード払いの固定費（予定に含む）',
+                        style: V2Typography.caption
+                            .copyWith(color: V2Colors.textSecondary)),
+                  ]),
+                  const SizedBox(height: 6),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: V2Colors.surfaceMuted,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: V2Colors.border),
+                    ),
+                    child: Column(
+                      children: [
+                        for (int i = 0; i < _cardSubs.length; i++) ...[
+                          if (i > 0)
+                            const Divider(
+                                height: 1, color: V2Colors.divider),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: V2Spacing.md, vertical: 10),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.subscriptions_outlined,
+                                    size: 16, color: V2Colors.textMuted),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(_cardSubs[i].name,
+                                      style: V2Typography.body,
+                                      overflow: TextOverflow.ellipsis),
+                                ),
+                                Text('-${formatYen(_cardSubs[i].amount)}',
+                                    style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: V2Colors.negative,
+                                        fontFeatures:
+                                            V2Typography.tabularNums)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: V2Spacing.xl),
               ],
             ),
