@@ -1,1 +1,1 @@
-{"version":"1.0.332","buildNumber":"333","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.332/futa-finance-v1.0.332.apk","releaseNotes":"クレカの「初期化／CSVで置き換え」が、昔の手入力で支払方法を「クレカ」等にしていた取引も削除対象に含めるようにしました（確認ダイアログに内訳を表示）。"}
+{"version":"1.0.333","buildNumber":"334","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.333/futa-finance-v1.0.333.apk","releaseNotes":"CSV取り込みの科目提案に履歴学習を追加。過去に確定した「店名→科目」を覚えて自動で埋め、無い店だけAIに聞きます。使うほど賢くなります。"}
