@@ -15,6 +15,7 @@ import '../../utils/formatters.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
+import '../widgets/month_closing_bar.dart';
 
 /// 新デザイン（リッチUI）のホーム画面。
 ///
@@ -296,6 +297,11 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // 締め済バッジ（締めた月のみ・読み取り専用）
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: MonthClosingBar(month: _month, compact: true),
+                ),
                 hero,
                 const SizedBox(height: V2Spacing.md),
                 balanceCard,

@@ -10,6 +10,7 @@ import '../../utils/formatters.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
+import '../widgets/month_closing_bar.dart';
 
 /// 新デザイン（リッチUI）の売上／収入タブ。
 /// サマリーカード（合計＋確定/見込み）＋明細リスト。既存 V2IncomeScreen は温存。
@@ -162,6 +163,9 @@ class _RichIncomeScreenState extends State<RichIncomeScreen>
                   ],
                 ),
               ),
+              const SizedBox(height: V2Spacing.md),
+              // 締め処理（支出タブと共通・可逆）
+              MonthClosingBar(month: _month, snapshotIncome: total),
               const SizedBox(height: V2Spacing.md),
               // 明細
               Container(
