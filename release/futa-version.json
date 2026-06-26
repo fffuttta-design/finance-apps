@@ -1,1 +1,1 @@
-{"version":"1.0.326","buildNumber":"327","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.326/futa-finance-v1.0.326.apk","releaseNotes":"カードCSVの読み込みを改善：UTF-8/Shift-JISの自動判定を堅牢化し、読み取れない時は原因が分かるダイアログを表示するようにしました。"}
+{"version":"1.0.327","buildNumber":"328","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.327/futa-finance-v1.0.327.apk","releaseNotes":"Windows(Electron)版でカード明細CSVが取り込めなかった問題を修正しました（ファイル選択をブラウザ標準の方式に切り替え）。"}
