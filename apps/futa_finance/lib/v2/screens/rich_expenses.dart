@@ -5,6 +5,7 @@ import 'package:finance_core/finance_core.dart' as core;
 
 import '../../data/app_mode.dart';
 import '../../data/settings_repository.dart';
+import '../../data/month_closing_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
 import '../../screens/expense_input_screen.dart';
@@ -42,6 +43,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
 
   /// 支出合計カードの内訳を展開しているか。
   bool _summaryOpen = false;
+
+  /// 月末締めの状態（締め処理完了フラグ）。
+  core.MonthClosingConfig _closing = core.MonthClosingConfig.empty();
 
   /// 事業モードの諸経費/制作原価サブタブ（個人モードは null）。
   TabController? _subTab;
@@ -90,13 +94,35 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     final txns = await _txRepo.loadAll();
     final subs = await SubscriptionRepository.instance.load();
     final payments = await _settings.loadPayments();
+    final closing = await MonthClosingRepository.instance.load();
     if (!mounted) return;
     setState(() {
       _transactions = txns;
       _subs = subs.subscriptions;
       _payments = payments;
+      _closing = closing;
       _loading = false;
     });
+  }
+
+  /// この月を締める（締め処理完了）。可逆。
+  Future<void> _closeMonth(int totalExpense) async {
+    final key = core.MonthClosing.monthKey(_month.year, _month.month);
+    final existing = _closing.forMonth(_month.year, _month.month) ??
+        core.MonthClosing(yearMonth: key);
+    final cfg = _closing.upsert(existing.copyWith(
+        closedAt: DateTime.now(), closedTotalExpense: totalExpense));
+    await MonthClosingRepository.instance.save(cfg);
+    if (mounted) setState(() => _closing = cfg);
+  }
+
+  /// 締め処理を取り消す（再び編集可能な状態に戻す）。
+  Future<void> _reopenMonth() async {
+    final existing = _closing.forMonth(_month.year, _month.month);
+    if (existing == null) return;
+    final cfg = _closing.upsert(existing.copyWith(clearClosedAt: true));
+    await MonthClosingRepository.instance.save(cfg);
+    if (mounted) setState(() => _closing = cfg);
   }
 
   /// クレカ照合に表示するカードが当月あるか（無ければセクション余白を出さない）。
@@ -129,6 +155,63 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   }
 
   /// 指定月に計上される固定費（サブスク）の明細（名前・金額・アイコン）。金額降順。
+  /// 締め処理バー（未締め＝締めるボタン／締め済＝完了バナー＋取り消し）。
+  Widget _buildClosingBar(int total) {
+    final closing = _closing.forMonth(_month.year, _month.month);
+    final isClosed = closing?.isClosed ?? false;
+    if (isClosed) {
+      final d = closing!.closedAt!;
+      final stamp =
+          '${d.month}/${d.day} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+      return Container(
+        padding: const EdgeInsets.symmetric(
+            horizontal: V2Spacing.md, vertical: V2Spacing.sm),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0FDF4),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: V2Colors.positive),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.check_circle, size: 20, color: V2Colors.positive),
+            const SizedBox(width: V2Spacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${_month.month}月は締め処理完了',
+                      style: V2Typography.body.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF166534))),
+                  Text('$stamp に締め・もう編集の必要はありません',
+                      style: V2Typography.micro
+                          .copyWith(color: const Color(0xFF166534))),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: _reopenMonth,
+              child: const Text('締めを取り消す', style: TextStyle(fontSize: 12)),
+            ),
+          ],
+        ),
+      );
+    }
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => _closeMonth(total),
+        icon: const Icon(Icons.task_alt, size: 18),
+        label: Text('${_month.month}月を締める（締め処理完了）'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: V2Colors.positive,
+          side: const BorderSide(color: V2Colors.positive),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+        ),
+      ),
+    );
+  }
+
   /// サマリー展開の1行（ラベル＋金額）。
   Widget _summaryLine(String label, int amount) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
@@ -533,6 +616,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                   ],
                 ),
               ),
+              const SizedBox(height: V2Spacing.md),
+              // 締め処理（この月はもう編集不要、を示す。可逆）
+              _buildClosingBar(total),
               const SizedBox(height: V2Spacing.md),
               // クレカ引落照合・棚卸し（支出合計のすぐ下・目立つ位置）
               if (showFixedAndCard) ...[
