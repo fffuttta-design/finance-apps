@@ -4,6 +4,8 @@ import 'dart:typed_data';
 
 import 'package:web/web.dart' as web;
 
+import 'debug_log.dart';
+
 /// Web/Electron 向け：ブラウザ標準の `<input type=file>` を直接使ってCSVを選ぶ。
 /// file_picker が Electron で結果を返さない問題を回避するため、自前で実装する。
 Future<({String name, Uint8List bytes})?> pickCsvFile() {
@@ -21,12 +23,16 @@ Future<({String name, Uint8List bytes})?> pickCsvFile() {
     input.remove();
   }
 
+  DebugLog.add('picker(web): input生成・DOM追加');
+
   input.addEventListener(
       'change',
       ((web.Event _) {
+        DebugLog.add('picker(web): changeイベント発火');
         try {
           final files = input.files;
           if (files == null || files.length == 0) {
+            DebugLog.add('picker(web): ファイル無し');
             finish(null);
             return;
           }
@@ -35,6 +41,7 @@ Future<({String name, Uint8List bytes})?> pickCsvFile() {
             finish(null);
             return;
           }
+          DebugLog.add('picker(web): file=${file.name} 読込開始');
           final reader = web.FileReader();
           reader.addEventListener(
               'load',
@@ -42,19 +49,23 @@ Future<({String name, Uint8List bytes})?> pickCsvFile() {
                 try {
                   final res = reader.result;
                   if (res == null) {
+                    DebugLog.add('picker(web): reader.result=null');
                     finish(null);
                     return;
                   }
                   final bytes = (res as JSArrayBuffer).toDart.asUint8List();
+                  DebugLog.add('picker(web): 読込完了 bytes=${bytes.length}');
                   finish((name: file.name, bytes: bytes));
-                } catch (_) {
+                } catch (e) {
+                  DebugLog.add('picker(web): load例外 $e');
                   finish(null);
                 }
               }).toJS);
           reader.addEventListener(
               'error', ((web.Event _) => finish(null)).toJS);
           reader.readAsArrayBuffer(file);
-        } catch (_) {
+        } catch (e) {
+          DebugLog.add('picker(web): change例外 $e');
           finish(null);
         }
       }).toJS);
@@ -62,6 +73,7 @@ Future<({String name, Uint8List bytes})?> pickCsvFile() {
   // ※ 'cancel' イベントは一部 Electron/Chromium で選択時にも発火し、せっかく選んだ
   //   ファイルを null で潰す不具合があるため購読しない（キャンセル時は Future 未完了＝無害）。
 
+  DebugLog.add('picker(web): input.click()でダイアログを開く');
   input.click();
   return completer.future;
 }

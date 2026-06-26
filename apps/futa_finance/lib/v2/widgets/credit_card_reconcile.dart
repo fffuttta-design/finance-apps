@@ -8,6 +8,7 @@ import 'package:finance_core/finance_core.dart' as core;
 import '../../data/app_mode.dart';
 import '../../data/backup_repository.dart';
 import '../../data/csv_picker.dart';
+import '../../data/debug_log.dart';
 import '../../data/settings_repository.dart';
 import '../../data/store_category_classifier.dart';
 import '../../data/transaction_repository.dart';
@@ -450,6 +451,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
 
   /// CSV/貼り付け明細をセットし、行ごとの編集状態を作って科目をAI提案する。
   void _setPasted(List<_StmtLine> lines) {
+    DebugLog.add('setPasted: ${lines.length}件で開始');
     for (final e in _edits.values) {
       e.dispose();
     }
@@ -457,7 +459,8 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
     for (final l in lines) {
       _edits[l] = _LineEdit(name: l.name);
     }
-    _setPasted(lines);
+    setState(() => _pasted = lines);
+    DebugLog.add('setPasted: setState完了（突合UIを表示へ）');
     _propose();
   }
 
@@ -762,9 +765,14 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
       ),
     );
     if (ok != true) return;
+    DebugLog.add('貼り付け: 突合ボタン押下 文字数=${ctrl.text.length}');
     // まずCSV(カンマ区切り)として解析。だめなら自由文として金額拾い。
     var lines = _parseCardCsv(ctrl.text, _year);
-    if (lines.isEmpty) lines = _parseStatement(ctrl.text, _year);
+    DebugLog.add('貼り付け: CSV解析=${lines.length}件');
+    if (lines.isEmpty) {
+      lines = _parseStatement(ctrl.text, _year);
+      DebugLog.add('貼り付け: 自由文解析=${lines.length}件');
+    }
     if (!mounted) return;
     if (lines.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -776,12 +784,19 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
 
   /// カード明細CSVを選択 → Shift-JIS/UTF-8 を判定して解析 → 突合用にセット。
   Future<void> _importCsv() async {
+    DebugLog.add('CSV読込: pickCsvFile()を呼び出し');
     final picked = await pickCsvFile();
     if (!mounted) return;
-    if (picked == null) return; // キャンセル or 取得失敗
+    if (picked == null) {
+      DebugLog.add('CSV読込: picker結果=null（選択キャンセル/取得失敗）');
+      return; // キャンセル or 取得失敗
+    }
     final bytes = picked.bytes;
+    DebugLog.add('CSV読込: ファイル取得 name=${picked.name} bytes=${bytes.length}');
     final content = _decodeCsvBytes(bytes);
+    DebugLog.add('CSV読込: デコード完了 chars=${content.length}');
     final lines = _parseCardCsv(content, _year);
+    DebugLog.add('CSV読込: 解析完了 ${lines.length}件');
     if (!mounted) return;
     if (lines.isEmpty) {
       // 何が読めなかったか分かるよう、デコード結果の先頭を見せる固定ダイアログ。
@@ -933,11 +948,19 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
             icon: const Icon(Icons.content_paste, size: 18),
             label: const Text('貼り付け'),
           ),
+          const SizedBox(width: V2Spacing.sm),
+          IconButton(
+            tooltip: 'デバッグログを見る',
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.bug_report_outlined, size: 20),
+            onPressed: _showDebugLog,
+          ),
         ],
       ),
     ];
 
     if (_pasted.isNotEmpty) {
+      DebugLog.add('突合UI: 構築開始（_pasted=${_pasted.length}件）');
       // 突合対象 = このカード払いの取引のうち「貼り付け明細がカバーする期間」のもの。
       // （請求月と利用月はズレるため、表示中の月では絞らない。明細の日付範囲±2日で照合）
       DateTime? minD, maxD;
@@ -1147,10 +1170,44 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
           ),
         ));
       }
+      DebugLog.add('突合UI: 構築完了（記録漏れ${missing.length}件/一致$matchedCount件）');
     }
 
     return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
+  }
+
+  /// デバッグログを表示するダイアログ（コピー可・クリア可）。
+  void _showDebugLog() {
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('デバッグログ'),
+        content: SizedBox(
+          width: 520,
+          child: ValueListenableBuilder<List<String>>(
+            valueListenable: DebugLog.notifier,
+            builder: (_, lines, child) => SingleChildScrollView(
+              child: SelectableText(
+                lines.isEmpty ? '(まだログがありません)' : lines.join('\n'),
+                style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () {
+                DebugLog.clear();
+                Navigator.pop(context);
+              },
+              child: const Text('クリア')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('閉じる')),
+        ],
+      ),
+    );
   }
 
   Widget _chip(String label, Color color) => Container(
