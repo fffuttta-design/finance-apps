@@ -1,1 +1,1 @@
-{"version":"1.0.338","buildNumber":"339","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.338/futa-finance-v1.0.338.apk","releaseNotes":"「クレカ引落照合」を「ウォレット照合」に拡張。クレジット・現金・PayPay・銀行の全ウォレットで、予定（記録した明細合計）vs 実際（手入力）をすり合わせられるようにしました。"}
+{"version":"1.0.339","buildNumber":"340","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.339/futa-finance-v1.0.339.apk","releaseNotes":"支出タブに「締め処理完了」ボタンを追加しました（その月はもう編集不要、を示す緑バナー表示）。締めは取り消しできます（可逆）。"}
