@@ -9,6 +9,24 @@ import '../data/store_category_classifier.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 
+/// 初期化／CSV置き換えで「このカードの取引」とみなして削除対象にするか判定。
+///
+/// - 支払方法がそのカード名と一致 → 対象
+/// - 支払方法が汎用クレジット表記（昔の手入力分。「クレカ」等）→ 対象
+///   ※ 別の登録カード名（例「三井住友カード」）は完全一致しないので巻き込まない。
+bool isCreditDeleteTarget(String paymentMethod, String cardName) {
+  final pm = paymentMethod.trim();
+  if (pm == cardName.trim()) return true;
+  const generic = {
+    'クレカ',
+    'クレジットカード',
+    'クレジット',
+    'クレジット決済',
+    'カード',
+  };
+  return generic.contains(pm);
+}
+
 /// クレカCSVの1行（取り込み元データ）。
 class CardCsvLine {
   final DateTime? date;
@@ -245,7 +263,8 @@ class _CardCsvImportScreenState extends State<CardCsvImportScreen> {
     final all = await _txRepo.loadAll();
     final existing = all.where((t) {
       if (t.type != core.TransactionType.expense) return false;
-      if (t.paymentMethod != widget.card.name) return false;
+      // このカード名＋汎用クレカ表記（昔の手入力）も置換対象にする。
+      if (!isCreditDeleteTarget(t.paymentMethod, widget.card.name)) return false;
       if (lo != null && t.date.isBefore(lo)) return false;
       if (hi != null && t.date.isAfter(hi)) return false;
       return true;

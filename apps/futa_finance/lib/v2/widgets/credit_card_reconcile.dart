@@ -685,12 +685,25 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
   int get _year => int.parse(widget.ym.split('-')[0]);
   int get _month => int.parse(widget.ym.split('-')[1]);
 
-  /// 当月・当カード払いの明細（新しい順）。
+  /// 当月・当カード払いの明細（新しい順）。明細表示と予定金額に使う。
   List<core.Transaction> get _cardTxns {
     return _all
         .where((t) =>
             t.type == core.TransactionType.expense &&
             t.paymentMethod == widget.card.name &&
+            t.date.year == _year &&
+            t.date.month == _month)
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+  }
+
+  /// 初期化の削除対象（当月・このカード名＋汎用クレカ表記の支出）。
+  /// 昔の手入力で支払方法を「クレカ」等にしていた分も拾う。
+  List<core.Transaction> get _deleteTargetsThisMonth {
+    return _all
+        .where((t) =>
+            t.type == core.TransactionType.expense &&
+            isCreditDeleteTarget(t.paymentMethod, widget.card.name) &&
             t.date.year == _year &&
             t.date.month == _month)
         .toList()
@@ -920,13 +933,23 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
   /// 「全部消してから明細を正として入れ直す」運用の最初の一歩。実行前に自動バックアップ。
   Future<void> _initializeMonth(List<core.Transaction> txns) async {
     if (txns.isEmpty) return;
+    // 支払方法ごとの内訳（何が消えるかを明示）。
+    final byMethod = <String, int>{};
+    for (final t in txns) {
+      byMethod[t.paymentMethod] = (byMethod[t.paymentMethod] ?? 0) + 1;
+    }
+    final breakdown = (byMethod.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value)))
+        .map((e) => '・${e.key}：${e.value}件')
+        .join('\n');
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('$_month月の${widget.card.name}を初期化しますか？'),
+        title: Text('$_month月のクレカ取引を初期化しますか？'),
         content: Text(
-            '「${widget.card.name}」払いの$_year年$_month月の取引 ${txns.length}件を'
-            'すべて削除します。\n\n'
+            '$_year年$_month月の次の取引 計${txns.length}件を削除します'
+            '（このカード名＋昔の手入力「クレカ」等を含む）:\n\n'
+            '$breakdown\n\n'
             'この操作は元に戻せません。実行直前に自動バックアップを取ります。\n'
             '削除後、正しい明細をCSV取り込みや手入力で入れ直してください。'),
         actions: [
@@ -1266,6 +1289,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
   @override
   Widget build(BuildContext context) {
     final txns = _cardTxns;
+    final delTargets = _deleteTargetsThisMonth;
     final planned = _planned;
     final actual = _actual;
     final diff = actual != null ? actual - planned : null;
@@ -1395,14 +1419,15 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
                             .copyWith(color: V2Colors.textSecondary)),
                   ],
                 ),
-                // 荒療治：この月のこのカード取引を丸ごと初期化（削除）。
-                // CSV無しでも使える独立ボタン。明細があるときだけ表示。
-                if (txns.isNotEmpty) ...[
+                // 荒療治：この月のクレカ取引（このカード名＋汎用クレカ表記）を初期化。
+                // CSV無しでも使える独立ボタン。対象があるときだけ表示。
+                if (delTargets.isNotEmpty) ...[
                   const SizedBox(height: V2Spacing.sm),
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
-                      onPressed: _replacing ? null : () => _initializeMonth(txns),
+                      onPressed:
+                          _replacing ? null : () => _initializeMonth(delTargets),
                       icon: _replacing
                           ? const SizedBox(
                               width: 15,
@@ -1412,7 +1437,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
                           : const Icon(Icons.delete_sweep_outlined, size: 18),
                       label: Text(_replacing
                           ? '初期化中…'
-                          : '$_month月の${widget.card.name}を初期化（${txns.length}件を削除）'),
+                          : '$_month月のクレカ取引を初期化（${delTargets.length}件を削除）'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFFDC2626),
                         side: const BorderSide(color: Color(0xFFFCA5A5)),
