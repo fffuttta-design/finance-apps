@@ -1,1 +1,1 @@
-{"version":"1.0.339","buildNumber":"340","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.339/futa-finance-v1.0.339.apk","releaseNotes":"支出タブに「締め処理完了」ボタンを追加しました（その月はもう編集不要、を示す緑バナー表示）。締めは取り消しできます（可逆）。"}
+{"version":"1.0.340","buildNumber":"341","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.340/futa-finance-v1.0.340.apk","releaseNotes":"締め処理の状態を収入タブとホームにも表示するようにしました。支出/収入タブで締め・取り消し、ホームに「N月 締め済」バッジが出ます。"}
