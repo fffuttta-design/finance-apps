@@ -24,35 +24,43 @@ Future<({String name, Uint8List bytes})?> pickCsvFile() {
   input.addEventListener(
       'change',
       ((web.Event _) {
-        final files = input.files;
-        if (files == null || files.length == 0) {
+        try {
+          final files = input.files;
+          if (files == null || files.length == 0) {
+            finish(null);
+            return;
+          }
+          final file = files.item(0);
+          if (file == null) {
+            finish(null);
+            return;
+          }
+          final reader = web.FileReader();
+          reader.addEventListener(
+              'load',
+              ((web.Event _) {
+                try {
+                  final res = reader.result;
+                  if (res == null) {
+                    finish(null);
+                    return;
+                  }
+                  final bytes = (res as JSArrayBuffer).toDart.asUint8List();
+                  finish((name: file.name, bytes: bytes));
+                } catch (_) {
+                  finish(null);
+                }
+              }).toJS);
+          reader.addEventListener(
+              'error', ((web.Event _) => finish(null)).toJS);
+          reader.readAsArrayBuffer(file);
+        } catch (_) {
           finish(null);
-          return;
         }
-        final file = files.item(0);
-        if (file == null) {
-          finish(null);
-          return;
-        }
-        final reader = web.FileReader();
-        reader.addEventListener(
-            'load',
-            ((web.Event _) {
-              final res = reader.result;
-              if (res == null) {
-                finish(null);
-                return;
-              }
-              final bytes = (res as JSArrayBuffer).toDart.asUint8List();
-              finish((name: file.name, bytes: bytes));
-            }).toJS);
-        reader.addEventListener('error', ((web.Event _) => finish(null)).toJS);
-        reader.readAsArrayBuffer(file);
       }).toJS);
 
-  // キャンセル（ファイル未選択でダイアログを閉じた）も拾う。
-  input.addEventListener(
-      'cancel', ((web.Event _) => finish(null)).toJS);
+  // ※ 'cancel' イベントは一部 Electron/Chromium で選択時にも発火し、せっかく選んだ
+  //   ファイルを null で潰す不具合があるため購読しない（キャンセル時は Future 未完了＝無害）。
 
   input.click();
   return completer.future;

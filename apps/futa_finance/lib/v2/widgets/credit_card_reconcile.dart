@@ -730,19 +730,20 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                  'カード会社サイトの利用明細をコピーして貼り付けてください。\n'
-                  '（1行＝1明細。日付・店名・金額が混ざっていてもOK。金額だけ拾います）',
+                  '【確実な方法】CSVファイルを開いて全選択(Ctrl+A)→コピー(Ctrl+C)→'
+                  'ここに貼り付け(Ctrl+V)してください。CSVの中身そのままでOKです。\n'
+                  '（カード会社サイトの明細をコピペしてもOK。1行＝1明細）',
                   style:
                       TextStyle(fontSize: 11, color: V2Colors.textSecondary)),
               const SizedBox(height: 10),
               TextField(
                 controller: ctrl,
                 autofocus: true,
-                maxLines: 10,
+                maxLines: 12,
                 minLines: 6,
                 decoration: const InputDecoration(
-                  hintText: '2026/06/15  Amazon.co.jp  3,980\n'
-                      '06/18  スターバックス  ¥540 …',
+                  hintText: 'CSVの中身をそのまま貼り付け、または\n'
+                      '2026/06/15  Amazon.co.jp  3,980 …',
                   border: OutlineInputBorder(),
                   isDense: true,
                 ),
@@ -761,7 +762,9 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
       ),
     );
     if (ok != true) return;
-    final lines = _parseStatement(ctrl.text, _year);
+    // まずCSV(カンマ区切り)として解析。だめなら自由文として金額拾い。
+    var lines = _parseCardCsv(ctrl.text, _year);
+    if (lines.isEmpty) lines = _parseStatement(ctrl.text, _year);
     if (!mounted) return;
     if (lines.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
