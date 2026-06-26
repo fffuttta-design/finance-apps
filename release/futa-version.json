@@ -1,1 +1,1 @@
-{"version":"1.0.331","buildNumber":"332","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.331/futa-finance-v1.0.331.apk","releaseNotes":"記録漏れ編集の入力もっさりを解消し、小カテゴリの選択も追加しました。デスクトップ版でも科目のAI提案が効くようになりました。"}
+{"version":"1.0.332","buildNumber":"333","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.332/futa-finance-v1.0.332.apk","releaseNotes":"クレカの「初期化／CSVで置き換え」が、昔の手入力で支払方法を「クレカ」等にしていた取引も削除対象に含めるようにしました（確認ダイアログに内訳を表示）。"}
