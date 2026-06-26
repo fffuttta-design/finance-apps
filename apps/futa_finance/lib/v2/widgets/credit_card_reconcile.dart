@@ -1668,44 +1668,53 @@ List<_StmtLine> _parseStatement(String text, int year) {
   return out;
 }
 
-/// 突合の「記録漏れ」1行（明細にあるが記録に無い）。[追加]で支出登録へ。
-// ── カード明細CSVの解析（金額のみで突合するため金額列の確実な取得を最優先） ──
+// ── カード明細CSVの解析 ──
+
+/// 金額セルか判定し、正なら金額を返す。「¥ / \ / ￥ ＋ 数字(カンマ可)」のセルだけを
+/// 金額とみなす。これで「2026年6月」のような期間列を金額と誤検出しない。
+int? _yenAmount(String cell) {
+  final c = cell.trim();
+  if (c.isEmpty) return null;
+  final f = c[0];
+  if (f != '\\' && f != '¥' && f != '￥') return null;
+  final rest = c.substring(1).replaceAll(',', '');
+  if (rest.isEmpty || !RegExp(r'^\d+$').hasMatch(rest)) return null;
+  final v = int.tryParse(rest);
+  return (v != null && v > 0) ? v : null;
+}
 
 /// カード明細CSVを解析して明細行リストにする。
-/// 対応様式: ① Orico「ご利用明細」(ヘッダに「ご利用日」「ご利用金額」)
-///          ② 三井住友 等(1列目=yyyy/mm/dd, 2列目=店名, 3列目=金額)
+///
+/// **ヘッダー行に依存しない**（Shift-JISデコーダが前文/ヘッダーを落としても拾えるよう、
+/// 「1列目が日付の行」を明細とみなす）。
+/// 対応様式: ① Orico「ご利用明細」(日付列＋「¥/\付き金額」列) ② 三井住友等(日付/店名/金額)
 List<_StmtLine> _parseCardCsv(String content, int year) {
   final rows =
       const LineSplitter().convert(content).map(_splitCsvLine).toList();
 
-  // ── 様式①: 「ご利用日」「ご利用金額」ヘッダを持つ ──
-  final headerIdx = rows.indexWhere((c) =>
-      c.any((x) => x.contains('ご利用日')) &&
-      c.any((x) => x.contains('ご利用金額')));
-  if (headerIdx >= 0) {
-    final header = rows[headerIdx];
-    var amountCol = header.indexWhere((x) => x.contains('ご利用金額'));
-    var nameCol =
-        header.indexWhere((x) => x.contains('店名') || x.contains('商品名'));
-    if (amountCol < 0) amountCol = 8;
-    if (nameCol < 0) nameCol = 1;
-    final out = <_StmtLine>[];
-    for (int i = headerIdx + 1; i < rows.length; i++) {
-      final c = rows[i];
-      if (c.isEmpty) continue;
-      final date = _parseAnyDate(c[0], year);
-      if (date == null) continue;
-      if (amountCol >= c.length) continue;
-      final amt = _yen(c[amountCol]);
-      if (amt <= 0) continue;
-      final name = nameCol < c.length ? c[nameCol].trim() : '';
-      out.add(_StmtLine(date, name.isEmpty ? '明細' : name, amt));
-    }
-    if (out.isNotEmpty) return out;
-  }
-
-  // ── 様式②: 1列目=日付 / 2列目=店名 / 3列目=金額 ──
+  // ── 主方式: 1列目が日付の行を拾い、金額は「¥/\/￥付きの最初の正値」を採用 ──
+  // （前文・ヘッダー行は日付にならないので自然に除外される）
   final out = <_StmtLine>[];
+  for (final c in rows) {
+    if (c.isEmpty) continue;
+    final date = _parseAnyDate(c[0], year);
+    if (date == null) continue;
+    int amt = 0;
+    for (int j = 1; j < c.length; j++) {
+      final v = _yenAmount(c[j]);
+      if (v != null) {
+        amt = v;
+        break;
+      }
+    }
+    if (amt <= 0) continue;
+    final name = c.length > 1 ? c[1].trim() : '';
+    out.add(_StmtLine(date, name.isEmpty ? '明細' : name, amt));
+  }
+  if (out.isNotEmpty) return out;
+
+  // ── フォールバック: 1列目=日付 / 2列目=店名 / 3列目=金額（¥記号なしの様式） ──
+  final out2 = <_StmtLine>[];
   for (final c in rows) {
     if (c.length < 3) continue;
     final date = _parseAnyDate(c[0], year);
@@ -1713,9 +1722,9 @@ List<_StmtLine> _parseCardCsv(String content, int year) {
     final amt = _yen(c[2]);
     if (amt <= 0) continue;
     final name = c[1].trim();
-    out.add(_StmtLine(date, name.isEmpty ? '明細' : name, amt));
+    out2.add(_StmtLine(date, name.isEmpty ? '明細' : name, amt));
   }
-  return out;
+  return out2;
 }
 
 /// CSVバイト列を文字列にデコードする。
