@@ -1,1 +1,1 @@
-{"version":"1.0.344","buildNumber":"345","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.344/futa-finance-v1.0.344.apk","releaseNotes":"ウォレット照合シートの明細履歴を「履歴を編集する」ボタンで開く形にしました（既定は非表示）。デバッグボタンを削除しました。"}
+{"version":"1.0.345","buildNumber":"346","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.345/futa-finance-v1.0.345.apk","releaseNotes":"銀行・現金・PayPayウォレットの照合シートの文言を、カード前提から実態に合わせて出し分けました（要件定義の反映）。"}
