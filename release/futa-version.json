@@ -1,1 +1,1 @@
-{"version":"1.0.346","buildNumber":"347","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.346/futa-finance-v1.0.346.apk","releaseNotes":"支出入力フォームを簡素化しました（店舗欄の削除・備考のデフォルト表示・レシート添付ボタンの廃止）。"}
+{"version":"1.0.347","buildNumber":"348","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.347/futa-finance-v1.0.347.apk","releaseNotes":"奢り精算（立替）機能を追加しました。一括で払って他人から現金をもらうとき、経費は全額のまま、もらう現金を財布に加算できます。"}
