@@ -10,6 +10,7 @@ import '../../data/windows_update.dart';
 import '../../screens/account_editor_screen.dart';
 import '../../screens/balance_adjust_screen.dart';
 import '../../screens/budget_items_screen.dart';
+import '../../screens/compliance_calendar_screen.dart';
 import '../../screens/card_editor_screen.dart';
 import '../../screens/category_editor_screen.dart';
 import '../../screens/checklist_editor_screen.dart';
@@ -88,6 +89,8 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
           desc: '毎月・毎年の固定支払を管理'),
       _MenuItem('budget', '税金・保険', Icons.account_balance_outlined,
           desc: '法人税・消費税・社保などの予定（資金繰りに反映）'),
+      _MenuItem('compliance', '手続き・届出カレンダー', Icons.event_note_outlined,
+          desc: '算定基礎届・年度更新・申告期限などの締切'),
       _MenuItem('replacements', '変換マスタ', Icons.find_replace,
           desc: 'レシートの表記ゆれを置換'),
       _MenuItem('checklist', '月末締めチェックリスト', Icons.checklist,
@@ -229,6 +232,13 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
                 '資金繰り（ランウェイ）予測に反映されます。',
             icon: Icons.account_balance_outlined,
             iconColor: V2Colors.badgePurple);
+      case 'compliance':
+        return _embedV1(const ComplianceCalendarScreen(),
+            title: '手続き・届出カレンダー',
+            note: '算定基礎届・労働保険の年度更新・各種申告期限など、'
+                '会社の手続きの締切を管理します。',
+            icon: Icons.event_note_outlined,
+            iconColor: V2Colors.info);
       case 'checklist':
         return _embedV1(const ChecklistEditorScreen(),
             title: '月末締めチェックリスト',

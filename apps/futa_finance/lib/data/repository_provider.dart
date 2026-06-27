@@ -1,5 +1,7 @@
 import 'app_mode.dart';
+import 'budget_item_repository.dart';
 import 'checklist_repository.dart';
+import 'compliance_task_repository.dart';
 import 'income_source_repository.dart';
 import 'month_closing_repository.dart';
 import 'monthly_snapshot_repository.dart';
@@ -32,6 +34,8 @@ class RepositoryProvider {
     MonthlySnapshotRepository.useFirestore(uid);
     MonthClosingRepository.useFirestore(uid);
     ChecklistRepository.useFirestore(uid);
+    BudgetItemRepository.instance.useFirestore(uid);
+    ComplianceTaskRepository.instance.useFirestore(uid);
     _firestoreActive = true;
     _currentUid = uid;
   }
@@ -45,6 +49,8 @@ class RepositoryProvider {
     MonthlySnapshotRepository.useLocal();
     MonthClosingRepository.useLocal();
     ChecklistRepository.useLocal();
+    BudgetItemRepository.instance.useLocal();
+    ComplianceTaskRepository.instance.useLocal();
     _firestoreActive = false;
     _currentUid = null;
   }
