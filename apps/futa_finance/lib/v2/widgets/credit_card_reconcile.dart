@@ -115,13 +115,14 @@ class CreditCardBillingSection extends StatelessWidget {
     }
   }
 
-  /// 表示する全ウォレット行（予定>0 or 実際入力済み）。カードを先に並べる。
+  /// 表示する全ウォレット行。登録済みウォレット（カード→銀行/現金/電子マネー）は
+  /// 活動が無くても常に表示し、加えて未登録でも当月その支払方法の取引があれば自動で出す。
   List<({ReconcileWallet wallet, int planned, int? actual})> get _rows {
     final out = <({ReconcileWallet wallet, int planned, int? actual})>[];
+    final registered = <String>{};
+    // 登録カード（常に表示）。
     for (final c in cards) {
-      final planned = _planned(c.name);
-      final actual = c.monthlyActualBillings[ym];
-      if (planned <= 0 && actual == null) continue;
+      registered.add(c.name);
       out.add((
         wallet: ReconcileWallet(
           name: c.name,
@@ -132,14 +133,13 @@ class CreditCardBillingSection extends StatelessWidget {
               ? '引き落とし日：毎月${c.paymentDay}日'
               : 'クレジットカード',
         ),
-        planned: planned,
-        actual: actual,
+        planned: _planned(c.name),
+        actual: c.monthlyActualBillings[ym],
       ));
     }
+    // 登録口座/現金/電子マネー（常に表示）。
     for (final b in bankAccounts) {
-      final planned = _planned(b.name);
-      final actual = b.monthlyActualBillings[ym];
-      if (planned <= 0 && actual == null) continue;
+      registered.add(b.name);
       out.add((
         wallet: ReconcileWallet(
           name: b.name,
@@ -148,8 +148,29 @@ class CreditCardBillingSection extends StatelessWidget {
           isCard: false,
           subtitle: _labelForAccount(b.accountType),
         ),
-        planned: planned,
-        actual: actual,
+        planned: _planned(b.name),
+        actual: b.monthlyActualBillings[ym],
+      ));
+    }
+    // 未登録でも当月に使われた支払方法（例「PayPay」「現金」を未登録で手入力）は自動表示。
+    final parts = ym.split('-');
+    final year = int.parse(parts[0]);
+    final month = int.parse(parts[1]);
+    final adhoc = <String>{};
+    for (final t in transactions) {
+      if (t.type != core.TransactionType.expense) continue;
+      if (t.date.year != year || t.date.month != month) continue;
+      final pm = t.paymentMethod.trim();
+      if (pm.isEmpty || registered.contains(pm) || !adhoc.add(pm)) continue;
+      out.add((
+        wallet: ReconcileWallet(
+          name: pm,
+          fallbackIcon: Icons.account_balance_wallet_outlined,
+          isCard: false,
+          subtitle: '未登録の支払方法',
+        ),
+        planned: _planned(pm),
+        actual: null,
       ));
     }
     return out;
