@@ -160,7 +160,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   /// (true: 支出は累積額に +、false: 支出は残高から -)
   bool _selectedIsCard = false;
 
-  /// 奢り精算（立替）モード。ON のとき、支出は全額を計上しつつ、
+  /// 立替精算モード。ON のとき、支出は全額を計上しつつ、
   /// 他人から受け取る現金ぶんを指定ウォレットに加算する（PL非計上の振替扱い）。
   bool _treatSplit = false;
 
@@ -625,7 +625,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       return;
     }
 
-    // 奢り精算のバリデーション。
+    // 立替精算のバリデーション。
     if (_treatSplit) {
       final myShare = parseAmount(_myShareCtrl.text) ?? 0;
       if (myShare > amount) {
@@ -708,7 +708,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       await _settings.savePayments(_payments!);
     }
 
-    // 奢り精算（立替）：もらう現金を指定ウォレットに加算する。
+    // 立替精算：もらう現金を指定ウォレットに加算する。
     // 支出は全額のまま計上済み。受け取りは振替扱いでPLには載せない。
     if (_treatSplit && _payments != null) {
       final receive = amount - (parseAmount(_myShareCtrl.text) ?? 0);
@@ -723,9 +723,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
           type: core.TransactionType.transfer,
           category: const core.Category(major: '振替', sub: ''),
           paymentMethod: '',
-          description: '奢り精算（立替回収）: ${_descCtrl.text.trim()}',
+          description: '立替精算（現金回収）: ${_descCtrl.text.trim()}',
           amount: receive,
-          transferFromAccount: '奢り精算',
+          transferFromAccount: '立替精算',
           transferToAccount: wallet,
           memo: '立替分の現金受け取り（支出「${_descCtrl.text.trim()}」に紐づく）',
         );
@@ -962,7 +962,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                   paymentMethods, hasBalanceTracking, isCard),
               const SizedBox(height: 16),
 
-              // 奢り精算（立替）。一括で払って他人から現金を受け取るケース。
+              // 立替精算。一括で払って他人から現金を受け取るケース。
               if (widget.editing == null) ...[
                 _treatSplitSection(payments),
                 const SizedBox(height: 16),
@@ -1089,7 +1089,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     ];
   }
 
-  /// 奢り精算（立替）セクション。
+  /// 立替精算セクション。
   ///
   /// 「自分が一括で支払い、他人から現金をもらう」ケース。
   /// 支出は全額を計上したまま（経費・カード請求はそのまま）、もらう現金を
@@ -1123,7 +1123,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                   size: 18, color: Color(0xFF059669)),
               const SizedBox(width: 8),
               const Expanded(
-                child: Text('奢り精算（立替）',
+                child: Text('立替精算',
                     style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
