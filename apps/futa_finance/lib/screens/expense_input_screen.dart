@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
-import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/app_mode.dart';
@@ -900,8 +899,13 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                   paymentMethods, hasBalanceTracking, isCard),
               const SizedBox(height: 16),
 
-              // 任意項目は「詳細を追加 ▾」で畳む（店舗・備考・領収書）。
-              _detailsExpansion(),
+              // 備考はデフォルト表示（店舗・領収書添付UIは廃止）。
+              _label('備考（任意）'),
+              TextFormField(
+                controller: _memoCtrl,
+                maxLines: 2,
+                decoration: _inputDecoration(),
+              ),
               const SizedBox(height: 18),
 
               FilledButton.icon(
@@ -1102,78 +1106,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     );
   }
 
-  /// 任意項目（店舗・備考・領収書リンク）を「詳細を追加 ▾」で畳む。
-  Widget _detailsExpansion() {
-    return Theme(
-      data: Theme.of(context)
-          .copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        tilePadding: EdgeInsets.zero,
-        childrenPadding: const EdgeInsets.only(top: 4, bottom: 8),
-        expandedCrossAxisAlignment: CrossAxisAlignment.start,
-        title: const Text('詳細を追加（店舗・備考・領収書）',
-            style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF374151))),
-        children: [
-          _label('店舗（任意）'),
-          TextFormField(
-            controller: _storeCtrl,
-            decoration: _inputDecoration(hint: '例: ファミリーマート').copyWith(
-              prefixIcon: const Icon(Icons.storefront_outlined, size: 18),
-            ),
-            onChanged: (_) {
-              // 変換中は再描画しない（Windowsのカーソル飛び誘発を防ぐ）。
-              if (_storeCtrl.value.composing.isValid) return;
-              if (!_categoryTouched) {
-                setState(() => _autoPredictCategory());
-              }
-            },
-          ),
-          const SizedBox(height: 16),
-          _label('備考（任意）'),
-          TextFormField(
-            controller: _memoCtrl,
-            maxLines: 2,
-            decoration: _inputDecoration(),
-          ),
-          const SizedBox(height: 16),
-          _label('領収書リンク（任意）'),
-          TextFormField(
-            controller: _receiptUrlCtrl,
-            keyboardType: TextInputType.url,
-            decoration: _inputDecoration(hint: 'Drive等のURLを貼り付け').copyWith(
-              prefixIcon: const Icon(Icons.receipt_long_outlined),
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.only(left: 4, top: 2),
-            child: Text(
-              '領収書はGoogleドライブ等に保存し、その共有リンクを貼り付けてください（後で開けます）。',
-              style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
-            ),
-          ),
-          Wrap(
-            spacing: 8,
-            children: [
-              TextButton.icon(
-                onPressed: _attachReceiptImage,
-                icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
-                label: const Text('ギャラリー/カメラから追加'),
-              ),
-              TextButton.icon(
-                onPressed: _openReceiptLink,
-                icon: const Icon(Icons.open_in_new, size: 16),
-                label: const Text('レシートを開く'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   /// 領収書を開く。Driveのファイルならアプリ内ビューアで表示（ブラウザ不要）。
   Future<void> _openReceiptLink() async {
     final url = _receiptUrlCtrl.text.trim();
@@ -1198,73 +1130,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  /// ギャラリー/カメラから領収書画像を選び、Driveに保存してリンクを設定する。
-  /// レシートOCRを通さず、既存・手入力の支出にも後から画像を添付できる。
-  Future<void> _attachReceiptImage() async {
-    final source = await showDialog<ImageSource>(
-      context: context,
-      builder: (dctx) => SimpleDialog(
-        title: const Text('領収書画像の取得方法'),
-        children: [
-          ListTile(
-            leading: const Icon(Icons.photo_camera_outlined),
-            title: const Text('カメラで撮影'),
-            onTap: () => Navigator.pop(dctx, ImageSource.camera),
-          ),
-          ListTile(
-            leading: const Icon(Icons.photo_library_outlined),
-            title: const Text('ギャラリーから選択'),
-            onTap: () => Navigator.pop(dctx, ImageSource.gallery),
-          ),
-        ],
-      ),
-    );
-    if (source == null || !mounted) return;
-    final xfile = await ImagePicker()
-        .pickImage(source: source, imageQuality: 60, maxWidth: 1280);
-    if (xfile == null || !mounted) return;
-    final bytes = await xfile.readAsBytes();
-    if (!mounted) return;
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const AlertDialog(
-        content: Row(children: [
-          SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(strokeWidth: 2.5)),
-          SizedBox(width: 16),
-          Text('Driveに保存中...'),
-        ]),
-      ),
-    );
-    final link = await DriveReceiptService.instance.uploadReceiptImage(
-      bytes: bytes,
-      date: _date,
-      isBusiness: AppModeManager.instance.current == AppMode.business,
-      store: _storeCtrl.text.trim().isEmpty ? null : _storeCtrl.text.trim(),
-      amount: parseAmount(_amountCtrl.text),
-    );
-    if (!mounted) return;
-    Navigator.of(context, rootNavigator: true).pop();
-    if (link != null) {
-      setState(() => _receiptUrlCtrl.text = link);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('レシート画像をDriveに保存しました')),
-      );
-    } else {
-      final reason = DriveReceiptService.instance.lastError;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 8),
-          content: Text(reason == null
-              ? 'Drive保存に失敗（初回はGoogleの許可が必要・リンク手動貼付も可）'
-              : 'Drive保存に失敗: $reason'),
-        ),
-      );
-    }
-  }
 
   Widget _label(String text) => Padding(
         padding: const EdgeInsets.only(bottom: 6, left: 2),
