@@ -115,14 +115,19 @@ class CreditCardBillingSection extends StatelessWidget {
     }
   }
 
-  /// 表示する全ウォレット行。登録済みウォレット（カード→銀行/現金/電子マネー）は
-  /// 活動が無くても常に表示し、加えて未登録でも当月その支払方法の取引があれば自動で出す。
+  /// 表示するウォレット行。
+  /// - 現金 / 電子マネー(PayPay等)：毎月照合するので**常に表示**。
+  /// - カード / 銀行：当月に活動（予定>0）or 実際入力済みのときだけ表示（休眠中は隠す）。
+  /// - 未登録でも当月その支払方法の取引があれば自動で出す。
   List<({ReconcileWallet wallet, int planned, int? actual})> get _rows {
     final out = <({ReconcileWallet wallet, int planned, int? actual})>[];
     final registered = <String>{};
-    // 登録カード（常に表示）。
+    // 登録カード（活動 or 実際入力済みのみ）。
     for (final c in cards) {
       registered.add(c.name);
+      final planned = _planned(c.name);
+      final actual = c.monthlyActualBillings[ym];
+      if (planned <= 0 && actual == null) continue;
       out.add((
         wallet: ReconcileWallet(
           name: c.name,
@@ -133,13 +138,18 @@ class CreditCardBillingSection extends StatelessWidget {
               ? '引き落とし日：毎月${c.paymentDay}日'
               : 'クレジットカード',
         ),
-        planned: _planned(c.name),
-        actual: c.monthlyActualBillings[ym],
+        planned: planned,
+        actual: actual,
       ));
     }
-    // 登録口座/現金/電子マネー（常に表示）。
+    // 登録口座/現金/電子マネー。現金・電子マネーは常に、銀行は活動時のみ表示。
     for (final b in bankAccounts) {
       registered.add(b.name);
+      final planned = _planned(b.name);
+      final actual = b.monthlyActualBillings[ym];
+      final alwaysShow = b.accountType == core.AccountType.cash ||
+          b.accountType == core.AccountType.emoney;
+      if (!alwaysShow && planned <= 0 && actual == null) continue;
       out.add((
         wallet: ReconcileWallet(
           name: b.name,
@@ -148,8 +158,8 @@ class CreditCardBillingSection extends StatelessWidget {
           isCard: false,
           subtitle: _labelForAccount(b.accountType),
         ),
-        planned: _planned(b.name),
-        actual: b.monthlyActualBillings[ym],
+        planned: planned,
+        actual: actual,
       ));
     }
     // 未登録でも当月に使われた支払方法（例「PayPay」「現金」を未登録で手入力）は自動表示。
