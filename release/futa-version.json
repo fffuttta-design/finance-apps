@@ -1,1 +1,1 @@
-{"version":"1.0.343","buildNumber":"344","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.343/futa-finance-v1.0.343.apk","releaseNotes":"PC（Web/Windows）の支出明細を1行の表形式にしました（日付・内容・カテゴリ・支払方法・金額を横並び、ヘッダー付き）。"}
+{"version":"1.0.344","buildNumber":"345","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.344/futa-finance-v1.0.344.apk","releaseNotes":"ウォレット照合シートの明細履歴を「履歴を編集する」ボタンで開く形にしました（既定は非表示）。デバッグボタンを削除しました。"}
