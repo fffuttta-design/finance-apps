@@ -9,6 +9,7 @@ import '../../data/update_flow.dart';
 import '../../data/windows_update.dart';
 import '../../screens/account_editor_screen.dart';
 import '../../screens/balance_adjust_screen.dart';
+import '../../screens/budget_items_screen.dart';
 import '../../screens/card_editor_screen.dart';
 import '../../screens/category_editor_screen.dart';
 import '../../screens/checklist_editor_screen.dart';
@@ -85,6 +86,8 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
           desc: '収入源（売上）を登録'),
       _MenuItem('subscription', '固定費・サブスク', Icons.event_repeat,
           desc: '毎月・毎年の固定支払を管理'),
+      _MenuItem('budget', '税金・保険', Icons.account_balance_outlined,
+          desc: '法人税・消費税・社保などの予定（資金繰りに反映）'),
       _MenuItem('replacements', '変換マスタ', Icons.find_replace,
           desc: 'レシートの表記ゆれを置換'),
       _MenuItem('checklist', '月末締めチェックリスト', Icons.checklist,
@@ -219,6 +222,13 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
             note: '毎月・毎年の固定支払（家賃・サブスク等）を管理します。',
             icon: Icons.event_repeat,
             iconColor: V2Colors.warning);
+      case 'budget':
+        return _embedV1(const BudgetItemsScreen(),
+            title: '税金・保険',
+            note: '法人税・消費税・社会保険料などの支払予定を登録します。'
+                '資金繰り（ランウェイ）予測に反映されます。',
+            icon: Icons.account_balance_outlined,
+            iconColor: V2Colors.badgePurple);
       case 'checklist':
         return _embedV1(const ChecklistEditorScreen(),
             title: '月末締めチェックリスト',
