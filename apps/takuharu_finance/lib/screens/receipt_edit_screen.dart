@@ -418,6 +418,11 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
                 Text('品目（${_items.length}件）',
                     style: const TextStyle(
                         fontSize: 14, fontWeight: FontWeight.w800)),
+                // 食費があるレシートだけ、見出しの横に一括トグルのチップを出す。
+                if (_hasFoodItem) ...[
+                  const SizedBox(width: 8),
+                  _bulkPersonalFoodChip(),
+                ],
                 const Spacer(),
                 Text('合計 ${formatYen(_total)}',
                     style: const TextStyle(
@@ -426,11 +431,6 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
                         color: AppColors.expense)),
               ],
             ),
-            // 食費が含まれるレシートは、まとめて個人わくに入れられる一括トグル。
-            if (_hasFoodItem) ...[
-              const SizedBox(height: 8),
-              _bulkPersonalFoodToggle(),
-            ],
             const SizedBox(height: 8),
             for (int i = 0; i < _items.length; i++) _itemCard(i),
             const SizedBox(height: 4),
@@ -456,45 +456,38 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
     );
   }
 
-  /// 食費の品目をまとめて個人の食費わくに入れる一括トグル。
-  /// 個別カードのトグルと連動（全部ONなら点灯）。
-  Widget _bulkPersonalFoodToggle() {
+  /// 食費の品目をまとめて個人の食費わくに入れる一括チップ（見出しの横に置く）。
+  /// 個別カードのトグルと連動（全部ONならピンクに点灯）。
+  Widget _bulkPersonalFoodChip() {
     final on = _allFoodPersonal;
     return GestureDetector(
       onTap: _toggleAllFoodPersonal,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        duration: const Duration(milliseconds: 120),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: on
-              ? AppColors.pink.withValues(alpha: 0.12)
-              : AppColors.pink.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(16),
+          color: on ? AppColors.pink.withValues(alpha: 0.18) : Colors.white,
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color:
-                on ? AppColors.pink : AppColors.pink.withValues(alpha: 0.45),
-            width: on ? 1.8 : 1.4,
+            color: on ? AppColors.pink : AppColors.divider,
+            width: on ? 1.6 : 1,
           ),
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
                 on
                     ? Icons.check_circle_rounded
                     : Icons.lunch_dining_rounded,
-                size: 20,
+                size: 15,
                 color: AppColors.pinkDark),
-            const SizedBox(width: 10),
-            const Expanded(
-              child: Text('🍙 食費を全部 個人の食費わくに入れる',
-                  style:
-                      TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800)),
-            ),
-            Switch(
-              value: on,
-              activeThumbColor: AppColors.pink,
-              onChanged: (_) => _toggleAllFoodPersonal(),
-            ),
+            const SizedBox(width: 5),
+            Text('ぜんぶ個人わく',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: on ? FontWeight.w700 : FontWeight.w600,
+                    color: AppColors.text)),
           ],
         ),
       ),
