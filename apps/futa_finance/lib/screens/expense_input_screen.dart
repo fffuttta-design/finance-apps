@@ -160,6 +160,16 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   /// (true: 支出は累積額に +、false: 支出は残高から -)
   bool _selectedIsCard = false;
 
+  /// 奢り精算（立替）モード。ON のとき、支出は全額を計上しつつ、
+  /// 他人から受け取る現金ぶんを指定ウォレットに加算する（PL非計上の振替扱い）。
+  bool _treatSplit = false;
+
+  /// 自分の負担額（円）。受け取る現金 = 入力金額 − 自分の負担。
+  final _myShareCtrl = NoComposingUnderlineController();
+
+  /// 受け取った現金の入金先ウォレット名（現金/口座）。
+  String? _splitReceiveWallet;
+
   /// 過去の取引（カテゴリ予測の履歴学習に使う）。
   List<core.Transaction> _history = const [];
 
@@ -238,6 +248,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     _memoCtrl.dispose();
     _storeCtrl.dispose();
     _receiptUrlCtrl.dispose();
+    _myShareCtrl.dispose();
     _amountFocus.dispose();
     super.dispose();
   }
@@ -614,6 +625,23 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       return;
     }
 
+    // 奢り精算のバリデーション。
+    if (_treatSplit) {
+      final myShare = parseAmount(_myShareCtrl.text) ?? 0;
+      if (myShare > amount) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('自分の負担額が金額を超えています')),
+        );
+        return;
+      }
+      if (myShare < amount && _splitReceiveWallet == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('現金の受け取り先を選んでください')),
+        );
+        return;
+      }
+    }
+
     double? usdAmount;
     if (_currency == 'USD') {
       usdAmount = double.tryParse(_usdAmountCtrl.text.trim());
@@ -676,8 +704,43 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         }
         return b;
       }).toList();
-      await _settings
-          .savePayments(_payments!.copyWith(bankAccounts: updated));
+      _payments = _payments!.copyWith(bankAccounts: updated);
+      await _settings.savePayments(_payments!);
+    }
+
+    // 奢り精算（立替）：もらう現金を指定ウォレットに加算する。
+    // 支出は全額のまま計上済み。受け取りは振替扱いでPLには載せない。
+    if (_treatSplit && _payments != null) {
+      final receive = amount - (parseAmount(_myShareCtrl.text) ?? 0);
+      final wallet = _splitReceiveWallet;
+      if (receive > 0 && wallet != null) {
+        // 監査用に振替取引を作成（受け取り先 +receive・PL非計上）。
+        // transferFromAccount は実口座でないラベルにして、口座台帳で
+        // 引かれないようにする（外部からの立替回収のため）。
+        final settle = core.Transaction(
+          id: '${DateTime.now().microsecondsSinceEpoch}s',
+          date: _date,
+          type: core.TransactionType.transfer,
+          category: const core.Category(major: '振替', sub: ''),
+          paymentMethod: '',
+          description: '奢り精算（立替回収）: ${_descCtrl.text.trim()}',
+          amount: receive,
+          transferFromAccount: '奢り精算',
+          transferToAccount: wallet,
+          memo: '立替分の現金受け取り（支出「${_descCtrl.text.trim()}」に紐づく）',
+        );
+        await TransactionRepository.instance.add(settle);
+        // 受け取りウォレットの現在残高を加算（クイック表示の整合）。
+        final updated = _payments!.bankAccounts.map((b) {
+          if (b.name == wallet) {
+            return b.copyWith(
+                currentBalance: (b.displayBalance ?? 0) + receive);
+          }
+          return b;
+        }).toList();
+        _payments = _payments!.copyWith(bankAccounts: updated);
+        await _settings.savePayments(_payments!);
+      }
     }
 
     if (!mounted) return;
@@ -899,6 +962,12 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                   paymentMethods, hasBalanceTracking, isCard),
               const SizedBox(height: 16),
 
+              // 奢り精算（立替）。一括で払って他人から現金を受け取るケース。
+              if (widget.editing == null) ...[
+                _treatSplitSection(payments),
+                const SizedBox(height: 16),
+              ],
+
               // 備考はデフォルト表示（店舗・領収書添付UIは廃止）。
               _label('備考（任意）'),
               TextFormField(
@@ -1018,6 +1087,161 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         ),
       ],
     ];
+  }
+
+  /// 奢り精算（立替）セクション。
+  ///
+  /// 「自分が一括で支払い、他人から現金をもらう」ケース。
+  /// 支出は全額を計上したまま（経費・カード請求はそのまま）、もらう現金を
+  /// 指定ウォレットに加算する。受け取りは振替扱い（PL非計上）。
+  Widget _treatSplitSection(core.PaymentMethodsConfig payments) {
+    // 受け取り先候補＝非カードの有効ウォレット（現金/口座/電子マネー）。
+    final wallets = payments.bankAccounts
+        .where((b) => !b.inactive)
+        .map((b) => b.name)
+        .toList();
+    final amount = parseAmount(_amountCtrl.text) ?? 0;
+    final myShare = parseAmount(_myShareCtrl.text) ?? 0;
+    final receive = amount - myShare;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: _treatSplit ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+            color: _treatSplit
+                ? const Color(0xFF86EFAC)
+                : const Color(0xFFE5E7EB)),
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 4, 8, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.volunteer_activism_outlined,
+                  size: 18, color: Color(0xFF059669)),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('奢り精算（立替）',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111827))),
+              ),
+              Switch(
+                value: _treatSplit,
+                activeTrackColor: const Color(0xFF059669),
+                onChanged: (v) {
+                  setState(() {
+                    _treatSplit = v;
+                    if (v && _splitReceiveWallet == null) {
+                      // 既定の受け取り先：現金口座 → 無ければ先頭。
+                      final cash = payments.bankAccounts.firstWhere(
+                        (b) =>
+                            !b.inactive &&
+                            b.accountType == core.AccountType.cash,
+                        orElse: () => payments.bankAccounts.firstWhere(
+                          (b) => !b.inactive,
+                          orElse: () => payments.bankAccounts.isNotEmpty
+                              ? payments.bankAccounts.first
+                              : (throw StateError('no wallet'))),
+                      );
+                      _splitReceiveWallet = cash.name;
+                    }
+                  });
+                },
+              ),
+            ],
+          ),
+          if (_treatSplit) ...[
+            const Padding(
+              padding: EdgeInsets.only(left: 2, bottom: 8),
+              child: Text(
+                '一括で支払い、他人から現金をもらうとき。経費は全額のまま、'
+                'もらう現金を財布（指定ウォレット）に加算します。',
+                style: TextStyle(fontSize: 11, color: Color(0xFF4B5563)),
+              ),
+            ),
+            _label('自分の負担額（円）'),
+            TextFormField(
+              controller: _myShareCtrl,
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                HalfWidthDigitsFormatter(),
+                ThousandsSeparatorInputFormatter(),
+              ],
+              decoration: _inputDecoration(hint: '例: 4000').copyWith(
+                prefixIcon: const Icon(Icons.person_outline, size: 18),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 10),
+            // もらう現金（自動計算）。
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.payments_outlined,
+                      size: 16, color: Color(0xFF059669)),
+                  const SizedBox(width: 8),
+                  const Text('もらう現金',
+                      style: TextStyle(
+                          fontSize: 12, color: Color(0xFF6B7280))),
+                  const Spacer(),
+                  Text(
+                    receive > 0 ? '+${formatYen(receive)}' : '—',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: receive > 0
+                            ? const Color(0xFF059669)
+                            : const Color(0xFF9CA3AF)),
+                  ),
+                ],
+              ),
+            ),
+            if (receive < 0)
+              const Padding(
+                padding: EdgeInsets.only(left: 2, top: 4),
+                child: Text('自分の負担が金額を超えています。',
+                    style:
+                        TextStyle(fontSize: 11, color: Color(0xFFDC2626))),
+              ),
+            const SizedBox(height: 10),
+            _label('受け取り先（現金が増えるウォレット）'),
+            if (wallets.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  '現金/口座が未登録です。設定で登録してください。',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF92400E)),
+                ),
+              )
+            else
+              DropdownButtonFormField<String>(
+                initialValue: wallets.contains(_splitReceiveWallet)
+                    ? _splitReceiveWallet
+                    : null,
+                items: wallets
+                    .map((w) => DropdownMenuItem(value: w, child: Text(w)))
+                    .toList(),
+                onChanged: (v) => setState(() => _splitReceiveWallet = v),
+                decoration: _inputDecoration(hint: '選択してください'),
+              ),
+          ],
+        ],
+      ),
+    );
   }
 
   /// 金額入力（ヒーロー）。画面上部に大きく表示。USD 切替もここで行う。
