@@ -1,1 +1,1 @@
-{"version":"1.0.349","buildNumber":"350","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.349/futa-finance-v1.0.349.apk","releaseNotes":"設定>マスタデータに「税金・保険」を追加しました。法人税・消費税・社会保険料などの支払予定を登録でき（法人プリセットあり）、資金繰り予測に反映されます。"}
+{"version":"1.0.350","buildNumber":"351","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.350/futa-finance-v1.0.350.apk","releaseNotes":"税金・保険マスタを全端末で同期（ログイン時）するようにしました。さらに「手続き・届出カレンダー」を追加（算定基礎届・年度更新・申告期限などの締切管理／法人プリセット付き）。"}
