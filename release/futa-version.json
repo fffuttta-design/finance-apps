@@ -1,1 +1,1 @@
-{"version":"1.0.342","buildNumber":"343","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.342/futa-finance-v1.0.342.apk","releaseNotes":"ウォレット照合の表示を調整：現金・電子マネー(PayPay等)は常に表示、カード・銀行は当月に動きがある時だけ表示するようにしました（休眠中は隠す）。"}
+{"version":"1.0.343","buildNumber":"344","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.343/futa-finance-v1.0.343.apk","releaseNotes":"PC（Web/Windows）の支出明細を1行の表形式にしました（日付・内容・カテゴリ・支払方法・金額を横並び、ヘッダー付き）。"}
