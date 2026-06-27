@@ -409,7 +409,7 @@ class _BillingRow extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(children: [
-                            Text('実際（カード通知）',
+                            Text(wallet.isCard ? '実際（カード通知）' : '実際',
                                 style: V2Typography.micro
                                     .copyWith(color: V2Colors.textMuted)),
                             const SizedBox(width: 3),
@@ -452,7 +452,9 @@ class _BillingRow extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '明細合計より ${formatYen(diff)} 多く請求されています！未記録の支出がある可能性があります。',
+                        wallet.isCard
+                            ? '明細合計より ${formatYen(diff)} 多く請求されています！未記録の支出がある可能性があります。'
+                            : '記録合計より ${formatYen(diff)} 多く使われています！未記録の支出がある可能性があります。',
                         style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -967,12 +969,14 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
     await showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('${widget.wallet.name}の実際請求額'),
+        title: Text(widget.wallet.isCard
+            ? '${widget.wallet.name}の実際請求額'
+            : '${widget.wallet.name}の実際に使った額'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('予定（明細合計）: ${formatYen(_planned)}',
+            Text('予定（記録合計）: ${formatYen(_planned)}',
                 style: const TextStyle(
                     fontSize: 12, color: V2Colors.textSecondary)),
             const SizedBox(height: 12),
@@ -984,8 +988,10 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
                 HalfWidthDigitsFormatter(),
                 ThousandsSeparatorInputFormatter(),
               ],
-              decoration: const InputDecoration(
-                labelText: 'カード会社通知の請求額（円）',
+              decoration: InputDecoration(
+                labelText: widget.wallet.isCard
+                    ? 'カード会社通知の請求額（円）'
+                    : '実際に使った額（円）',
                 prefixText: '¥ ',
                 border: OutlineInputBorder(),
                 isDense: true,
@@ -1570,7 +1576,8 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
       appBar: AppBar(
         backgroundColor: V2Colors.surface,
         elevation: 0,
-        title: Text('クレカ棚卸し（$_month月）',
+        title: Text(
+            widget.wallet.isCard ? 'クレカ棚卸し（$_month月）' : '棚卸し（$_month月）',
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         leading: IconButton(
           icon: const Icon(Icons.close),
@@ -1604,6 +1611,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
                   diffColor: diffColor,
                   diffLabel: diffLabel,
                   onInputActual: _inputActual,
+                  isCard: widget.wallet.isCard,
                 ),
                 const SizedBox(height: V2Spacing.lg),
                 if (diff != null && diff > 0)
@@ -1626,9 +1634,9 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            '明細合計が実際請求より ${formatYen(-diff)} 多いです。'
+                            '${widget.wallet.isCard ? '明細合計' : '記録合計'}が実際より ${formatYen(-diff)} 多いです。'
                             '二重計上や取消済みの可能性があります。'
-                            '下の明細から余分な記録を削除・修正してください。',
+                            '下の履歴から余分な記録を削除・修正してください。',
                             style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -1651,7 +1659,8 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
                         const Icon(Icons.check_circle_outline,
                             size: 20, color: V2Colors.positive),
                         const SizedBox(width: 8),
-                        Text('明細合計と実際請求が一致しています。',
+                        Text(
+                            '${widget.wallet.isCard ? '明細合計と実際請求' : '記録合計と実際'}が一致しています。',
                             style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -1819,6 +1828,7 @@ class _SummaryBox extends StatelessWidget {
   final Color diffColor;
   final String diffLabel;
   final VoidCallback onInputActual;
+  final bool isCard;
 
   const _SummaryBox({
     required this.planned,
@@ -1827,6 +1837,7 @@ class _SummaryBox extends StatelessWidget {
     required this.diffColor,
     required this.diffLabel,
     required this.onInputActual,
+    required this.isCard,
   });
 
   @override
@@ -1850,7 +1861,7 @@ class _SummaryBox extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('予定（明細合計）',
+                      Text(isCard ? '予定（明細合計）' : '予定（記録合計）',
                           style: V2Typography.micro
                               .copyWith(color: V2Colors.textMuted)),
                       const SizedBox(height: 4),
@@ -1874,7 +1885,7 @@ class _SummaryBox extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(children: [
-                          Text('実際（カード通知）',
+                          Text(isCard ? '実際（カード通知）' : '実際',
                               style: V2Typography.micro
                                   .copyWith(color: V2Colors.textMuted)),
                           const SizedBox(width: 3),
@@ -1956,7 +1967,7 @@ class _AdjustmentPrompt extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '実際の請求が明細合計より ${formatYen(amount)} 多いです。'
+                  '実際が予定より ${formatYen(amount)} 多いです。'
                   '記録漏れの支出がある可能性があります。',
                   style: const TextStyle(
                       fontSize: 12,
