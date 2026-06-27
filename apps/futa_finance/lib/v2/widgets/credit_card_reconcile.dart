@@ -538,6 +538,9 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
   /// AIが科目を推定中。
   bool _proposing = false;
 
+  /// このカードの明細履歴（編集・初期化）を展開しているか。既定は隠す。
+  bool _showHistory = false;
+
   @override
   void initState() {
     super.initState();
@@ -1256,13 +1259,6 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
             icon: const Icon(Icons.content_paste, size: 18),
             label: const Text('貼り付け'),
           ),
-          const SizedBox(width: V2Spacing.sm),
-          IconButton(
-            tooltip: 'デバッグログを見る',
-            visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.bug_report_outlined, size: 20),
-            onPressed: _showDebugLog,
-          ),
         ],
       ),
     ];
@@ -1533,39 +1529,6 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
         crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
   }
 
-  /// デバッグログを表示するダイアログ（コピー可・クリア可）。
-  void _showDebugLog() {
-    showDialog<void>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('デバッグログ'),
-        content: SizedBox(
-          width: 520,
-          child: ValueListenableBuilder<List<String>>(
-            valueListenable: DebugLog.notifier,
-            builder: (_, lines, child) => SingleChildScrollView(
-              child: SelectableText(
-                lines.isEmpty ? '(まだログがありません)' : lines.join('\n'),
-                style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
-              ),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () {
-                DebugLog.clear();
-                Navigator.pop(context);
-              },
-              child: const Text('クリア')),
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('閉じる')),
-        ],
-      ),
-    );
-  }
-
   Widget _chip(String label, Color color) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
@@ -1702,6 +1665,23 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
                 const SizedBox(height: V2Spacing.sm),
                 _statementSection(),
                 const SizedBox(height: V2Spacing.lg),
+                // 履歴（既存明細の確認・編集・初期化）は既定で隠し、ボタンで開く。
+                OutlinedButton.icon(
+                  onPressed: () =>
+                      setState(() => _showHistory = !_showHistory),
+                  icon: Icon(
+                      _showHistory ? Icons.expand_less : Icons.history,
+                      size: 18),
+                  label: Text(_showHistory
+                      ? '履歴を閉じる'
+                      : '履歴を編集する（${txns.length}件）'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: V2Colors.textSecondary,
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                  ),
+                ),
+                if (_showHistory) ...[
+                const SizedBox(height: V2Spacing.sm),
                 Row(
                   children: [
                     Text('このカードの$_month月明細', style: V2Typography.h2),
@@ -1823,6 +1803,7 @@ class _CardReconcileSheetState extends State<_CardReconcileSheet> {
                     ),
                   ),
                 ],
+                ], // _showHistory
                 const SizedBox(height: V2Spacing.xl),
               ],
             ),
