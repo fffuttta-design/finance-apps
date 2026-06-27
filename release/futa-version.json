@@ -1,1 +1,1 @@
-{"version":"1.0.341","buildNumber":"342","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.341/futa-finance-v1.0.341.apk","releaseNotes":"ウォレット照合に現金・PayPayなどの登録ウォレットを常に表示するようにしました（未登録でも当月使った支払方法は自動で並びます）。"}
+{"version":"1.0.342","buildNumber":"343","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.342/futa-finance-v1.0.342.apk","releaseNotes":"ウォレット照合の表示を調整：現金・電子マネー(PayPay等)は常に表示、カード・銀行は当月に動きがある時だけ表示するようにしました（休眠中は隠す）。"}
