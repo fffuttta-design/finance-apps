@@ -681,7 +681,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 ),
                 const SizedBox(height: V2Spacing.md),
               ],
-              // 明細（左アクセント＋大›小バッジ＋支払チップの独立カード）
+              // 明細（PC幅は1行＝表形式：日付/内容/カテゴリ/支払方法/金額）
               Row(
                 children: [
                   Text(detailLabel,
@@ -740,7 +740,23 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                   ),
                 )
               else
-                for (final t in rows) _ExpenseRow(t: t, onTap: () => _edit(t)),
+                Container(
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: V2Colors.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: V2Colors.border),
+                  ),
+                  child: Column(
+                    children: [
+                      const _ExpenseTableHeader(),
+                      for (final t in rows) ...[
+                        const Divider(height: 1, color: V2Colors.divider),
+                        _ExpenseRow(t: t, onTap: () => _edit(t)),
+                      ],
+                    ],
+                  ),
+                ),
             ],
           ),
         ),
@@ -939,53 +955,43 @@ IconData _richPaymentIcon(String method) {
   return Icons.payment_outlined;
 }
 
-/// 「大カテゴリ › 小カテゴリ」の色付きバッジ。
-Widget _richCatBadge(core.Category c, Color color) {
-  final major = c.major.trim();
-  final sub = c.sub.trim();
-  final label = (major.isEmpty && sub.isEmpty)
-      ? '未分類'
-      : (sub.isEmpty ? major : '$major › $sub');
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.10),
-      borderRadius: BorderRadius.circular(5),
-      border: Border.all(color: color.withValues(alpha: 0.30)),
-    ),
-    child: Text(label,
-        style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: HSLColor.fromColor(color).withLightness(0.32).toColor())),
-  );
+// 明細テーブルの列幅（ヘッダーと行で共通）。
+const double _kDateW = 48;
+const double _kAmountW = 92;
+const int _kContentFlex = 4;
+const int _kCatFlex = 4;
+const int _kPayFlex = 3;
+
+/// 支出明細テーブルのヘッダー行。
+class _ExpenseTableHeader extends StatelessWidget {
+  const _ExpenseTableHeader();
+  static Widget _h(String s, {bool right = false}) => Text(s,
+      textAlign: right ? TextAlign.right : TextAlign.left,
+      style: V2Typography.micro
+          .copyWith(color: V2Colors.textMuted, fontWeight: FontWeight.w700));
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: V2Colors.surfaceMuted,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          SizedBox(width: _kDateW, child: _h('日付')),
+          const SizedBox(width: 8),
+          Expanded(flex: _kContentFlex, child: _h('内容')),
+          const SizedBox(width: 8),
+          Expanded(flex: _kCatFlex, child: _h('カテゴリ')),
+          const SizedBox(width: 8),
+          Expanded(flex: _kPayFlex, child: _h('支払方法')),
+          const SizedBox(width: 8),
+          SizedBox(width: _kAmountW, child: _h('金額', right: true)),
+        ],
+      ),
+    );
+  }
 }
 
-/// 支払方法チップ（アイコン＋名称）。
-Widget _richPaymentChip(String method) {
-  final m = method.trim();
-  if (m.isEmpty) return const SizedBox.shrink();
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-    decoration: BoxDecoration(
-      color: const Color(0xFFF1F5F9),
-      borderRadius: BorderRadius.circular(5),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(_richPaymentIcon(m), size: 12, color: const Color(0xFF64748B)),
-        const SizedBox(width: 3),
-        Text(m,
-            style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF64748B))),
-      ],
-    ),
-  );
-}
-
+/// 支出明細の1行（表形式・PC幅）。日付/内容/カテゴリ/支払方法/金額を横並び。
 class _ExpenseRow extends StatelessWidget {
   final core.Transaction t;
   final VoidCallback onTap;
@@ -994,82 +1000,93 @@ class _ExpenseRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = _richCatColor(t.category.major);
-    final sub = t.category.sub.trim();
     final major = t.category.major.trim();
+    final sub = t.category.sub.trim();
+    final catLabel = (major.isEmpty && sub.isEmpty)
+        ? '未分類'
+        : (sub.isEmpty ? major : '$major › $sub');
     final title = t.description.trim().isNotEmpty
         ? t.description.trim()
         : (sub.isNotEmpty ? sub : (major.isNotEmpty ? major : '未分類'));
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Material(
-        color: V2Colors.surface,
-        borderRadius: BorderRadius.circular(10),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: V2Colors.border),
+    final pay = t.paymentMethod.trim();
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: _kDateW,
+              child: Text(formatMonthDay(t.date),
+                  style: V2Typography.micro.copyWith(
+                      color: V2Colors.textSecondary,
+                      fontFeatures: V2Typography.tabularNums)),
             ),
-            child: IntrinsicHeight(
+            const SizedBox(width: 8),
+            Expanded(
+              flex: _kContentFlex,
+              child: Text(title,
+                  style:
+                      V2Typography.body.copyWith(fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: _kCatFlex,
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Container(width: 4, color: accent),
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                        color: accent, borderRadius: BorderRadius.circular(2)),
+                  ),
+                  const SizedBox(width: 6),
                   Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 7, 12, 7),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 40,
-                            child: Text(formatMonthDay(t.date),
-                                style: V2Typography.micro.copyWith(
-                                    color: V2Colors.textSecondary,
-                                    fontFeatures: V2Typography.tabularNums)),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(title,
-                                    style: V2Typography.body.copyWith(
-                                        fontWeight: FontWeight.w600),
-                                    overflow: TextOverflow.ellipsis,
-                                    maxLines: 1),
-                                const SizedBox(height: 3),
-                                Wrap(
-                                  spacing: 6,
-                                  runSpacing: 3,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  children: [
-                                    _richCatBadge(t.category, accent),
-                                    _richPaymentChip(t.paymentMethod),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text('-${formatYen(t.amount)}',
-                              style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: V2Colors.negative,
-                                  fontFeatures: V2Typography.tabularNums)),
-                        ],
-                      ),
-                    ),
+                    child: Text(catLabel,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: HSLColor.fromColor(accent)
+                                .withLightness(0.32)
+                                .toColor())),
                   ),
                 ],
               ),
             ),
-          ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: _kPayFlex,
+              child: Row(
+                children: [
+                  Icon(_richPaymentIcon(pay),
+                      size: 13, color: const Color(0xFF64748B)),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(pay,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF64748B))),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: _kAmountW,
+              child: Text('-${formatYen(t.amount)}',
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: V2Colors.negative,
+                      fontFeatures: V2Typography.tabularNums)),
+            ),
+          ],
         ),
       ),
     );
