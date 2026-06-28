@@ -1,1 +1,1 @@
-{"version":"1.0.351","buildNumber":"352","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.351/futa-finance-v1.0.351.apk","releaseNotes":"PC/Web版の支出明細を改善：列順を「日付→カテゴリ→内容→支払方法→金額」に変更し、別画面の一覧をやめてその場で並び替え・検索ができるようにしました。"}
+{"version":"1.0.352","buildNumber":"353","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.352/futa-finance-v1.0.352.apk","releaseNotes":"支出タブのウォレットをタップすると、まず詳細画面（明細一覧）が開くようにしました。クレカは詳細画面の「クレカ棚卸し（突合）」から突合できます。銀行・現金・PayPayは通帳表示のみ。記録メニューから「明細を分けて記録」を削除。振替に名前を付けられるようにしました。"}
