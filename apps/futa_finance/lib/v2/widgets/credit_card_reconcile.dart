@@ -279,192 +279,56 @@ class _BillingRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final diff = actual != null ? actual! - planned : null;
-    final hasActual = actual != null && actual! > 0;
-
-    // 差分の色・ラベル
-    Color diffColor;
-    String diffLabel;
-    if (diff == null) {
-      diffColor = V2Colors.textMuted;
-      diffLabel = '未入力';
-    } else if (diff == 0) {
-      diffColor = V2Colors.positive;
-      diffLabel = '一致';
-    } else if (diff > 0) {
-      diffColor = V2Colors.negative;
-      diffLabel = '+${formatYen(diff)} 超過';
-    } else {
-      diffColor = V2Colors.warning;
-      diffLabel = '${formatYen(diff)} 未確認';
-    }
-
-    final isOver = diff != null && diff > 0;
-
+    // 予定（明細合計）だけを表示。実際額の照合は各ウォレットの詳細画面で行う。
     return InkWell(
       onTap: () => onOpenReconcile(wallet),
       child: Padding(
         padding: const EdgeInsets.symmetric(
             horizontal: V2Spacing.lg, vertical: V2Spacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Row(
           children: [
-            // ウォレット名行
-            Row(
-              children: [
-                BrandLogo(
-                  iconUrl: wallet.iconUrl,
-                  fallbackIcon: wallet.fallbackIcon,
-                  size: 20,
-                  borderRadius: 3,
-                ),
-                const SizedBox(width: V2Spacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(wallet.name,
-                          style: V2Typography.body
-                              .copyWith(fontWeight: FontWeight.w700)),
-                      if (wallet.subtitle != null)
-                        Text(wallet.subtitle!,
-                            style: V2Typography.micro
-                                .copyWith(color: V2Colors.textMuted)),
-                    ],
-                  ),
-                ),
-                // 差分バッジ
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: diffColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                        color: diffColor.withValues(alpha: 0.4), width: 1),
-                  ),
-                  child: Text(diffLabel,
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: diffColor)),
-                ),
-                const SizedBox(width: V2Spacing.xs),
-                const Icon(Icons.chevron_right,
-                    size: 18, color: V2Colors.textMuted),
-              ],
+            BrandLogo(
+              iconUrl: wallet.iconUrl,
+              fallbackIcon: wallet.fallbackIcon,
+              size: 22,
+              borderRadius: 3,
             ),
-            const SizedBox(height: V2Spacing.sm),
-            // 予定 / 実際 の2列（同一スタイル）
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+            const SizedBox(width: V2Spacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 予定金額（自動）
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: V2Colors.surfaceMuted,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: V2Colors.border),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('予定（明細合計）',
-                              style: V2Typography.micro
-                                  .copyWith(color: V2Colors.textMuted)),
-                          const SizedBox(height: 4),
-                          Text(formatYen(planned),
-                              style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: planned > 0
-                                      ? V2Colors.textPrimary
-                                      : V2Colors.textMuted,
-                                  fontFeatures: V2Typography.tabularNums)),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: V2Spacing.sm),
-                  // 実際金額（タップで棚卸しシートを開いて入力）
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: hasActual
-                            ? const Color(0xFFFEF2F2)
-                            : V2Colors.surfaceMuted,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                            color: hasActual
-                                ? const Color(0xFFDC2626).withValues(alpha: 0.4)
-                                : V2Colors.border),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(children: [
-                            Text(wallet.isCard ? '実際（カード通知）' : '実際',
-                                style: V2Typography.micro
-                                    .copyWith(color: V2Colors.textMuted)),
-                            const SizedBox(width: 3),
-                            const Icon(Icons.edit,
-                                size: 11, color: V2Colors.textMuted),
-                          ]),
-                          const SizedBox(height: 4),
-                          Text(
-                            hasActual ? formatYen(actual!) : '未入力',
-                            style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: hasActual
-                                    ? const Color(0xFFDC2626)
-                                    : V2Colors.textMuted,
-                                fontFeatures: V2Typography.tabularNums),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  Text(wallet.name,
+                      style: V2Typography.body
+                          .copyWith(fontWeight: FontWeight.w700)),
+                  if (wallet.subtitle != null)
+                    Text(wallet.subtitle!,
+                        style: V2Typography.micro
+                            .copyWith(color: V2Colors.textMuted)),
                 ],
               ),
             ),
-            // 超過警告バナー
-            if (isOver) ...[
-              const SizedBox(height: V2Spacing.sm),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEF2F2),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFDC2626), width: 1.5),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.warning_rounded,
-                        size: 20, color: Color(0xFFDC2626)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        wallet.isCard
-                            ? '明細合計より ${formatYen(diff)} 多く請求されています！未記録の支出がある可能性があります。'
-                            : '記録合計より ${formatYen(diff)} 多く使われています！未記録の支出がある可能性があります。',
-                        style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFFDC2626)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            const SizedBox(width: V2Spacing.sm),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text('予定（明細合計）',
+                    style: V2Typography.micro
+                        .copyWith(color: V2Colors.textMuted)),
+                const SizedBox(height: 2),
+                Text(formatYen(planned),
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: planned > 0
+                            ? V2Colors.textPrimary
+                            : V2Colors.textMuted,
+                        fontFeatures: V2Typography.tabularNums)),
+              ],
+            ),
+            const SizedBox(width: V2Spacing.sm),
+            const Icon(Icons.chevron_right,
+                size: 18, color: V2Colors.textMuted),
           ],
         ),
       ),

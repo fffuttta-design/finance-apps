@@ -50,6 +50,28 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   final _expSearchCtrl = TextEditingController();
   String _expQuery = '';
 
+  /// 並び替えバッジ（チップ）。選択中はアクセント色で塗る。
+  Widget _sortBadge(_ExpSort s, Color accent) {
+    final sel = _expSort == s;
+    return InkWell(
+      onTap: () => setState(() => _expSort = s),
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: sel ? accent : V2Colors.surfaceMuted,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: sel ? accent : V2Colors.border),
+        ),
+        child: Text(s.badgeLabel,
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: sel ? Colors.white : V2Colors.textSecondary)),
+      ),
+    );
+  }
+
   /// 検索＋並び替えを適用した明細行。要約・カテゴリ内訳には影響しない。
   List<core.Transaction> _sortFilter(List<core.Transaction> rows) {
     final q = _expQuery.trim().toLowerCase();
@@ -761,28 +783,16 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                             style: V2Typography.caption
                                 .copyWith(color: V2Colors.textSecondary)),
                         const Spacer(),
-                        PopupMenuButton<_ExpSort>(
-                          tooltip: '並び替え',
-                          initialValue: _expSort,
-                          onSelected: (v) => setState(() => _expSort = v),
-                          itemBuilder: (_) => [
+                        // 並び替えバッジ（プルダウンから変更）。
+                        const Icon(Icons.sort,
+                            size: 16, color: V2Colors.textSecondary),
+                        const SizedBox(width: 6),
+                        Wrap(
+                          spacing: 6,
+                          children: [
                             for (final s in _ExpSort.values)
-                              PopupMenuItem(value: s, child: Text(s.label)),
+                              _sortBadge(s, accent),
                           ],
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 4),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.sort, size: 16, color: accent),
-                                const SizedBox(width: 4),
-                                Text(_expSort.label,
-                                    style: V2Typography.caption
-                                        .copyWith(color: accent)),
-                              ],
-                            ),
-                          ),
                         ),
                       ],
                     ),
@@ -1065,16 +1075,17 @@ IconData _richPaymentIcon(String method) {
 enum _ExpSort { dateDesc, dateAsc, amountDesc, amountAsc }
 
 extension _ExpSortX on _ExpSort {
-  String get label {
+  /// バッジ用の短いラベル。
+  String get badgeLabel {
     switch (this) {
       case _ExpSort.dateDesc:
-        return '日付（新しい順）';
+        return '新しい順';
       case _ExpSort.dateAsc:
-        return '日付（古い順）';
+        return '古い順';
       case _ExpSort.amountDesc:
-        return '金額（高い順）';
+        return '高い順';
       case _ExpSort.amountAsc:
-        return '金額（安い順）';
+        return '安い順';
     }
   }
 }
@@ -1150,26 +1161,41 @@ class _ExpenseRow extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               flex: _kCatFlex,
-              child: Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                        color: accent, borderRadius: BorderRadius.circular(2)),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    // カテゴリ色の淡い背景（行全体ではなくこのセルだけ）。
+                    color: accent.withValues(alpha: 0.13),
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(catLabel,
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: HSLColor.fromColor(accent)
-                                .withLightness(0.32)
-                                .toColor())),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                            color: accent,
+                            borderRadius: BorderRadius.circular(2)),
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(catLabel,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: HSLColor.fromColor(accent)
+                                    .withLightness(0.30)
+                                    .toColor())),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
             const SizedBox(width: 8),
