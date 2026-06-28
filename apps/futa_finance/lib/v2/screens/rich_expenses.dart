@@ -8,7 +8,6 @@ import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
 import '../../screens/expense_input_screen.dart';
-import '../../screens/expense_list_screen.dart';
 import '../../screens/subscription_list_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
 import '../../utils/formatters.dart';
@@ -43,6 +42,47 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
 
   /// 支出合計カードの内訳を展開しているか。
   bool _summaryOpen = false;
+
+  /// 明細の並び替え・検索（この画面内で完結。一覧画面は廃止）。
+  _ExpSort _expSort = _ExpSort.dateDesc;
+  final _expSearchCtrl = TextEditingController();
+  String _expQuery = '';
+
+  /// 検索＋並び替えを適用した明細行。要約・カテゴリ内訳には影響しない。
+  List<core.Transaction> _sortFilter(List<core.Transaction> rows) {
+    final q = _expQuery.trim().toLowerCase();
+    var list = rows;
+    if (q.isNotEmpty) {
+      list = rows.where((t) {
+        final hay = [
+          t.description,
+          t.category.major,
+          t.category.sub,
+          t.paymentMethod,
+          t.memo ?? '',
+          t.store ?? '',
+        ].join(' ').toLowerCase();
+        return hay.contains(q);
+      }).toList();
+    } else {
+      list = [...rows];
+    }
+    switch (_expSort) {
+      case _ExpSort.dateDesc:
+        list.sort((a, b) => b.date.compareTo(a.date));
+        break;
+      case _ExpSort.dateAsc:
+        list.sort((a, b) => a.date.compareTo(b.date));
+        break;
+      case _ExpSort.amountDesc:
+        list.sort((a, b) => b.amount.compareTo(a.amount));
+        break;
+      case _ExpSort.amountAsc:
+        list.sort((a, b) => a.amount.compareTo(b.amount));
+        break;
+    }
+    return list;
+  }
 
   /// 事業モードの諸経費/制作原価サブタブ（個人モードは null）。
   TabController? _subTab;
@@ -84,6 +124,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   void dispose() {
     _sub?.cancel();
     _subTab?.dispose();
+    _expSearchCtrl.dispose();
     super.dispose();
   }
 
@@ -681,82 +722,125 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 ),
                 const SizedBox(height: V2Spacing.md),
               ],
-              // 明細（PC幅は1行＝表形式：日付/内容/カテゴリ/支払方法/金額）
-              Row(
-                children: [
-                  Text(detailLabel,
-                      style: V2Typography.h2
-                          .copyWith(color: V2Colors.textPrimary)),
-                  const Spacer(),
-                  InkWell(
-                    onTap: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ExpenseListScreen(
-                            title: '$detailLabel一覧',
-                            month: _month,
-                          ),
-                        ),
-                      );
-                      await _load();
-                    },
-                    borderRadius: BorderRadius.circular(6),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 4, vertical: 2),
-                      child: Row(
-                        children: [
-                          Text('一覧',
-                              style: V2Typography.caption
-                                  .copyWith(color: accent)),
-                          Icon(Icons.chevron_right, size: 16, color: accent),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: V2Spacing.sm),
-              if (rows.isEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 40),
-                  decoration: BoxDecoration(
-                    color: V2Colors.surface,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: V2Colors.border),
-                  ),
-                  child: Center(
-                    child: Column(
+              // 明細（PC幅は1行＝表形式：日付/カテゴリ/内容/支払方法/金額）。
+              // 並び替え・検索はこの画面内で完結（一覧画面は廃止）。
+              Builder(builder: (context) {
+                final detailRows = _sortFilter(rows);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
                       children: [
-                        const Icon(Icons.inbox_outlined,
-                            size: 36, color: V2Colors.textMuted),
-                        const SizedBox(height: 8),
-                        Text('${_month.month}月の記録はまだありません',
+                        Text(detailLabel,
+                            style: V2Typography.h2
+                                .copyWith(color: V2Colors.textPrimary)),
+                        const SizedBox(width: 8),
+                        Text('${detailRows.length}件',
                             style: V2Typography.caption
                                 .copyWith(color: V2Colors.textSecondary)),
+                        const Spacer(),
+                        PopupMenuButton<_ExpSort>(
+                          tooltip: '並び替え',
+                          initialValue: _expSort,
+                          onSelected: (v) => setState(() => _expSort = v),
+                          itemBuilder: (_) => [
+                            for (final s in _ExpSort.values)
+                              PopupMenuItem(value: s, child: Text(s.label)),
+                          ],
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 4),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.sort, size: 16, color: accent),
+                                const SizedBox(width: 4),
+                                Text(_expSort.label,
+                                    style: V2Typography.caption
+                                        .copyWith(color: accent)),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
-                  ),
-                )
-              else
-                Container(
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(
-                    color: V2Colors.surface,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: V2Colors.border),
-                  ),
-                  child: Column(
-                    children: [
-                      const _ExpenseTableHeader(),
-                      for (final t in rows) ...[
-                        const Divider(height: 1, color: V2Colors.divider),
-                        _ExpenseRow(t: t, onTap: () => _edit(t)),
-                      ],
-                    ],
-                  ),
-                ),
+                    const SizedBox(height: V2Spacing.sm),
+                    // 検索
+                    TextField(
+                      controller: _expSearchCtrl,
+                      onChanged: (v) => setState(() => _expQuery = v),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: '内容・カテゴリ・支払方法で検索',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        suffixIcon: _expQuery.isEmpty
+                            ? null
+                            : IconButton(
+                                icon: const Icon(Icons.close, size: 18),
+                                onPressed: () {
+                                  _expSearchCtrl.clear();
+                                  setState(() => _expQuery = '');
+                                },
+                              ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: V2Colors.border)),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: V2Colors.border)),
+                      ),
+                    ),
+                    const SizedBox(height: V2Spacing.sm),
+                    if (detailRows.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 40),
+                        decoration: BoxDecoration(
+                          color: V2Colors.surface,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: V2Colors.border),
+                        ),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              const Icon(Icons.inbox_outlined,
+                                  size: 36, color: V2Colors.textMuted),
+                              const SizedBox(height: 8),
+                              Text(
+                                  _expQuery.isNotEmpty
+                                      ? '「$_expQuery」に一致する明細はありません'
+                                      : '${_month.month}月の記録はまだありません',
+                                  style: V2Typography.caption.copyWith(
+                                      color: V2Colors.textSecondary)),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      Container(
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          color: V2Colors.surface,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: V2Colors.border),
+                        ),
+                        child: Column(
+                          children: [
+                            const _ExpenseTableHeader(),
+                            for (final t in detailRows) ...[
+                              const Divider(
+                                  height: 1, color: V2Colors.divider),
+                              _ExpenseRow(t: t, onTap: () => _edit(t)),
+                            ],
+                          ],
+                        ),
+                      ),
+                  ],
+                );
+              }),
             ],
           ),
         ),
@@ -955,6 +1039,24 @@ IconData _richPaymentIcon(String method) {
   return Icons.payment_outlined;
 }
 
+/// 明細の並び替えモード。
+enum _ExpSort { dateDesc, dateAsc, amountDesc, amountAsc }
+
+extension _ExpSortX on _ExpSort {
+  String get label {
+    switch (this) {
+      case _ExpSort.dateDesc:
+        return '日付（新しい順）';
+      case _ExpSort.dateAsc:
+        return '日付（古い順）';
+      case _ExpSort.amountDesc:
+        return '金額（高い順）';
+      case _ExpSort.amountAsc:
+        return '金額（安い順）';
+    }
+  }
+}
+
 // 明細テーブルの列幅（ヘッダーと行で共通）。
 const double _kDateW = 48;
 const double _kAmountW = 92;
@@ -978,9 +1080,9 @@ class _ExpenseTableHeader extends StatelessWidget {
         children: [
           SizedBox(width: _kDateW, child: _h('日付')),
           const SizedBox(width: 8),
-          Expanded(flex: _kContentFlex, child: _h('内容')),
-          const SizedBox(width: 8),
           Expanded(flex: _kCatFlex, child: _h('カテゴリ')),
+          const SizedBox(width: 8),
+          Expanded(flex: _kContentFlex, child: _h('内容')),
           const SizedBox(width: 8),
           Expanded(flex: _kPayFlex, child: _h('支払方法')),
           const SizedBox(width: 8),
@@ -1025,15 +1127,6 @@ class _ExpenseRow extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Expanded(
-              flex: _kContentFlex,
-              child: Text(title,
-                  style:
-                      V2Typography.body.copyWith(fontWeight: FontWeight.w600),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
               flex: _kCatFlex,
               child: Row(
                 children: [
@@ -1056,6 +1149,15 @@ class _ExpenseRow extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: _kContentFlex,
+              child: Text(title,
+                  style:
+                      V2Typography.body.copyWith(fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1),
             ),
             const SizedBox(width: 8),
             Expanded(
