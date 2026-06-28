@@ -1,1 +1,1 @@
-{"version":"1.0.350","buildNumber":"351","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.350/futa-finance-v1.0.350.apk","releaseNotes":"税金・保険マスタを全端末で同期（ログイン時）するようにしました。さらに「手続き・届出カレンダー」を追加（算定基礎届・年度更新・申告期限などの締切管理／法人プリセット付き）。"}
+{"version":"1.0.351","buildNumber":"352","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.351/futa-finance-v1.0.351.apk","releaseNotes":"PC/Web版の支出明細を改善：列順を「日付→カテゴリ→内容→支払方法→金額」に変更し、別画面の一覧をやめてその場で並び替え・検索ができるようにしました。"}
