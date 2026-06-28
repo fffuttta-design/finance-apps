@@ -64,6 +64,7 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
   String? _toAccount;
   final _amountCtrl = NoComposingUnderlineController();
   final _memoCtrl = TextEditingController();
+  final _nameCtrl = TextEditingController();
   bool _saving = false;
 
   @override
@@ -77,6 +78,11 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
       _toAccount = e.transferToAccount;
       _amountCtrl.text = formatAmount(e.amount);
       _memoCtrl.text = e.memo ?? '';
+      // 自動命名（移動元 → 移動先）でなければ、付けた名前として復元。
+      final auto = '${e.transferFromAccount} → ${e.transferToAccount}';
+      if (e.description.trim().isNotEmpty && e.description != auto) {
+        _nameCtrl.text = e.description;
+      }
     }
     _load();
   }
@@ -85,6 +91,7 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
   void dispose() {
     _amountCtrl.dispose();
     _memoCtrl.dispose();
+    _nameCtrl.dispose();
     super.dispose();
   }
 
@@ -147,7 +154,9 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
         category: const core.Category(major: '振替', sub: ''),
         // paymentMethod は使わない。互換のため空文字。
         paymentMethod: '',
-        description: '${_fromAccount!} → ${_toAccount!}',
+        description: _nameCtrl.text.trim().isEmpty
+            ? '${_fromAccount!} → ${_toAccount!}'
+            : _nameCtrl.text.trim(),
         amount: amount,
         memo: _memoCtrl.text.trim().isEmpty ? null : _memoCtrl.text.trim(),
         transferFromAccount: _fromAccount,
@@ -485,6 +494,17 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
                       DropdownMenuItem(value: c.value, child: Text(c.label)))
                   .toList(),
               onChanged: (v) => setState(() => _toAccount = v),
+            ),
+            const SizedBox(height: 12),
+            // 名前（任意）。未入力なら「移動元 → 移動先」を自動で名前にする。
+            TextField(
+              controller: _nameCtrl,
+              decoration: const InputDecoration(
+                labelText: '名前（任意）',
+                hintText: '例: 生活費の移動・カード引落用',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.label_outline, size: 18),
+              ),
             ),
             const SizedBox(height: 12),
             // 金額

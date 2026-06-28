@@ -7,6 +7,8 @@ import '../../data/app_mode.dart';
 import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
+import '../../screens/account_detail_screen.dart';
+import '../../screens/card_detail_screen.dart';
 import '../../screens/expense_input_screen.dart';
 import '../../screens/subscription_list_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
@@ -309,8 +311,28 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     }
   }
 
-  /// ウォレット照合シートを開く。
+  /// ウォレットの行をタップ → まず詳細画面（明細一覧）へ。
+  /// クレカ＝CardDetailScreen（そこから「突合」を選べる）。
+  /// 銀行/現金/電子マネー＝AccountDetailScreen（通帳）。突合は不要・自力で追える。
+  /// 未登録の支払方法（手入力のPayPay等）は詳細画面が無いので照合シートを直接開く。
   Future<void> _openCardReconcile(ReconcileWallet wallet) async {
+    for (final c in _payments.creditCards) {
+      if (c.name == wallet.name) {
+        await Navigator.push(context,
+            MaterialPageRoute(builder: (_) => CardDetailScreen(card: c)));
+        if (mounted) await _load();
+        return;
+      }
+    }
+    for (final b in _payments.bankAccounts) {
+      if (b.name == wallet.name) {
+        await Navigator.push(context,
+            MaterialPageRoute(builder: (_) => AccountDetailScreen(account: b)));
+        if (mounted) await _load();
+        return;
+      }
+    }
+    // 未登録の支払方法：詳細画面が無いので、従来どおり簡易の照合シート。
     final ym = _ymKey;
     await showCardReconcileSheet(
       context,

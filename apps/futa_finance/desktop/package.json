@@ -1,7 +1,7 @@
 {
     "name":  "futafinance_desktop",
     "productName":  "FutaFinance",
-    "version":  "1.0.350",
+    "version":  "1.0.351",
     "description":  "FutaFinance desktop shell (Electron wrapper around the Flutter web build).",
     "main":  "main.js",
     "author":  "RunStrategy",

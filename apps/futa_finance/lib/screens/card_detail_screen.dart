@@ -7,8 +7,11 @@ import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
+import '../utils/modal_input.dart';
 import '../utils/thousands_separator_input_formatter.dart';
+import '../v2/widgets/credit_card_reconcile.dart';
 import '../widgets/brand_logo.dart';
+import 'expense_input_screen.dart';
 
 /// クレジットカード詳細（利用明細）画面。
 /// 銀行通帳の AccountDetailScreen に相当するクレカ版。
@@ -141,6 +144,12 @@ class _CardDetailScreenState extends State<CardDetailScreen>
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.fact_check_outlined,
+                color: Color(0xFF1A237E)),
+            tooltip: 'クレカ棚卸し（突合）',
+            onPressed: _openReconcile,
+          ),
           IconButton(
             icon: const Icon(Icons.add_circle,
                 color: Color(0xFFDC2626)),
@@ -556,6 +565,79 @@ class _CardDetailScreenState extends State<CardDetailScreen>
         ),
       ),
     );
+  }
+
+  // ─── クレカ棚卸し（突合）──
+  /// この詳細画面から突合シートを開く。対象月は期間セレクタの選択月
+  /// （全期間のときは当月）。CSV突合・実際額入力・記録漏れ補完はここで行う。
+  Future<void> _openReconcile() async {
+    final now = DateTime.now();
+    final m = _selectedMonth ?? DateTime(now.year, now.month);
+    final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
+    final c = _card;
+    final wallet = ReconcileWallet(
+      name: c.name,
+      iconUrl: c.iconUrl,
+      fallbackIcon: Icons.credit_card,
+      isCard: true,
+      subtitle: c.paymentDay != null
+          ? '引き落とし日：毎月${c.paymentDay}日'
+          : 'クレジットカード',
+    );
+    await showCardReconcileSheet(
+      context,
+      wallet: wallet,
+      initialActual: c.monthlyActualBillings[ym],
+      ym: ym,
+      onSaveActual: (amount) => _saveActual(ym, amount),
+      onEditTxn: (t) async {
+        await showInputSheet<bool>(context, ExpenseInputScreen(editing: t));
+      },
+      onDeleteTxn: (t) async {
+        await TransactionRepository.instance.delete(t.id);
+      },
+      onAddAdjustment: (amount, {description, date}) async {
+        final fallback = DateTime(m.year, m.month + 1, 0);
+        await showInputSheet<bool>(
+          context,
+          ExpenseInputScreen(
+            initialPaymentMethod: c.name,
+            initialAmount: amount > 0 ? amount : null,
+            initialDate: date ?? fallback,
+            initialDescription: description ?? '差額調整',
+          ),
+        );
+      },
+    );
+    if (mounted) await _load();
+  }
+
+  /// 実際請求額（カード会社通知）を保存／クリアする。
+  Future<void> _saveActual(String ym, int? amount) async {
+    final cfg = await SettingsRepository.instance.loadPayments();
+    final cards = cfg.creditCards.map((c) {
+      if (c.name != _card.name) return c;
+      final map = Map<String, int>.from(c.monthlyActualBillings);
+      if (amount == null) {
+        map.remove(ym);
+      } else {
+        map[ym] = amount;
+      }
+      return c.copyWith(monthlyActualBillings: map);
+    }).toList();
+    await SettingsRepository.instance
+        .savePayments(cfg.copyWith(creditCards: cards));
+    if (!mounted) return;
+    setState(() {
+      final map = Map<String, int>.from(_card.monthlyActualBillings);
+      if (amount == null) {
+        map.remove(ym);
+      } else {
+        map[ym] = amount;
+      }
+      _updatedCard = _card.copyWith(monthlyActualBillings: map);
+    });
+    PaymentsChangeNotifier.instance.notifyChanged();
   }
 
   // ─── 引落予定日 編集 ──

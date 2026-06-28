@@ -434,17 +434,6 @@ class _RecordMenuButton extends StatelessWidget {
           ),
         ),
         PopupMenuItem(
-          value: 'split',
-          child: Row(
-            children: [
-              const Icon(Icons.format_list_bulleted,
-                  size: 16, color: Color(0xFFEF4444)),
-              const SizedBox(width: 8),
-              const Text('明細を分けて記録'),
-            ],
-          ),
-        ),
-        PopupMenuItem(
           value: 'income',
           child: Row(
             children: [
