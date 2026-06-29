@@ -1,1 +1,1 @@
-{"version":"1.0.354","buildNumber":"355","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.354/futa-finance-v1.0.354.apk","releaseNotes":"支出明細テーブルの列幅をドラッグで変えられるようにしました（カテゴリ/内容/支払方法の境界をヘッダーで掴んで調整・端末に保存）。"}
+{"version":"1.0.355","buildNumber":"356","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.355/futa-finance-v1.0.355.apk","releaseNotes":"支出明細の並び替えに「カテゴリ順」を追加。支出カテゴリ編集で、PLセクションが無い（全部その他になる）場合は見出しを出さずスッキリ表示するようにしました。"}
