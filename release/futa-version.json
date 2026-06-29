@@ -1,1 +1,1 @@
-{"version":"1.0.359","buildNumber":"360","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.359/futa-finance-v1.0.359.apk","releaseNotes":"支出カテゴリの色を手動で選べるようにしました。カテゴリ編集画面の各行のパレットアイコンから10色プリセットで指定でき（「自動」で解除）、支出明細などの色に反映されます。"}
+{"version":"1.0.360","buildNumber":"361","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.360/futa-finance-v1.0.360.apk","releaseNotes":"クレジットカードの明細画面（PC/Web）を、支出明細と同じ表（日付・カテゴリ色・内容・支払方法・金額＋検索＋並び替え＋列幅調整）にしました。口座詳細（通帳）の明細テーブルは列幅を固定してきれいに揃うようにしました。"}
