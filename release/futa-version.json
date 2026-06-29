@@ -1,1 +1,1 @@
-{"version":"1.0.365","buildNumber":"366","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.365/futa-finance-v1.0.365.apk","releaseNotes":"ウォレットのカードの表記を「クレジットカード」に統一して、他の行（銀行口座・現金・電子マネー）と揃えました。カテゴリ内訳に、各カテゴリのアイコンを表示し、バーの色もそのカテゴリの色に変えました。"}
+{"version":"1.0.366","buildNumber":"367","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.366/futa-finance-v1.0.366.apk","releaseNotes":"ウォレットの各行に合計金額を再表示しました。新デザインに固定し（切替トグルを廃止）、使っていない「明細の貼り付け取込・開発ラボ」を削除。スクロールでヘッダーの帯がグレーになる現象も直しました。"}
