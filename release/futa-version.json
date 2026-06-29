@@ -1,1 +1,1 @@
-{"version":"1.0.373","buildNumber":"374","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.373/futa-finance-v1.0.373.apk","releaseNotes":"支出カテゴリの色を選んでもすぐ反映されなかった不具合を直しました。さらに、色を並び順にそって階段状に散りばめ、隣り合うカテゴリが必ず別の色になるようにしました（このカテゴリ＝この色、が安定します。手動で選んだ色はそのまま優先）。"}
+{"version":"1.0.374","buildNumber":"375","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.374/futa-finance-v1.0.374.apk","releaseNotes":"カテゴリの色数を16色に増やし、隣り合うカテゴリの色かぶりを減らしました。また、支出明細の並び替え矢印（↓）は、ヘッダーをタップして並び替えたときだけ表示するようにしました（既定の日付順ではスッキリ非表示）。"}
