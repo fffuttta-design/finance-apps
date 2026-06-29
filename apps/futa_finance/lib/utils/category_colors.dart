@@ -10,18 +10,25 @@ import 'package:finance_core/finance_core.dart' as core;
 class CategoryColors {
   CategoryColors._();
 
-  /// 選べる10色（カテゴリ色プリセット）。
+  /// カテゴリ色プリセット（16色）。並び順で割り当てる際に「隣同士が大きく違う色」に
+  /// なるよう暖色/寒色を交互に配置し、かぶりをできるだけ減らす。
   static const palette = <int>[
     0xFF6366F1, // インディゴ
-    0xFF3B82F6, // ブルー
-    0xFF06B6D4, // シアン
-    0xFF10B981, // エメラルド
-    0xFF84CC16, // ライム
-    0xFFF59E0B, // アンバー
     0xFFF97316, // オレンジ
-    0xFFEF4444, // レッド
+    0xFF10B981, // エメラルド
     0xFFEC4899, // ピンク
+    0xFF0EA5E9, // スカイ
+    0xFFF59E0B, // アンバー
     0xFF8B5CF6, // バイオレット
+    0xFF84CC16, // ライム
+    0xFFEF4444, // レッド
+    0xFF14B8A6, // ティール
+    0xFFD946EF, // フクシア
+    0xFF22C55E, // グリーン
+    0xFF3B82F6, // ブルー
+    0xFFF43F5E, // ローズ
+    0xFFA855F7, // パープル
+    0xFFEAB308, // イエロー
   ];
 
   // 数字プレフィックス無しの大カテゴリ名 → 色(ARGB int)。

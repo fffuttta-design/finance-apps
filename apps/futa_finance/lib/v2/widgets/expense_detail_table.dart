@@ -59,12 +59,15 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
   // 並び替えは表ヘッダーのクリックで列＋昇順/降順を切替。
   _SortCol _sortCol = _SortCol.date;
   bool _asc = false; // 日付は既定で降順（新しい順）。
+  // ユーザーが一度でも並び替えを操作したか。既定（日付順）のうちは矢印を出さない。
+  bool _sortTouched = false;
   final _searchCtrl = TextEditingController();
   String _query = '';
 
   /// ヘッダークリック：同じ列なら昇順/降順をトグル、別列なら列を切替（既定向き）。
   void _onSort(_SortCol col) {
     setState(() {
+      _sortTouched = true;
       if (_sortCol == col) {
         _asc = !_asc;
       } else {
@@ -257,6 +260,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                       asc: _asc,
                       onSort: _onSort,
                       accent: widget.accent,
+                      touched: _sortTouched,
                     ),
                     for (final t in detailRows) ...[
                       const Divider(height: 1, color: V2Colors.divider),
@@ -296,6 +300,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                     onSort: _onSort,
                     accent: widget.accent,
                     showReceipt: widget.showReceiptCheck,
+                    touched: _sortTouched,
                   ),
                   for (final t in detailRows) ...[
                     const Divider(height: 1, color: V2Colors.divider),
@@ -391,6 +396,7 @@ class _ExpenseTableHeader extends StatelessWidget {
   final void Function(_SortCol col) onSort;
   final Color accent;
   final bool showReceipt;
+  final bool touched;
   const _ExpenseTableHeader({
     required this.w,
     required this.onResize,
@@ -400,11 +406,13 @@ class _ExpenseTableHeader extends StatelessWidget {
     required this.onSort,
     required this.accent,
     this.showReceipt = false,
+    this.touched = false,
   });
 
-  /// 並び替え可能な見出しセル（タップで切替・現在列は矢印＋アクセント色）。
+  /// 並び替え可能な見出しセル（タップで切替）。既定（未操作）のうちは矢印も
+  /// アクセント色も出さず、ヘッダーをタップしてから現在列を強調する。
   Widget _h(String s, _SortCol col, {bool right = false}) {
-    final active = sortCol == col;
+    final active = sortCol == col && touched;
     final color = active ? accent : V2Colors.textMuted;
     final children = <Widget>[
       Flexible(
@@ -671,11 +679,13 @@ class _NarrowSortBar extends StatelessWidget {
   final bool asc;
   final void Function(_SortCol col) onSort;
   final Color accent;
+  final bool touched;
   const _NarrowSortBar({
     required this.sortCol,
     required this.asc,
     required this.onSort,
     required this.accent,
+    this.touched = false,
   });
 
   static const _labels = {
@@ -688,7 +698,7 @@ class _NarrowSortBar extends StatelessWidget {
   };
 
   Widget _chip(_SortCol c) {
-    final active = sortCol == c;
+    final active = sortCol == c && touched;
     return InkWell(
       onTap: () => onSort(c),
       borderRadius: BorderRadius.circular(20),

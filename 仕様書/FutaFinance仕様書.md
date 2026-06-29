@@ -1,6 +1,6 @@
 # FutaFinance 仕様書
 
-> **最終更新: 2026-06-29 / v1.0.373+374**
+> **最終更新: 2026-06-29 / v1.0.374+375**
 > 変更があるたびにこのファイルを編集してバージョンを更新すること。
 
 ---
@@ -431,6 +431,10 @@ class MonthlySnapshot {
 - **マウス「進む」ボタンの暫定対応（v1.0.367〜）**: Flutter Web/Navigator 1.0 は「戻る」はできるが「進む」で直前の画面を復元できない。go_router 化（大改修）を避けつつ、`NavHistory`（`lib/data/nav_history.dart`）で主要なフルスクリーン遷移だけを `push` 経由で開き、戻ったら "進む候補" として記憶 → 進むボタンで開き直す簡易フォワードスタックを実装。
   - 対応範囲: **設定の各サブ画面（`_openPanelScreen`）/ 支出カテゴリ→小カテゴリ編集 / ウォレットからの口座・カード詳細**。モーダルやPCの2ペイン切替は対象外。
   - 配線: `main.dart` に `navigatorKey` 設置＋`Listener` で `kForwardMouseButton` を拾う。Web/Electron は `window.futaGoForward`（`nav_history_hook_web.dart`、条件付きimport `dart.library.js_interop`）を生やし、`main.js` の `browser-forward` から呼ぶ（無ければ `history.forward()` にフォールバック）。
+
+### パレット16色化＋既定時の並び替え矢印を非表示（v1.0.374〜）
+- **`CategoryColors.palette` を10→16色に拡張**（暖色/寒色を交互配置でかぶり低減）。色ピッカーの選択肢も16色に。
+- **明細テーブルの並び替え矢印を「未操作時は非表示」に**（`_sortTouched`）。既定の日付順では `日付` に矢印・アクセント色を出さず、ヘッダー/チップを一度タップしてから現在列を強調する（PC・スマホ両方）。
 
 ### カテゴリ色の即時反映バグ修正＋階段状の色割当（v1.0.373〜）
 - **色変更が即反映されないバグを修正**：カテゴリ編集の行が `CategoryColors.effective`（保存後に更新されるキャッシュ）を見ていたため、色を選んでも即時に変わらなかった。行は `major.colorValue`（`_config` の生値）を直接読むようにして即時反映。
