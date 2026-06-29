@@ -230,6 +230,25 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
               border: Border.all(color: V2Colors.border),
             ),
             child: LayoutBuilder(builder: (ctx, cons) {
+              // 狭い幅（スマホ）は1行表だと潰れるので2行のスリム表示。
+              final narrow = cons.maxWidth < 560;
+              if (narrow) {
+                return Column(
+                  children: [
+                    _NarrowSortBar(
+                      sortCol: _sortCol,
+                      asc: _asc,
+                      onSort: _onSort,
+                      accent: widget.accent,
+                    ),
+                    for (final t in detailRows) ...[
+                      const Divider(height: 1, color: V2Colors.divider),
+                      _NarrowRow(
+                          t: t, onTap: () => widget.onEditTxn(t)),
+                    ],
+                  ],
+                );
+              }
               final innerW = cons.maxWidth - 24;
               final fixed =
                   _kDateW + _kAmountW + _kColGap * 2 + _kHandleW * 2;
@@ -552,6 +571,175 @@ class _DateWithWeekday extends StatelessWidget {
       ]),
       maxLines: 1,
       overflow: TextOverflow.clip,
+    );
+  }
+}
+
+/// 狭い幅用の並び替えバー（列ラベルをタップで切替・現在列は矢印＋アクセント色）。
+class _NarrowSortBar extends StatelessWidget {
+  final _SortCol sortCol;
+  final bool asc;
+  final void Function(_SortCol col) onSort;
+  final Color accent;
+  const _NarrowSortBar({
+    required this.sortCol,
+    required this.asc,
+    required this.onSort,
+    required this.accent,
+  });
+
+  static const _labels = {
+    _SortCol.date: '日付',
+    _SortCol.category: 'カテゴリ',
+    _SortCol.content: '内容',
+    _SortCol.payment: '支払方法',
+    _SortCol.amount: '金額',
+  };
+
+  Widget _chip(_SortCol c) {
+    final active = sortCol == c;
+    return InkWell(
+      onTap: () => onSort(c),
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_labels[c]!,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: active ? accent : V2Colors.textMuted)),
+            if (active)
+              Icon(asc ? Icons.arrow_upward : Icons.arrow_downward,
+                  size: 12, color: accent),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: V2Colors.surfaceMuted,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(children: [for (final c in _SortCol.values) _chip(c)]),
+      ),
+    );
+  }
+}
+
+/// 狭い幅用の2行スリム行。
+/// 1行目：日付(曜日)＋内容＋金額／2行目：カテゴリ＋支払方法。
+class _NarrowRow extends StatelessWidget {
+  final core.Transaction t;
+  final VoidCallback onTap;
+  const _NarrowRow({required this.t, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = _catColor(t.category.major);
+    final major = t.category.major.trim();
+    final sub = t.category.sub.trim();
+    final catLabel = (major.isEmpty && sub.isEmpty)
+        ? '未分類'
+        : (sub.isEmpty ? major : '$major › $sub');
+    final title = t.description.trim().isNotEmpty
+        ? t.description.trim()
+        : (sub.isNotEmpty ? sub : (major.isNotEmpty ? major : '未分類'));
+    final pay = t.paymentMethod.trim();
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1行目：日付 + 内容 + 金額
+            Row(
+              children: [
+                _DateWithWeekday(date: t.date),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: V2Typography.body
+                          .copyWith(fontWeight: FontWeight.w600)),
+                ),
+                const SizedBox(width: 8),
+                Text('-${formatYen(t.amount)}',
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: V2Colors.negative,
+                        fontFeatures: V2Typography.tabularNums)),
+              ],
+            ),
+            const SizedBox(height: 5),
+            // 2行目：カテゴリ + 支払方法
+            Row(
+              children: [
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.13),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                              color: accent,
+                              borderRadius: BorderRadius.circular(2)),
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(catLabel,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: HSLColor.fromColor(accent)
+                                      .withLightness(0.30)
+                                      .toColor())),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Row(
+                    children: [
+                      Icon(_paymentIcon(pay),
+                          size: 12, color: const Color(0xFF64748B)),
+                      const SizedBox(width: 3),
+                      Flexible(
+                        child: Text(pay,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: const TextStyle(
+                                fontSize: 12, color: Color(0xFF64748B))),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

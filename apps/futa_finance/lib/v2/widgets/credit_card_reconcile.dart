@@ -201,7 +201,7 @@ class CreditCardBillingSection extends StatelessWidget {
               const Icon(Icons.account_balance_wallet_outlined,
                   size: 18, color: Color(0xFFDC2626)),
               const SizedBox(width: V2Spacing.sm),
-              Text('ウォレット照合',
+              Text('ウォレット',
                   style: V2Typography.h2.copyWith(color: V2Colors.textPrimary)),
             ],
           ),
@@ -307,24 +307,6 @@ class _BillingRow extends StatelessWidget {
                             .copyWith(color: V2Colors.textMuted)),
                 ],
               ),
-            ),
-            const SizedBox(width: V2Spacing.sm),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text('予定（明細合計）',
-                    style: V2Typography.micro
-                        .copyWith(color: V2Colors.textMuted)),
-                const SizedBox(height: 2),
-                Text(formatYen(planned),
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: planned > 0
-                            ? V2Colors.textPrimary
-                            : V2Colors.textMuted,
-                        fontFeatures: V2Typography.tabularNums)),
-              ],
             ),
             const SizedBox(width: V2Spacing.sm),
             const Icon(Icons.chevron_right,
