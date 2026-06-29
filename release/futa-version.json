@@ -1,1 +1,1 @@
-{"version":"1.0.353","buildNumber":"354","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.353/futa-finance-v1.0.353.apk","releaseNotes":"支出明細：カテゴリ列に色付き背景、並び替えをバッジ化。ウォレット照合は「予定（明細合計）」だけのシンプル表示にしました（実際額の照合は各ウォレットの詳細画面から／クレカのCSV突合はカード詳細の「クレカ棚卸し」ボタンから）。"}
+{"version":"1.0.354","buildNumber":"355","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.354/futa-finance-v1.0.354.apk","releaseNotes":"支出明細テーブルの列幅をドラッグで変えられるようにしました（カテゴリ/内容/支払方法の境界をヘッダーで掴んで調整・端末に保存）。"}
