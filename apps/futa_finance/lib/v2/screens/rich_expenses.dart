@@ -12,6 +12,7 @@ import '../../screens/card_detail_screen.dart';
 import '../../screens/expense_input_screen.dart';
 import '../../screens/subscription_list_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
+import '../../utils/emoji_palette.dart';
 import '../../utils/formatters.dart';
 import '../../utils/modal_input.dart';
 import '../../widgets/brand_logo.dart';
@@ -41,6 +42,8 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   List<core.Transaction> _transactions = [];
   List<core.Subscription> _subs = [];
   core.PaymentMethodsConfig _payments = core.PaymentMethodsConfig.empty();
+  /// 大カテゴリ名 → アイコンキー（カテゴリ内訳のアイコン表示用）。
+  Map<String, String?> _catIcons = {};
   bool _loading = true;
 
   /// 支出合計カードの内訳を展開しているか。
@@ -93,11 +96,13 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     final txns = await _txRepo.loadAll();
     final subs = await SubscriptionRepository.instance.load();
     final payments = await _settings.loadPayments();
+    final cats = await _settings.loadCategories();
     if (!mounted) return;
     setState(() {
       _transactions = txns;
       _subs = subs.subscriptions;
       _payments = payments;
+      _catIcons = {for (final m in cats.majors) m.name: m.iconKey};
       _loading = false;
     });
   }
@@ -625,6 +630,13 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                           value: e.value,
                           ratio: total == 0 ? 0 : e.value / total,
                           accent: accent,
+                          // カテゴリのアイコンと色（固定費は合算なので汎用）。
+                          iconKey: e.key == '固定費・サブスク'
+                              ? null
+                              : _catIcons[e.key],
+                          barColor: e.key == '固定費・サブスク'
+                              ? accent
+                              : expenseCatColor(e.key),
                           // 展開時の内訳はホームと同じシンプルな1行（日付＋名前＋金額）。
                           details: e.key == '固定費・サブスク'
                               ? [
@@ -776,6 +788,12 @@ class _CatBar extends StatefulWidget {
   final double ratio;
   final Color accent;
 
+  /// カテゴリのアイコンキー（絵文字/URL/Material名）。null は汎用アイコン。
+  final String? iconKey;
+
+  /// バーの色（カテゴリ色）。
+  final Color barColor;
+
   /// 展開時に表示する内訳（取引行など）。空ならタップで展開しない。
   final List<Widget> details;
   const _CatBar({
@@ -783,6 +801,8 @@ class _CatBar extends StatefulWidget {
     required this.value,
     required this.ratio,
     required this.accent,
+    required this.iconKey,
+    required this.barColor,
     this.details = const [],
   });
 
@@ -812,6 +832,23 @@ class _CatBarState extends State<_CatBar> {
                       Icon(_open ? Icons.expand_less : Icons.expand_more,
                           size: 18, color: V2Colors.textMuted),
                     if (canExpand) const SizedBox(width: 2),
+                    // カテゴリアイコン（色付き丸背景）。
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: widget.barColor.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                      alignment: Alignment.center,
+                      child: widget.iconKey != null &&
+                              widget.iconKey!.isNotEmpty
+                          ? categoryIconWidget(widget.iconKey,
+                              size: 15, color: widget.barColor)
+                          : Icon(Icons.event_repeat,
+                              size: 14, color: widget.barColor),
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(widget.name,
                           style: V2Typography.body,
@@ -835,7 +872,7 @@ class _CatBarState extends State<_CatBar> {
                     value: widget.ratio.clamp(0.0, 1.0),
                     minHeight: 8,
                     backgroundColor: V2Colors.surfaceMuted,
-                    valueColor: AlwaysStoppedAnimation(widget.accent),
+                    valueColor: AlwaysStoppedAnimation(widget.barColor),
                   ),
                 ),
               ],

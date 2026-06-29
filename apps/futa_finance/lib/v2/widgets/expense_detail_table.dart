@@ -285,7 +285,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
 }
 
 /// 大カテゴリ名から安定した色を作る（ユーザー指定色を最優先）。
-Color _catColor(String major) {
+Color expenseCatColor(String major) {
   final manual = CategoryColors.resolve(major);
   if (manual != null) return manual;
   final m = major.trim();
@@ -437,7 +437,7 @@ class _ExpenseRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = _catColor(t.category.major);
+    final accent = expenseCatColor(t.category.major);
     final major = t.category.major.trim();
     final sub = t.category.sub.trim();
     final catLabel = (major.isEmpty && sub.isEmpty)
@@ -642,7 +642,7 @@ class _NarrowRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = _catColor(t.category.major);
+    final accent = expenseCatColor(t.category.major);
     final major = t.category.major.trim();
     final sub = t.category.sub.trim();
     final catLabel = (major.isEmpty && sub.isEmpty)

@@ -134,9 +134,7 @@ class CreditCardBillingSection extends StatelessWidget {
           iconUrl: c.iconUrl,
           fallbackIcon: Icons.credit_card,
           isCard: true,
-          subtitle: c.paymentDay != null
-              ? '引き落とし日：毎月${c.paymentDay}日'
-              : 'クレジットカード',
+          subtitle: 'クレジットカード',
         ),
         planned: planned,
         actual: actual,
