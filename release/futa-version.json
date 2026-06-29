@@ -1,1 +1,1 @@
-{"version":"1.0.362","buildNumber":"363","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.362/futa-finance-v1.0.362.apk","releaseNotes":"クレジットカード詳細を見やすく調整しました。上部の件数ボックスを削除して「利用合計」と「引落予定日」を横並びに。明細/請求推移タブと期間表示をコンパクトにして、明細リストの表示領域を広げました。"}
+{"version":"1.0.363","buildNumber":"364","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.363/futa-finance-v1.0.363.apk","releaseNotes":"「ウォレット照合」を「ウォレット」に改称し、照合をやめたので各行の「予定（明細合計）」の金額表示を外しました。スマホの支出明細は、狭い画面でも読みやすいように自動で2行のスリム表示に切り替わります（並び替えは上部のバーから）。"}
