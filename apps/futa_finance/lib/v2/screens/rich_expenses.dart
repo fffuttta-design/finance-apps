@@ -242,6 +242,17 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
 
   /// 指定月に計上される固定費（サブスク）の明細（名前・金額・アイコン）。金額降順。
   /// サマリー展開の1行（ラベル＋金額）。
+  /// 内訳セクションの小見出し（種類別／支払方法別）。
+  Widget _breakdownHeader(IconData icon, String label) => Row(
+        children: [
+          Icon(icon, size: 14, color: widget.accent),
+          const SizedBox(width: 6),
+          Text(label,
+              style: V2Typography.micro.copyWith(
+                  color: V2Colors.textSecondary, fontWeight: FontWeight.w700)),
+        ],
+      );
+
   Widget _summaryLine(String label, int amount) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
@@ -568,12 +579,19 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (title != null) ...[
-                Text(title,
-                    style:
-                        V2Typography.h1.copyWith(color: V2Colors.textPrimary)),
-                const SizedBox(height: V2Spacing.md),
-              ],
+              // タブ上部：タイトル（個人モードのみ）＋ 右上に締め処理チップ。
+              Row(
+                children: [
+                  if (title != null)
+                    Text(title,
+                        style: V2Typography.h1
+                            .copyWith(color: V2Colors.textPrimary)),
+                  const Spacer(),
+                  MonthClosingBar(
+                      month: _month, snapshotExpense: total, dense: true),
+                ],
+              ),
+              const SizedBox(height: V2Spacing.md),
               // サマリー（タップで内訳を展開）
               Container(
                 decoration: BoxDecoration(
@@ -646,16 +664,19 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // 変動費 / 固定費
+                            // ── 種類別（変動費 / 固定費）──
+                            _breakdownHeader(Icons.donut_small_outlined, '種類別'),
+                            const SizedBox(height: 6),
                             _summaryLine('変動費（明細）', txTotal),
                             if (subTotal > 0)
                               _summaryLine('固定費（サブスク）', subTotal),
-                            const SizedBox(height: 10),
-                            Text('支払方法別',
-                                style: V2Typography.micro.copyWith(
-                                    color: V2Colors.textMuted,
-                                    fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 14),
+                            const Divider(height: 1, color: V2Colors.divider),
+                            const SizedBox(height: 14),
+                            // ── 支払方法別 ──
+                            _breakdownHeader(
+                                Icons.account_balance_wallet_outlined, '支払方法別'),
+                            const SizedBox(height: 6),
                             for (final e in paymentEntries)
                               _summaryLine(e.key, e.value),
                           ],
@@ -665,9 +686,6 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                   ],
                 ),
               ),
-              const SizedBox(height: V2Spacing.md),
-              // 締め処理（この月はもう編集不要、を示す。可逆）
-              MonthClosingBar(month: _month, snapshotExpense: total),
               const SizedBox(height: V2Spacing.md),
               // クレカ引落照合・棚卸し（支出合計のすぐ下・目立つ位置）
               if (showFixedAndCard) ...[

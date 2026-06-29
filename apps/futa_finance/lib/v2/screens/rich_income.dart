@@ -105,9 +105,17 @@ class _RichIncomeScreenState extends State<RichIncomeScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(isBusiness ? '売上' : '収入',
-                  style:
-                      V2Typography.h1.copyWith(color: V2Colors.textPrimary)),
+              // タブ上部：タイトル＋右上に締め処理チップ。
+              Row(
+                children: [
+                  Text(isBusiness ? '売上' : '収入',
+                      style: V2Typography.h1
+                          .copyWith(color: V2Colors.textPrimary)),
+                  const Spacer(),
+                  MonthClosingBar(
+                      month: _month, snapshotIncome: total, dense: true),
+                ],
+              ),
               const SizedBox(height: V2Spacing.md),
               // サマリーカード
               Container(
@@ -163,9 +171,6 @@ class _RichIncomeScreenState extends State<RichIncomeScreen>
                   ],
                 ),
               ),
-              const SizedBox(height: V2Spacing.md),
-              // 締め処理（支出タブと共通・可逆）
-              MonthClosingBar(month: _month, snapshotIncome: total),
               const SizedBox(height: V2Spacing.md),
               // 明細
               Container(

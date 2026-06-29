@@ -297,11 +297,12 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // 締め済バッジ（締めた月のみ・読み取り専用）
+                // 締め処理チップ（右上・他タブと統一）
                 Align(
-                  alignment: Alignment.centerLeft,
-                  child: MonthClosingBar(month: _month, compact: true),
+                  alignment: Alignment.centerRight,
+                  child: MonthClosingBar(month: _month, dense: true),
                 ),
+                const SizedBox(height: V2Spacing.sm),
                 hero,
                 const SizedBox(height: V2Spacing.md),
                 balanceCard,

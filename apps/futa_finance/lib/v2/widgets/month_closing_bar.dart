@@ -20,12 +20,16 @@ class MonthClosingBar extends StatefulWidget {
   /// コンパクト表示（ホーム用・締め済バッジのみ）。
   final bool compact;
 
+  /// 小さい操作チップ（タブ右上用）。未締め→「締める」、締め済→「締め済・取消」。
+  final bool dense;
+
   const MonthClosingBar({
     super.key,
     required this.month,
     this.snapshotExpense,
     this.snapshotIncome,
     this.compact = false,
+    this.dense = false,
   });
 
   @override
@@ -103,6 +107,65 @@ class _MonthClosingBarState extends State<MonthClosingBar> {
                     fontWeight: FontWeight.w700,
                     color: V2Colors.positive)),
           ],
+        ),
+      );
+    }
+
+    // タブ右上用の小さい操作チップ。
+    if (widget.dense) {
+      if (isClosed) {
+        return InkWell(
+          onTap: _reopen,
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(20),
+              border:
+                  Border.all(color: V2Colors.positive.withValues(alpha: 0.5)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.check_circle,
+                    size: 14, color: V2Colors.positive),
+                const SizedBox(width: 4),
+                Text('${widget.month.month}月 締め済',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: V2Colors.positive)),
+                const SizedBox(width: 6),
+                Text('取消',
+                    style: V2Typography.micro
+                        .copyWith(color: V2Colors.textMuted)),
+              ],
+            ),
+          ),
+        );
+      }
+      return InkWell(
+        onTap: _close,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: V2Colors.positive),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.task_alt, size: 15, color: V2Colors.positive),
+              const SizedBox(width: 5),
+              Text('${widget.month.month}月を締める',
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: V2Colors.positive)),
+            ],
+          ),
         ),
       );
     }
