@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/transaction_repository.dart';
+import '../utils/category_colors.dart';
 import '../utils/formatters.dart';
 import '../widgets/date_weekday_text.dart';
 import 'receipt_group_detail_screen.dart';
@@ -428,6 +429,8 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
 
   /// 大カテゴリ名から安定した色を作る（バッジ・アクセントの色付けに使う）。
   Color _catColor(String major) {
+    final manual = CategoryColors.resolve(major);
+    if (manual != null) return manual;
     final m = major.trim();
     if (m.isEmpty) return const Color(0xFF9CA3AF);
     var h = 0;

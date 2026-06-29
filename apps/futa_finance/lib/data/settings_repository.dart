@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:finance_core/finance_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../utils/category_colors.dart';
 import 'app_mode.dart';
 import 'transfer_template.dart';
 
@@ -60,7 +61,10 @@ class LocalSettingsRepository implements SettingsRepository {
   Future<CategoryConfig> loadCategories() async {
     final prefix = AppModeManager.instance.current.keyPrefix;
     final cached = _categoriesCache[prefix];
-    if (cached != null) return cached;
+    if (cached != null) {
+      CategoryColors.update(cached);
+      return cached;
+    }
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_kCategories);
     final result = raw == null
@@ -73,12 +77,14 @@ class LocalSettingsRepository implements SettingsRepository {
             }
           })();
     _categoriesCache[prefix] = result;
+    CategoryColors.update(result);
     return result;
   }
 
   @override
   Future<void> saveCategories(CategoryConfig config) async {
     _categoriesCache[AppModeManager.instance.current.keyPrefix] = config;
+    CategoryColors.update(config);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kCategories, config.toJsonString());
   }
@@ -178,6 +184,7 @@ class FirestoreSettingsRepository implements SettingsRepository {
     final mk = _modeKey;
     final cached = _categoriesCache[mk];
     if (cached != null) {
+      CategoryColors.update(cached);
       // 裏で最新を取得してキャッシュ更新（cross-device 変更を次回に反映）。
       unawaited(_fetchCategories(mk));
       return cached;
@@ -199,6 +206,7 @@ class FirestoreSettingsRepository implements SettingsRepository {
       }
     }
     _categoriesCache[modeKey] = result;
+    CategoryColors.update(result);
     return result;
   }
 

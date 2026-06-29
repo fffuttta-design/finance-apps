@@ -14,6 +14,7 @@ import '../../screens/card_detail_screen.dart';
 import '../../screens/expense_input_screen.dart';
 import '../../screens/income_input_screen.dart';
 import '../../screens/transfer_input_screen.dart';
+import '../../utils/category_colors.dart';
 import '../../utils/formatters.dart';
 import '../../utils/modal_input.dart';
 import '../../utils/thousands_separator_input_formatter.dart';
@@ -1471,6 +1472,8 @@ class _WideExpenseTableState extends State<_WideExpenseTable> {
   }
 
   static Color _catColor(String key) {
+    final manual = CategoryColors.resolve(key);
+    if (manual != null) return manual;
     if (key.isEmpty) return const Color(0xFF94A3B8);
     int hash = 0;
     for (final c in key.codeUnits) {
@@ -1869,6 +1872,8 @@ class _ReceiptGroupRow extends StatelessWidget {
 
   /// 大カテゴリ名からハッシュで安定した色を生成。
   Color _categoryColor(String key) {
+    final manual = CategoryColors.resolve(key);
+    if (manual != null) return manual;
     if (key.isEmpty) return V2Colors.textSecondary;
     int hash = 0;
     for (final c in key.codeUnits) {
@@ -2077,6 +2082,8 @@ class _ExpenseRowState extends State<_ExpenseRow> {
   /// 大カテゴリ名からハッシュで安定した色を生成（HSL）。
   Color _categoryColor() {
     final key = _bareMajor(widget.t.category.major.trim());
+    final manual = CategoryColors.resolve(key);
+    if (manual != null) return manual;
     if (key.isEmpty) return V2Colors.textSecondary;
     int hash = 0;
     for (final c in key.codeUnits) {

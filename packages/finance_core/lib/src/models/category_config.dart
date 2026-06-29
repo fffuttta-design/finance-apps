@@ -238,6 +238,9 @@ class MajorCategory {
   /// 既存取引や集計には影響しない（編集画面では薄く表示して復帰可能）。
   final bool inactive;
 
+  /// ユーザー指定のカテゴリ色（ARGB int）。null なら名前から自動生成。
+  final int? colorValue;
+
   const MajorCategory({
     required this.name,
     required this.subs,
@@ -245,6 +248,7 @@ class MajorCategory {
     this.subIcons,
     this.section,
     this.inactive = false,
+    this.colorValue,
   });
 
   /// インデックス付きの表示名（例: "0.固定費(定額)"）。
@@ -260,6 +264,7 @@ class MajorCategory {
         'subIcons': subIcons,
         'section': section,
         'inactive': inactive,
+        'colorValue': colorValue,
       };
 
   factory MajorCategory.fromJson(Map<String, dynamic> json) => MajorCategory(
@@ -270,6 +275,7 @@ class MajorCategory {
             ?.map((k, v) => MapEntry(k, v as String)),
         section: json['section'] as String?,
         inactive: json['inactive'] as bool? ?? false,
+        colorValue: (json['colorValue'] as num?)?.toInt(),
       );
 
   MajorCategory copyWith({
@@ -279,6 +285,8 @@ class MajorCategory {
     Map<String, String>? subIcons,
     String? section,
     bool? inactive,
+    int? colorValue,
+    bool clearColor = false,
   }) =>
       MajorCategory(
         name: name ?? this.name,
@@ -287,5 +295,6 @@ class MajorCategory {
         subIcons: subIcons ?? this.subIcons,
         section: section ?? this.section,
         inactive: inactive ?? this.inactive,
+        colorValue: clearColor ? null : (colorValue ?? this.colorValue),
       );
 }

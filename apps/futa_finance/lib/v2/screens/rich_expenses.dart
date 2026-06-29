@@ -13,6 +13,7 @@ import '../../screens/card_detail_screen.dart';
 import '../../screens/expense_input_screen.dart';
 import '../../screens/subscription_list_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
+import '../../utils/category_colors.dart';
 import '../../utils/formatters.dart';
 import '../../utils/modal_input.dart';
 import '../../widgets/brand_logo.dart';
@@ -1124,6 +1125,9 @@ class _CatDetailRow extends StatelessWidget {
 
 /// 大カテゴリ名から安定した色を作る。
 Color _richCatColor(String major) {
+  // ユーザー指定色があれば最優先。
+  final manual = CategoryColors.resolve(major);
+  if (manual != null) return manual;
   final m = major.trim();
   if (m.isEmpty) return const Color(0xFF9CA3AF);
   var h = 0;

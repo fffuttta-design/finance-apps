@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart';
 
 import '../data/settings_repository.dart';
+import '../utils/category_colors.dart';
 import '../utils/emoji_palette.dart';
 import '../utils/subcategory_icon_suggester.dart';
 import '../widgets/centered_body.dart';
@@ -142,6 +143,63 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
   void _toggleInactive(int index) {
     final list = [..._config!.majors];
     list[index] = list[index].copyWith(inactive: !list[index].inactive);
+    _update(list);
+  }
+
+  /// カテゴリ色を10色プリセットから選ぶ（「自動」で指定解除）。
+  Future<void> _pickColor(int index) async {
+    final current = _config!.majors[index].colorValue;
+    final result = await showDialog<int?>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('カテゴリの色'),
+        content: SizedBox(
+          width: 280,
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              for (final v in CategoryColors.palette)
+                GestureDetector(
+                  onTap: () => Navigator.pop(ctx, v),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Color(v),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: current == v
+                            ? const Color(0xFF111827)
+                            : Colors.transparent,
+                        width: 3,
+                      ),
+                    ),
+                    child: current == v
+                        ? const Icon(Icons.check,
+                            color: Colors.white, size: 20)
+                        : null,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, -1), // -1 = 自動（解除）
+            child: const Text('自動（指定なし）'),
+          ),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, null),
+              child: const Text('キャンセル')),
+        ],
+      ),
+    );
+    if (result == null) return; // キャンセル
+    final list = [..._config!.majors];
+    list[index] = result == -1
+        ? list[index].copyWith(clearColor: true)
+        : list[index].copyWith(colorValue: result);
     _update(list);
   }
 
@@ -352,23 +410,29 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
                       color: Color(0xFF9CA3AF)),
                 ),
               ),
-              // アイコン（タップで変更）
-              InkWell(
-                onTap: () => _pickIcon(index),
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE0E7FF),
-                    borderRadius: BorderRadius.circular(8),
+              // アイコン（タップで変更）。色指定があればその色を反映。
+              Builder(builder: (_) {
+                final hasColor = major.colorValue != null;
+                final c = hasColor
+                    ? Color(major.colorValue!)
+                    : const Color(0xFF1A237E);
+                return InkWell(
+                  onTap: () => _pickIcon(index),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: c.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: categoryIconWidget(
+                      major.iconKey,
+                      color: c,
+                      size: 22,
+                    ),
                   ),
-                  child: categoryIconWidget(
-                    major.iconKey,
-                    color: const Color(0xFF1A237E),
-                    size: 22,
-                  ),
-                ),
-              ),
+                );
+              }),
               const SizedBox(width: 12),
               Expanded(
                 child: Opacity(
@@ -413,6 +477,16 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
                     ],
                   ),
                 ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: Icon(Icons.palette_outlined,
+                    size: 18,
+                    color: major.colorValue != null
+                        ? Color(major.colorValue!)
+                        : const Color(0xFF9CA3AF)),
+                onPressed: () => _pickColor(index),
+                tooltip: '色を選ぶ',
               ),
               IconButton(
                 visualDensity: VisualDensity.compact,
