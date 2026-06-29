@@ -206,6 +206,19 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
     }
     final sections = config.sectionsInOrder;
 
+    // セクションが実質「その他」だけ（＝個人モード等でPLセクション未設定）の場合は、
+    // 「その他」の見出しを出さずフラットに並べる（全部その他に見える違和感を解消）。
+    final onlyOther = sections.length == 1 && sections.first == 'その他';
+    if (onlyOther) {
+      return ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _sectionReorderable(
+              'その他', bySection['その他'] ?? const <(int, MajorCategory)>[]),
+        ],
+      );
+    }
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [

@@ -140,6 +140,15 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
       case _ExpSort.amountAsc:
         list.sort((a, b) => a.amount.compareTo(b.amount));
         break;
+      case _ExpSort.category:
+        list.sort((a, b) {
+          final c = a.category.majorOrder.compareTo(b.category.majorOrder);
+          if (c != 0) return c;
+          final s = a.category.sub.compareTo(b.category.sub);
+          if (s != 0) return s;
+          return b.date.compareTo(a.date);
+        });
+        break;
     }
     return list;
   }
@@ -1132,7 +1141,7 @@ IconData _richPaymentIcon(String method) {
 }
 
 /// 明細の並び替えモード。
-enum _ExpSort { dateDesc, dateAsc, amountDesc, amountAsc }
+enum _ExpSort { dateDesc, dateAsc, amountDesc, amountAsc, category }
 
 extension _ExpSortX on _ExpSort {
   /// バッジ用の短いラベル。
@@ -1146,6 +1155,8 @@ extension _ExpSortX on _ExpSort {
         return '高い順';
       case _ExpSort.amountAsc:
         return '安い順';
+      case _ExpSort.category:
+        return 'カテゴリ順';
     }
   }
 }
