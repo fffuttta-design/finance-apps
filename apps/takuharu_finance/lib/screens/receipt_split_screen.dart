@@ -53,6 +53,10 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
   List<Account> _accounts = []; // 登録済みの口座/クレカ
   final _items = <_Item>[];
   late final TextEditingController _storeCtrl; // 店名（読み取り結果を編集できる）
+  // レシート印字の合計（税込・OCR読取、手修正可）。外税レシートでは品目合計が
+  // 税抜きになるため、この値と品目合計の差額＝消費税ぶんを1行で補う。
+  late final TextEditingController _receiptTotalCtrl;
+  bool _addAdjustment = true; // 差額を「消費税・調整」として自動追加するか
   bool _saving = false;
 
   /// レシート記録の既定の支払元。手入力画面と揃える。
@@ -66,6 +70,8 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
     final r = widget.result;
     _date = r.date ?? DateTime.now();
     _storeCtrl = TextEditingController(text: r.store ?? '');
+    _receiptTotalCtrl = TextEditingController(
+        text: (r.amount != null && r.amount! > 0) ? r.amount!.toString() : '');
     _payer = AuthService.instance.currentUser?.uid;
     for (final it in r.items) {
       _items.add(_Item(it.name, it.price, it.category ?? r.category));
@@ -86,6 +92,7 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
   @override
   void dispose() {
     _storeCtrl.dispose();
+    _receiptTotalCtrl.dispose();
     for (final i in _items) {
       i.dispose();
     }
@@ -94,6 +101,19 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
 
   int get _total => _items.fold<int>(
       0, (s, i) => s + (int.tryParse(i.price.text) ?? 0));
+
+  /// レシート印字の合計（税込・手修正可）。未入力・0以下なら null。
+  int? get _receiptTotal {
+    final v = int.tryParse(_receiptTotalCtrl.text.trim());
+    return (v != null && v > 0) ? v : null;
+  }
+
+  /// レシート合計 − 品目合計（＝消費税・送料・値引きなどの差額）。
+  /// レシート合計が未入力なら 0（差額なし扱い）。
+  int get _adjustment {
+    final rt = _receiptTotal;
+    return rt == null ? 0 : rt - _total;
+  }
 
   /// 食費の品目が1つでもあるか（一括トグルの表示判定）。
   bool get _hasFoodItem => _items.any((i) => i.category == '食費');
@@ -217,6 +237,25 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
         const SnackBar(content: Text('記録できる品目がありません')),
       );
       return;
+    }
+    // レシート印字の合計（税込）と品目合計の差額を、消費税・送料・値引きぶんとして
+    // 1行追加し、記録合計をレシートとピッタリ合わせる（外税レシート対策）。
+    final adj = _addAdjustment ? _adjustment : 0;
+    if (adj != 0) {
+      txns.add(core.Transaction(
+        id: '${DateTime.now().microsecondsSinceEpoch}-adj',
+        date: _date,
+        type: core.TransactionType.expense,
+        category: core.Category(major: 'その他', sub: ''),
+        paymentMethod: _payment ?? '',
+        description: adj >= 0 ? '消費税・調整' : '値引き・調整',
+        amount: adj,
+        store: store,
+        receiptId: receiptId,
+        receiptUrl: widget.receiptUrl ??
+            DriveReceiptService.instance.urlFor(receiptId),
+        paidBy: _payer,
+      ));
     }
     setState(() => _saving = true);
     try {
@@ -358,6 +397,8 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                 side: const BorderSide(color: AppColors.pinkSoft),
               ),
             ),
+            const SizedBox(height: 16),
+            _reconCard(),
             const SizedBox(height: 20),
             FilledButton(
               onPressed: _saving ? null : _save,
@@ -405,6 +446,110 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                     color: AppColors.text)),
           ],
         ),
+      ),
+    );
+  }
+
+  /// レシート印字の合計（税込）と品目合計を突き合わせ、差額を確認・調整するカード。
+  /// 外税（税抜）レシートでは品目合計が税抜きになるため、差額＝消費税ぶんを1行で補う。
+  Widget _reconCard() {
+    final rt = _receiptTotal;
+    final adj = _adjustment;
+    return Card(
+      color: AppColors.pinkSoft.withValues(alpha: 0.35),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.receipt_long_rounded,
+                    size: 18, color: AppColors.pinkDark),
+                const SizedBox(width: 8),
+                const Text('レシート合計（税込）',
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                const Spacer(),
+                SizedBox(
+                  width: 110,
+                  child: TextField(
+                    controller: _receiptTotalCtrl,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.right,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      prefixText: '¥',
+                      hintText: '未入力',
+                      border: InputBorder.none,
+                    ),
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+            if (rt != null) ...[
+              const SizedBox(height: 4),
+              _reconRow('品目合計', formatYen(_total)),
+              _reconRow(adj >= 0 ? '差額（消費税・送料など）' : '差額（値引きなど）',
+                  formatYen(adj)),
+              if (adj != 0) ...[
+                const Divider(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        adj >= 0
+                            ? '差額 ${formatYen(adj)} を「消費税・調整」として1行追加'
+                            : '差額 ${formatYen(adj)} を「値引き・調整」として1行追加',
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.text),
+                      ),
+                    ),
+                    Switch(
+                      value: _addAdjustment,
+                      activeThumbColor: AppColors.pink,
+                      onChanged: (v) => setState(() => _addAdjustment = v),
+                    ),
+                  ],
+                ),
+                Text(
+                  _addAdjustment
+                      ? 'レシート合計とピッタリ合います ♡'
+                      : '品目合計のまま記録します（差額は記録されません）',
+                  style:
+                      const TextStyle(fontSize: 11, color: AppColors.textSub),
+                ),
+              ] else
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text('品目合計と一致しています ♡',
+                      style:
+                          TextStyle(fontSize: 11, color: AppColors.textSub)),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _reconRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Text(label,
+              style: const TextStyle(fontSize: 12, color: AppColors.textSub)),
+          const Spacer(),
+          Text(value,
+              style:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+        ],
       ),
     );
   }
