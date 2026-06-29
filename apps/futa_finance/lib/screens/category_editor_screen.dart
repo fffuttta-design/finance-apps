@@ -380,8 +380,11 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
 
   Widget _majorCard(int index, MajorCategory major,
       {required int dragIndex, Key? key}) {
-    // カテゴリ色（手動指定 or 名前から推測した既定色）。アイコン・背景・左帯に反映。
-    final c = CategoryColors.effective(major.name);
+    // カテゴリ色。手動指定があれば即その色（_config の生値を読むので色変更が
+    // その場で反映される）。無ければ名前/並び順から散りばめた既定色。
+    final c = major.colorValue != null
+        ? Color(major.colorValue!)
+        : CategoryColors.autoColor(major.name);
     return Container(
       key: key,
       margin: const EdgeInsets.only(bottom: 8),

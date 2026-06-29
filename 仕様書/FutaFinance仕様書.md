@@ -1,6 +1,6 @@
 # FutaFinance 仕様書
 
-> **最終更新: 2026-06-29 / v1.0.372+373**
+> **最終更新: 2026-06-29 / v1.0.373+374**
 > 変更があるたびにこのファイルを編集してバージョンを更新すること。
 
 ---
@@ -431,6 +431,10 @@ class MonthlySnapshot {
 - **マウス「進む」ボタンの暫定対応（v1.0.367〜）**: Flutter Web/Navigator 1.0 は「戻る」はできるが「進む」で直前の画面を復元できない。go_router 化（大改修）を避けつつ、`NavHistory`（`lib/data/nav_history.dart`）で主要なフルスクリーン遷移だけを `push` 経由で開き、戻ったら "進む候補" として記憶 → 進むボタンで開き直す簡易フォワードスタックを実装。
   - 対応範囲: **設定の各サブ画面（`_openPanelScreen`）/ 支出カテゴリ→小カテゴリ編集 / ウォレットからの口座・カード詳細**。モーダルやPCの2ペイン切替は対象外。
   - 配線: `main.dart` に `navigatorKey` 設置＋`Listener` で `kForwardMouseButton` を拾う。Web/Electron は `window.futaGoForward`（`nav_history_hook_web.dart`、条件付きimport `dart.library.js_interop`）を生やし、`main.js` の `browser-forward` から呼ぶ（無ければ `history.forward()` にフォールバック）。
+
+### カテゴリ色の即時反映バグ修正＋階段状の色割当（v1.0.373〜）
+- **色変更が即反映されないバグを修正**：カテゴリ編集の行が `CategoryColors.effective`（保存後に更新されるキャッシュ）を見ていたため、色を選んでも即時に変わらなかった。行は `major.colorValue`（`_config` の生値）を直接読むようにして即時反映。
+- **`autoColor` を「並び順インデックスで階段状にパレット割当」に変更**：`CategoryColors._order`（config.majors の並び順）を使い、隣同士が必ず別色になるよう `palette[index % 10]` を割り当て（キーワード一致＝食=オレンジ等は優先）。事業の多数カテゴリが似た色に潰れる問題を解消し「このカテゴリ＝この色」を安定化（手動色は従来どおり最優先）。
 
 ### 領収書リンク/画像入力＋金額列リサイズ＋固定費ヘッダー調整（v1.0.372〜）
 - **事業モードの支出入力/編集フォームに「領収書（任意・税理士提出用）」欄を復活**（`ExpenseInputScreen`）。リンク貼付（`receiptUrl`）と「画像を保存」（`ReceiptCameraScreen`で撮影/選択→`DriveReceiptService.uploadReceiptImage`でDrive保存→URL自動セット）の両方が選べる。保存時、領収書リンク/画像があれば `receiptSaved` を自動ON（無ければ既存の手動チェックを維持）。**編集時に receiptSaved が消えないよう保持も修正**。

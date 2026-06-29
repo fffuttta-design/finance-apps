@@ -27,6 +27,9 @@ class CategoryColors {
   // 数字プレフィックス無しの大カテゴリ名 → 色(ARGB int)。
   static final Map<String, int> _byMajor = {};
 
+  // 大カテゴリ名（bare）→ 並び順インデックス。色を階段状に散りばめるのに使う。
+  static final Map<String, int> _order = {};
+
   /// "12.通信費" → "通信費"（先頭の "数字." を除く）。
   static String bareMajor(String major) =>
       major.replaceFirst(RegExp(r'^\d+\.'), '').trim();
@@ -34,8 +37,12 @@ class CategoryColors {
   /// CategoryConfig からキャッシュを作り直す。
   static void update(core.CategoryConfig config) {
     _byMajor.clear();
-    for (final m in config.majors) {
+    _order.clear();
+    for (var i = 0; i < config.majors.length; i++) {
+      final m = config.majors[i];
       if (m.colorValue != null) _byMajor[m.name.trim()] = m.colorValue!;
+      // 並び順（プレフィックス無しの名前）でインデックスを覚える。
+      _order[bareMajor(m.name)] = i;
     }
   }
 
@@ -74,8 +81,9 @@ class CategoryColors {
     (['特別', '冠婚', '税金', '貯蓄', '投資', '寄付'], 0xFFEF4444), // レッド
   ];
 
-  /// 名前から「それっぽい」既定色を決める（手動色が無いカテゴリ用）。
-  /// キーワードに当てはまればその色、当てはまらなければ名前ハッシュで安定色。
+  /// 名前から既定色を決める（手動色が無いカテゴリ用）。
+  /// ① キーワード一致（食=オレンジ等）→ ② カテゴリの並び順で階段状にパレットを割当
+  /// （隣同士が必ず別色になり「このカテゴリ＝この色」が安定）→ ③ 名前ハッシュ。
   static Color autoColor(String major) {
     final n = bareMajor(major);
     if (n.isEmpty) return const Color(0xFF9CA3AF);
@@ -84,7 +92,10 @@ class CategoryColors {
         if (n.contains(kw)) return Color(e.$2);
       }
     }
-    // どのキーワードにも当てはまらない → 名前ハッシュでパレットから安定的に選ぶ。
+    // 並び順インデックスがあれば、それでパレットを順番に割り当てて散りばめる。
+    final idx = _order[n];
+    if (idx != null) return Color(palette[idx % palette.length]);
+    // 並び未取得（カテゴリ未読込）の保険：名前ハッシュで安定色。
     var h = 0;
     for (final c in n.codeUnits) {
       h = (h * 31 + c) & 0x7fffffff;
