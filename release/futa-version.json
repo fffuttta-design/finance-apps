@@ -1,1 +1,1 @@
-{"version":"1.0.355","buildNumber":"356","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.355/futa-finance-v1.0.355.apk","releaseNotes":"支出明細の並び替えに「カテゴリ順」を追加。支出カテゴリ編集で、PLセクションが無い（全部その他になる）場合は見出しを出さずスッキリ表示するようにしました。"}
+{"version":"1.0.356","buildNumber":"357","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.356/futa-finance-v1.0.356.apk","releaseNotes":"月末締めボタンを各タブ（支出/収入/ホーム）の右上の小さなチップに統一しました（目立ちすぎ解消）。支出合計の内訳を「種類別（変動費/固定費）」と「支払方法別」にハッキリ分けて表示。"}
