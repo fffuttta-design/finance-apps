@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/app_mode.dart';
 import '../../data/settings_repository.dart';
@@ -44,6 +45,41 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
 
   /// 支出合計カードの内訳を展開しているか。
   bool _summaryOpen = false;
+
+  /// 明細テーブルの中央3列（カテゴリ/内容/支払方法）の幅配分（合計1.0）。
+  /// ユーザーがヘッダーの境界をドラッグして変更でき、端末に保存される。
+  List<double> _colFrac = const [0.36, 0.37, 0.27];
+  static const _kColFracKey = 'futa.exp_table_col_frac';
+
+  Future<void> _loadColFrac() async {
+    final p = await SharedPreferences.getInstance();
+    final raw = p.getStringList(_kColFracKey);
+    if (raw == null || raw.length != 3) return;
+    final f = raw.map((e) => double.tryParse(e) ?? 0).toList();
+    final sum = f.fold<double>(0, (a, b) => a + b);
+    if (sum <= 0 || f.any((e) => e <= 0)) return;
+    if (!mounted) return;
+    setState(() => _colFrac = f.map((e) => e / sum).toList());
+  }
+
+  Future<void> _saveColFrac() async {
+    final p = await SharedPreferences.getInstance();
+    await p.setStringList(
+        _kColFracKey, _colFrac.map((e) => e.toStringAsFixed(4)).toList());
+  }
+
+  /// ヘッダー境界ドラッグで列[i]と列[i+1]の幅を相互に増減する。
+  void _resizeCol(int handleIndex, double dx, double middleWidth) {
+    const minW = 60.0;
+    final widths = _colFrac.map((f) => f * middleWidth).toList();
+    final i = handleIndex, j = handleIndex + 1;
+    final wi = widths[i] + dx;
+    final wj = widths[j] - dx;
+    if (wi < minW || wj < minW) return;
+    widths[i] = wi;
+    widths[j] = wj;
+    setState(() => _colFrac = widths.map((w) => w / middleWidth).toList());
+  }
 
   /// 明細の並び替え・検索（この画面内で完結。一覧画面は廃止）。
   _ExpSort _expSort = _ExpSort.dateDesc;
@@ -137,6 +173,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   void initState() {
     super.initState();
     _rebuildSubTab();
+    _loadColFrac();
     _load();
     _sub = _txRepo.stream.listen((list) {
       if (!mounted) return;
@@ -859,16 +896,39 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: V2Colors.border),
                         ),
-                        child: Column(
-                          children: [
-                            const _ExpenseTableHeader(),
-                            for (final t in detailRows) ...[
-                              const Divider(
-                                  height: 1, color: V2Colors.divider),
-                              _ExpenseRow(t: t, onTap: () => _edit(t)),
+                        child: LayoutBuilder(builder: (ctx, cons) {
+                          // 内側幅（header/row の左右パディング12ずつを除く）。
+                          final innerW = cons.maxWidth - 24;
+                          final fixed = _kDateW +
+                              _kAmountW +
+                              _kColGap * 2 +
+                              _kHandleW * 2;
+                          final mw = (innerW - fixed) < 120
+                              ? 120.0
+                              : innerW - fixed;
+                          final w = _ColW(
+                            date: _kDateW,
+                            cat: _colFrac[0] * mw,
+                            content: _colFrac[1] * mw,
+                            pay: _colFrac[2] * mw,
+                            amount: _kAmountW,
+                          );
+                          return Column(
+                            children: [
+                              _ExpenseTableHeader(
+                                w: w,
+                                onResize: (i, dx) => _resizeCol(i, dx, mw),
+                                onResizeEnd: _saveColFrac,
+                              ),
+                              for (final t in detailRows) ...[
+                                const Divider(
+                                    height: 1, color: V2Colors.divider),
+                                _ExpenseRow(
+                                    t: t, onTap: () => _edit(t), w: w),
+                              ],
                             ],
-                          ],
-                        ),
+                          );
+                        }),
                       ),
                   ],
                 );
@@ -1090,20 +1150,62 @@ extension _ExpSortX on _ExpSort {
   }
 }
 
-// 明細テーブルの列幅（ヘッダーと行で共通）。
+// 明細テーブルの固定列幅（日付・金額）と区切り。
 const double _kDateW = 48;
 const double _kAmountW = 92;
-const int _kContentFlex = 4;
-const int _kCatFlex = 4;
-const int _kPayFlex = 3;
+const double _kColGap = 8; // 日付|カテゴリ と 支払方法|金額 の間
+const double _kHandleW = 12; // 可変列の境界（ドラッグハンドル）
 
-/// 支出明細テーブルのヘッダー行。
+/// 明細テーブルの列幅セット（ヘッダーと行で共通）。
+class _ColW {
+  final double date;
+  final double cat;
+  final double content;
+  final double pay;
+  final double amount;
+  const _ColW({
+    required this.date,
+    required this.cat,
+    required this.content,
+    required this.pay,
+    required this.amount,
+  });
+}
+
+/// 支出明細テーブルのヘッダー行。中央3列の境界をドラッグして幅変更できる。
 class _ExpenseTableHeader extends StatelessWidget {
-  const _ExpenseTableHeader();
+  final _ColW w;
+  final void Function(int handleIndex, double dx) onResize;
+  final VoidCallback onResizeEnd;
+  const _ExpenseTableHeader({
+    required this.w,
+    required this.onResize,
+    required this.onResizeEnd,
+  });
+
   static Widget _h(String s, {bool right = false}) => Text(s,
       textAlign: right ? TextAlign.right : TextAlign.left,
+      overflow: TextOverflow.ellipsis,
       style: V2Typography.micro
           .copyWith(color: V2Colors.textMuted, fontWeight: FontWeight.w700));
+
+  Widget _handle(int i) => MouseRegion(
+        cursor: SystemMouseCursors.resizeColumn,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragUpdate: (d) => onResize(i, d.delta.dx),
+          onHorizontalDragEnd: (_) => onResizeEnd(),
+          child: SizedBox(
+            width: _kHandleW,
+            height: 20,
+            child: Center(
+              child: Container(
+                  width: 2, height: 12, color: V2Colors.border),
+            ),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1111,26 +1213,27 @@ class _ExpenseTableHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
         children: [
-          SizedBox(width: _kDateW, child: _h('日付')),
-          const SizedBox(width: 8),
-          Expanded(flex: _kCatFlex, child: _h('カテゴリ')),
-          const SizedBox(width: 8),
-          Expanded(flex: _kContentFlex, child: _h('内容')),
-          const SizedBox(width: 8),
-          Expanded(flex: _kPayFlex, child: _h('支払方法')),
-          const SizedBox(width: 8),
-          SizedBox(width: _kAmountW, child: _h('金額', right: true)),
+          SizedBox(width: w.date, child: _h('日付')),
+          const SizedBox(width: _kColGap),
+          SizedBox(width: w.cat, child: _h('カテゴリ')),
+          _handle(0),
+          SizedBox(width: w.content, child: _h('内容')),
+          _handle(1),
+          SizedBox(width: w.pay, child: _h('支払方法')),
+          const SizedBox(width: _kColGap),
+          SizedBox(width: w.amount, child: _h('金額', right: true)),
         ],
       ),
     );
   }
 }
 
-/// 支出明細の1行（表形式・PC幅）。日付/内容/カテゴリ/支払方法/金額を横並び。
+/// 支出明細の1行（表形式・PC幅）。日付/カテゴリ/内容/支払方法/金額を横並び。
 class _ExpenseRow extends StatelessWidget {
   final core.Transaction t;
   final VoidCallback onTap;
-  const _ExpenseRow({required this.t, required this.onTap});
+  final _ColW w;
+  const _ExpenseRow({required this.t, required this.onTap, required this.w});
 
   @override
   Widget build(BuildContext context) {
@@ -1152,15 +1255,15 @@ class _ExpenseRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             SizedBox(
-              width: _kDateW,
+              width: w.date,
               child: Text(formatMonthDay(t.date),
                   style: V2Typography.micro.copyWith(
                       color: V2Colors.textSecondary,
                       fontFeatures: V2Typography.tabularNums)),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: _kCatFlex,
+            const SizedBox(width: _kColGap),
+            SizedBox(
+              width: w.cat,
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Container(
@@ -1198,18 +1301,18 @@ class _ExpenseRow extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: _kContentFlex,
+            const SizedBox(width: _kHandleW),
+            SizedBox(
+              width: w.content,
               child: Text(title,
                   style:
                       V2Typography.body.copyWith(fontWeight: FontWeight.w600),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: _kPayFlex,
+            const SizedBox(width: _kHandleW),
+            SizedBox(
+              width: w.pay,
               child: Row(
                 children: [
                   Icon(_richPaymentIcon(pay),
@@ -1225,9 +1328,9 @@ class _ExpenseRow extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: _kColGap),
             SizedBox(
-              width: _kAmountW,
+              width: w.amount,
               child: Text('-${formatYen(t.amount)}',
                   textAlign: TextAlign.right,
                   style: const TextStyle(
