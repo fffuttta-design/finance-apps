@@ -1,1 +1,1 @@
-{"version":"1.0.369","buildNumber":"370","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.369/futa-finance-v1.0.369.apk","releaseNotes":"支出明細の「カテゴリ」を大カテゴリ（色バッジ）と小カテゴリの2列に分けて見やすくしました。各列の幅はドラッグで調整可、見出しタップで並び替えも大/小それぞれで可能です。あわせて支出タブのセクション（カテゴリ内訳・ウォレット・固定費・明細）の間隔を広げ、区切りを分かりやすくしました。"}
+{"version":"1.0.370","buildNumber":"371","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.370/futa-finance-v1.0.370.apk","releaseNotes":"支出明細の大カテゴリから色の四角（■）を外して名前だけのバッジにしました。あわせて表のように薄い縦の区切り線を入れて、列が見やすくなりました。"}
