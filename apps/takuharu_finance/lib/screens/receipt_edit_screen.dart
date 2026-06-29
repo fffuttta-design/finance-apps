@@ -11,6 +11,11 @@ import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 
+/// 差額調整の品目名（レシート税込合計と品目合計の差を埋める1行）。
+/// この名前の品目は編集画面では通常の品目リストに出さず、差額調整カードで管理する。
+const _kAdjPlus = '消費税・調整'; // 税込合計 > 品目合計（外税レシートの消費税ぶん）
+const _kAdjMinus = '値引き・調整'; // 品目合計 > 税込合計（値引き等でマイナス）
+
 /// すでに登録済みの「まとめレシート」（同じ receiptId の品目が複数）を
 /// 1画面でまとめて直す。レシート登録（ReceiptSplitScreen）と同じ挙動で、
 /// 共通項目（日付・だれ・支払元）も品目ごと（品名・金額・カテゴリ・個人の食費わく）も
@@ -62,6 +67,14 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
   String? _receiptUrl;
   String? _store;
   late final TextEditingController _storeCtrl;
+  // レシート印字の合計（税込）。品目合計とのズレを差額調整で吸収する。
+  late final TextEditingController _receiptTotalCtrl;
+  bool _addAdjustment = true; // 差額を「消費税・調整」として記録するか
+  String? _adjTxId; // 既存の差額調整品目のid（あれば更新、なければ追加）
+  core.Transaction? _adjSource; // 既存の差額調整品目（type等の引き継ぎ用）
+
+  static bool _isAdjustment(core.Transaction m) =>
+      m.description == _kAdjPlus || m.description == _kAdjMinus;
 
   Map<String, String> get _members => HouseholdService.instance.memberNames;
 
@@ -98,7 +111,11 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
         .map((t) => t.store?.trim() ?? '')
         .firstWhere((s) => s.isNotEmpty, orElse: () => '');
     _storeCtrl = TextEditingController(text: _store ?? '');
-    for (final m in widget.members) {
+    // 差額調整の品目は通常の品目リストから分離し、差額調整カードで管理する。
+    final adjMembers = widget.members.where(_isAdjustment).toList();
+    final normalMembers =
+        widget.members.where((m) => !_isAdjustment(m)).toList();
+    for (final m in normalMembers) {
       _items.add(_EItem(
         txId: m.id,
         source: m,
@@ -110,6 +127,15 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
         personalFood: m.personalFor == AuthService.instance.currentUser?.uid,
       ));
     }
+    if (adjMembers.isNotEmpty) {
+      _adjSource = adjMembers.first;
+      _adjTxId = adjMembers.first.id;
+    }
+    // 既に差額調整がある＝そのレシートの税込合計は「全品目（調整含む）の合計」。
+    // 無ければ空欄にしておき、レシートを見て税込合計を手入力できるようにする。
+    final fullTotal = widget.members.fold<int>(0, (s, m) => s + m.amount);
+    _receiptTotalCtrl = TextEditingController(
+        text: _adjTxId != null ? fullTotal.toString() : '');
     final hid = HouseholdService.instance.householdId;
     if (hid != null) {
       AccountRepository.instance.loadAll(hid).then((a) {
@@ -121,6 +147,7 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
   @override
   void dispose() {
     _storeCtrl.dispose();
+    _receiptTotalCtrl.dispose();
     for (final i in _items) {
       i.dispose();
     }
@@ -129,6 +156,18 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
 
   int get _total =>
       _items.fold<int>(0, (s, i) => s + (int.tryParse(i.price.text) ?? 0));
+
+  /// レシート印字の合計（税込・手修正可）。未入力・0以下なら null。
+  int? get _receiptTotal {
+    final v = int.tryParse(_receiptTotalCtrl.text.trim());
+    return (v != null && v > 0) ? v : null;
+  }
+
+  /// レシート合計 − 品目合計（＝消費税・送料・値引きなどの差額）。
+  int get _adjustment {
+    final rt = _receiptTotal;
+    return rt == null ? 0 : rt - _total;
+  }
 
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
@@ -249,9 +288,6 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
       }
     }
 
-    final deletes =
-        widget.members.where((m) => !keepIds.contains(m.id)).toList();
-
     if (updates.isEmpty && adds.isEmpty) {
       // 全部空 → このレシートを丸ごと消す確認。
       final ok = await showDialog<bool>(
@@ -275,6 +311,50 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
       );
       if (ok != true) return;
     }
+
+    // 差額調整：レシート税込合計と品目合計の差を1行で吸収する。
+    // 通常品目が1つでも残っているときだけ扱う（全消し→削除のケースには足さない）。
+    final hasNormal = updates.isNotEmpty || adds.isNotEmpty;
+    final adj = (_addAdjustment && _receiptTotal != null) ? _adjustment : 0;
+    if (hasNormal && adj != 0) {
+      final desc = adj >= 0 ? _kAdjPlus : _kAdjMinus;
+      if (_adjTxId != null && _adjSource != null) {
+        // 既存の調整行を更新（残すので keepIds に入れて削除対象から外す）。
+        keepIds.add(_adjTxId!);
+        updates.add(_adjSource!.copyWith(
+          date: _date,
+          paymentMethod: _payment,
+          paidBy: _payer,
+          store: store,
+          category: core.Category(major: 'その他', sub: ''),
+          description: desc,
+          amount: adj,
+          personalFor: null,
+          clearPersonalFor: true,
+        ));
+      } else {
+        adds.add(core.Transaction(
+          id: '${DateTime.now().microsecondsSinceEpoch}-adj',
+          date: _date,
+          type: core.TransactionType.expense,
+          category: core.Category(major: 'その他', sub: ''),
+          paymentMethod: _payment ?? '',
+          description: desc,
+          amount: adj,
+          store: store,
+          receiptId: _receiptId,
+          receiptUrl: _receiptUrl,
+          paidBy: _payer,
+        ));
+      }
+    }
+    // adj==0（または調整OFF）かつ既存の調整行があれば、keepIds に入れないので
+    // 下の deletes でそのまま消える（差額が解消されたら調整行も自動で消える）。
+
+    // 残さない品目（消した既存品目＋OFFになった調整行）を削除対象に。
+    // ※ keepIds は調整ブロックの後に確定するので、ここで算出する。
+    final deletes =
+        widget.members.where((m) => !keepIds.contains(m.id)).toList();
 
     setState(() => _saving = true);
     try {
@@ -444,6 +524,8 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
                 side: const BorderSide(color: AppColors.pinkSoft),
               ),
             ),
+            const SizedBox(height: 16),
+            _reconCard(),
             const SizedBox(height: 20),
             FilledButton(
               onPressed: _saving ? null : _save,
@@ -490,6 +572,111 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
                     color: AppColors.text)),
           ],
         ),
+      ),
+    );
+  }
+
+  /// レシート印字の合計（税込）と品目合計を突き合わせ、差額を確認・調整するカード。
+  /// 外税（税抜）レシートでは品目合計が税抜きになるため、差額＝消費税ぶんを1行で補う。
+  /// 記録済みレシートを後から合わせ込むときにも使える（税込合計を手入力）。
+  Widget _reconCard() {
+    final rt = _receiptTotal;
+    final adj = _adjustment;
+    return Card(
+      color: AppColors.pinkSoft.withValues(alpha: 0.35),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.receipt_long_rounded,
+                    size: 18, color: AppColors.pinkDark),
+                const SizedBox(width: 8),
+                const Text('レシート合計（税込）',
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                const Spacer(),
+                SizedBox(
+                  width: 110,
+                  child: TextField(
+                    controller: _receiptTotalCtrl,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.right,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      prefixText: '¥',
+                      hintText: '未入力',
+                      border: InputBorder.none,
+                    ),
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+            if (rt != null) ...[
+              const SizedBox(height: 4),
+              _reconRow('品目合計', formatYen(_total)),
+              _reconRow(adj >= 0 ? '差額（消費税・送料など）' : '差額（値引きなど）',
+                  formatYen(adj)),
+              if (adj != 0) ...[
+                const Divider(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        adj >= 0
+                            ? '差額 ${formatYen(adj)} を「消費税・調整」として記録'
+                            : '差額 ${formatYen(adj)} を「値引き・調整」として記録',
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.text),
+                      ),
+                    ),
+                    Switch(
+                      value: _addAdjustment,
+                      activeThumbColor: AppColors.pink,
+                      onChanged: (v) => setState(() => _addAdjustment = v),
+                    ),
+                  ],
+                ),
+                Text(
+                  _addAdjustment
+                      ? 'レシート合計とピッタリ合います ♡'
+                      : '品目合計のまま記録します（差額は記録されません）',
+                  style:
+                      const TextStyle(fontSize: 11, color: AppColors.textSub),
+                ),
+              ] else
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text('品目合計と一致しています ♡',
+                      style:
+                          TextStyle(fontSize: 11, color: AppColors.textSub)),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _reconRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Text(label,
+              style: const TextStyle(fontSize: 12, color: AppColors.textSub)),
+          const Spacer(),
+          Text(value,
+              style:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+        ],
       ),
     );
   }
