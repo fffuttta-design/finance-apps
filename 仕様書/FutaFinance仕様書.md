@@ -1,6 +1,6 @@
 # FutaFinance 仕様書
 
-> **最終更新: 2026-06-29 / v1.0.375+376**
+> **最終更新: 2026-06-29 / v1.0.376+377**
 > 変更があるたびにこのファイルを編集してバージョンを更新すること。
 
 ---
@@ -431,6 +431,11 @@ class MonthlySnapshot {
 - **マウス「進む」ボタンの暫定対応（v1.0.367〜）**: Flutter Web/Navigator 1.0 は「戻る」はできるが「進む」で直前の画面を復元できない。go_router 化（大改修）を避けつつ、`NavHistory`（`lib/data/nav_history.dart`）で主要なフルスクリーン遷移だけを `push` 経由で開き、戻ったら "進む候補" として記憶 → 進むボタンで開き直す簡易フォワードスタックを実装。
   - 対応範囲: **設定の各サブ画面（`_openPanelScreen`）/ 支出カテゴリ→小カテゴリ編集 / ウォレットからの口座・カード詳細**。モーダルやPCの2ペイン切替は対象外。
   - 配線: `main.dart` に `navigatorKey` 設置＋`Listener` で `kForwardMouseButton` を拾う。Web/Electron は `window.futaGoForward`（`nav_history_hook_web.dart`、条件付きimport `dart.library.js_interop`）を生やし、`main.js` の `browser-forward` から呼ぶ（無ければ `history.forward()` にフォールバック）。
+
+### Drive領収書の一覧→紐付け（B方式・v1.0.376〜）
+- 事業モードの支出入力フォームに **「Driveから選ぶ」** ボタンを追加。`showDriveReceiptPicker`（`lib/widgets/drive_receipt_picker.dart`）で、その取引の月フォルダ（事業用/YYYY年/MM月）にある領収書を一覧表示（サムネ＋ファイル名＋保存日、プレビュー可）→ タップで `receiptUrl` に紐付け。
+- `DriveReceiptService.listMonthReceipts({date, isBusiness})` ＋ `_findMonthFolderOnly`（作らず探すだけ）＋ `DriveReceiptFile` を追加。
+- **制約（drive.file 権限）**: 一覧に出るのは**このアプリが保存した領収書のみ**（手でDriveに入れたファイルはAPI仕様で取得不可）。全件連携が必要なら `drive.readonly` への拡張が別途必要（同意画面が変わる）。領収書運用は**事業モードのみ**。
 
 ### パレット24色化（v1.0.375〜）
 - **`CategoryColors.palette` を16→24色に拡張**（暖色/寒色交互・かぶりさらに低減）。色ピッカーも24色。

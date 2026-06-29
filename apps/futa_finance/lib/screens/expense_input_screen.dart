@@ -13,6 +13,7 @@ import '../utils/date_pick.dart';
 import '../utils/duplicate_check.dart';
 import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
+import '../widgets/drive_receipt_picker.dart';
 import 'receipt_camera_screen.dart';
 import 'receipt_image_screen.dart';
 
@@ -990,32 +991,44 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               // リンクを貼る／レシート画像を直接保存、どちらでも選べる。
               if (AppModeManager.instance.current == AppMode.business) ...[
                 _label('領収書（任意・税理士提出用）'),
+                TextFormField(
+                  controller: _receiptUrlCtrl,
+                  keyboardType: TextInputType.url,
+                  decoration:
+                      _inputDecoration(hint: 'リンクを貼り付け（Drive 等）'),
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
-                      child: TextFormField(
-                        controller: _receiptUrlCtrl,
-                        keyboardType: TextInputType.url,
-                        decoration: _inputDecoration(
-                            hint: 'リンクを貼り付け（Drive 等）'),
-                        onChanged: (_) => setState(() {}),
+                      child: OutlinedButton.icon(
+                        onPressed: (_saving || _savingReceipt)
+                            ? null
+                            : _saveReceiptImage,
+                        icon: _savingReceipt
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.photo_camera_outlined, size: 18),
+                        label: const Text('画像を保存'),
+                        style: OutlinedButton.styleFrom(
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 12)),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    OutlinedButton.icon(
-                      onPressed:
-                          (_saving || _savingReceipt) ? null : _saveReceiptImage,
-                      icon: _savingReceipt
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child:
-                                  CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.photo_camera_outlined, size: 18),
-                      label: const Text('画像を保存'),
-                      style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 14)),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _saving ? null : _pickFromDrive,
+                        icon: const Icon(Icons.folder_open_outlined, size: 18),
+                        label: const Text('Driveから選ぶ'),
+                        style: OutlinedButton.styleFrom(
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 12)),
+                      ),
                     ),
                   ],
                 ),
@@ -1382,6 +1395,18 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         ],
       ),
     );
+  }
+
+  /// Drive に保存済みの領収書（この取引の月フォルダ）から選んで紐付ける。
+  Future<void> _pickFromDrive() async {
+    final isBusiness =
+        AppModeManager.instance.current == AppMode.business;
+    final url = await showDriveReceiptPicker(context,
+        date: _date, isBusiness: isBusiness);
+    if (url == null || !mounted) return;
+    setState(() => _receiptUrlCtrl.text = url);
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('領収書を紐付けました')));
   }
 
   /// レシート画像を直接保存（カメラ/ギャラリー → Drive アップロード → URL をセット）。

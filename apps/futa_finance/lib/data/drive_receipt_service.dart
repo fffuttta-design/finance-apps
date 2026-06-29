@@ -111,6 +111,83 @@ class DriveReceiptService {
     }
   }
 
+  /// 指定モード×月のフォルダにある領収書ファイル一覧を返す（新しい順）。
+  /// ※ drive.file 権限のため、このアプリが保存したファイルのみ見える。
+  /// フォルダ未作成なら空リスト。失敗時も空（lastError に理由）。
+  Future<List<DriveReceiptFile>> listMonthReceipts({
+    required DateTime date,
+    required bool isBusiness,
+  }) async {
+    lastError = null;
+    try {
+      final token = await _accessToken();
+      if (token == null) {
+        lastError = 'アクセストークンを取得できませんでした';
+        return const [];
+      }
+      final monthId = await _findMonthFolderOnly(token, isBusiness, date);
+      if (monthId == null) return const []; // まだ保存実績なし
+      final q =
+          "'$monthId' in parents and trashed=false and mimeType!='application/vnd.google-apps.folder'";
+      final uri = Uri.parse(
+          'https://www.googleapis.com/drive/v3/files?q=${Uri.encodeQueryComponent(q)}'
+          '&fields=files(id,name,webViewLink,createdTime)&orderBy=createdTime desc'
+          '&spaces=drive&pageSize=200');
+      var res =
+          await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+      if (res.statusCode == 401) {
+        final fresh = await _accessToken(forceRefresh: true);
+        if (fresh != null) {
+          res = await http
+              .get(uri, headers: {'Authorization': 'Bearer $fresh'});
+        }
+      }
+      if (res.statusCode != 200) {
+        lastError = '一覧取得失敗 (${res.statusCode})';
+        return const [];
+      }
+      final files = (jsonDecode(res.body)['files'] as List?) ?? const [];
+      return files.map((f) {
+        final m = f as Map<String, dynamic>;
+        final id = m['id'] as String;
+        return DriveReceiptFile(
+          id: id,
+          name: (m['name'] as String?) ?? '(無名)',
+          webViewLink: (m['webViewLink'] as String?) ??
+              'https://drive.google.com/file/d/$id/view',
+          createdTime: m['createdTime'] != null
+              ? DateTime.tryParse(m['createdTime'] as String)
+              : null,
+        );
+      }).toList();
+    } catch (e) {
+      lastError = e.toString();
+      return const [];
+    }
+  }
+
+  /// 月フォルダを「探すだけ」（無ければ作らずに null）。一覧表示用。
+  Future<String?> _findMonthFolderOnly(
+      String token, bool isBusiness, DateTime d) async {
+    final mk =
+        '${isBusiness ? 'b' : 'p'}-${d.year}-${d.month.toString().padLeft(2, '0')}';
+    final cached = _monthPathCache[mk];
+    if (cached != null) return cached;
+    final prefs = await SharedPreferences.getInstance();
+    var rootId = prefs.getString(_rootIdKey);
+    rootId ??= await _findFolder(token, _rootName, 'root');
+    if (rootId == null) return null;
+    final modeId =
+        await _findFolder(token, isBusiness ? '事業用' : '個人用', rootId);
+    if (modeId == null) return null;
+    final yearId = await _findFolder(token, '${d.year}年', modeId);
+    if (yearId == null) return null;
+    final monthId = await _findFolder(
+        token, '${d.month.toString().padLeft(2, '0')}月', yearId);
+    if (monthId != null) _monthPathCache[mk] = monthId;
+    return monthId;
+  }
+
   String _fileName(DateTime d, String? store, int? amount) {
     String two(int n) => n.toString().padLeft(2, '0');
     final ymd = '${d.year}-${two(d.month)}-${two(d.day)}';
@@ -285,4 +362,18 @@ class DriveReceiptService {
     return (j['webViewLink'] as String?) ??
         'https://drive.google.com/file/d/${j['id']}/view';
   }
+}
+
+/// Drive 上の領収書ファイル1件（一覧表示・紐付け用）。
+class DriveReceiptFile {
+  final String id;
+  final String name;
+  final String webViewLink;
+  final DateTime? createdTime;
+  const DriveReceiptFile({
+    required this.id,
+    required this.name,
+    required this.webViewLink,
+    this.createdTime,
+  });
 }
