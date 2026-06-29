@@ -1,6 +1,6 @@
 # FutaFinance 仕様書
 
-> **最終更新: 2026-06-29 / v1.0.370+371**
+> **最終更新: 2026-06-29 / v1.0.371+372**
 > 変更があるたびにこのファイルを編集してバージョンを更新すること。
 
 ---
@@ -431,6 +431,11 @@ class MonthlySnapshot {
 - **マウス「進む」ボタンの暫定対応（v1.0.367〜）**: Flutter Web/Navigator 1.0 は「戻る」はできるが「進む」で直前の画面を復元できない。go_router 化（大改修）を避けつつ、`NavHistory`（`lib/data/nav_history.dart`）で主要なフルスクリーン遷移だけを `push` 経由で開き、戻ったら "進む候補" として記憶 → 進むボタンで開き直す簡易フォワードスタックを実装。
   - 対応範囲: **設定の各サブ画面（`_openPanelScreen`）/ 支出カテゴリ→小カテゴリ編集 / ウォレットからの口座・カード詳細**。モーダルやPCの2ペイン切替は対象外。
   - 配線: `main.dart` に `navigatorKey` 設置＋`Listener` で `kForwardMouseButton` を拾う。Web/Electron は `window.futaGoForward`（`nav_history_hook_web.dart`、条件付きimport `dart.library.js_interop`）を生やし、`main.js` の `browser-forward` から呼ぶ（無ければ `history.forward()` にフォールバック）。
+
+### 領収書保存チェック列＋テーブルヘッダー色付け（v1.0.371〜）
+- **`Transaction.receiptSaved`（bool・既定false）を追加**（toJson/fromJson/copyWith・Firestore永続化対応）。領収書URL保存済み or 現物レシート保管済みを手動チェックする税理士提出用フラグ。
+- **支出明細テーブルに「領収書」チェック列を追加**（`ExpenseDetailTable.showReceiptCheck` / `onToggleReceipt`）。**事業モードのみ表示**（`rich_expenses` が `_isBusiness` で渡す）。チェック切替で `TransactionRepository.update` 保存＋再読込。緑チェックボックス。PC/スマホ両対応。
+- **テーブルヘッダーをアクセント色の淡いトーンで色付け**（`Color.alphaBlend(accent 12%, white)`）。
 
 ### 支出明細テーブルの罫線＋大カテゴリのアイコン撤去（v1.0.370〜）
 - **大カテゴリのバッジから色ドット（■）を撤去**（名前のみのバッジに）。

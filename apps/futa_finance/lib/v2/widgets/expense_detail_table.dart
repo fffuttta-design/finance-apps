@@ -28,6 +28,12 @@ class ExpenseDetailTable extends StatefulWidget {
   /// 0件時の補助文（検索ヒット0件は別メッセージ）。
   final String emptyHint;
 
+  /// 領収書/レシート保存済みチェック列を出すか（事業モード・税理士提出用）。
+  final bool showReceiptCheck;
+
+  /// 領収書チェックの切替（保存はここで行う）。showReceiptCheck=true 時は必須。
+  final Future<void> Function(core.Transaction t, bool value)? onToggleReceipt;
+
   const ExpenseDetailTable({
     super.key,
     required this.rows,
@@ -35,6 +41,8 @@ class ExpenseDetailTable extends StatefulWidget {
     required this.accent,
     this.title = '明細',
     this.emptyHint = '記録はまだありません',
+    this.showReceiptCheck = false,
+    this.onToggleReceipt,
   });
 
   @override
@@ -252,14 +260,23 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                     for (final t in detailRows) ...[
                       const Divider(height: 1, color: V2Colors.divider),
                       _NarrowRow(
-                          t: t, onTap: () => widget.onEditTxn(t)),
+                        t: t,
+                        onTap: () => widget.onEditTxn(t),
+                        showReceipt: widget.showReceiptCheck,
+                        onToggleReceipt: widget.onToggleReceipt,
+                      ),
                     ],
                   ],
                 );
               }
               final innerW = cons.maxWidth - 24;
-              final fixed =
-                  _kDateW + _kAmountW + _kColGap * 2 + _kHandleW * 3;
+              final receiptExtra =
+                  widget.showReceiptCheck ? (_kReceiptW + _kColGap) : 0.0;
+              final fixed = _kDateW +
+                  _kAmountW +
+                  _kColGap * 2 +
+                  _kHandleW * 3 +
+                  receiptExtra;
               final mw = (innerW - fixed) < 160 ? 160.0 : innerW - fixed;
               final w = _ColW(
                 date: _kDateW,
@@ -279,10 +296,17 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                     asc: _asc,
                     onSort: _onSort,
                     accent: widget.accent,
+                    showReceipt: widget.showReceiptCheck,
                   ),
                   for (final t in detailRows) ...[
                     const Divider(height: 1, color: V2Colors.divider),
-                    _ExpenseRow(t: t, onTap: () => widget.onEditTxn(t), w: w),
+                    _ExpenseRow(
+                      t: t,
+                      onTap: () => widget.onEditTxn(t),
+                      w: w,
+                      showReceipt: widget.showReceiptCheck,
+                      onToggleReceipt: widget.onToggleReceipt,
+                    ),
                   ],
                 ],
               );
@@ -330,6 +354,7 @@ const double _kDateW = 64; // 「06/29(月)」が収まる幅。
 const double _kAmountW = 92;
 const double _kColGap = 8;
 const double _kHandleW = 12;
+const double _kReceiptW = 56; // 領収書チェック列の幅（事業モード）。
 const double _kRowH = 40; // データ行の固定高さ（縦罫線をこの高さで引く）。
 const double _kHeadH = 34; // ヘッダー行の固定高さ。
 const Color _kGridLine = Color(0xFFEDF0F3); // 薄い縦罫線（表のセル区切り）。
@@ -367,6 +392,7 @@ class _ExpenseTableHeader extends StatelessWidget {
   final bool asc;
   final void Function(_SortCol col) onSort;
   final Color accent;
+  final bool showReceipt;
   const _ExpenseTableHeader({
     required this.w,
     required this.onResize,
@@ -375,6 +401,7 @@ class _ExpenseTableHeader extends StatelessWidget {
     required this.asc,
     required this.onSort,
     required this.accent,
+    this.showReceipt = false,
   });
 
   /// 並び替え可能な見出しセル（タップで切替・現在列は矢印＋アクセント色）。
@@ -426,7 +453,8 @@ class _ExpenseTableHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: _kHeadH,
-      color: V2Colors.surfaceMuted,
+      // ヘッダーはアクセント色の淡いトーンで色付け（表らしく見やすく）。
+      color: Color.alphaBlend(accent.withValues(alpha: 0.12), Colors.white),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: [
@@ -442,6 +470,17 @@ class _ExpenseTableHeader extends StatelessWidget {
           _vGrid(_kColGap, _kHeadH),
           SizedBox(
               width: w.amount, child: _h('金額', _SortCol.amount, right: true)),
+          if (showReceipt) ...[
+            _vGrid(_kColGap, _kHeadH),
+            SizedBox(
+              width: _kReceiptW,
+              child: Text('領収書',
+                  textAlign: TextAlign.center,
+                  style: V2Typography.micro.copyWith(
+                      color: V2Colors.textMuted,
+                      fontWeight: FontWeight.w700)),
+            ),
+          ],
         ],
       ),
     );
@@ -452,7 +491,15 @@ class _ExpenseRow extends StatelessWidget {
   final core.Transaction t;
   final VoidCallback onTap;
   final _ColW w;
-  const _ExpenseRow({required this.t, required this.onTap, required this.w});
+  final bool showReceipt;
+  final Future<void> Function(core.Transaction t, bool value)? onToggleReceipt;
+  const _ExpenseRow({
+    required this.t,
+    required this.onTap,
+    required this.w,
+    this.showReceipt = false,
+    this.onToggleReceipt,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -556,6 +603,28 @@ class _ExpenseRow extends StatelessWidget {
                       color: V2Colors.negative,
                       fontFeatures: V2Typography.tabularNums)),
             ),
+            if (showReceipt) ...[
+              _vGrid(_kColGap, _kRowH),
+              SizedBox(
+                width: _kReceiptW,
+                child: Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Checkbox(
+                      value: t.receiptSaved,
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize:
+                          MaterialTapTargetSize.shrinkWrap,
+                      activeColor: const Color(0xFF16A34A),
+                      onChanged: onToggleReceipt == null
+                          ? null
+                          : (v) => onToggleReceipt!(t, v ?? false),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
         ),
@@ -662,7 +731,14 @@ class _NarrowSortBar extends StatelessWidget {
 class _NarrowRow extends StatelessWidget {
   final core.Transaction t;
   final VoidCallback onTap;
-  const _NarrowRow({required this.t, required this.onTap});
+  final bool showReceipt;
+  final Future<void> Function(core.Transaction t, bool value)? onToggleReceipt;
+  const _NarrowRow({
+    required this.t,
+    required this.onTap,
+    this.showReceipt = false,
+    this.onToggleReceipt,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -702,6 +778,22 @@ class _NarrowRow extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                         color: V2Colors.negative,
                         fontFeatures: V2Typography.tabularNums)),
+                if (showReceipt) ...[
+                  const SizedBox(width: 4),
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Checkbox(
+                      value: t.receiptSaved,
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      activeColor: const Color(0xFF16A34A),
+                      onChanged: onToggleReceipt == null
+                          ? null
+                          : (v) => onToggleReceipt!(t, v ?? false),
+                    ),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 5),

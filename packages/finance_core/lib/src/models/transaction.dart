@@ -97,6 +97,11 @@ class Transaction {
   /// 既存データは null。編集保存では上書きしない（toJson に含めるが copyWith では引き継ぐ）。
   final DateTime? createdAt;
 
+  /// 領収書/レシートを保存済みか（事業モードの手動チェック・税理士提出用）。
+  /// 領収書URLを保存した・現物レシートを保管した等を、ユーザーが手動でチェックする。
+  /// デフォルト false。既存データは false で読まれる。
+  final bool receiptSaved;
+
   const Transaction({
     required this.id,
     required this.date,
@@ -120,6 +125,7 @@ class Transaction {
     this.personalFor,
     this.commentCount = 0,
     this.createdAt,
+    this.receiptSaved = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -144,6 +150,7 @@ class Transaction {
         'recordedBy': recordedBy,
         'paidBy': paidBy,
         'personalFor': personalFor,
+        'receiptSaved': receiptSaved,
         if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
       };
 
@@ -178,6 +185,7 @@ class Transaction {
         createdAt: j['createdAt'] != null
             ? DateTime.tryParse(j['createdAt'] as String)
             : null,
+        receiptSaved: j['receiptSaved'] as bool? ?? false,
       );
 
   Transaction copyWith({
@@ -205,6 +213,7 @@ class Transaction {
     bool clearPersonalFor = false,
     DateTime? createdAt,
     bool forceCreatedAt = false,
+    bool? receiptSaved,
   }) =>
       Transaction(
         id: id,
@@ -229,5 +238,6 @@ class Transaction {
         personalFor: clearPersonalFor ? null : (personalFor ?? this.personalFor),
         commentCount: commentCount,
         createdAt: forceCreatedAt ? createdAt : (createdAt ?? this.createdAt),
+        receiptSaved: receiptSaved ?? this.receiptSaved,
       );
 }

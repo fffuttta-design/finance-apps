@@ -721,6 +721,12 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 onEditTxn: _edit,
                 accent: accent,
                 emptyHint: '${_month.month}月の記録はまだありません',
+                // 事業モードのみ、領収書/レシート保存済みチェック列（税理士提出用）。
+                showReceiptCheck: _isBusiness,
+                onToggleReceipt: (t, v) async {
+                  await _txRepo.update(t.copyWith(receiptSaved: v));
+                  if (mounted) await _load();
+                },
               ),
             ],
           ),
