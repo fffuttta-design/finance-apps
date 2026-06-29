@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.86",
-    "buildNumber":  "91",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.86/takuharu-finance-v0.2.86.apk",
-    "releaseNotes":  "レシート読み取りで、品目合計とレシートの税込合計がズレたとき（イオンネットスーパー等の外税レシート）、差額を「消費税・調整」として1行で自動追加し、合計がレシートとピッタリ合うようにしました。"
+    "version":  "0.2.87",
+    "buildNumber":  "92",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.87/takuharu-finance-v0.2.87.apk",
+    "releaseNotes":  "「レシートを編集」画面でも、レシートの税込合計を入れると品目合計とのズレを「消費税・調整」として自動で合わせられるようにしました。記録済みのレシート（イオンネットスーパー等の外税ぶん）も後から合計を合わせ込めます。"
 }
