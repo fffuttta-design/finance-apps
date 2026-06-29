@@ -164,8 +164,8 @@ class _CardDetailScreenState extends State<CardDetailScreen>
           final content = Column(
             children: [
               // 共通: サマリー（利用合計/件数/引落予定日）
-              _summaryCard(monthTotal, monthTxns.length),
-              // タブバー
+              _summaryCard(monthTotal),
+              // タブバー（コンパクト：アイコン＋テキストを横並びで低く）
               Container(
                 color: Colors.white,
                 child: TabBar(
@@ -173,16 +173,31 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                   labelColor: const Color(0xFFDC2626),
                   unselectedLabelColor: const Color(0xFF6B7280),
                   indicatorColor: const Color(0xFFDC2626),
+                  labelStyle: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w700),
+                  unselectedLabelStyle: const TextStyle(fontSize: 13),
                   tabs: const [
                     Tab(
-                      icon: Icon(Icons.receipt_long_outlined, size: 18),
-                      text: '明細',
-                      height: 48,
+                      height: 38,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.receipt_long_outlined, size: 16),
+                          SizedBox(width: 6),
+                          Text('明細'),
+                        ],
+                      ),
                     ),
                     Tab(
-                      icon: Icon(Icons.show_chart, size: 18),
-                      text: '請求推移',
-                      height: 48,
+                      height: 38,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.show_chart, size: 16),
+                          SizedBox(width: 6),
+                          Text('請求推移'),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -242,14 +257,17 @@ class _CardDetailScreenState extends State<CardDetailScreen>
     final months = _availableMonths();
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 2),
       child: Row(
         children: [
           const Text('期間: ',
               style: TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
           DropdownButton<DateTime?>(
             value: _selectedMonth,
+            isDense: true,
             underline: const SizedBox.shrink(),
+            style: const TextStyle(
+                fontSize: 13, color: Color(0xFF111827)),
             items: months.map((m) {
               final label = m == null ? '全期間' : '${m.year}年${m.month}月';
               return DropdownMenuItem<DateTime?>(
@@ -262,124 +280,97 @@ class _CardDetailScreenState extends State<CardDetailScreen>
     );
   }
 
-  Widget _summaryCard(int monthTotal, int txnCount) {
+  Widget _summaryCard(int monthTotal) {
     final paymentDay = _card.paymentDay;
+    // 件数は下の明細セクションに出るので、ここは「利用合計」と「引落予定日」を
+    // 高さを揃えて横並びにする（IntrinsicHeight）。
     return Container(
       color: const Color(0xFFFAFAFA),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Row(
-        children: [
-          // 利用合計（主役）
-          Expanded(
-            flex: 2,
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                    color: const Color(0xFFDC2626).withValues(alpha: 0.4),
-                    width: 1.5),
-              ),
-              child: Column(
-                children: [
-                  const Text('利用合計',
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFFDC2626),
-                          fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 4),
-                  Text(
-                    formatYen(monthTotal),
-                    style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFFDC2626),
-                        fontFamily: 'monospace'),
-                  ),
-                ],
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 利用合計（主役）
+            Expanded(
+              flex: 2,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: const Color(0xFFDC2626).withValues(alpha: 0.4),
+                      width: 1.5),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('利用合計',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFFDC2626),
+                            fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 3),
+                    Text(formatYen(monthTotal),
+                        style: const TextStyle(
+                            fontSize: 21,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFFDC2626),
+                            fontFamily: 'monospace')),
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 10),
-          // 件数 + 引落予定日
-          Expanded(
-            flex: 1,
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
-                  ),
-                  child: Column(
-                    children: [
-                      const Text('件数',
-                          style: TextStyle(
-                              fontSize: 10,
-                              color: Color(0xFF9CA3AF))),
-                      const SizedBox(height: 2),
-                      Text('$txnCount 件',
-                          style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 6),
-                // 引落予定日: タップで編集ダイアログ
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(6),
-                    onTap: _editPaymentDay,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(6),
-                        border:
-                            Border.all(color: const Color(0xFFE5E7EB)),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Text('引落予定日',
-                                  style: TextStyle(
-                                      fontSize: 10,
-                                      color: Color(0xFF9CA3AF))),
-                              const SizedBox(width: 2),
-                              const Icon(Icons.edit,
-                                  size: 10, color: Color(0xFF9CA3AF)),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                              paymentDay == null
-                                  ? '未設定（タップで設定）'
-                                  : '毎月 $paymentDay 日',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: paymentDay == null
-                                      ? const Color(0xFF9CA3AF)
-                                      : const Color(0xFF1A237E))),
-                        ],
-                      ),
+            const SizedBox(width: 10),
+            // 引落予定日（タップで編集）
+            Expanded(
+              flex: 1,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: _editPaymentDay,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text('引落予定日',
+                                style: TextStyle(
+                                    fontSize: 10, color: Color(0xFF9CA3AF))),
+                            const SizedBox(width: 2),
+                            const Icon(Icons.edit,
+                                size: 10, color: Color(0xFF9CA3AF)),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                            paymentDay == null ? '未設定' : '毎月 $paymentDay 日',
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: paymentDay == null
+                                    ? const Color(0xFF9CA3AF)
+                                    : const Color(0xFF1A237E))),
+                      ],
                     ),
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
