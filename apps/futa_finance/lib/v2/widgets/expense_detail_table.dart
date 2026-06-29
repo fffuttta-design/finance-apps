@@ -46,9 +46,24 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
   List<double> _colFrac = const [0.36, 0.37, 0.27];
   static const _kColFracKey = 'futa.exp_table_col_frac';
 
-  _ExpSort _expSort = _ExpSort.dateDesc;
+  // 並び替えは表ヘッダーのクリックで列＋昇順/降順を切替。
+  _SortCol _sortCol = _SortCol.date;
+  bool _asc = false; // 日付は既定で降順（新しい順）。
   final _searchCtrl = TextEditingController();
   String _query = '';
+
+  /// ヘッダークリック：同じ列なら昇順/降順をトグル、別列なら列を切替（既定向き）。
+  void _onSort(_SortCol col) {
+    setState(() {
+      if (_sortCol == col) {
+        _asc = !_asc;
+      } else {
+        _sortCol = col;
+        // 日付・金額は降順、文字列系は昇順を既定に。
+        _asc = !(col == _SortCol.date || col == _SortCol.amount);
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -106,51 +121,32 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
             ].join(' ').toLowerCase();
             return hay.contains(q);
           }).toList();
-    switch (_expSort) {
-      case _ExpSort.dateDesc:
-        list.sort((a, b) => b.date.compareTo(a.date));
-        break;
-      case _ExpSort.dateAsc:
+    int cmp;
+    switch (_sortCol) {
+      case _SortCol.date:
         list.sort((a, b) => a.date.compareTo(b.date));
         break;
-      case _ExpSort.amountDesc:
-        list.sort((a, b) => b.amount.compareTo(a.amount));
-        break;
-      case _ExpSort.amountAsc:
+      case _SortCol.amount:
         list.sort((a, b) => a.amount.compareTo(b.amount));
         break;
-      case _ExpSort.category:
+      case _SortCol.category:
         list.sort((a, b) {
-          final c = a.category.majorOrder.compareTo(b.category.majorOrder);
-          if (c != 0) return c;
-          final s = a.category.sub.compareTo(b.category.sub);
-          if (s != 0) return s;
-          return b.date.compareTo(a.date);
+          cmp = a.category.majorOrder.compareTo(b.category.majorOrder);
+          if (cmp != 0) return cmp;
+          return a.category.sub.compareTo(b.category.sub);
         });
         break;
+      case _SortCol.content:
+        list.sort((a, b) => a.description.compareTo(b.description));
+        break;
+      case _SortCol.payment:
+        list.sort((a, b) => a.paymentMethod.compareTo(b.paymentMethod));
+        break;
+    }
+    if (!_asc) {
+      list = list.reversed.toList();
     }
     return list;
-  }
-
-  Widget _sortBadge(_ExpSort s) {
-    final sel = _expSort == s;
-    return InkWell(
-      onTap: () => setState(() => _expSort = s),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: sel ? widget.accent : V2Colors.surfaceMuted,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: sel ? widget.accent : V2Colors.border),
-        ),
-        child: Text(s.badgeLabel,
-            style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: sel ? Colors.white : V2Colors.textSecondary)),
-      ),
-    );
   }
 
   @override
@@ -168,12 +164,9 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                 style: V2Typography.caption
                     .copyWith(color: V2Colors.textSecondary)),
             const Spacer(),
-            const Icon(Icons.sort, size: 16, color: V2Colors.textSecondary),
-            const SizedBox(width: 6),
-            Wrap(
-              spacing: 6,
-              children: [for (final s in _ExpSort.values) _sortBadge(s)],
-            ),
+            Text('ヘッダーをタップで並び替え',
+                style:
+                    V2Typography.micro.copyWith(color: V2Colors.textMuted)),
           ],
         ),
         const SizedBox(height: V2Spacing.sm),
@@ -254,6 +247,10 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                     w: w,
                     onResize: (i, dx) => _resizeCol(i, dx, mw),
                     onResizeEnd: _saveColFrac,
+                    sortCol: _sortCol,
+                    asc: _asc,
+                    onSort: _onSort,
+                    accent: widget.accent,
                   ),
                   for (final t in detailRows) ...[
                     const Divider(height: 1, color: V2Colors.divider),
@@ -305,26 +302,10 @@ IconData _paymentIcon(String method) {
   return Icons.payment_outlined;
 }
 
-enum _ExpSort { dateDesc, dateAsc, amountDesc, amountAsc, category }
+/// 並び替えの対象列。
+enum _SortCol { date, category, content, payment, amount }
 
-extension _ExpSortX on _ExpSort {
-  String get badgeLabel {
-    switch (this) {
-      case _ExpSort.dateDesc:
-        return '新しい順';
-      case _ExpSort.dateAsc:
-        return '古い順';
-      case _ExpSort.amountDesc:
-        return '高い順';
-      case _ExpSort.amountAsc:
-        return '安い順';
-      case _ExpSort.category:
-        return 'カテゴリ順';
-    }
-  }
-}
-
-const double _kDateW = 48;
+const double _kDateW = 64; // 「06/29(月)」が収まる幅。
 const double _kAmountW = 92;
 const double _kColGap = 8;
 const double _kHandleW = 12;
@@ -348,17 +329,47 @@ class _ExpenseTableHeader extends StatelessWidget {
   final _ColW w;
   final void Function(int handleIndex, double dx) onResize;
   final VoidCallback onResizeEnd;
+  final _SortCol sortCol;
+  final bool asc;
+  final void Function(_SortCol col) onSort;
+  final Color accent;
   const _ExpenseTableHeader({
     required this.w,
     required this.onResize,
     required this.onResizeEnd,
+    required this.sortCol,
+    required this.asc,
+    required this.onSort,
+    required this.accent,
   });
 
-  static Widget _h(String s, {bool right = false}) => Text(s,
-      textAlign: right ? TextAlign.right : TextAlign.left,
-      overflow: TextOverflow.ellipsis,
-      style: V2Typography.micro
-          .copyWith(color: V2Colors.textMuted, fontWeight: FontWeight.w700));
+  /// 並び替え可能な見出しセル（タップで切替・現在列は矢印＋アクセント色）。
+  Widget _h(String s, _SortCol col, {bool right = false}) {
+    final active = sortCol == col;
+    final color = active ? accent : V2Colors.textMuted;
+    final children = <Widget>[
+      Flexible(
+        child: Text(s,
+            textAlign: right ? TextAlign.right : TextAlign.left,
+            overflow: TextOverflow.ellipsis,
+            style: V2Typography.micro
+                .copyWith(color: color, fontWeight: FontWeight.w700)),
+      ),
+      if (active) ...[
+        const SizedBox(width: 2),
+        Icon(asc ? Icons.arrow_upward : Icons.arrow_downward,
+            size: 12, color: accent),
+      ],
+    ];
+    return InkWell(
+      onTap: () => onSort(col),
+      child: Row(
+        mainAxisAlignment:
+            right ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: children,
+      ),
+    );
+  }
 
   Widget _handle(int i) => MouseRegion(
         cursor: SystemMouseCursors.resizeColumn,
@@ -383,15 +394,16 @@ class _ExpenseTableHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
         children: [
-          SizedBox(width: w.date, child: _h('日付')),
+          SizedBox(width: w.date, child: _h('日付', _SortCol.date)),
           const SizedBox(width: _kColGap),
-          SizedBox(width: w.cat, child: _h('カテゴリ')),
+          SizedBox(width: w.cat, child: _h('カテゴリ', _SortCol.category)),
           _handle(0),
-          SizedBox(width: w.content, child: _h('内容')),
+          SizedBox(width: w.content, child: _h('内容', _SortCol.content)),
           _handle(1),
-          SizedBox(width: w.pay, child: _h('支払方法')),
+          SizedBox(width: w.pay, child: _h('支払方法', _SortCol.payment)),
           const SizedBox(width: _kColGap),
-          SizedBox(width: w.amount, child: _h('金額', right: true)),
+          SizedBox(
+              width: w.amount, child: _h('金額', _SortCol.amount, right: true)),
         ],
       ),
     );
@@ -425,10 +437,7 @@ class _ExpenseRow extends StatelessWidget {
           children: [
             SizedBox(
               width: w.date,
-              child: Text(formatMonthDay(t.date),
-                  style: V2Typography.micro.copyWith(
-                      color: V2Colors.textSecondary,
-                      fontFeatures: V2Typography.tabularNums)),
+              child: _DateWithWeekday(date: t.date),
             ),
             const SizedBox(width: _kColGap),
             SizedBox(
@@ -509,6 +518,40 @@ class _ExpenseRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 日付＋曜日（土=青 / 日=赤）。
+class _DateWithWeekday extends StatelessWidget {
+  final DateTime date;
+  const _DateWithWeekday({required this.date});
+
+  static const _wd = ['月', '火', '水', '木', '金', '土', '日'];
+
+  @override
+  Widget build(BuildContext context) {
+    final w = date.weekday; // 1=月 .. 7=日
+    final label = _wd[w - 1];
+    final wColor = w == 6
+        ? const Color(0xFF2563EB) // 土＝青
+        : w == 7
+            ? const Color(0xFFDC2626) // 日＝赤
+            : V2Colors.textMuted;
+    return Text.rich(
+      TextSpan(children: [
+        TextSpan(
+            text: formatMonthDay(date),
+            style: V2Typography.micro.copyWith(
+                color: V2Colors.textSecondary,
+                fontFeatures: V2Typography.tabularNums)),
+        TextSpan(
+            text: '($label)',
+            style: V2Typography.micro
+                .copyWith(color: wColor, fontWeight: FontWeight.w700)),
+      ]),
+      maxLines: 1,
+      overflow: TextOverflow.clip,
     );
   }
 }

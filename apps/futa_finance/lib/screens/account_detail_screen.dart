@@ -657,51 +657,32 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         ),
         const SizedBox.shrink(),
         const SizedBox.shrink(),
+        // 残高：他の行と同じ右端に揃える（鉛筆は次の編集列へ）。
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-          child: InkWell(
-            onTap: () => _editVirtualBalance(isMonthStart, balance),
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              decoration: BoxDecoration(
-                border: Border.all(
+          padding: _cellPad,
+          child: Text(formatYen(balance),
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                  fontSize: 12,
                   color: isEdited
                       ? const Color(0xFFEA580C)
-                      : Colors.transparent,
-                  width: 1.5,
-                ),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Text(
-                      formatYen(balance),
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: isEdited
-                              ? const Color(0xFFEA580C)
-                              : const Color(0xFF111827),
-                          fontWeight: FontWeight.w700,
-                          fontFamily: 'monospace'),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Icon(Icons.edit,
-                      size: 11,
-                      color: isEdited
-                          ? const Color(0xFFEA580C)
-                          : const Color(0xFF9CA3AF)),
-                ],
-              ),
-            ),
-          ),
+                      : const Color(0xFF111827),
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'monospace')),
         ),
-        const SizedBox.shrink(),
+        // 編集列（鉛筆）。
+        IconButton(
+          icon: Icon(Icons.edit,
+              size: 14,
+              color: isEdited
+                  ? const Color(0xFFEA580C)
+                  : const Color(0xFF9CA3AF)),
+          padding: EdgeInsets.zero,
+          visualDensity: VisualDensity.compact,
+          constraints: const BoxConstraints(),
+          tooltip: isMonthStart ? '月初残高を修正' : '月末残高を修正',
+          onPressed: () => _editVirtualBalance(isMonthStart, balance),
+        ),
       ],
     );
   }
