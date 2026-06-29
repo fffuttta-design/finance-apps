@@ -108,24 +108,6 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     });
   }
 
-  /// クレカ照合に表示するカードが当月あるか（無ければセクション余白を出さない）。
-  bool get _hasReconcileCards {
-    final ym = _ymKey;
-    for (final c in _payments.creditCards) {
-      if (c.inactive) continue;
-      if (c.monthlyActualBillings.containsKey(ym)) return true;
-      final planned = _transactions
-          .where((t) =>
-              t.type == core.TransactionType.expense &&
-              t.paymentMethod == c.name &&
-              t.date.year == _month.year &&
-              t.date.month == _month.month)
-          .fold<int>(0, (s, t) => s + t.amount);
-      if (planned > 0) return true;
-    }
-    return false;
-  }
-
   void _shiftMonth(int delta) {
     setState(() => _month = DateTime(_month.year, _month.month + delta));
   }
@@ -581,7 +563,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                   ],
                 ),
               ),
-              const SizedBox(height: V2Spacing.md),
+              const SizedBox(height: V2Spacing.xl),
               // カテゴリ内訳（支出合計の直下）
               if (majorEntries.isNotEmpty) ...[
                 Padding(
@@ -643,7 +625,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                     ],
                   ),
                 ),
-                const SizedBox(height: V2Spacing.md),
+                const SizedBox(height: V2Spacing.xl),
               ],
               // ウォレット（クレカ引落照合・棚卸し）— カテゴリ内訳の下
               if (showFixedAndCard) ...[
@@ -659,7 +641,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                   ym: _ymKey,
                   onOpenReconcile: _openCardReconcile,
                 ),
-                if (_hasReconcileCards) const SizedBox(height: V2Spacing.md),
+                const SizedBox(height: V2Spacing.xl),
               ],
               // 毎月の固定費（引落予定）— 見出しはカード外・クレカ引落照合と同じスタイル
               if (fixedLines.isNotEmpty) ...[
@@ -730,7 +712,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                     ],
                   ),
                 ),
-                const SizedBox(height: V2Spacing.md),
+                const SizedBox(height: V2Spacing.xl),
               ],
               // 明細（PC幅＝表形式。検索・並び替え・列幅は共通ウィジェットに集約）。
               ExpenseDetailTable(

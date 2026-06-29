@@ -42,9 +42,10 @@ class ExpenseDetailTable extends StatefulWidget {
 }
 
 class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
-  // 列幅（中央3列の配分・合計1.0）。端末に保存（全画面共通）。
-  List<double> _colFrac = const [0.36, 0.37, 0.27];
-  static const _kColFracKey = 'futa.exp_table_col_frac';
+  // 列幅（中央4列＝大カテゴリ/小カテゴリ/内容/支払方法 の配分・合計1.0）。端末に保存。
+  List<double> _colFrac = const [0.18, 0.20, 0.37, 0.25];
+  static const _kColFracKey = 'futa.exp_table_col_frac_v2';
+  static const _kColCount = 4;
 
   // 並び替えは表ヘッダーのクリックで列＋昇順/降順を切替。
   _SortCol _sortCol = _SortCol.date;
@@ -80,7 +81,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
   Future<void> _loadColFrac() async {
     final p = await SharedPreferences.getInstance();
     final raw = p.getStringList(_kColFracKey);
-    if (raw == null || raw.length != 3) return;
+    if (raw == null || raw.length != _kColCount) return;
     final f = raw.map((e) => double.tryParse(e) ?? 0).toList();
     final sum = f.fold<double>(0, (a, b) => a + b);
     if (sum <= 0 || f.any((e) => e <= 0)) return;
@@ -129,11 +130,18 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
       case _SortCol.amount:
         list.sort((a, b) => a.amount.compareTo(b.amount));
         break;
-      case _SortCol.category:
+      case _SortCol.major:
         list.sort((a, b) {
           cmp = a.category.majorOrder.compareTo(b.category.majorOrder);
           if (cmp != 0) return cmp;
           return a.category.sub.compareTo(b.category.sub);
+        });
+        break;
+      case _SortCol.sub:
+        list.sort((a, b) {
+          cmp = a.category.sub.compareTo(b.category.sub);
+          if (cmp != 0) return cmp;
+          return a.category.majorOrder.compareTo(b.category.majorOrder);
         });
         break;
       case _SortCol.content:
@@ -251,13 +259,14 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
               }
               final innerW = cons.maxWidth - 24;
               final fixed =
-                  _kDateW + _kAmountW + _kColGap * 2 + _kHandleW * 2;
-              final mw = (innerW - fixed) < 120 ? 120.0 : innerW - fixed;
+                  _kDateW + _kAmountW + _kColGap * 2 + _kHandleW * 3;
+              final mw = (innerW - fixed) < 160 ? 160.0 : innerW - fixed;
               final w = _ColW(
                 date: _kDateW,
-                cat: _colFrac[0] * mw,
-                content: _colFrac[1] * mw,
-                pay: _colFrac[2] * mw,
+                major: _colFrac[0] * mw,
+                sub: _colFrac[1] * mw,
+                content: _colFrac[2] * mw,
+                pay: _colFrac[3] * mw,
                 amount: _kAmountW,
               );
               return Column(
@@ -315,7 +324,7 @@ IconData _paymentIcon(String method) {
 }
 
 /// 並び替えの対象列。
-enum _SortCol { date, category, content, payment, amount }
+enum _SortCol { date, major, sub, content, payment, amount }
 
 const double _kDateW = 64; // 「06/29(月)」が収まる幅。
 const double _kAmountW = 92;
@@ -324,13 +333,15 @@ const double _kHandleW = 12;
 
 class _ColW {
   final double date;
-  final double cat;
+  final double major;
+  final double sub;
   final double content;
   final double pay;
   final double amount;
   const _ColW({
     required this.date,
-    required this.cat,
+    required this.major,
+    required this.sub,
     required this.content,
     required this.pay,
     required this.amount,
@@ -408,10 +419,12 @@ class _ExpenseTableHeader extends StatelessWidget {
         children: [
           SizedBox(width: w.date, child: _h('日付', _SortCol.date)),
           const SizedBox(width: _kColGap),
-          SizedBox(width: w.cat, child: _h('カテゴリ', _SortCol.category)),
+          SizedBox(width: w.major, child: _h('大カテゴリ', _SortCol.major)),
           _handle(0),
-          SizedBox(width: w.content, child: _h('内容', _SortCol.content)),
+          SizedBox(width: w.sub, child: _h('小カテゴリ', _SortCol.sub)),
           _handle(1),
+          SizedBox(width: w.content, child: _h('内容', _SortCol.content)),
+          _handle(2),
           SizedBox(width: w.pay, child: _h('支払方法', _SortCol.payment)),
           const SizedBox(width: _kColGap),
           SizedBox(
@@ -433,9 +446,11 @@ class _ExpenseRow extends StatelessWidget {
     final accent = expenseCatColor(t.category.major);
     final major = t.category.major.trim();
     final sub = t.category.sub.trim();
-    final catLabel = (major.isEmpty && sub.isEmpty)
+    // 大カテゴリは番号プレフィックス（"1."）を外して表示。
+    final majorDisplay = major.isEmpty
         ? '未分類'
-        : (sub.isEmpty ? major : '$major › $sub');
+        : major.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
+    final subDisplay = sub.isEmpty ? '—' : sub;
     final title = t.description.trim().isNotEmpty
         ? t.description.trim()
         : (sub.isNotEmpty ? sub : (major.isNotEmpty ? major : '未分類'));
@@ -452,8 +467,9 @@ class _ExpenseRow extends StatelessWidget {
               child: _DateWithWeekday(date: t.date),
             ),
             const SizedBox(width: _kColGap),
+            // 大カテゴリ（色付きバッジ）。
             SizedBox(
-              width: w.cat,
+              width: w.major,
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Container(
@@ -475,7 +491,7 @@ class _ExpenseRow extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                       Flexible(
-                        child: Text(catLabel,
+                        child: Text(majorDisplay,
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
                             style: TextStyle(
@@ -489,6 +505,19 @@ class _ExpenseRow extends StatelessWidget {
                   ),
                 ),
               ),
+            ),
+            const SizedBox(width: _kHandleW),
+            // 小カテゴリ（プレーンテキスト）。
+            SizedBox(
+              width: w.sub,
+              child: Text(subDisplay,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: sub.isEmpty
+                          ? V2Colors.textMuted
+                          : V2Colors.textSecondary)),
             ),
             const SizedBox(width: _kHandleW),
             SizedBox(
@@ -583,7 +612,8 @@ class _NarrowSortBar extends StatelessWidget {
 
   static const _labels = {
     _SortCol.date: '日付',
-    _SortCol.category: 'カテゴリ',
+    _SortCol.major: '大カテゴリ',
+    _SortCol.sub: '小カテゴリ',
     _SortCol.content: '内容',
     _SortCol.payment: '支払方法',
     _SortCol.amount: '金額',
