@@ -286,15 +286,8 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
 
 /// 大カテゴリ名から安定した色を作る（ユーザー指定色を最優先）。
 Color expenseCatColor(String major) {
-  final manual = CategoryColors.resolve(major);
-  if (manual != null) return manual;
-  final m = major.trim();
-  if (m.isEmpty) return const Color(0xFF9CA3AF);
-  var h = 0;
-  for (final c in m.codeUnits) {
-    h = (h * 31 + c) & 0x7fffffff;
-  }
-  return HSLColor.fromAHSL(1, (h % 360).toDouble(), 0.5, 0.45).toColor();
+  // 手動色 → 無ければ名前から推測した「それっぽい」既定色（食=オレンジ等）。
+  return CategoryColors.effective(major);
 }
 
 IconData _paymentIcon(String method) {

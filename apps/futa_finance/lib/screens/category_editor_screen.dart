@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart';
 
+import '../data/nav_history.dart';
 import '../data/settings_repository.dart';
 import '../utils/category_colors.dart';
 import '../utils/emoji_palette.dart';
@@ -379,23 +380,25 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
 
   Widget _majorCard(int index, MajorCategory major,
       {required int dragIndex, Key? key}) {
+    // カテゴリ色（手動指定 or 名前から推測した既定色）。アイコン・背景・左帯に反映。
+    final c = CategoryColors.effective(major.name);
     return Container(
       key: key,
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        // 行の背景もカテゴリ色の薄いトーンにして、ひと目で色が分かるようにする。
+        color: Color.alphaBlend(c.withValues(alpha: 0.08), Colors.white),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: c.withValues(alpha: 0.30)),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
         onTap: () {
-          Navigator.push(
+          NavHistory.instance.push(
             context,
-            MaterialPageRoute(
-              builder: (_) => CategorySubEditorScreen(majorIndex: index),
-            ),
-          ).then((_) => _load()); // 戻り後に再読込
+            (_) => CategorySubEditorScreen(majorIndex: index),
+            onReturn: _load, // 戻り後に再読込
+          );
         },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -410,29 +413,23 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
                       color: Color(0xFF9CA3AF)),
                 ),
               ),
-              // アイコン（タップで変更）。色指定があればその色を反映。
-              Builder(builder: (_) {
-                final hasColor = major.colorValue != null;
-                final c = hasColor
-                    ? Color(major.colorValue!)
-                    : const Color(0xFF1A237E);
-                return InkWell(
-                  onTap: () => _pickIcon(index),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: c.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: categoryIconWidget(
-                      major.iconKey,
-                      color: c,
-                      size: 22,
-                    ),
+              // アイコン（タップで変更）。カテゴリ色を反映。
+              InkWell(
+                onTap: () => _pickIcon(index),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: c.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                );
-              }),
+                  child: categoryIconWidget(
+                    major.iconKey,
+                    color: c,
+                    size: 22,
+                  ),
+                ),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Opacity(

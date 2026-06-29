@@ -4,6 +4,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../data/app_mode.dart';
 import '../../data/auth_service.dart';
 import '../../data/desktop_bridge.dart' as desktop;
+import '../../data/nav_history.dart';
 import '../../data/ui_preferences.dart';
 import '../../data/update_flow.dart';
 import '../../data/windows_update.dart';
@@ -123,27 +124,25 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
   /// 狭い画面（スマホ）：メニュー項目タップで該当パネルをフルスクリーンで開く。
   void _openPanelScreen(String id) {
     setState(() => _currentId = id);
-    Navigator.push(
+    NavHistory.instance.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => Theme(
-          data: V2Theme.light(),
-          child: Scaffold(
-            backgroundColor: V2Colors.surfaceMuted,
-            appBar: AppBar(
-              // スクロールで上部の帯がグレーに染まる（M3 surfaceTint）のを防ぐ。
-              scrolledUnderElevation: 0,
-              surfaceTintColor: Colors.transparent,
-              backgroundColor: Colors.white,
-              title: Text(_titleFor(id),
-                  style: const TextStyle(
-                      fontSize: 17, fontWeight: FontWeight.w700)),
-            ),
-            body: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(V2Spacing.lg),
-                child: _buildPanel(),
-              ),
+      (_) => Theme(
+        data: V2Theme.light(),
+        child: Scaffold(
+          backgroundColor: V2Colors.surfaceMuted,
+          appBar: AppBar(
+            // スクロールで上部の帯がグレーに染まる（M3 surfaceTint）のを防ぐ。
+            scrolledUnderElevation: 0,
+            surfaceTintColor: Colors.transparent,
+            backgroundColor: Colors.white,
+            title: Text(_titleFor(id),
+                style: const TextStyle(
+                    fontSize: 17, fontWeight: FontWeight.w700)),
+          ),
+          body: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(V2Spacing.lg),
+              child: _buildPanel(),
             ),
           ),
         ),

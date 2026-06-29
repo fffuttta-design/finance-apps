@@ -9,6 +9,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'data/app_mode.dart';
 import 'data/auth_service.dart';
 import 'data/data_migration_service.dart';
+import 'data/nav_history.dart';
+import 'data/nav_history_hook_stub.dart'
+    if (dart.library.js_interop) 'data/nav_history_hook_web.dart';
 import 'data/repository_provider.dart';
 import 'data/ui_preferences.dart';
 import 'firebase_options.dart';
@@ -28,6 +31,8 @@ Future<void> main() async {
   );
   // Google Sign-In 初期化
   await AuthService.instance.init();
+  // マウスの「進む」ボタン用フック（Web/Electron）を登録。
+  registerForwardHook();
   // まず画面を即出す（白画面の待ち時間ゼロ）。
   runApp(const FutaFinanceApp());
   // 自動ログイン（保存トークンでの再ログイン）は UI をブロックせず裏で実行。
@@ -56,6 +61,7 @@ class FutaFinanceApp extends StatelessWidget {
       builder: (context, _) {
         return MaterialApp(
           title: 'FutaFinance',
+          navigatorKey: NavHistory.instance.navigatorKey,
           debugShowCheckedModeBanner: false,
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
@@ -91,6 +97,9 @@ class FutaFinanceApp extends StatelessWidget {
                 if (event.buttons == kBackMouseButton) {
                   final nav = Navigator.maybeOf(context);
                   if (nav != null && nav.canPop()) nav.pop();
+                } else if (event.buttons == kForwardMouseButton) {
+                  // 進むボタン：戻った先の画面を開き直す（NavHistory 経由で開いた画面のみ）。
+                  NavHistory.instance.goForward();
                 }
               },
               child: child ?? const SizedBox.shrink(),

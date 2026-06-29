@@ -367,7 +367,12 @@ async function createWindow() {
     if (cmd === 'browser-backward') {
       mainWindow.webContents.executeJavaScript('window.history.back()').catch(() => {});
     } else if (cmd === 'browser-forward') {
-      mainWindow.webContents.executeJavaScript('window.history.forward()').catch(() => {});
+      // 進むは Flutter 側の簡易フォワードスタック（window.futaGoForward）を呼ぶ。
+      // 無い場合はブラウザ履歴の forward にフォールバック。
+      mainWindow.webContents
+          .executeJavaScript(
+              'window.futaGoForward ? window.futaGoForward() : window.history.forward()')
+          .catch(() => {});
     }
   });
 

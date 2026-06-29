@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../../data/app_mode.dart';
+import '../../data/nav_history.dart';
 import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
@@ -293,17 +294,19 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   Future<void> _openCardReconcile(ReconcileWallet wallet) async {
     for (final c in _payments.creditCards) {
       if (c.name == wallet.name) {
-        await Navigator.push(context,
-            MaterialPageRoute(builder: (_) => CardDetailScreen(card: c)));
-        if (mounted) await _load();
+        NavHistory.instance.push(context, (_) => CardDetailScreen(card: c),
+            onReturn: () {
+          if (mounted) _load();
+        });
         return;
       }
     }
     for (final b in _payments.bankAccounts) {
       if (b.name == wallet.name) {
-        await Navigator.push(context,
-            MaterialPageRoute(builder: (_) => AccountDetailScreen(account: b)));
-        if (mounted) await _load();
+        NavHistory.instance.push(
+            context, (_) => AccountDetailScreen(account: b), onReturn: () {
+          if (mounted) _load();
+        });
         return;
       }
     }

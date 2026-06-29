@@ -1,6 +1,6 @@
 # FutaFinance 仕様書
 
-> **最終更新: 2026-06-29 / v1.0.366+367**
+> **最終更新: 2026-06-29 / v1.0.367+368**
 > 変更があるたびにこのファイルを編集してバージョンを更新すること。
 
 ---
@@ -428,7 +428,14 @@ class MonthlySnapshot {
 - **新デザイン（リッチUI）に固定**。`UiPreferences.richUi` は常に true、設定の「新デザイン」トグルを廃止（旧デザインの切替は不可に。`V2HomeTopNavScreen` 等の旧画面コードは未使用＝今後物理削除可）。
 - 設定「データ管理」から **「明細の貼り付け取込・開発ラボ」（devLab）を削除**（未使用のため）。
 - **AppBar のスクロール時グレー化（M3 surfaceTint）を全体で無効化**（`V2Theme.light()` の `appBarTheme` ＋設定のフルスクリーンパネルで `scrolledUnderElevation:0 / surfaceTintColor: transparent`）。
-- **マウス「進む」ボタン**は `main.js` で `browser-forward → history.forward()` を実装済みだが、Flutter Web は戻った先のNavigatorルート復元（forward）が効きにくい既知制約あり（戻るは可）。
+- **マウス「進む」ボタンの暫定対応（v1.0.367〜）**: Flutter Web/Navigator 1.0 は「戻る」はできるが「進む」で直前の画面を復元できない。go_router 化（大改修）を避けつつ、`NavHistory`（`lib/data/nav_history.dart`）で主要なフルスクリーン遷移だけを `push` 経由で開き、戻ったら "進む候補" として記憶 → 進むボタンで開き直す簡易フォワードスタックを実装。
+  - 対応範囲: **設定の各サブ画面（`_openPanelScreen`）/ 支出カテゴリ→小カテゴリ編集 / ウォレットからの口座・カード詳細**。モーダルやPCの2ペイン切替は対象外。
+  - 配線: `main.dart` に `navigatorKey` 設置＋`Listener` で `kForwardMouseButton` を拾う。Web/Electron は `window.futaGoForward`（`nav_history_hook_web.dart`、条件付きimport `dart.library.js_interop`）を生やし、`main.js` の `browser-forward` から呼ぶ（無ければ `history.forward()` にフォールバック）。
+
+### カテゴリ色の自動付与（v1.0.367〜）
+- 大カテゴリに**手動色が無くても、名前から「それっぽい」既定色を自動付与**（食費=オレンジ、交通=ブルー、病院/薬=エメラルド、美容/衣服=ピンク、固定費=インディゴ、交際=バイオレット 等）。`CategoryColors.autoColor` がキーワード一致で色を返し、未一致は名前ハッシュでパレットから安定色。手動指定があれば従来どおりそちら優先（`CategoryColors.effective` = 手動 ?? autoColor）。
+- `expenseCatColor`（支出明細・内訳の色）も従来のHSLハッシュから `CategoryColors.effective` に統一。
+- **支出カテゴリ一覧（`CategoryEditorScreen`）の各行の背景・枠線・アイコン**を、そのカテゴリ色の薄いトーンに（ひと目で色が分かるように）。色アイコン（パレットボタン）は手動指定の有無を示すため未指定時はグレーのまま。
 
 ## 9. UI タブ構成
 
