@@ -373,6 +373,10 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     );
   }
 
+  static const _cGreen = Color(0xFF16A34A);
+  static const _cRed = Color(0xFFDC2626);
+  static const _cSky = Color(0xFF0284C7);
+
   Widget _summaryCard({
     required int inSum,
     required int outSum,
@@ -380,101 +384,125 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     int? startBalance,
     int? endBalance,
   }) {
+    final hasMonth = startBalance != null && endBalance != null;
     return Container(
       color: const Color(0xFFFAFAFA),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Column(
-        children: [
-          // ── 月初/月末 残高（主役、大きく強調） ──
-          if (startBalance != null || endBalance != null) ...[
-            Row(
+      child: hasMonth
+          ? _balanceFlowStrip(startBalance, endBalance, inSum, outSum, netDelta)
+          // 全期間は月初/月末が無いので、入金/出金/差引のみ。
+          : Row(
               children: [
-                if (startBalance != null)
-                  _balanceHeadlineCard(
-                    label: '月初残高',
-                    value: startBalance,
-                    accent: const Color(0xFFEAB308), // 黄系
-                  ),
-                if (startBalance != null && endBalance != null)
-                  const SizedBox(width: 10),
-                if (endBalance != null)
-                  _balanceHeadlineCard(
-                    label: '月末残高',
-                    value: endBalance,
-                    accent: const Color(0xFF0EA5E9), // 水色系
-                  ),
+                _summaryItem('入金合計', formatYen(inSum), _cGreen),
+                const SizedBox(width: 10),
+                _summaryItem('出金合計', formatYen(outSum), _cRed),
+                const SizedBox(width: 10),
+                _summaryItem('差引', formatYen(netDelta, withSign: true),
+                    netDelta >= 0 ? _cGreen : _cRed),
               ],
             ),
-            const SizedBox(height: 8),
-          ],
-          // ── 入金/出金/差引（補助、小さめ） ──
-          Row(
-            children: [
-              _summaryItem(
-                  '入金合計', formatYen(inSum), const Color(0xFF16A34A)),
-              const SizedBox(width: 10),
-              _summaryItem(
-                  '出金合計', formatYen(outSum), const Color(0xFFDC2626)),
-              const SizedBox(width: 10),
-              _summaryItem(
-                '差引',
-                formatYen(netDelta, withSign: true),
-                netDelta >= 0
-                    ? const Color(0xFF16A34A)
-                    : const Color(0xFFDC2626),
-              ),
-            ],
+    );
+  }
+
+  /// 月初 → ＋入金/−出金 → 月末 の残高フロー帯（案A）。
+  Widget _balanceFlowStrip(
+      int start, int end, int inSum, int outSum, int net) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          // 月初残高
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('月初残高',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF))),
+                const SizedBox(height: 4),
+                Text(formatYen(start),
+                    style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF111827),
+                        fontFamily: 'monospace')),
+              ],
+            ),
+          ),
+          // 入金 / 出金
+          SizedBox(
+            width: 150,
+            child: Column(
+              children: [
+                _flowChip('入金', '+${formatYen(inSum)}', _cGreen,
+                    const Color(0xFFF0FDF4), Icons.south_west),
+                const SizedBox(height: 6),
+                _flowChip('出金', '−${formatYen(outSum)}', _cRed,
+                    const Color(0xFFFEF2F2), Icons.north_east),
+              ],
+            ),
+          ),
+          // 月末残高 ＋ 差引
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const Text('月末残高',
+                    style: TextStyle(fontSize: 12, color: _cSky)),
+                const SizedBox(height: 4),
+                Text(formatYen(end),
+                    style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: _cSky,
+                        fontFamily: 'monospace')),
+                const SizedBox(height: 4),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: net >= 0
+                        ? const Color(0xFFF0FDF4)
+                        : const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text('差引 ${formatYen(net, withSign: true)}',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: net >= 0 ? _cGreen : _cRed)),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  /// 月初/月末残高の見出しカード（強調表示）。
-  Widget _balanceHeadlineCard({
-    required String label,
-    required int value,
-    required Color accent,
-  }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: accent.withValues(alpha: 0.5), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: accent.withValues(alpha: 0.08),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              label,
+  Widget _flowChip(
+      String label, String value, Color color, Color bg, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 5),
+          Text(label, style: TextStyle(fontSize: 12, color: color)),
+          const Spacer(),
+          Text(value,
               style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: accent,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              formatYen(value),
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF111827),
-                fontFamily: 'monospace',
-              ),
-            ),
-          ],
-        ),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                  fontFamily: 'monospace')),
+        ],
       ),
     );
   }
