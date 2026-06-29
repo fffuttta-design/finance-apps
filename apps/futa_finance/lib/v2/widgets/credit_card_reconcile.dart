@@ -307,6 +307,16 @@ class _BillingRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: V2Spacing.sm),
+            // 合計金額（このウォレットの当月明細合計）を右側に表示。
+            Text(formatYen(planned),
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: planned > 0
+                        ? V2Colors.textPrimary
+                        : V2Colors.textMuted,
+                    fontFeatures: V2Typography.tabularNums)),
+            const SizedBox(width: V2Spacing.sm),
             const Icon(Icons.chevron_right,
                 size: 18, color: V2Colors.textMuted),
           ],

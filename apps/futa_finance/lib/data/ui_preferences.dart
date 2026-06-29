@@ -49,15 +49,9 @@ class UiPreferences extends ChangeNotifier {
   static const v2VariantSidebar = 'sidebar';
   static const v2VariantTopNav = 'topnav';
 
-  /// 新デザイン（リッチUI・ベータ）を ON/OFF するキー。
-  /// 既定 OFF。ON にすると現行UIの代わりに rich_* 系の新デザインを使う。
-  /// 気に入らなければ OFF に戻すだけで即・元通り（切り戻し用フラグ）。
-  static const _kRichUi = 'futa.ui.rich';
-  // 既定 ON（2026-06-17〜）。明示的に OFF にした端末だけ従来デザインのまま。
-  bool _richUi = true;
-
-  /// 新デザイン（リッチUI・ベータ）が有効か。既定 false。
-  bool get richUi => _richUi;
+  /// 新デザイン（リッチUI）に固定（v1.0.366〜・旧デザインは廃止）。
+  /// 切替トグルは削除し、常に新デザインを使う。
+  bool get richUi => true;
 
   /// ホーム（広い画面）の総資産カラム幅。ユーザーがドラッグで調整・永続化。
   static const _kHomeAssetWidth = 'futa.ui.home_asset_width';
@@ -142,8 +136,6 @@ class UiPreferences extends ChangeNotifier {
     // ホーム総資産カラム幅
     final w = prefs.getDouble(_kHomeAssetWidth) ?? homeAssetWidthDefault;
     _homeAssetWidth = w.clamp(homeAssetWidthMin, homeAssetWidthMax);
-    // 新デザイン（リッチUI）フラグ。未設定は true（既定ON）。
-    _richUi = prefs.getBool(_kRichUi) ?? true;
     _loaded = true;
     notifyListeners();
   }
@@ -178,15 +170,6 @@ class UiPreferences extends ChangeNotifier {
     } else {
       await prefs.setBool(_kUseV2Ui, v);
     }
-    notifyListeners();
-  }
-
-  /// 新デザイン（リッチUI）の ON/OFF を切替えて永続化。
-  Future<void> setRichUi(bool v) async {
-    if (_richUi == v) return;
-    _richUi = v;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_kRichUi, v);
     notifyListeners();
   }
 

@@ -44,6 +44,14 @@ class V2Theme {
         thickness: 1,
         space: 1,
       ),
+      // スクロールで AppBar 帯がグレーに染まる（M3 surfaceTint）のを無効化。
+      appBarTheme: const AppBarTheme(
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: Color(0xFF111827),
+        elevation: 0,
+      ),
       cardTheme: const CardThemeData(
         color: V2Colors.surface,
         surfaceTintColor: Colors.transparent,
