@@ -1,1 +1,1 @@
-{"version":"1.0.370","buildNumber":"371","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.370/futa-finance-v1.0.370.apk","releaseNotes":"支出明細の大カテゴリから色の四角（■）を外して名前だけのバッジにしました。あわせて表のように薄い縦の区切り線を入れて、列が見やすくなりました。"}
+{"version":"1.0.371","buildNumber":"372","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.371/futa-finance-v1.0.371.apk","releaseNotes":"事業モードの支出明細に「領収書」チェック列を追加しました。領収書URL保存済み・レシート保管済みをチェックで記録でき、税理士提出の管理に使えます。あわせて明細テーブルのヘッダーに色を付けて見やすくしました。"}
