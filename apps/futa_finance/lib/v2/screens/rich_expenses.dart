@@ -646,7 +646,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
               // 毎月の固定費（引落予定）— 見出しはカード外・クレカ引落照合と同じスタイル
               if (fixedLines.isNotEmpty) ...[
                 Padding(
-                  padding: const EdgeInsets.only(bottom: V2Spacing.sm),
+                  // 右の合計は、下の各行の金額（カード余白12+矢印16+間隔4=32）に
+                  // 合わせて内側に寄せ、カード右端からはみ出さないようにする。
+                  padding: const EdgeInsets.only(right: 32, bottom: V2Spacing.sm),
                   child: Row(
                     children: [
                       const Icon(Icons.repeat,

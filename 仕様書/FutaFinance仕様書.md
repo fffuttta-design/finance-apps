@@ -1,6 +1,6 @@
 # FutaFinance 仕様書
 
-> **最終更新: 2026-06-29 / v1.0.371+372**
+> **最終更新: 2026-06-29 / v1.0.372+373**
 > 変更があるたびにこのファイルを編集してバージョンを更新すること。
 
 ---
@@ -431,6 +431,11 @@ class MonthlySnapshot {
 - **マウス「進む」ボタンの暫定対応（v1.0.367〜）**: Flutter Web/Navigator 1.0 は「戻る」はできるが「進む」で直前の画面を復元できない。go_router 化（大改修）を避けつつ、`NavHistory`（`lib/data/nav_history.dart`）で主要なフルスクリーン遷移だけを `push` 経由で開き、戻ったら "進む候補" として記憶 → 進むボタンで開き直す簡易フォワードスタックを実装。
   - 対応範囲: **設定の各サブ画面（`_openPanelScreen`）/ 支出カテゴリ→小カテゴリ編集 / ウォレットからの口座・カード詳細**。モーダルやPCの2ペイン切替は対象外。
   - 配線: `main.dart` に `navigatorKey` 設置＋`Listener` で `kForwardMouseButton` を拾う。Web/Electron は `window.futaGoForward`（`nav_history_hook_web.dart`、条件付きimport `dart.library.js_interop`）を生やし、`main.js` の `browser-forward` から呼ぶ（無ければ `history.forward()` にフォールバック）。
+
+### 領収書リンク/画像入力＋金額列リサイズ＋固定費ヘッダー調整（v1.0.372〜）
+- **事業モードの支出入力/編集フォームに「領収書（任意・税理士提出用）」欄を復活**（`ExpenseInputScreen`）。リンク貼付（`receiptUrl`）と「画像を保存」（`ReceiptCameraScreen`で撮影/選択→`DriveReceiptService.uploadReceiptImage`でDrive保存→URL自動セット）の両方が選べる。保存時、領収書リンク/画像があれば `receiptSaved` を自動ON（無ければ既存の手動チェックを維持）。**編集時に receiptSaved が消えないよう保持も修正**。
+- **支出明細テーブルの「金額」列も可変列化**（中央5列＝大/小/内容/支払方法/金額）。支払方法↔金額の境界にリサイズハンドル追加。保存キー `..._v3`。
+- **「毎月の固定費」ヘッダーの右合計のはみ出しを修正**（右パディング32で下の各行金額に揃える）。
 
 ### 領収書保存チェック列＋テーブルヘッダー色付け（v1.0.371〜）
 - **`Transaction.receiptSaved`（bool・既定false）を追加**（toJson/fromJson/copyWith・Firestore永続化対応）。領収書URL保存済み or 現物レシート保管済みを手動チェックする税理士提出用フラグ。

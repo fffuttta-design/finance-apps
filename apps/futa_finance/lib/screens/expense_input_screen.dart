@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 import 'package:url_launcher/url_launcher.dart';
@@ -11,6 +13,7 @@ import '../utils/date_pick.dart';
 import '../utils/duplicate_check.dart';
 import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
+import 'receipt_camera_screen.dart';
 import 'receipt_image_screen.dart';
 
 /// 支払元のカテゴリ。UI 上はまずこれを選択 → 該当の項目プルダウンが切り替わる。
@@ -133,6 +136,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   core.PaymentMethodsConfig? _payments;
 
   DateTime _date = DateTime.now();
+  bool _savingReceipt = false; // レシート画像の保存中フラグ。
   String? _majorCategory;
   String? _subCategory;
   String? _paymentMethod;
@@ -655,6 +659,12 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
 
     setState(() => _saving = true);
     final editing = widget.editing;
+    // 入力欄が空なら、裏のDrive保存が先に終わっていればキャッシュURLを付与。
+    final receiptUrlVal = _receiptUrlCtrl.text.trim().isNotEmpty
+        ? _receiptUrlCtrl.text.trim()
+        : (widget.receiptId != null
+            ? DriveReceiptService.instance.urlFor(widget.receiptId!)
+            : null);
     final tx = core.Transaction(
       id: editing?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
       date: _date,
@@ -666,13 +676,12 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       amount: amount,
       memo: _memoCtrl.text.trim().isEmpty ? null : _memoCtrl.text.trim(),
       store: _storeCtrl.text.trim().isEmpty ? null : _storeCtrl.text.trim(),
-      // 入力欄が空なら、裏のDrive保存が先に終わっていればキャッシュURLを付与。
-      receiptUrl: _receiptUrlCtrl.text.trim().isNotEmpty
-          ? _receiptUrlCtrl.text.trim()
-          : (widget.receiptId != null
-              ? DriveReceiptService.instance.urlFor(widget.receiptId!)
-              : null),
+      receiptUrl: receiptUrlVal,
       receiptId: widget.receiptId ?? editing?.receiptId,
+      // 領収書リンク/画像があれば「保存済み」を自動ON。無ければ既存の手動チェックを維持。
+      receiptSaved: (receiptUrlVal != null && receiptUrlVal.isNotEmpty)
+          ? true
+          : (editing?.receiptSaved ?? false),
       originalCurrency: _currency == 'USD' ? 'USD' : null,
       originalAmount: usdAmount,
       isPending: editing?.isPending ?? false,
@@ -968,7 +977,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 const SizedBox(height: 16),
               ],
 
-              // 備考はデフォルト表示（店舗・領収書添付UIは廃止）。
+              // 備考はデフォルト表示。
               _label('備考（任意）'),
               TextFormField(
                 controller: _memoCtrl,
@@ -976,6 +985,51 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 decoration: _inputDecoration(),
               ),
               const SizedBox(height: 18),
+
+              // 領収書（事業モードのみ・税理士提出用）。
+              // リンクを貼る／レシート画像を直接保存、どちらでも選べる。
+              if (AppModeManager.instance.current == AppMode.business) ...[
+                _label('領収書（任意・税理士提出用）'),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _receiptUrlCtrl,
+                        keyboardType: TextInputType.url,
+                        decoration: _inputDecoration(
+                            hint: 'リンクを貼り付け（Drive 等）'),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed:
+                          (_saving || _savingReceipt) ? null : _saveReceiptImage,
+                      icon: _savingReceipt
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.photo_camera_outlined, size: 18),
+                      label: const Text('画像を保存'),
+                      style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 14)),
+                    ),
+                  ],
+                ),
+                if (_receiptUrlCtrl.text.trim().isNotEmpty)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _openReceiptLink,
+                      icon: const Icon(Icons.open_in_new, size: 16),
+                      label: const Text('領収書を開く'),
+                    ),
+                  ),
+                const SizedBox(height: 18),
+              ],
 
               FilledButton.icon(
                 onPressed: _saving ? null : _save,
@@ -1328,6 +1382,33 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         ],
       ),
     );
+  }
+
+  /// レシート画像を直接保存（カメラ/ギャラリー → Drive アップロード → URL をセット）。
+  Future<void> _saveReceiptImage() async {
+    final bytes = await Navigator.of(context).push<Uint8List>(
+      MaterialPageRoute(builder: (_) => const ReceiptCameraScreen()),
+    );
+    if (bytes == null || !mounted) return;
+    setState(() => _savingReceipt = true);
+    final isBusiness =
+        AppModeManager.instance.current == AppMode.business;
+    final url = await DriveReceiptService.instance.uploadReceiptImage(
+        bytes: bytes, date: _date, isBusiness: isBusiness);
+    if (!mounted) return;
+    if (url == null || url.isEmpty) {
+      setState(() => _savingReceipt = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              'レシートの保存に失敗しました: ${DriveReceiptService.instance.lastError ?? ''}')));
+      return;
+    }
+    setState(() {
+      _receiptUrlCtrl.text = url;
+      _savingReceipt = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('レシートを保存しました')));
   }
 
   /// 領収書を開く。Driveのファイルならアプリ内ビューアで表示（ブラウザ不要）。

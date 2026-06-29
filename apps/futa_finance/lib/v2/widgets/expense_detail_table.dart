@@ -50,10 +50,11 @@ class ExpenseDetailTable extends StatefulWidget {
 }
 
 class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
-  // 列幅（中央4列＝大カテゴリ/小カテゴリ/内容/支払方法 の配分・合計1.0）。端末に保存。
-  List<double> _colFrac = const [0.18, 0.20, 0.37, 0.25];
-  static const _kColFracKey = 'futa.exp_table_col_frac_v2';
-  static const _kColCount = 4;
+  // 列幅（中央5列＝大カテゴリ/小カテゴリ/内容/支払方法/金額 の配分・合計1.0）。
+  // 金額も可変にして、支払方法↔金額の境界をドラッグで調整できるようにする。端末保存。
+  List<double> _colFrac = const [0.16, 0.18, 0.30, 0.18, 0.18];
+  static const _kColFracKey = 'futa.exp_table_col_frac_v3';
+  static const _kColCount = 5;
 
   // 並び替えは表ヘッダーのクリックで列＋昇順/降順を切替。
   _SortCol _sortCol = _SortCol.date;
@@ -272,19 +273,17 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
               final innerW = cons.maxWidth - 24;
               final receiptExtra =
                   widget.showReceiptCheck ? (_kReceiptW + _kColGap) : 0.0;
-              final fixed = _kDateW +
-                  _kAmountW +
-                  _kColGap * 2 +
-                  _kHandleW * 3 +
-                  receiptExtra;
-              final mw = (innerW - fixed) < 160 ? 160.0 : innerW - fixed;
+              // 金額も可変列（5列）。固定は date ＋ date|major の隙間 ＋ ハンドル4本。
+              final fixed =
+                  _kDateW + _kColGap + _kHandleW * 4 + receiptExtra;
+              final mw = (innerW - fixed) < 200 ? 200.0 : innerW - fixed;
               final w = _ColW(
                 date: _kDateW,
                 major: _colFrac[0] * mw,
                 sub: _colFrac[1] * mw,
                 content: _colFrac[2] * mw,
                 pay: _colFrac[3] * mw,
-                amount: _kAmountW,
+                amount: _colFrac[4] * mw,
               );
               return Column(
                 children: [
@@ -351,7 +350,6 @@ IconData _paymentIcon(String method) {
 enum _SortCol { date, major, sub, content, payment, amount }
 
 const double _kDateW = 64; // 「06/29(月)」が収まる幅。
-const double _kAmountW = 92;
 const double _kColGap = 8;
 const double _kHandleW = 12;
 const double _kReceiptW = 56; // 領収書チェック列の幅（事業モード）。
@@ -467,7 +465,7 @@ class _ExpenseTableHeader extends StatelessWidget {
           SizedBox(width: w.content, child: _h('内容', _SortCol.content)),
           _handle(2),
           SizedBox(width: w.pay, child: _h('支払方法', _SortCol.payment)),
-          _vGrid(_kColGap, _kHeadH),
+          _handle(3),
           SizedBox(
               width: w.amount, child: _h('金額', _SortCol.amount, right: true)),
           if (showReceipt) ...[
@@ -592,7 +590,7 @@ class _ExpenseRow extends StatelessWidget {
                 ],
               ),
             ),
-            _vGrid(_kColGap, _kRowH),
+            _vGrid(_kHandleW, _kRowH),
             SizedBox(
               width: w.amount,
               child: Text('-${formatYen(t.amount)}',
