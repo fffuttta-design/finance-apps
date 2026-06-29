@@ -1,1 +1,1 @@
-{"version":"1.0.360","buildNumber":"361","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.360/futa-finance-v1.0.360.apk","releaseNotes":"クレジットカードの明細画面（PC/Web）を、支出明細と同じ表（日付・カテゴリ色・内容・支払方法・金額＋検索＋並び替え＋列幅調整）にしました。口座詳細（通帳）の明細テーブルは列幅を固定してきれいに揃うようにしました。"}
+{"version":"1.0.361","buildNumber":"362","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.361/futa-finance-v1.0.361.apk","releaseNotes":"支出明細の並び替えを、バッジから「表ヘッダーのクリック」に変更（同じ列を再タップで昇順⇄降順）。日付に曜日を表示（土＝青／日＝赤）。通帳の月初・月末残高の桁を他の行とまっすぐ揃えました。"}
