@@ -547,65 +547,87 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
             style: TextStyle(color: Color(0xFF9CA3AF))),
       );
     }
-    return Scrollbar(
-      child: SingleChildScrollView(
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            headingRowColor:
-                WidgetStateProperty.all(const Color(0xFFF3F4F6)),
-            headingTextStyle: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF374151)),
-            dataTextStyle: const TextStyle(
-                fontSize: 12, color: Color(0xFF111827)),
-            columnSpacing: 16,
-            horizontalMargin: 12,
-            columns: const [
-              DataColumn(label: Text('取引日')),
-              DataColumn(label: Text('摘要')),
-              DataColumn(label: Text('出金'), numeric: true),
-              DataColumn(label: Text('入金'), numeric: true),
-              DataColumn(label: Text('残高'), numeric: true),
-              DataColumn(label: SizedBox.shrink()), // 編集アイコン列
-            ],
-            rows: [
-              // 月末残高（先頭 = 一番上）
-              if (monthEndBalance != null && _selectedMonth != null)
-                _virtualBalanceRow(
-                  label: '月末残高',
-                  date: DateTime(_selectedMonth!.year,
-                      _selectedMonth!.month + 1, 0),
-                  balance: monthEndBalance,
-                  background: const Color(0xFFE0F2FE),
-                  isMonthStart: false,
-                  isEdited: _pendingMonthEndBalance != null,
-                ),
-              // 通常の取引行
-              for (final row in displayRows) _txnRow(row),
-              // 月初残高（末尾 = 一番下）
-              if (monthStartBalance != null && _selectedMonth != null)
-                _virtualBalanceRow(
-                  label: '月初残高',
-                  date: DateTime(
-                      _selectedMonth!.year, _selectedMonth!.month, 1),
-                  balance: monthStartBalance,
-                  background: const Color(0xFFFEF3C7),
-                  isMonthStart: true,
-                  isEdited: _pendingMonthStartBalance != null,
-                ),
-            ],
-          ),
+    // 列幅を固定した Table で揃える（DataTableの不揃いを解消）。
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+        ),
+        child: Table(
+          columnWidths: const {
+            0: FixedColumnWidth(108),
+            1: FlexColumnWidth(),
+            2: FixedColumnWidth(100),
+            3: FixedColumnWidth(100),
+            4: FixedColumnWidth(124),
+            5: FixedColumnWidth(40),
+          },
+          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+          border: const TableBorder(
+              horizontalInside:
+                  BorderSide(color: Color(0xFFF1F2F4), width: 1)),
+          children: [
+            _ledgerHeaderRow(),
+            if (monthEndBalance != null && _selectedMonth != null)
+              _virtualBalanceRow(
+                label: '月末残高',
+                date: DateTime(
+                    _selectedMonth!.year, _selectedMonth!.month + 1, 0),
+                balance: monthEndBalance,
+                background: const Color(0xFFE0F2FE),
+                isMonthStart: false,
+                isEdited: _pendingMonthEndBalance != null,
+              ),
+            for (final row in displayRows) _txnRow(row),
+            if (monthStartBalance != null && _selectedMonth != null)
+              _virtualBalanceRow(
+                label: '月初残高',
+                date:
+                    DateTime(_selectedMonth!.year, _selectedMonth!.month, 1),
+                balance: monthStartBalance,
+                background: const Color(0xFFFEF3C7),
+                isMonthStart: true,
+                isEdited: _pendingMonthStartBalance != null,
+              ),
+          ],
         ),
       ),
+    );
+  }
+
+  static const _cellPad = EdgeInsets.symmetric(horizontal: 12, vertical: 11);
+
+  TableRow _ledgerHeaderRow() {
+    Widget h(String s, {bool right = false}) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          child: Text(s,
+              textAlign: right ? TextAlign.right : TextAlign.left,
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF6B7280))),
+        );
+    return TableRow(
+      decoration: const BoxDecoration(color: Color(0xFFF3F4F6)),
+      children: [
+        h('取引日'),
+        h('摘要'),
+        h('出金', right: true),
+        h('入金', right: true),
+        h('残高', right: true),
+        const SizedBox.shrink(),
+      ],
     );
   }
 
   /// 月初/月末残高の仮想行（残高セルをタップで手入力編集可能）。
   /// [isMonthStart] true=月初残高、false=月末残高
   /// [isEdited] true なら pending 編集中（オレンジ枠で強調）
-  DataRow _virtualBalanceRow({
+  TableRow _virtualBalanceRow({
     required String label,
     required DateTime date,
     required int balance,
@@ -613,26 +635,35 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     required bool isMonthStart,
     required bool isEdited,
   }) {
-    return DataRow(
-      color: WidgetStateProperty.all(background),
-      cells: [
-        DataCell(Text(
-            '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}',
-            style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF6B7280)))),
-        DataCell(Text(label,
-            style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF374151)))),
-        const DataCell(Text('')),
-        const DataCell(Text('')),
-        DataCell(
-          InkWell(
+    return TableRow(
+      decoration: BoxDecoration(color: background),
+      children: [
+        Padding(
+          padding: _cellPad,
+          child: Text(
+              '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}',
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF6B7280))),
+        ),
+        Padding(
+          padding: _cellPad,
+          child: Text(label,
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF374151))),
+        ),
+        const SizedBox.shrink(),
+        const SizedBox.shrink(),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+          child: InkWell(
             onTap: () => _editVirtualBalance(isMonthStart, balance),
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 6, vertical: 4),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               decoration: BoxDecoration(
                 border: Border.all(
                   color: isEdited
@@ -643,16 +674,21 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    formatYen(balance),
-                    style: TextStyle(
-                        color: isEdited
-                            ? const Color(0xFFEA580C)
-                            : const Color(0xFF111827),
-                        fontWeight: FontWeight.w700,
-                        fontFamily: 'monospace'),
+                  Flexible(
+                    child: Text(
+                      formatYen(balance),
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: isEdited
+                              ? const Color(0xFFEA580C)
+                              : const Color(0xFF111827),
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'monospace'),
+                    ),
                   ),
                   const SizedBox(width: 4),
                   Icon(Icons.edit,
@@ -665,7 +701,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
             ),
           ),
         ),
-        const DataCell(SizedBox.shrink()),
+        const SizedBox.shrink(),
       ],
     );
   }
@@ -852,53 +888,62 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     }
   }
 
-  DataRow _txnRow(_LedgerRow row) {
+  TableRow _txnRow(_LedgerRow row) {
     final t = row.txn;
     final isOut = row.signedAmount < 0;
     final isTransfer = t.type == core.TransactionType.transfer;
     final desc = isTransfer
         ? '振替 ${t.transferFromAccount ?? '?'} → ${t.transferToAccount ?? '?'}'
         : t.description;
-    return DataRow(cells: [
-      DataCell(Text(
-          '${t.date.year}/${t.date.month.toString().padLeft(2, '0')}/${t.date.day.toString().padLeft(2, '0')}')),
-      DataCell(SizedBox(
-        width: 220,
-        child: Text(desc, overflow: TextOverflow.ellipsis),
-      )),
-      DataCell(Text(
-        isOut ? formatYen(-row.signedAmount) : '',
-        style: const TextStyle(
-            color: Color(0xFFDC2626),
-            fontWeight: FontWeight.w600,
-            fontFamily: 'monospace'),
-      )),
-      DataCell(Text(
-        isOut ? '' : formatYen(row.signedAmount),
-        style: const TextStyle(
-            color: Color(0xFF16A34A),
-            fontWeight: FontWeight.w600,
-            fontFamily: 'monospace'),
-      )),
-      DataCell(Text(
-        formatYen(row.balanceAfter),
-        style: TextStyle(
-            color: row.balanceAfter >= 0
-                ? const Color(0xFF111827)
-                : const Color(0xFFDC2626),
-            fontWeight: FontWeight.w700,
-            fontFamily: 'monospace'),
-      )),
-      DataCell(
-        IconButton(
-          icon: const Icon(Icons.edit_outlined,
-              size: 16, color: Color(0xFF6B7280)),
-          padding: EdgeInsets.zero,
-          visualDensity: VisualDensity.compact,
-          constraints: const BoxConstraints(),
-          tooltip: '編集',
-          onPressed: () => _showEditDialog(t),
-        ),
+    Widget money(String s, Color c) => Padding(
+          padding: _cellPad,
+          child: Text(s,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                  fontSize: 12,
+                  color: c,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'monospace')),
+        );
+    return TableRow(children: [
+      Padding(
+        padding: _cellPad,
+        child: Text(
+            '${t.date.year}/${t.date.month.toString().padLeft(2, '0')}/${t.date.day.toString().padLeft(2, '0')}',
+            style: const TextStyle(
+                fontSize: 12, color: Color(0xFF6B7280))),
+      ),
+      Padding(
+        padding: _cellPad,
+        child: Text(desc,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF111827))),
+      ),
+      money(isOut ? formatYen(-row.signedAmount) : '',
+          const Color(0xFFDC2626)),
+      money(isOut ? '' : formatYen(row.signedAmount),
+          const Color(0xFF16A34A)),
+      Padding(
+        padding: _cellPad,
+        child: Text(formatYen(row.balanceAfter),
+            textAlign: TextAlign.right,
+            style: TextStyle(
+                fontSize: 12,
+                color: row.balanceAfter >= 0
+                    ? const Color(0xFF111827)
+                    : const Color(0xFFDC2626),
+                fontWeight: FontWeight.w700,
+                fontFamily: 'monospace')),
+      ),
+      IconButton(
+        icon: const Icon(Icons.edit_outlined,
+            size: 16, color: Color(0xFF6B7280)),
+        padding: EdgeInsets.zero,
+        visualDensity: VisualDensity.compact,
+        constraints: const BoxConstraints(),
+        tooltip: '編集',
+        onPressed: () => _showEditDialog(t),
       ),
     ]);
   }

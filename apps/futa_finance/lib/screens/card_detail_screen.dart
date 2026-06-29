@@ -10,6 +10,7 @@ import '../utils/formatters.dart';
 import '../utils/modal_input.dart';
 import '../utils/thousands_separator_input_formatter.dart';
 import '../v2/widgets/credit_card_reconcile.dart';
+import '../v2/widgets/expense_detail_table.dart';
 import '../widgets/brand_logo.dart';
 import 'expense_input_screen.dart';
 
@@ -196,7 +197,22 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                       children: [
                         _monthSelector(),
                         const Divider(height: 1),
-                        Expanded(child: _historyList(monthTxns)),
+                        Expanded(
+                          // PC幅は支出明細と同じ表（検索・並び替え・列幅）。
+                          // スマホ幅は従来のカード型リスト。
+                          child: constraints.maxWidth >= 900
+                              ? SingleChildScrollView(
+                                  padding: const EdgeInsets.all(16),
+                                  child: ExpenseDetailTable(
+                                    title: '明細',
+                                    rows: monthTxns,
+                                    onEditTxn: _editCardTxn,
+                                    accent: const Color(0xFFDC2626),
+                                    emptyHint: 'この期間の利用はありません',
+                                  ),
+                                )
+                              : _historyList(monthTxns),
+                        ),
                       ],
                     ),
                     // ── タブ2: 月別請求推移 ──
@@ -565,6 +581,12 @@ class _CardDetailScreenState extends State<CardDetailScreen>
         ),
       ),
     );
+  }
+
+  /// 明細テーブル行タップ → 取引を編集して再読込。
+  Future<void> _editCardTxn(core.Transaction t) async {
+    await showInputSheet<bool>(context, ExpenseInputScreen(editing: t));
+    if (mounted) await _load();
   }
 
   // ─── クレカ棚卸し（突合）──
