@@ -1,6 +1,6 @@
 # FutaFinance 仕様書
 
-> **最終更新: 2026-06-29 / v1.0.363+364**
+> **最終更新: 2026-06-29 / v1.0.364+365**
 > 変更があるたびにこのファイルを編集してバージョンを更新すること。
 
 ---
@@ -747,5 +747,5 @@ class AppModeManager extends ChangeNotifier {
 
 | 種別 | バージョン |
 |---|---|
-| Flutter アプリ | 1.0.363+364 |
+| Flutter アプリ | 1.0.364+365 |
 | Electron Desktop | 1.0.278 / buildNumber 279 |
