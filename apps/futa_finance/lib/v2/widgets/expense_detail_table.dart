@@ -330,6 +330,17 @@ const double _kDateW = 64; // 「06/29(月)」が収まる幅。
 const double _kAmountW = 92;
 const double _kColGap = 8;
 const double _kHandleW = 12;
+const double _kRowH = 40; // データ行の固定高さ（縦罫線をこの高さで引く）。
+const double _kHeadH = 34; // ヘッダー行の固定高さ。
+const Color _kGridLine = Color(0xFFEDF0F3); // 薄い縦罫線（表のセル区切り）。
+
+/// 指定高さの縦罫線（列の区切り）。[box] の中央に1px。
+Widget _vGrid(double boxWidth, double height) => SizedBox(
+      width: boxWidth,
+      child: Center(
+        child: Container(width: 1, height: height, color: _kGridLine),
+      ),
+    );
 
 class _ColW {
   final double date;
@@ -394,6 +405,7 @@ class _ExpenseTableHeader extends StatelessWidget {
     );
   }
 
+  // リサイズハンドル兼・縦罫線（ヘッダー高さいっぱいの1px線をドラッグ可能に）。
   Widget _handle(int i) => MouseRegion(
         cursor: SystemMouseCursors.resizeColumn,
         child: GestureDetector(
@@ -402,9 +414,9 @@ class _ExpenseTableHeader extends StatelessWidget {
           onHorizontalDragEnd: (_) => onResizeEnd(),
           child: SizedBox(
             width: _kHandleW,
-            height: 20,
+            height: _kHeadH,
             child: Center(
-              child: Container(width: 2, height: 12, color: V2Colors.border),
+              child: Container(width: 1, height: _kHeadH, color: _kGridLine),
             ),
           ),
         ),
@@ -413,12 +425,13 @@ class _ExpenseTableHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      height: _kHeadH,
       color: V2Colors.surfaceMuted,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: [
           SizedBox(width: w.date, child: _h('日付', _SortCol.date)),
-          const SizedBox(width: _kColGap),
+          _vGrid(_kColGap, _kHeadH),
           SizedBox(width: w.major, child: _h('大カテゴリ', _SortCol.major)),
           _handle(0),
           SizedBox(width: w.sub, child: _h('小カテゴリ', _SortCol.sub)),
@@ -426,7 +439,7 @@ class _ExpenseTableHeader extends StatelessWidget {
           SizedBox(width: w.content, child: _h('内容', _SortCol.content)),
           _handle(2),
           SizedBox(width: w.pay, child: _h('支払方法', _SortCol.payment)),
-          const SizedBox(width: _kColGap),
+          _vGrid(_kColGap, _kHeadH),
           SizedBox(
               width: w.amount, child: _h('金額', _SortCol.amount, right: true)),
         ],
@@ -457,8 +470,10 @@ class _ExpenseRow extends StatelessWidget {
     final pay = t.paymentMethod.trim();
     return InkWell(
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      child: SizedBox(
+        height: _kRowH,
+        child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -466,8 +481,8 @@ class _ExpenseRow extends StatelessWidget {
               width: w.date,
               child: _DateWithWeekday(date: t.date),
             ),
-            const SizedBox(width: _kColGap),
-            // 大カテゴリ（色付きバッジ）。
+            _vGrid(_kColGap, _kRowH),
+            // 大カテゴリ（色付きバッジ・アイコン無し）。
             SizedBox(
               width: w.major,
               child: Align(
@@ -479,34 +494,19 @@ class _ExpenseRow extends StatelessWidget {
                     color: accent.withValues(alpha: 0.13),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                            color: accent,
-                            borderRadius: BorderRadius.circular(2)),
-                      ),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(majorDisplay,
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: HSLColor.fromColor(accent)
-                                    .withLightness(0.30)
-                                    .toColor())),
-                      ),
-                    ],
-                  ),
+                  child: Text(majorDisplay,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: HSLColor.fromColor(accent)
+                              .withLightness(0.30)
+                              .toColor())),
                 ),
               ),
             ),
-            const SizedBox(width: _kHandleW),
+            _vGrid(_kHandleW, _kRowH),
             // 小カテゴリ（プレーンテキスト）。
             SizedBox(
               width: w.sub,
@@ -519,7 +519,7 @@ class _ExpenseRow extends StatelessWidget {
                           ? V2Colors.textMuted
                           : V2Colors.textSecondary)),
             ),
-            const SizedBox(width: _kHandleW),
+            _vGrid(_kHandleW, _kRowH),
             SizedBox(
               width: w.content,
               child: Text(title,
@@ -527,7 +527,7 @@ class _ExpenseRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1),
             ),
-            const SizedBox(width: _kHandleW),
+            _vGrid(_kHandleW, _kRowH),
             SizedBox(
               width: w.pay,
               child: Row(
@@ -545,7 +545,7 @@ class _ExpenseRow extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: _kColGap),
+            _vGrid(_kColGap, _kRowH),
             SizedBox(
               width: w.amount,
               child: Text('-${formatYen(t.amount)}',
@@ -557,6 +557,7 @@ class _ExpenseRow extends StatelessWidget {
                       fontFeatures: V2Typography.tabularNums)),
             ),
           ],
+        ),
         ),
       ),
     );
