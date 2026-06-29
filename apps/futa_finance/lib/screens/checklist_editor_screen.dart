@@ -329,6 +329,18 @@ class _ChecklistEditorScreenState extends State<ChecklistEditorScreen> {
     _update(list);
   }
 
+  /// サブ項目（子）の並び替え。
+  void _reorderChild(int parentIndex, int oldIndex, int newIndex) {
+    final parent = _config!.items[parentIndex];
+    final children = [...parent.children];
+    if (newIndex > oldIndex) newIndex--;
+    final c = children.removeAt(oldIndex);
+    children.insert(newIndex, c);
+    final list = [..._config!.items];
+    list[parentIndex] = parent.copyWith(children: children);
+    _update(list);
+  }
+
   @override
   Widget build(BuildContext context) {
     final config = _config;
@@ -461,11 +473,25 @@ class _ChecklistEditorScreenState extends State<ChecklistEditorScreen> {
               ),
             )
           else ...[
-            // サブ項目セクション
-            if (item.children.isNotEmpty)
+            // サブ項目セクション（ドラッグで並び替え可能）
+            if (item.children.isNotEmpty) ...[
               const Divider(height: 1, color: Color(0xFFF3F4F6)),
-            ...item.children.asMap().entries.map((e) =>
-                _childRow(parentIndex: i, childIndex: e.key, child: e.value)),
+              ReorderableListView(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                buildDefaultDragHandles: false,
+                onReorder: (o, n) => _reorderChild(i, o, n),
+                children: [
+                  for (int ci = 0; ci < item.children.length; ci++)
+                    _childRow(
+                      key: ValueKey('child-$i-${item.children[ci].id}'),
+                      parentIndex: i,
+                      childIndex: ci,
+                      child: item.children[ci],
+                    ),
+                ],
+              ),
+            ],
             // サブ項目追加ボタン
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
@@ -492,18 +518,28 @@ class _ChecklistEditorScreenState extends State<ChecklistEditorScreen> {
   }
 
   Widget _childRow({
+    required Key key,
     required int parentIndex,
     required int childIndex,
     required ChecklistItem child,
   }) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(40, 4, 8, 4),
+      key: key,
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: Color(0xFFF9FAFB))),
       ),
       child: Row(
         children: [
-          // インデントだけで階層を表現（矢印アイコンは廃止）
+          // ドラッグハンドル（並び替え）＋インデント。
+          ReorderableDragStartListener(
+            index: childIndex,
+            child: const Padding(
+              padding: EdgeInsets.only(left: 16, right: 8),
+              child: Icon(Icons.drag_indicator,
+                  size: 16, color: Color(0xFFCBD5E1)),
+            ),
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

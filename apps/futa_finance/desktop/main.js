@@ -359,6 +359,18 @@ async function createWindow() {
   mainWindow.on('unmaximize', () => saveWindowState(mainWindow));
   mainWindow.on('close', () => saveWindowState(mainWindow));
   mainWindow.on('closed', () => { mainWindow = null; });
+
+  // マウスの「戻る/進む」ボタン（Windowsの app-command）をブラウザ履歴に流す。
+  // Flutter Web は Navigator.push でブラウザ履歴に積むため、history.back/forward で
+  // 直前の画面（設定の各マスタ等）に戻れる。
+  mainWindow.on('app-command', (e, cmd) => {
+    if (cmd === 'browser-backward') {
+      mainWindow.webContents.executeJavaScript('window.history.back()').catch(() => {});
+    } else if (cmd === 'browser-forward') {
+      mainWindow.webContents.executeJavaScript('window.history.forward()').catch(() => {});
+    }
+  });
+
   mainWindow.loadURL(`http://127.0.0.1:${port}/`);
 }
 
