@@ -533,13 +533,8 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                             const SizedBox(height: 6),
                             Row(
                               children: [
-                                Expanded(
-                                  child: Text(
-                                      '明細 ${rows.length}件'
-                                      '${subTotal > 0 ? ' ＋ 固定費 ${formatYen(subTotal)}' : ''}',
-                                      style: V2Typography.micro.copyWith(
-                                          color: V2Colors.textMuted)),
-                                ),
+                                // 「明細◯件＋固定費◯円」は内訳を開けば分かるので省略。
+                                const Spacer(),
                                 Text(_summaryOpen ? '内訳を閉じる' : '内訳を見る',
                                     style: V2Typography.micro
                                         .copyWith(color: widget.accent)),
@@ -566,9 +561,10 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                             // ── 種類別（変動費 / 固定費）──
                             _breakdownHeader(Icons.donut_small_outlined, '種類別'),
                             const SizedBox(height: 6),
-                            _summaryLine('変動費（明細）', txTotal),
                             if (subTotal > 0)
                               _summaryLine('固定費（サブスク）', subTotal),
+                            _summaryLine(
+                                '変動費（各種支出${rows.length}件）', txTotal),
                             const SizedBox(height: 14),
                             const Divider(height: 1, color: V2Colors.divider),
                             const SizedBox(height: 14),
@@ -586,23 +582,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 ),
               ),
               const SizedBox(height: V2Spacing.md),
-              // クレカ引落照合・棚卸し（支出合計のすぐ下・目立つ位置）
-              if (showFixedAndCard) ...[
-                CreditCardBillingSection(
-                  cards: _payments.creditCards
-                      .where((c) => !c.inactive)
-                      .toList(),
-                  bankAccounts: _payments.bankAccounts
-                      .where((b) => !b.inactive)
-                      .toList(),
-                  transactions: _transactions,
-                  subscriptions: _subs,
-                  ym: _ymKey,
-                  onOpenReconcile: _openCardReconcile,
-                ),
-                if (_hasReconcileCards) const SizedBox(height: V2Spacing.md),
-              ],
-              // カテゴリ内訳（見出しはカード外・クレカ引落照合と同じスタイル）
+              // カテゴリ内訳（支出合計の直下）
               if (majorEntries.isNotEmpty) ...[
                 Padding(
                   padding: const EdgeInsets.only(bottom: V2Spacing.sm),
@@ -664,6 +644,22 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                   ),
                 ),
                 const SizedBox(height: V2Spacing.md),
+              ],
+              // ウォレット（クレカ引落照合・棚卸し）— カテゴリ内訳の下
+              if (showFixedAndCard) ...[
+                CreditCardBillingSection(
+                  cards: _payments.creditCards
+                      .where((c) => !c.inactive)
+                      .toList(),
+                  bankAccounts: _payments.bankAccounts
+                      .where((b) => !b.inactive)
+                      .toList(),
+                  transactions: _transactions,
+                  subscriptions: _subs,
+                  ym: _ymKey,
+                  onOpenReconcile: _openCardReconcile,
+                ),
+                if (_hasReconcileCards) const SizedBox(height: V2Spacing.md),
               ],
               // 毎月の固定費（引落予定）— 見出しはカード外・クレカ引落照合と同じスタイル
               if (fixedLines.isNotEmpty) ...[
@@ -831,10 +827,7 @@ class _CatBarState extends State<_CatBar> {
               children: [
                 Row(
                   children: [
-                    if (canExpand)
-                      Icon(_open ? Icons.expand_less : Icons.expand_more,
-                          size: 18, color: V2Colors.textMuted),
-                    if (canExpand) const SizedBox(width: 2),
+                    // トグル矢印は出さず、行クリックで開閉する。
                     // カテゴリアイコン（色付き丸背景）。
                     Container(
                       width: 24,
