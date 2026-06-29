@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.85",
-    "buildNumber":  "90",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.85/takuharu-finance-v0.2.85.apk",
-    "releaseNotes":  "レシート品目画面の一括ボタンを、見出し横の小さなチップ「🍙 ぜんぶ個人わく」にスッキリ変更しました。"
+    "version":  "0.2.86",
+    "buildNumber":  "91",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.86/takuharu-finance-v0.2.86.apk",
+    "releaseNotes":  "レシート読み取りで、品目合計とレシートの税込合計がズレたとき（イオンネットスーパー等の外税レシート）、差額を「消費税・調整」として1行で自動追加し、合計がレシートとピッタリ合うようにしました。"
 }
