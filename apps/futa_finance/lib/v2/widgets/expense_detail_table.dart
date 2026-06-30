@@ -106,6 +106,9 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
   final _searchCtrl = TextEditingController();
   String _query = '';
 
+  /// 決済手段の絞り込み（null = すべて表示）。
+  String? _payFilter;
+
   /// ヘッダークリック：同じ列なら昇順/降順をトグル、別列なら列を切替（既定向き）。
   void _onSort(_SortCol col) {
     setState(() {
@@ -169,6 +172,9 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
     final q = _query.trim().toLowerCase();
     var list =
         q.isEmpty ? rows : rows.where((r) => r.searchHay.contains(q)).toList();
+    if (_payFilter != null) {
+      list = list.where((r) => r.payKey == _payFilter).toList();
+    }
     int cmp;
     switch (_sortCol) {
       case _SortCol.date:
@@ -204,9 +210,31 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
     return list;
   }
 
+  /// 決済手段の選択肢（件数の多い順）。取引＋固定費の両方から集計。
+  List<({String key, int count})> _payOptions() {
+    final all = <_Row>[
+      ...widget.rows.map(_Row.txn),
+      ...widget.fixedRows.map(_Row.fixed),
+    ];
+    final counts = <String, int>{};
+    for (final r in all) {
+      counts[r.payKey] = (counts[r.payKey] ?? 0) + 1;
+    }
+    final list =
+        counts.entries.map((e) => (key: e.key, count: e.value)).toList()
+          ..sort((a, b) => b.count.compareTo(a.count));
+    return list;
+  }
+
   @override
   Widget build(BuildContext context) {
     final detailRows = _sortFilter();
+    final payOptions = _payOptions();
+    // 絞り込み中の決済手段が選択肢から消えたら（データ変化など）解除する。
+    if (_payFilter != null &&
+        !payOptions.any((o) => o.key == _payFilter)) {
+      _payFilter = null;
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -252,6 +280,34 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
           ),
         ),
         const SizedBox(height: V2Spacing.sm),
+        // 決済手段でしぼり込み（2種類以上あるときだけ表示）。
+        if (payOptions.length >= 2) ...[
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _PayChip(
+                  label: 'すべて',
+                  icon: Icons.apps,
+                  selected: _payFilter == null,
+                  accent: widget.accent,
+                  onTap: () => setState(() => _payFilter = null),
+                ),
+                for (final o in payOptions) ...[
+                  const SizedBox(width: 6),
+                  _PayChip(
+                    label: '${o.key}（${o.count}）',
+                    icon: _paymentIcon(o.key),
+                    selected: _payFilter == o.key,
+                    accent: widget.accent,
+                    onTap: () => setState(() => _payFilter = o.key),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: V2Spacing.sm),
+        ],
         if (detailRows.isEmpty)
           Container(
             padding: const EdgeInsets.symmetric(vertical: 40),
@@ -429,6 +485,9 @@ class _Row {
 
   String get paymentText =>
       (txn?.paymentMethod ?? fx!.paymentMethod ?? '').trim();
+
+  /// 決済手段フィルタ用のキー（空は「未設定」）。
+  String get payKey => paymentText.isEmpty ? '未設定' : paymentText;
 
   String get searchHay => (txn != null
           ? [
@@ -1189,6 +1248,54 @@ class _NarrowFixedRow extends StatelessWidget {
                 ],
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 決済手段の絞り込みチップ（横スクロール）。選択中はアクセント色。
+class _PayChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final Color accent;
+  final VoidCallback onTap;
+  const _PayChip({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.accent,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = selected
+        ? Color.alphaBlend(accent.withValues(alpha: 0.16), Colors.white)
+        : V2Colors.surface;
+    final fg = selected ? accent : V2Colors.textSecondary;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: selected ? accent : V2Colors.border,
+              width: selected ? 1.4 : 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: fg),
+            const SizedBox(width: 5),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w700, color: fg)),
           ],
         ),
       ),

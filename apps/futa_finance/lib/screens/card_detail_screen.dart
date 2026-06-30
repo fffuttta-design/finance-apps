@@ -5,6 +5,7 @@ import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
+import '../data/subscription_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 import '../utils/modal_input.dart';
@@ -13,6 +14,7 @@ import '../v2/widgets/credit_card_reconcile.dart';
 import '../v2/widgets/expense_detail_table.dart';
 import '../widgets/brand_logo.dart';
 import 'expense_input_screen.dart';
+import 'subscription_list_screen.dart';
 
 /// クレジットカード詳細（利用明細）画面。
 /// 銀行通帳の AccountDetailScreen に相当するクレカ版。
@@ -36,7 +38,11 @@ class _CardDetailScreenState extends State<CardDetailScreen>
     with SingleTickerProviderStateMixin {
   StreamSubscription<List<core.Transaction>>? _sub;
   List<core.Transaction> _all = [];
+  List<core.Subscription> _subs = [];
   DateTime? _selectedMonth;
+
+  /// 初回ロードで「利用のある最新月」を初期選択にしたか（以後はユーザー操作を尊重）。
+  bool _monthPicked = false;
   late final TabController _tabController =
       TabController(length: 2, vsync: this);
 
@@ -85,8 +91,80 @@ class _CardDetailScreenState extends State<CardDetailScreen>
 
   Future<void> _load() async {
     final list = await TransactionRepository.instance.loadAll();
+    final subs = await SubscriptionRepository.instance.load();
     if (!mounted) return;
-    setState(() => _all = list);
+    setState(() {
+      _all = list;
+      _subs = subs.subscriptions;
+      // 初回だけ「利用のある最新月」を初期選択にする（当月が空でも実績月を開く）。
+      if (!_monthPicked) {
+        _monthPicked = true;
+        _selectedMonth = _defaultMonth();
+      }
+    });
+  }
+
+  /// 初期表示する月。当月に利用があれば当月、無ければ利用のある最新月。
+  /// 利用が全く無ければ当月のまま。
+  DateTime _defaultMonth() {
+    final now = DateTime.now();
+    final cur = DateTime(now.year, now.month);
+    final name = _card.name;
+    final months = <DateTime>{};
+    for (final t in _all) {
+      if (t.type != core.TransactionType.expense) continue;
+      if (t.paymentMethod != name) continue;
+      months.add(DateTime(t.date.year, t.date.month));
+    }
+    if (months.isEmpty || months.contains(cur)) return cur;
+    return months.reduce((a, b) => a.isAfter(b) ? a : b);
+  }
+
+  /// このカードに紐づく固定費（支払方法が一致）を、明細テーブルに混ぜる行に変換。
+  /// [month] が null（全期間）のときは月が定まらないので出さない。
+  List<FixedCostRow> _cardFixedRows(DateTime? month) {
+    if (month == null) return const [];
+    final now = DateTime.now();
+    final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final ym = '${month.year}-${month.month.toString().padLeft(2, '0')}';
+    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
+    final name = _card.name;
+    final rows = <FixedCostRow>[];
+    for (final sub in _subs) {
+      if ((sub.paymentMethod ?? '').trim() != name) continue;
+      final amt = sub.plAmountForMonth(ym, curYm);
+      if (amt <= 0) continue;
+      DateTime date;
+      if (sub.cycle == core.SubscriptionCycle.annually &&
+          sub.nextBillingDate != null) {
+        date = sub.nextBillingDate!;
+      } else {
+        final day = (sub.billingDay ?? 1).clamp(1, daysInMonth);
+        date = DateTime(month.year, month.month, day);
+      }
+      final label = (sub.plMajor ?? '').trim().isNotEmpty
+          ? sub.plMajor!.trim()
+          : (sub.category ?? '').trim();
+      rows.add(FixedCostRow(
+        id: sub.id,
+        name: sub.name.trim().isEmpty ? '固定費' : sub.name.trim(),
+        amount: amt,
+        date: date,
+        paymentMethod: sub.paymentMethod,
+        categoryLabel: label,
+      ));
+    }
+    return rows;
+  }
+
+  /// 固定費行タップ → サブスク編集を開いて再読込。
+  Future<void> _editCardFixed(String id) async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+          builder: (_) => SubscriptionListScreen(initialEditId: id)),
+    );
+    if (mounted) await _load();
   }
 
   /// このカードに紐づく取引（paymentMethod が一致）。
@@ -223,6 +301,8 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                                     rows: monthTxns,
                                     onEditTxn: _editCardTxn,
                                     accent: const Color(0xFFDC2626),
+                                    fixedRows: _cardFixedRows(_selectedMonth),
+                                    onEditFixed: (f) => _editCardFixed(f.id),
                                     emptyHint: 'この期間の利用はありません',
                                   ),
                                 )
