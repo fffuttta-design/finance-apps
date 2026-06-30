@@ -173,6 +173,41 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     return lines;
   }
 
+  /// 指定月に計上される固定費を、明細テーブルに混ぜる用の行に変換する。
+  /// 日付＝請求日（billingDay／年払いは nextBillingDate）。無ければ月初。
+  List<FixedCostRow> _fixedTableRows(DateTime m) {
+    final now = DateTime.now();
+    final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
+    final daysInMonth = DateTime(m.year, m.month + 1, 0).day;
+    final rows = <FixedCostRow>[];
+    for (final sub in _subs) {
+      final amt = sub.plAmountForMonth(ym, curYm);
+      if (amt <= 0) continue;
+      DateTime date;
+      if (sub.cycle == core.SubscriptionCycle.annually &&
+          sub.nextBillingDate != null) {
+        date = sub.nextBillingDate!;
+      } else {
+        final day = (sub.billingDay ?? 1).clamp(1, daysInMonth);
+        date = DateTime(m.year, m.month, day);
+      }
+      // 小カテゴリ列に出す科目／グループ（会計科目を優先、無ければカテゴリ）。
+      final label = (sub.plMajor ?? '').trim().isNotEmpty
+          ? sub.plMajor!.trim()
+          : (sub.category ?? '').trim();
+      rows.add(FixedCostRow(
+        id: sub.id,
+        name: sub.name.trim().isEmpty ? '固定費' : sub.name.trim(),
+        amount: amt,
+        date: date,
+        paymentMethod: sub.paymentMethod,
+        categoryLabel: label,
+      ));
+    }
+    return rows;
+  }
+
   /// 固定費（サブスク）の編集画面をディープリンクで開く。
   Future<void> _editSubscription(String id) async {
     await Navigator.push<void>(
@@ -717,11 +752,17 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 const SizedBox(height: V2Spacing.xl),
               ],
               // 明細（PC幅＝表形式。検索・並び替え・列幅は共通ウィジェットに集約）。
+              // 固定費（引落予定）も淡色で混ぜて表示し、明細チェック時に
+              // 「固定費が計上されているか」を同じ表で確認できるようにする。
               ExpenseDetailTable(
                 title: detailLabel,
                 rows: rows,
                 onEditTxn: _edit,
                 accent: accent,
+                fixedRows: showFixedAndCard
+                    ? _fixedTableRows(_month)
+                    : const <FixedCostRow>[],
+                onEditFixed: (f) => _editSubscription(f.id),
                 emptyHint: '${_month.month}月の記録はまだありません',
                 // 事業モードのみ、領収書/レシート保存済みチェック列（税理士提出用）。
                 showReceiptCheck: _isBusiness,

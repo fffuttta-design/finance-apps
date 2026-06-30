@@ -8,6 +8,40 @@ import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
 
+/// 明細テーブルに「実際の取引」と混ぜて並べる固定費（サブスク）の1行。
+///
+/// 固定費は実取引（Transaction）ではなく毎月の引落予定だが、明細を1件ずつ
+/// チェックするときに「固定費が計上されているか」を同時に確認できるよう、
+/// 同じ表に淡色（区別色）で混ぜて表示するための行データ。
+class FixedCostRow {
+  /// 元のサブスク(Subscription)のID。タップ編集時に使う。
+  final String id;
+
+  /// サービス名（例「中部電力」）。明細の「内容」列に出す。
+  final String name;
+
+  /// その月の計上額（円）。
+  final int amount;
+
+  /// 並び替え（日付）用の日付。請求日があればその日、無ければ月初。
+  final DateTime date;
+
+  /// 支払方法（任意）。
+  final String? paymentMethod;
+
+  /// 「小カテゴリ」列に出す科目/グループ名（任意・空可）。
+  final String categoryLabel;
+
+  const FixedCostRow({
+    required this.id,
+    required this.name,
+    required this.amount,
+    required this.date,
+    this.paymentMethod,
+    this.categoryLabel = '',
+  });
+}
+
 /// 支出明細の共通テーブル（PC幅・表形式）。
 ///
 /// 支出タブ（rich_expenses）とクレカ詳細（card_detail）で共用。
@@ -15,6 +49,12 @@ import '../theme/typography.dart';
 class ExpenseDetailTable extends StatefulWidget {
   /// 表示対象の取引（呼び出し側で絞り込み済み）。
   final List<core.Transaction> rows;
+
+  /// 取引に混ぜて表示する固定費（任意）。空なら従来どおり取引のみ。
+  final List<FixedCostRow> fixedRows;
+
+  /// 固定費行タップ時（サブスク編集を開く）。fixedRows を渡すなら指定する。
+  final Future<void> Function(FixedCostRow f)? onEditFixed;
 
   /// 行タップ時（編集を開く等）。
   final Future<void> Function(core.Transaction t) onEditTxn;
@@ -39,6 +79,8 @@ class ExpenseDetailTable extends StatefulWidget {
     required this.rows,
     required this.onEditTxn,
     required this.accent,
+    this.fixedRows = const [],
+    this.onEditFixed,
     this.title = '明細',
     this.emptyHint = '記録はまだありません',
     this.showReceiptCheck = false,
@@ -119,21 +161,14 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
     setState(() => _colFrac = widths.map((w) => w / middleWidth).toList());
   }
 
-  List<core.Transaction> _sortFilter(List<core.Transaction> rows) {
+  List<_Row> _sortFilter() {
+    final rows = <_Row>[
+      ...widget.rows.map(_Row.txn),
+      ...widget.fixedRows.map(_Row.fixed),
+    ];
     final q = _query.trim().toLowerCase();
-    var list = q.isEmpty
-        ? [...rows]
-        : rows.where((t) {
-            final hay = [
-              t.description,
-              t.category.major,
-              t.category.sub,
-              t.paymentMethod,
-              t.memo ?? '',
-              t.store ?? '',
-            ].join(' ').toLowerCase();
-            return hay.contains(q);
-          }).toList();
+    var list =
+        q.isEmpty ? rows : rows.where((r) => r.searchHay.contains(q)).toList();
     int cmp;
     switch (_sortCol) {
       case _SortCol.date:
@@ -144,23 +179,23 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
         break;
       case _SortCol.major:
         list.sort((a, b) {
-          cmp = a.category.majorOrder.compareTo(b.category.majorOrder);
+          cmp = a.majorOrder.compareTo(b.majorOrder);
           if (cmp != 0) return cmp;
-          return a.category.sub.compareTo(b.category.sub);
+          return a.subText.compareTo(b.subText);
         });
         break;
       case _SortCol.sub:
         list.sort((a, b) {
-          cmp = a.category.sub.compareTo(b.category.sub);
+          cmp = a.subText.compareTo(b.subText);
           if (cmp != 0) return cmp;
-          return a.category.majorOrder.compareTo(b.category.majorOrder);
+          return a.majorOrder.compareTo(b.majorOrder);
         });
         break;
       case _SortCol.content:
-        list.sort((a, b) => a.description.compareTo(b.description));
+        list.sort((a, b) => a.contentText.compareTo(b.contentText));
         break;
       case _SortCol.payment:
-        list.sort((a, b) => a.paymentMethod.compareTo(b.paymentMethod));
+        list.sort((a, b) => a.paymentText.compareTo(b.paymentText));
         break;
     }
     if (!_asc) {
@@ -171,7 +206,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
 
   @override
   Widget build(BuildContext context) {
-    final detailRows = _sortFilter(widget.rows);
+    final detailRows = _sortFilter();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -262,14 +297,21 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                       accent: widget.accent,
                       touched: _sortTouched,
                     ),
-                    for (final t in detailRows) ...[
+                    for (final r in detailRows) ...[
                       const Divider(height: 1, color: V2Colors.divider),
-                      _NarrowRow(
-                        t: t,
-                        onTap: () => widget.onEditTxn(t),
-                        showReceipt: widget.showReceiptCheck,
-                        onToggleReceipt: widget.onToggleReceipt,
-                      ),
+                      if (r.isFixed)
+                        _NarrowFixedRow(
+                          f: r.fx!,
+                          onTap: () => widget.onEditFixed?.call(r.fx!),
+                          showReceipt: widget.showReceiptCheck,
+                        )
+                      else
+                        _NarrowRow(
+                          t: r.txn!,
+                          onTap: () => widget.onEditTxn(r.txn!),
+                          showReceipt: widget.showReceiptCheck,
+                          onToggleReceipt: widget.onToggleReceipt,
+                        ),
                     ],
                   ],
                 );
@@ -302,15 +344,23 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                     showReceipt: widget.showReceiptCheck,
                     touched: _sortTouched,
                   ),
-                  for (final t in detailRows) ...[
+                  for (final r in detailRows) ...[
                     const Divider(height: 1, color: V2Colors.divider),
-                    _ExpenseRow(
-                      t: t,
-                      onTap: () => widget.onEditTxn(t),
-                      w: w,
-                      showReceipt: widget.showReceiptCheck,
-                      onToggleReceipt: widget.onToggleReceipt,
-                    ),
+                    if (r.isFixed)
+                      _FixedRow(
+                        f: r.fx!,
+                        onTap: () => widget.onEditFixed?.call(r.fx!),
+                        w: w,
+                        showReceipt: widget.showReceiptCheck,
+                      )
+                    else
+                      _ExpenseRow(
+                        t: r.txn!,
+                        onTap: () => widget.onEditTxn(r.txn!),
+                        w: w,
+                        showReceipt: widget.showReceiptCheck,
+                        onToggleReceipt: widget.onToggleReceipt,
+                      ),
                   ],
                 ],
               );
@@ -353,6 +403,51 @@ IconData _paymentIcon(String method) {
 
 /// 並び替えの対象列。
 enum _SortCol { date, major, sub, content, payment, amount }
+
+/// 取引行 or 固定費行を統一して扱う内部ラッパ（並び替え・検索を共通化）。
+class _Row {
+  final core.Transaction? txn;
+  final FixedCostRow? fx;
+  _Row.txn(this.txn) : fx = null;
+  _Row.fixed(this.fx) : txn = null;
+
+  bool get isFixed => fx != null;
+
+  DateTime get date => txn?.date ?? fx!.date;
+  int get amount => txn?.amount ?? fx!.amount;
+
+  /// 大カテゴリ並び順。固定費は末尾側に寄せる（取引の後）。
+  int get majorOrder => txn?.category.majorOrder ?? (1 << 20);
+
+  String get subText => txn != null ? txn!.category.sub : fx!.categoryLabel;
+
+  String get contentText => txn != null
+      ? (txn!.description.trim().isNotEmpty
+          ? txn!.description.trim()
+          : txn!.category.sub)
+      : fx!.name;
+
+  String get paymentText =>
+      (txn?.paymentMethod ?? fx!.paymentMethod ?? '').trim();
+
+  String get searchHay => (txn != null
+          ? [
+              txn!.description,
+              txn!.category.major,
+              txn!.category.sub,
+              txn!.paymentMethod,
+              txn!.memo ?? '',
+              txn!.store ?? '',
+            ]
+          : [fx!.name, fx!.categoryLabel, fx!.paymentMethod ?? '', '固定費'])
+      .join(' ')
+      .toLowerCase();
+}
+
+/// 固定費行の見た目（取引と区別するための淡いアンバー系）。
+const Color _kFixedBg = Color(0xFFFFF8EC); // 行の淡い背景
+const Color _kFixedBadgeBg = Color(0xFFFBE3BE); // 「固定費」バッジ背景
+const Color _kFixedAccent = Color(0xFFB45309); // 「固定費」バッジ文字・金額
 
 const double _kDateW = 64; // 「06/29(月)」が収まる幅。
 const double _kColGap = 8;
@@ -639,6 +734,133 @@ class _ExpenseRow extends StatelessWidget {
   }
 }
 
+/// 固定費の1行（PC幅）。取引行と同じ列割りだが、淡いアンバー背景＋
+/// 先頭に「固定費」バッジを付けて、ひと目で区別できるようにする。
+class _FixedRow extends StatelessWidget {
+  final FixedCostRow f;
+  final VoidCallback onTap;
+  final _ColW w;
+  final bool showReceipt;
+  const _FixedRow({
+    required this.f,
+    required this.onTap,
+    required this.w,
+    this.showReceipt = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cat = f.categoryLabel.trim();
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        height: _kRowH,
+        color: _kFixedBg,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SizedBox(width: w.date, child: _DateWithWeekday(date: f.date)),
+            _vGrid(_kColGap, _kRowH),
+            // 大カテゴリ列：常に「固定費」バッジ（区別色）。
+            SizedBox(
+              width: w.major,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _kFixedBadgeBg,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.event_repeat, size: 12, color: _kFixedAccent),
+                      SizedBox(width: 4),
+                      Text('固定費',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: _kFixedAccent)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            _vGrid(_kHandleW, _kRowH),
+            // 小カテゴリ列：科目/グループ（あれば）。
+            SizedBox(
+              width: w.sub,
+              child: Text(cat.isEmpty ? '—' : cat,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: cat.isEmpty
+                          ? V2Colors.textMuted
+                          : V2Colors.textSecondary)),
+            ),
+            _vGrid(_kHandleW, _kRowH),
+            SizedBox(
+              width: w.content,
+              child: Text(f.name,
+                  style: V2Typography.body.copyWith(fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1),
+            ),
+            _vGrid(_kHandleW, _kRowH),
+            SizedBox(
+              width: w.pay,
+              child: Row(
+                children: [
+                  Icon(_paymentIcon(f.paymentMethod ?? ''),
+                      size: 13, color: const Color(0xFF64748B)),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                        (f.paymentMethod ?? '').trim().isEmpty
+                            ? '—'
+                            : f.paymentMethod!.trim(),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF64748B))),
+                  ),
+                ],
+              ),
+            ),
+            _vGrid(_kHandleW, _kRowH),
+            SizedBox(
+              width: w.amount,
+              child: Text('-${formatYen(f.amount)}',
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: _kFixedAccent,
+                      fontFeatures: V2Typography.tabularNums)),
+            ),
+            if (showReceipt) ...[
+              _vGrid(_kColGap, _kRowH),
+              // 固定費に領収書チェックは無い（予定なので「—」）。
+              const SizedBox(
+                width: _kReceiptW,
+                child: Center(
+                  child: Text('—',
+                      style: TextStyle(
+                          fontSize: 13, color: V2Colors.textMuted)),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// 日付＋曜日（土=青 / 日=赤）。
 class _DateWithWeekday extends StatelessWidget {
   final DateTime date;
@@ -859,6 +1081,112 @@ class _NarrowRow extends StatelessWidget {
                     ],
                   ),
                 ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 狭い幅用の固定費2行スリム行（淡いアンバー背景＋「固定費」バッジ）。
+class _NarrowFixedRow extends StatelessWidget {
+  final FixedCostRow f;
+  final VoidCallback onTap;
+  final bool showReceipt;
+  const _NarrowFixedRow({
+    required this.f,
+    required this.onTap,
+    this.showReceipt = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cat = f.categoryLabel.trim();
+    final pay = (f.paymentMethod ?? '').trim();
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        color: _kFixedBg,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1行目：日付 + 内容 + 金額
+            Row(
+              children: [
+                _DateWithWeekday(date: f.date),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(f.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: V2Typography.body
+                          .copyWith(fontWeight: FontWeight.w600)),
+                ),
+                const SizedBox(width: 8),
+                Text('-${formatYen(f.amount)}',
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: _kFixedAccent,
+                        fontFeatures: V2Typography.tabularNums)),
+              ],
+            ),
+            const SizedBox(height: 5),
+            // 2行目：固定費バッジ + 科目 + 支払方法
+            Row(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _kFixedBadgeBg,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.event_repeat, size: 12, color: _kFixedAccent),
+                      SizedBox(width: 4),
+                      Text('固定費',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: _kFixedAccent)),
+                    ],
+                  ),
+                ),
+                if (cat.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(cat,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: const TextStyle(
+                            fontSize: 12, color: V2Colors.textSecondary)),
+                  ),
+                ],
+                if (pay.isNotEmpty) ...[
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Row(
+                      children: [
+                        Icon(_paymentIcon(pay),
+                            size: 12, color: const Color(0xFF64748B)),
+                        const SizedBox(width: 3),
+                        Flexible(
+                          child: Text(pay,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: const TextStyle(
+                                  fontSize: 12, color: Color(0xFF64748B))),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ],
