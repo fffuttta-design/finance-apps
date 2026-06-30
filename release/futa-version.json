@@ -1,1 +1,1 @@
-{"version":"1.0.377","buildNumber":"378","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.377/futa-finance-v1.0.377.apk","releaseNotes":"支出明細の表に固定費（毎月の引落予定）を淡い色で混ぜて表示するようにしました。明細を1件ずつチェックするときに、固定費が計上されているかを同じ表で同時に確認できます。"}
+{"version":"1.0.378","buildNumber":"379","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.378/futa-finance-v1.0.378.apk","releaseNotes":"明細を決済手段で絞り込めるようにしました（オリコだけ等）。クレジット明細画面は開いたとき利用のある最新月を表示し、固定費も淡色で混ぜて表示します。"}
