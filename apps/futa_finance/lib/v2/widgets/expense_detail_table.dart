@@ -258,7 +258,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
           onChanged: (v) => setState(() => _query = v),
           decoration: InputDecoration(
             isDense: true,
-            hintText: '内容・カテゴリ・支払方法で検索',
+            hintText: '内容・カテゴリ・支払方法・金額で検索',
             prefixIcon: const Icon(Icons.search, size: 20),
             suffixIcon: _query.isEmpty
                 ? null
@@ -497,8 +497,18 @@ class _Row {
               txn!.paymentMethod,
               txn!.memo ?? '',
               txn!.store ?? '',
+              // 金額でも検索可（カンマ無し「420」も ¥付き「¥4,200」も両対応）。
+              amount.toString(),
+              formatYen(amount),
             ]
-          : [fx!.name, fx!.categoryLabel, fx!.paymentMethod ?? '', '固定費'])
+          : [
+              fx!.name,
+              fx!.categoryLabel,
+              fx!.paymentMethod ?? '',
+              '固定費',
+              amount.toString(),
+              formatYen(amount),
+            ])
       .join(' ')
       .toLowerCase();
 }
