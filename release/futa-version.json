@@ -1,1 +1,1 @@
-{"version":"1.0.390","buildNumber":"391","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.390/futa-finance-v1.0.390.apk","releaseNotes":"銀行明細：月初残高を直すと月末も自動で合うように修正。期間切替を横矢印＋全期間対応に。"}
+{"version":"1.0.391","buildNumber":"392","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.391/futa-finance-v1.0.391.apk","releaseNotes":"明細に確認済みチェック（締め処理用・チェックで薄くグレーアウト）を追加。銀行/現金にも対応。絞り込み後の明細だけを手で並び替えできるように（支出とクレカの並びが揃います）。"}
