@@ -9,7 +9,6 @@ import '../utils/modal_input.dart';
 import '../widgets/centered_body.dart';
 import 'expense_input_screen.dart';
 import 'income_input_screen.dart';
-import 'receipt_image_screen.dart';
 import 'transfer_input_screen.dart';
 
 /// 取引の詳細画面（フル画面）。
@@ -188,18 +187,15 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () async {
+                  // 領収書はDriveの閲覧リンクを外部（ブラウザ/Driveアプリ）で開く。
+                  // 自前ビューアはアカウント違い等で404になりがちなため、
+                  // ログイン済みのDriveセッションに任せる。
                   final raw = t.receiptUrl!.trim();
                   final fileId = DriveReceiptService.fileIdFromUrl(raw);
-                  if (fileId != null) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) =>
-                              ReceiptImageScreen(fileId: fileId)),
-                    );
-                    return;
-                  }
-                  final uri = Uri.tryParse(raw);
+                  final open = fileId != null
+                      ? 'https://drive.google.com/file/d/$fileId/view'
+                      : raw;
+                  final uri = Uri.tryParse(open);
                   if (uri != null) {
                     await launchUrl(uri,
                         mode: LaunchMode.externalApplication);

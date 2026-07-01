@@ -419,6 +419,28 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                     style:
                         V2Typography.h1.copyWith(color: V2Colors.textPrimary)),
               ),
+              // 月セレクタ＋締めは、諸経費/制作原価タブより「上」に配置する。
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: V2Spacing.md),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Center(
+                        child: MonthNavBar(
+                          label: '${_month.year}年${_month.month}月',
+                          onPrev: () => _shiftMonth(-1),
+                          onNext: () => _shiftMonth(1),
+                        ),
+                      ),
+                    ),
+                    MonthClosingBar(
+                        month: _month,
+                        snapshotExpense: keihiTotal + gaichuTotal,
+                        dense: true),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 4),
               TabBar(
                 controller: _subTab,
                 labelColor: widget.accent,
@@ -437,12 +459,14 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                         rows: keihi,
                         showFixedAndCard: true,
                         title: null,
-                        detailLabel: '経費明細'),
+                        detailLabel: '経費明細',
+                        showTopHeader: false),
                     _buildBody(
                         rows: gaichu,
                         showFixedAndCard: false,
                         title: null,
-                        detailLabel: '制作原価明細'),
+                        detailLabel: '制作原価明細',
+                        showTopHeader: false),
                   ],
                 ),
               ),
@@ -466,6 +490,8 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     required bool showFixedAndCard,
     required String? title,
     required String detailLabel,
+    // 事業モードは月セレクタ＋締めをタブより上に出すため、本文側では隠す。
+    bool showTopHeader = true,
   }) {
     final accent = widget.accent;
     final summaryLabel = detailLabel.replaceAll('明細', '');
@@ -526,26 +552,29 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
             children: [
               // タブ上部：タイトル（個人モードのみ）＋ 中央に月セレクタ（資産タブと
               // 同じシンプルな見た目）＋ 右上に締め処理チップ。
-              Row(
-                children: [
-                  if (title != null)
-                    Text(title,
-                        style: V2Typography.h1
-                            .copyWith(color: V2Colors.textPrimary)),
-                  Expanded(
-                    child: Center(
-                      child: MonthNavBar(
-                        label: '${_month.year}年${_month.month}月',
-                        onPrev: () => _shiftMonth(-1),
-                        onNext: () => _shiftMonth(1),
+              // 事業モードでは月セレクタをタブより上に出すため、ここは省略する。
+              if (showTopHeader) ...[
+                Row(
+                  children: [
+                    if (title != null)
+                      Text(title,
+                          style: V2Typography.h1
+                              .copyWith(color: V2Colors.textPrimary)),
+                    Expanded(
+                      child: Center(
+                        child: MonthNavBar(
+                          label: '${_month.year}年${_month.month}月',
+                          onPrev: () => _shiftMonth(-1),
+                          onNext: () => _shiftMonth(1),
+                        ),
                       ),
                     ),
-                  ),
-                  MonthClosingBar(
-                      month: _month, snapshotExpense: total, dense: true),
-                ],
-              ),
-              const SizedBox(height: V2Spacing.md),
+                    MonthClosingBar(
+                        month: _month, snapshotExpense: total, dense: true),
+                  ],
+                ),
+                const SizedBox(height: V2Spacing.md),
+              ],
               // サマリー（タップで内訳を展開）
               Container(
                 decoration: BoxDecoration(

@@ -100,6 +100,8 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     final memoCtrl = TextEditingController(text: initial?.memo ?? '');
     final iconUrlCtrl =
         TextEditingController(text: initial?.iconUrl ?? '');
+    // ロゴ設定済みなら最初は「ロゴ編集」ボタンだけ（URLをベタ表示しない）。
+    bool logoEditing = (initial?.iconUrl ?? '').trim().isEmpty;
     SubscriptionCycle cycle = initial?.cycle ?? SubscriptionCycle.monthly;
     SubscriptionAmountType amountType =
         initial?.amountType ?? SubscriptionAmountType.fixed;
@@ -657,7 +659,10 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          _logoUrlField(iconUrlCtrl, '🔁', setLocal),
+                          _logoUrlField(iconUrlCtrl, '🔁', setLocal,
+                              editing: logoEditing,
+                              onEdit: () =>
+                                  setLocal(() => logoEditing = true)),
                           const SizedBox(height: 12),
                           MemoField(controller: memoCtrl),
                           // 下端のフッターに被らないようのpadding
@@ -1564,8 +1569,10 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
   }
 
   /// ロゴURL入力欄（共通）。
+  /// [editing] が false でロゴ設定済みのときは、URLを出さず「ロゴ編集」ボタンだけ。
   Widget _logoUrlField(TextEditingController ctrl, String fallbackEmoji,
-      void Function(VoidCallback fn) setLocal) {
+      void Function(VoidCallback fn) setLocal,
+      {bool editing = true, VoidCallback? onEdit}) {
     void convertDomain() {
       final input = ctrl.text.trim();
       if (input.isEmpty) return;
@@ -1577,6 +1584,25 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
       }
       final url = domainToFaviconUrl(input);
       if (url != null) setLocal(() => ctrl.text = url);
+    }
+
+    if (ctrl.text.trim().isNotEmpty && !editing) {
+      return Row(
+        children: [
+          BrandLogo(
+              iconUrl: ctrl.text.trim(), fallbackEmoji: fallbackEmoji, size: 40),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text('ロゴ設定済み',
+                style: TextStyle(fontSize: 13, color: Color(0xFF6B7280))),
+          ),
+          OutlinedButton.icon(
+            onPressed: onEdit,
+            icon: const Icon(Icons.edit, size: 16),
+            label: const Text('ロゴ編集'),
+          ),
+        ],
+      );
     }
 
     return Row(

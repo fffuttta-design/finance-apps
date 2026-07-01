@@ -26,6 +26,9 @@ Future<Subscription?> showSubscriptionEditSheet(
   int? billingDay = initial?.billingDay;
   final memoCtrl = TextEditingController(text: initial?.memo ?? '');
   final iconUrlCtrl = TextEditingController(text: initial?.iconUrl ?? '');
+  // ロゴのURL入力欄を開いているか。既にロゴがあるときは閉じておき（＝
+  // URLをベタ表示せず「ロゴ編集」ボタンだけ）、押したら開く。
+  bool logoEditing = (initial?.iconUrl ?? '').trim().isEmpty;
   SubscriptionCycle cycle = initial?.cycle ?? SubscriptionCycle.monthly;
   SubscriptionAmountType amountType =
       initial?.amountType ?? SubscriptionAmountType.fixed;
@@ -150,6 +153,27 @@ Future<Subscription?> showSubscriptionEditSheet(
       }
       final url = domainToFaviconUrl(input);
       if (url != null) setLocal(() => iconUrlCtrl.text = url);
+    }
+
+    final hasLogo = iconUrlCtrl.text.trim().isNotEmpty;
+    // ロゴ設定済みで編集中でなければ、URLは出さずプレビュー＋「ロゴ編集」だけ。
+    if (hasLogo && !logoEditing) {
+      return Row(
+        children: [
+          BrandLogo(iconUrl: iconUrlCtrl.text.trim(),
+              fallbackEmoji: '🔁', size: 40),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text('ロゴ設定済み',
+                style: TextStyle(fontSize: 13, color: Color(0xFF6B7280))),
+          ),
+          OutlinedButton.icon(
+            onPressed: () => setLocal(() => logoEditing = true),
+            icon: const Icon(Icons.edit, size: 16),
+            label: const Text('ロゴ編集'),
+          ),
+        ],
+      );
     }
 
     return Row(

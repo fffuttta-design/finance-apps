@@ -16,7 +16,6 @@ import '../utils/thousands_separator_input_formatter.dart';
 import '../widgets/drive_receipt_picker.dart';
 import 'category_editor_screen.dart';
 import 'receipt_camera_screen.dart';
-import 'receipt_image_screen.dart';
 
 /// 支払元のカテゴリ。UI 上はまずこれを選択 → 該当の項目プルダウンが切り替わる。
 /// 表示順 = クレカ・電子・現金・銀行（使用頻度の高い順）。
@@ -1651,16 +1650,13 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       );
       return;
     }
+    // Driveの閲覧リンクを外部で開く（自前ビューアはアカウント違い等で404に
+    // なりやすいので、ログイン済みのDriveセッションに任せる）。
     final fileId = DriveReceiptService.fileIdFromUrl(url);
-    if (fileId != null) {
-      if (!mounted) return;
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => ReceiptImageScreen(fileId: fileId)),
-      );
-      return;
-    }
-    final uri = Uri.tryParse(url);
+    final open = fileId != null
+        ? 'https://drive.google.com/file/d/$fileId/view'
+        : url;
+    final uri = Uri.tryParse(open);
     if (uri == null) return;
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
