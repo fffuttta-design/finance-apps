@@ -1,1 +1,1 @@
-{"version":"1.0.391","buildNumber":"392","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.391/futa-finance-v1.0.391.apk","releaseNotes":"明細に確認済みチェック（締め処理用・チェックで薄くグレーアウト）を追加。銀行/現金にも対応。絞り込み後の明細だけを手で並び替えできるように（支出とクレカの並びが揃います）。"}
+{"version":"1.0.392","buildNumber":"393","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.392/futa-finance-v1.0.392.apk","releaseNotes":"支出明細の固定費にも確認済みチェックを追加（月ごとに管理）。締め処理で固定費も潰せます。"}
