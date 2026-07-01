@@ -221,14 +221,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     if (c != 0) return c;
                     return b.id.compareTo(a.id);
                   });
-                // 「最近の入出金」用：日付降順 → 同日内は登録時刻（ID）降順。
-                // 月フィルタなし・全件対象なので、古い日付を後から追加しても確実に出る。
-                final recentAll = all.toList()
-                  ..sort((a, b) {
-                    final c = b.date.compareTo(a.date);
-                    if (c != 0) return c;
-                    return b.id.compareTo(a.id);
-                  });
+                // 「最近の入出金」用：選択中の月だけを対象にする。
+                // 並びは日付降順 → 同日内は登録時刻（ID）降順。month と同じ並び。
+                final recentAll = month;
                 return _body(month, recentAll);
               },
             ),
@@ -282,7 +277,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (recentAll.isEmpty)
           _empty()
         else ...[
-          // 追加した順で最新5件（取引日でなく登録順なので、古い日付を後から追加しても必ず出る）。
+          // 選択中の月の中で、日付の新しい順に最新5件。
           // レシートの品目は1レシート＝親1行にまとめてから5件を数える。
           ...groupByReceipt(recentAll).take(5).map((g) => g.isGroup
               ? ReceiptGroupTile(
