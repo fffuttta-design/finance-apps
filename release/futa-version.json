@@ -1,1 +1,1 @@
-{"version":"1.0.393","buildNumber":"394","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.393/futa-finance-v1.0.393.apk","releaseNotes":"明細の列順を領収書→確認に。固定費一覧のデフォルトを金額の高い順に。毎月の固定費に支払日表示・合計を枠内へ・変動費の入力待ち表示を追加。"}
+{"version":"1.0.394","buildNumber":"395","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.394/futa-finance-v1.0.394.apk","releaseNotes":"支出明細にも変動費の入力待ちを表示（タップで金額入力）。資産タブに振替履歴（全口座横断）を追加。"}
