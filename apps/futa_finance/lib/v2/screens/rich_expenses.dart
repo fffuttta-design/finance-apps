@@ -156,25 +156,103 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
         ),
       );
 
-  List<({String id, String name, int amount, String? iconUrl})>
-      _fixedLinesForMonth(DateTime m) {
+  /// この月が対象の変動費か（月払い・範囲内・当月まで）。未入力でも「入力待ち」で出す判定用。
+  bool _variableActiveInMonth(core.Subscription sub, String ym, String curYm) {
+    if (ym.compareTo(curYm) > 0) return false;
+    if (sub.startYearMonth != null &&
+        ym.compareTo(sub.startYearMonth!) < 0) {
+      return false;
+    }
+    if (sub.endYearMonth != null && ym.compareTo(sub.endYearMonth!) > 0) {
+      return false;
+    }
+    return sub.cycle == core.SubscriptionCycle.monthly;
+  }
+
+  List<
+      ({
+        String id,
+        String name,
+        int amount,
+        String? iconUrl,
+        int? billingDay,
+        bool pending
+      })> _fixedLinesForMonth(DateTime m) {
     final now = DateTime.now();
     final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
-    final lines = <({String id, String name, int amount, String? iconUrl})>[];
+    final lines = <({
+      String id,
+      String name,
+      int amount,
+      String? iconUrl,
+      int? billingDay,
+      bool pending
+    })>[];
     for (final sub in _subs) {
       final amt = sub.plAmountForMonth(ym, curYm);
-      if (amt > 0) {
-        lines.add((
-          id: sub.id,
-          name: sub.name.trim().isEmpty ? '固定費' : sub.name,
-          amount: amt,
-          iconUrl: sub.iconUrl,
-        ));
-      }
+      // 変動費で対象月だが未入力＝「入力待ち」として出す。
+      final pending = sub.isVariable &&
+          !sub.monthlyActuals.containsKey(ym) &&
+          _variableActiveInMonth(sub, ym, curYm);
+      if (amt <= 0 && !pending) continue;
+      lines.add((
+        id: sub.id,
+        name: sub.name.trim().isEmpty ? '固定費' : sub.name,
+        amount: amt,
+        iconUrl: sub.iconUrl,
+        billingDay: sub.billingDay,
+        pending: pending,
+      ));
     }
-    lines.sort((a, b) => b.amount.compareTo(a.amount));
+    // 入力待ちは末尾、それ以外は金額の高い順。
+    lines.sort((a, b) {
+      if (a.pending != b.pending) return a.pending ? 1 : -1;
+      return b.amount.compareTo(a.amount);
+    });
     return lines;
+  }
+
+  /// 変動費のその月の金額を手入力して保存する（入力待ち行から呼ぶ）。
+  Future<void> _inputVariableAmount(String subId) async {
+    final ctrl = TextEditingController();
+    final v = await showDialog<int>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: const Text('今月の金額を入力'),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: const InputDecoration(
+              prefixText: '¥ ', labelText: '金額（円）'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx),
+              child: const Text('キャンセル')),
+          FilledButton(
+            onPressed: () {
+              final n = int.tryParse(
+                  ctrl.text.replaceAll(RegExp(r'[^0-9]'), ''));
+              if (n != null) Navigator.pop(dctx, n);
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (v == null) return;
+    final cfg = await SubscriptionRepository.instance.load();
+    final newSubs = cfg.subscriptions.map((s) {
+      if (s.id != subId) return s;
+      final map = Map<String, int>.from(s.monthlyActuals);
+      map[_ymKey] = v;
+      return s.copyWith(monthlyActuals: map);
+    }).toList();
+    await SubscriptionRepository.instance
+        .save(core.SubscriptionConfig(subscriptions: newSubs));
+    if (mounted) await _load();
   }
 
   /// 指定月に計上される固定費を、明細テーブルに混ぜる用の行に変換する。
@@ -519,7 +597,14 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     final total = txTotal + subTotal;
     final fixedLines = showFixedAndCard
         ? _fixedLinesForMonth(_month)
-        : <({String id, String name, int amount, String? iconUrl})>[];
+        : <({
+            String id,
+            String name,
+            int amount,
+            String? iconUrl,
+            int? billingDay,
+            bool pending
+          })>[];
 
     // カテゴリ内訳（大カテゴリ別・固定費込み）＋ドリルダウン用の取引一覧。
     final byMajor = <String, int>{};
@@ -716,7 +801,8 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                           // 展開時の内訳はホームと同じシンプルな1行（日付＋名前＋金額）。
                           details: e.key == '固定費・サブスク'
                               ? [
-                                  for (final f in fixedLines)
+                                  for (final f
+                                      in fixedLines.where((x) => !x.pending))
                                     _CatDetailRow(
                                         label: f.name,
                                         amount: f.amount,
@@ -757,30 +843,25 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 ),
                 const SizedBox(height: V2Spacing.xl),
               ],
-              // 毎月の固定費（引落予定）— 見出しはカード外・クレカ引落照合と同じスタイル
+              // 毎月の固定費（引落予定）— 見出しはカード外。合計は枠内フッターに。
               if (fixedLines.isNotEmpty) ...[
-                Padding(
-                  // 右の合計は、下の各行の金額（カード余白12+矢印16+間隔4=32）に
-                  // 合わせて内側に寄せ、カード右端からはみ出さないようにする。
-                  padding: const EdgeInsets.only(right: 32, bottom: V2Spacing.sm),
+                const Padding(
+                  padding: EdgeInsets.only(bottom: V2Spacing.sm),
                   child: Row(
                     children: [
-                      const Icon(Icons.repeat,
+                      Icon(Icons.repeat,
                           size: 18, color: V2Colors.textSecondary),
-                      const SizedBox(width: V2Spacing.sm),
+                      SizedBox(width: V2Spacing.sm),
                       Text('毎月の固定費（引落予定）',
-                          style: V2Typography.h2
-                              .copyWith(color: V2Colors.textPrimary)),
-                      const Spacer(),
-                      Text(formatYen(subTotal),
-                          style: V2Typography.bodyStrong.copyWith(
-                              color: V2Colors.textPrimary,
-                              fontFeatures: V2Typography.tabularNums)),
+                          style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color: V2Colors.textPrimary)),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.all(V2Spacing.md),
+                  padding: const EdgeInsets.symmetric(horizontal: V2Spacing.md),
                   decoration: BoxDecoration(
                     color: V2Colors.surface,
                     borderRadius: BorderRadius.circular(14),
@@ -793,7 +874,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                         if (i > 0)
                           const Divider(height: 1, color: V2Colors.divider),
                         InkWell(
-                          onTap: () => _editSubscription(fixedLines[i].id),
+                          onTap: fixedLines[i].pending
+                              ? () => _inputVariableAmount(fixedLines[i].id)
+                              : () => _editSubscription(fixedLines[i].id),
                           borderRadius: BorderRadius.circular(8),
                           child: Padding(
                             padding:
@@ -808,15 +891,43 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
-                                  child: Text(fixedLines[i].name,
-                                      style: V2Typography.body,
-                                      overflow: TextOverflow.ellipsis),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(fixedLines[i].name,
+                                          style: V2Typography.body,
+                                          overflow: TextOverflow.ellipsis),
+                                      // 3-1: 毎月の支払日を表示。
+                                      if (fixedLines[i].billingDay != null)
+                                        Text('毎月${fixedLines[i].billingDay}日',
+                                            style: V2Typography.micro.copyWith(
+                                                color: V2Colors.textMuted)),
+                                    ],
+                                  ),
                                 ),
-                                Text(formatYen(fixedLines[i].amount),
-                                    style: V2Typography.caption.copyWith(
-                                        color: V2Colors.textSecondary,
-                                        fontFeatures:
-                                            V2Typography.tabularNums)),
+                                // 3-3: 入力待ち（変動費）はバッジ、そうでなければ金額。
+                                if (fixedLines[i].pending)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFEF3C7),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Text('入力待ち',
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFFB45309))),
+                                  )
+                                else
+                                  Text(formatYen(fixedLines[i].amount),
+                                      style: V2Typography.caption.copyWith(
+                                          color: V2Colors.textSecondary,
+                                          fontFeatures:
+                                              V2Typography.tabularNums)),
                                 const SizedBox(width: 4),
                                 const Icon(Icons.chevron_right,
                                     size: 16, color: V2Colors.textMuted),
@@ -825,6 +936,23 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                           ),
                         ),
                       ],
+                      // 3-2: 合計をカード枠内のフッターに置く（枠外のはみ出し解消）。
+                      const Divider(height: 1, color: V2Colors.divider),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Row(
+                          children: [
+                            Text('合計',
+                                style: V2Typography.bodyStrong.copyWith(
+                                    color: V2Colors.textPrimary)),
+                            const Spacer(),
+                            Text(formatYen(subTotal),
+                                style: V2Typography.bodyStrong.copyWith(
+                                    color: V2Colors.textPrimary,
+                                    fontFeatures: V2Typography.tabularNums)),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),

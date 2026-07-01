@@ -980,22 +980,23 @@ class _ExpenseTableHeader extends StatelessWidget {
           _handle(4),
           SizedBox(
               width: w.amount, child: _h('金額', _SortCol.amount, right: true)),
-          if (showReview) ...[
+          // 事業モードは「領収書 → 確認」の順で並べる。
+          if (showReceipt) ...[
             _vGrid(_kColGap, _kHeadH),
             SizedBox(
-              width: _kReviewW,
-              child: Text('確認',
+              width: _kReceiptW,
+              child: Text('領収書',
                   textAlign: TextAlign.center,
                   style: V2Typography.micro.copyWith(
                       color: V2Colors.textMuted,
                       fontWeight: FontWeight.w700)),
             ),
           ],
-          if (showReceipt) ...[
+          if (showReview) ...[
             _vGrid(_kColGap, _kHeadH),
             SizedBox(
-              width: _kReceiptW,
-              child: Text('領収書',
+              width: _kReviewW,
+              child: Text('確認',
                   textAlign: TextAlign.center,
                   style: V2Typography.micro.copyWith(
                       color: V2Colors.textMuted,
@@ -1147,28 +1148,6 @@ class _ExpenseRow extends StatelessWidget {
                       color: V2Colors.negative,
                       fontFeatures: V2Typography.tabularNums)),
             ),
-            if (showReview) ...[
-              _vGrid(_kColGap, _kRowH),
-              SizedBox(
-                width: _kReviewW,
-                child: Center(
-                  child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: Checkbox(
-                      value: reviewed,
-                      visualDensity: VisualDensity.compact,
-                      materialTapTargetSize:
-                          MaterialTapTargetSize.shrinkWrap,
-                      activeColor: const Color(0xFF6B7280),
-                      onChanged: onToggleReviewed == null
-                          ? null
-                          : (v) => onToggleReviewed!(t, v ?? false),
-                    ),
-                  ),
-                ),
-              ),
-            ],
             if (showReceipt) ...[
               _vGrid(_kColGap, _kRowH),
               SizedBox(
@@ -1186,6 +1165,28 @@ class _ExpenseRow extends StatelessWidget {
                       onChanged: onToggleReceipt == null
                           ? null
                           : (v) => onToggleReceipt!(t, v ?? false),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            if (showReview) ...[
+              _vGrid(_kColGap, _kRowH),
+              SizedBox(
+                width: _kReviewW,
+                child: Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Checkbox(
+                      value: reviewed,
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize:
+                          MaterialTapTargetSize.shrinkWrap,
+                      activeColor: const Color(0xFF6B7280),
+                      onChanged: onToggleReviewed == null
+                          ? null
+                          : (v) => onToggleReviewed!(t, v ?? false),
                     ),
                   ),
                 ),
@@ -1323,6 +1324,18 @@ class _FixedRow extends StatelessWidget {
                       color: _kFixedAccent,
                       fontFeatures: V2Typography.tabularNums)),
             ),
+            if (showReceipt) ...[
+              _vGrid(_kColGap, _kRowH),
+              // 固定費に領収書チェックは無い（予定なので「—」）。
+              const SizedBox(
+                width: _kReceiptW,
+                child: Center(
+                  child: Text('—',
+                      style: TextStyle(
+                          fontSize: 13, color: V2Colors.textMuted)),
+                ),
+              ),
+            ],
             if (showReview) ...[
               _vGrid(_kColGap, _kRowH),
               SizedBox(
@@ -1342,18 +1355,6 @@ class _FixedRow extends StatelessWidget {
                           : (v) => onToggleReviewed!(f, v ?? false),
                     ),
                   ),
-                ),
-              ),
-            ],
-            if (showReceipt) ...[
-              _vGrid(_kColGap, _kRowH),
-              // 固定費に領収書チェックは無い（予定なので「—」）。
-              const SizedBox(
-                width: _kReceiptW,
-                child: Center(
-                  child: Text('—',
-                      style: TextStyle(
-                          fontSize: 13, color: V2Colors.textMuted)),
                 ),
               ),
             ],

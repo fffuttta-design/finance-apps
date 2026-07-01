@@ -38,8 +38,9 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
   SubscriptionConfig? _config;
   PaymentMethodsConfig? _payments;
 
-  /// 並び順モード。デフォルトは手動（永続化された順序）。
-  _SortMode _sortMode = _SortMode.manual;
+  /// 並び順モード。デフォルトは「定額/変動別＋月額の高い順」。
+  /// （グループ分けは常に有効。手動ドラッグにしたいときは並び替えメニューで切替）
+  _SortMode _sortMode = _SortMode.amountDesc;
 
   /// グループ表示モード。デフォルトはカテゴリ別。
   _GroupMode _groupMode = _GroupMode.byCategory;
