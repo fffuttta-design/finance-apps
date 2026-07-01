@@ -64,8 +64,12 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   bool get _isBusiness =>
       AppModeManager.instance.current == AppMode.business;
 
-  /// 制作原価（外注費）判定。
-  bool _isGaichu(core.Transaction t) => t.category.major.contains('外注費');
+  /// 制作原価判定。大分類が「外注費／売上原価／制作原価」いずれかを含めば原価扱い。
+  /// （既存データは大分類が「売上原価」表記のものがあるため両対応する）
+  bool _isGaichu(core.Transaction t) {
+    final m = t.category.major;
+    return m.contains('外注費') || m.contains('売上原価') || m.contains('制作原価');
+  }
 
   void _rebuildSubTab() {
     _subTab?.dispose();

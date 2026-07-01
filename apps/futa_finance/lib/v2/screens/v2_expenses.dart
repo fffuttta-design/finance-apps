@@ -406,9 +406,11 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     if (changed == true && mounted) await _load();
   }
 
-  /// 外注費カテゴリ判定（大カテゴリが "0.外注費" 相当）。
-  bool _isGaichu(core.Transaction t) =>
-      t.category.major.contains('外注費');
+  /// 外注費(制作原価)カテゴリ判定。大分類が「外注費／売上原価／制作原価」を含めば原価扱い。
+  bool _isGaichu(core.Transaction t) {
+    final m = t.category.major;
+    return m.contains('外注費') || m.contains('売上原価') || m.contains('制作原価');
+  }
 
   @override
   Widget build(BuildContext context) {
