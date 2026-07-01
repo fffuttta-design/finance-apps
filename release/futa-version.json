@@ -1,1 +1,1 @@
-{"version":"1.0.383","buildNumber":"384","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.383/futa-finance-v1.0.383.apk","releaseNotes":"タブを移動しても選んだ月を維持。支出入力の日付を前後日ボタンと今日/昨日チップで素早く。クレジット明細を日付範囲で絞り込めるようにしました。"}
+{"version":"1.0.385","buildNumber":"386","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.385/futa-finance-v1.0.385.apk","releaseNotes":"支出・クレカ明細で、同じ日付の中を手で並び替えできるようにしました（順番は保存され、日付で並べ直しても保持されます）。あわせてクレカ明細の利用合計に固定費を含めてウォレットと一致させました。"}
