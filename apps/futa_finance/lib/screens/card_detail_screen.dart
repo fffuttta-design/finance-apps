@@ -41,6 +41,9 @@ class _CardDetailScreenState extends State<CardDetailScreen>
   List<core.Subscription> _subs = [];
   DateTime? _selectedMonth;
 
+  /// 日付範囲での絞り込み（設定中は月選択より優先）。null なら月モード。
+  DateTimeRange? _range;
+
   /// 初回ロードで「利用のある最新月」を初期選択にしたか（以後はユーザー操作を尊重）。
   bool _monthPicked = false;
   late final TabController _tabController =
@@ -195,13 +198,25 @@ class _CardDetailScreenState extends State<CardDetailScreen>
   @override
   Widget build(BuildContext context) {
     final allTxns = _cardTransactions();
-    final monthTxns = _selectedMonth == null
-        ? allTxns
-        : allTxns
-            .where((t) =>
-                t.date.year == _selectedMonth!.year &&
-                t.date.month == _selectedMonth!.month)
-            .toList();
+    final List<core.Transaction> monthTxns;
+    if (_range != null) {
+      // 日付範囲での絞り込み（◯月◯日〜◯月◯日）。
+      final s = DateTime(_range!.start.year, _range!.start.month,
+          _range!.start.day);
+      final e = DateTime(_range!.end.year, _range!.end.month,
+          _range!.end.day, 23, 59, 59);
+      monthTxns = allTxns
+          .where((t) => !t.date.isBefore(s) && !t.date.isAfter(e))
+          .toList();
+    } else if (_selectedMonth == null) {
+      monthTxns = allTxns;
+    } else {
+      monthTxns = allTxns
+          .where((t) =>
+              t.date.year == _selectedMonth!.year &&
+              t.date.month == _selectedMonth!.month)
+          .toList();
+    }
     final monthTotal =
         monthTxns.fold<int>(0, (s, t) => s + t.amount);
 
@@ -301,7 +316,11 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                                     rows: monthTxns,
                                     onEditTxn: _editCardTxn,
                                     accent: const Color(0xFFDC2626),
-                                    fixedRows: _cardFixedRows(_selectedMonth),
+                                    // 固定費は月モードのときだけ混ぜる
+                                    // （範囲指定はまたぐ月が曖昧なので出さない）。
+                                    fixedRows: _range != null
+                                        ? const <FixedCostRow>[]
+                                        : _cardFixedRows(_selectedMonth),
                                     onEditFixed: (f) => _editCardFixed(f.id),
                                     emptyHint: 'この期間の利用はありません',
                                   ),
@@ -337,27 +356,74 @@ class _CardDetailScreenState extends State<CardDetailScreen>
     final months = _availableMonths();
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 2, 16, 2),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
       child: Row(
         children: [
           const Text('期間: ',
               style: TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
-          DropdownButton<DateTime?>(
-            value: _selectedMonth,
-            isDense: true,
-            underline: const SizedBox.shrink(),
-            style: const TextStyle(
-                fontSize: 13, color: Color(0xFF111827)),
-            items: months.map((m) {
-              final label = m == null ? '全期間' : '${m.year}年${m.month}月';
-              return DropdownMenuItem<DateTime?>(
-                  value: m, child: Text(label));
-            }).toList(),
-            onChanged: (v) => setState(() => _selectedMonth = v),
+          if (_range == null)
+            // 月モード：月プルダウン。
+            DropdownButton<DateTime?>(
+              value: _selectedMonth,
+              isDense: true,
+              underline: const SizedBox.shrink(),
+              style: const TextStyle(
+                  fontSize: 13, color: Color(0xFF111827)),
+              items: months.map((m) {
+                final label = m == null ? '全期間' : '${m.year}年${m.month}月';
+                return DropdownMenuItem<DateTime?>(
+                    value: m, child: Text(label));
+              }).toList(),
+              onChanged: (v) => setState(() => _selectedMonth = v),
+            )
+          else
+            // 範囲モード：選択中の期間をチップ表示（✕で月モードに戻る）。
+            InputChip(
+              label: Text(
+                '${_range!.start.month}/${_range!.start.day}〜'
+                '${_range!.end.month}/${_range!.end.day}',
+                style: const TextStyle(fontSize: 12),
+              ),
+              avatar: const Icon(Icons.date_range, size: 16),
+              onDeleted: () => setState(() => _range = null),
+              visualDensity: VisualDensity.compact,
+            ),
+          const Spacer(),
+          // 期間指定（◯月◯日〜◯月◯日）ボタン。
+          TextButton.icon(
+            onPressed: _pickRange,
+            icon: const Icon(Icons.date_range, size: 16),
+            label: Text(_range == null ? '期間指定' : '期間を変更',
+                style: const TextStyle(fontSize: 12)),
+            style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF1A237E),
+                visualDensity: VisualDensity.compact),
           ),
         ],
       ),
     );
+  }
+
+  /// 日付範囲（◯月◯日〜◯月◯日）を選ぶ。設定すると月選択より優先される。
+  Future<void> _pickRange() async {
+    final now = DateTime.now();
+    final base = _selectedMonth ?? DateTime(now.year, now.month);
+    final initial = _range ??
+        DateTimeRange(
+          start: DateTime(base.year, base.month, 1),
+          end: DateTime(base.year, base.month + 1, 0),
+        );
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 5, 1, 1),
+      lastDate: DateTime(now.year + 1, 12, 31),
+      initialDateRange: initial,
+      helpText: '期間を選択',
+      saveText: '決定',
+    );
+    if (picked != null && mounted) {
+      setState(() => _range = picked);
+    }
   }
 
   Widget _summaryCard(int monthTotal) {

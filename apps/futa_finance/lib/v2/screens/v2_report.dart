@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../../data/app_mode.dart';
+import '../../data/month_cursor.dart';
 import '../../data/monthly_snapshot_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/tax_estimate_repository.dart';
@@ -132,9 +133,8 @@ class _V2ReportScreenState extends State<V2ReportScreen>
   /// 表示期間。false=当月（単月PL）/ true=1年（年度12ヶ月表）。デフォルトは当月。
   bool _yearView = false;
 
-  /// 当月モードで表示する月（デフォルト=今月）。
-  late DateTime _selMonth =
-      DateTime(DateTime.now().year, DateTime.now().month);
+  /// 当月モードで表示する月（タブ横断で共有＝切替で今月にリセットしない）。
+  late DateTime _selMonth = MonthCursor.instance.month;
 
   /// 表示対象の月リスト（当月=1件、1年=12件）。集計・表はこれを基準に並べる。
   List<DateTime> get _displayMonths => _yearView ? _fyMonths : [_selMonth];
@@ -365,6 +365,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
   void _shiftMonth(int delta) {
     setState(() =>
         _selMonth = DateTime(_selMonth.year, _selMonth.month + delta));
+    MonthCursor.instance.month = _selMonth; // タブ横断で共有
   }
 
   @override

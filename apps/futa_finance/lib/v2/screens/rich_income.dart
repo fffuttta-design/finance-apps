@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../../data/app_mode.dart';
+import '../../data/month_cursor.dart';
 import '../../data/transaction_repository.dart';
 import '../../screens/income_input_screen.dart';
 import '../../utils/formatters.dart';
@@ -31,7 +32,8 @@ class _RichIncomeScreenState extends State<RichIncomeScreen>
   List<core.Transaction> _transactions = [];
   bool _loading = true;
 
-  late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+  // タブ横断で月を共有（切替で今月にリセットされないよう共有カーソルを初期値に）。
+  late DateTime _month = MonthCursor.instance.month;
 
   @override
   void onModeChanged() => _load();
@@ -63,6 +65,7 @@ class _RichIncomeScreenState extends State<RichIncomeScreen>
 
   void _shiftMonth(int delta) {
     setState(() => _month = DateTime(_month.year, _month.month + delta));
+    MonthCursor.instance.month = _month; // タブ横断で共有
   }
 
   List<core.Transaction> get _monthIncome => _transactions

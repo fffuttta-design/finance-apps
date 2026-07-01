@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../../data/app_mode.dart';
+import '../../data/month_cursor.dart';
 import '../../data/nav_history.dart';
 import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
@@ -54,7 +55,8 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   /// 事業モードの諸経費/制作原価サブタブ（個人モードは null）。
   TabController? _subTab;
 
-  late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+  // タブ横断で月を共有（切替で今月にリセットされないよう共有カーソルを初期値に）。
+  late DateTime _month = MonthCursor.instance.month;
 
   String get _ymKey =>
       '${_month.year}-${_month.month.toString().padLeft(2, '0')}';
@@ -111,6 +113,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
 
   void _shiftMonth(int delta) {
     setState(() => _month = DateTime(_month.year, _month.month + delta));
+    MonthCursor.instance.month = _month; // タブ横断で共有
   }
 
   int _subsOf(DateTime m) {

@@ -675,6 +675,31 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     if (picked != null) setState(() => _date = picked);
   }
 
+  /// 日付を前後に日単位でずらす（カットオフより前・2030年末より後は不可）。
+  void _shiftDate(int deltaDays) {
+    final min = AppModeManager.instance.current.minDate;
+    final d = DateTime(_date.year, _date.month, _date.day + deltaDays);
+    if (d.isBefore(min) || d.isAfter(DateTime(2030, 12, 31))) return;
+    setState(() => _date = d);
+  }
+
+  /// 「今日/昨日/一昨日」など、今日から[daysAgo]日前に一発セット。
+  void _setDateDaysAgo(int daysAgo) {
+    final now = DateTime.now();
+    final d = DateTime(now.year, now.month, now.day - daysAgo);
+    final min = AppModeManager.instance.current.minDate;
+    if (d.isBefore(min)) return;
+    setState(() => _date = d);
+  }
+
+  bool _dateIsDaysAgo(int daysAgo) {
+    final now = DateTime.now();
+    final d = DateTime(now.year, now.month, now.day - daysAgo);
+    return _date.year == d.year &&
+        _date.month == d.month &&
+        _date.day == d.day;
+  }
+
   Future<void> _deleteTxn() async {
     final e = widget.editing;
     if (e == null) return;
@@ -940,25 +965,48 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 const SizedBox(height: 16),
               ],
               _label('日付'),
-              InkWell(
-                onTap: _pickDate,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 14),
-                  decoration: _fieldDecoration(),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.calendar_today,
-                          size: 18, color: Color(0xFF6B7280)),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${_date.year}年${_date.month}月${_date.day}日（${weekdayKanji(_date)}）',
-                        style: const TextStyle(
-                            fontSize: 14, color: Color(0xFF111827)),
+              // PC でもサッと入れられるよう：前後日の矢印＋日付ボタン（タップで
+              // カレンダー）＋「今日/昨日/一昨日」ワンタップチップ。
+              Row(
+                children: [
+                  _dayArrowButton(Icons.chevron_left, () => _shiftDate(-1)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: InkWell(
+                      onTap: _pickDate,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 14),
+                        decoration: _fieldDecoration(),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.calendar_today,
+                                size: 18, color: Color(0xFF6B7280)),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${_date.year}年${_date.month}月${_date.day}日（${weekdayKanji(_date)}）',
+                              style: const TextStyle(
+                                  fontSize: 14, color: Color(0xFF111827)),
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 6),
+                  _dayArrowButton(Icons.chevron_right, () => _shiftDate(1)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  _quickDateChip('今日', 0),
+                  const SizedBox(width: 8),
+                  _quickDateChip('昨日', 1),
+                  const SizedBox(width: 8),
+                  _quickDateChip('一昨日', 2),
+                ],
               ),
               const SizedBox(height: 16),
 
@@ -1555,6 +1603,51 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+
+  /// 日付を前後にずらす矢印ボタン（日付欄の左右）。
+  Widget _dayArrowButton(IconData icon, VoidCallback onTap) => Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            width: 44,
+            height: 48,
+            alignment: Alignment.center,
+            decoration: _fieldDecoration(),
+            child: Icon(icon, size: 22, color: const Color(0xFF6B7280)),
+          ),
+        ),
+      );
+
+  /// 「今日/昨日/一昨日」ワンタップチップ。該当日は色付きで強調。
+  Widget _quickDateChip(String label, int daysAgo) {
+    final selected = _dateIsDaysAgo(daysAgo);
+    return InkWell(
+      onTap: () => _setDateDaysAgo(daysAgo),
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFEEF2FF) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: selected
+                  ? const Color(0xFF1A237E)
+                  : const Color(0xFFE5E7EB),
+              width: selected ? 1.4 : 1),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: selected
+                    ? const Color(0xFF1A237E)
+                    : const Color(0xFF6B7280))),
+      ),
+    );
+  }
 
   Widget _label(String text) => Padding(
         padding: const EdgeInsets.only(bottom: 6, left: 2),

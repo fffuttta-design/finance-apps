@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/app_mode.dart';
 import '../../data/auth_service.dart';
 import '../../data/backup_repository.dart';
+import '../../data/month_cursor.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/monthly_snapshot_repository.dart';
 import '../../data/payments_change_notifier.dart';
@@ -75,9 +76,8 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
   /// 専用メッセージ＋アカウント切替を出す。
   bool _isPermissionError = false;
 
-  /// 表示月（既定は今月、月切替で前後）
-  late DateTime _selectedMonth =
-      DateTime(DateTime.now().year, DateTime.now().month);
+  /// 表示月（タブ横断で共有。切替で今月にリセットされないよう共有カーソルを初期値に）
+  late DateTime _selectedMonth = MonthCursor.instance.month;
 
   /// 当月支出の口座別内訳展開
   bool _expenseBreakdownExpanded = false;
@@ -118,11 +118,13 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
       _selectedMonth =
           DateTime(_selectedMonth.year, _selectedMonth.month + delta);
     });
+    MonthCursor.instance.month = _selectedMonth; // タブ横断で共有
   }
 
   /// 月チップ列からの絶対指定（外側 widget から呼べる公開メソッド）
   void selectMonth(DateTime m) {
     setState(() => _selectedMonth = DateTime(m.year, m.month));
+    MonthCursor.instance.month = _selectedMonth; // タブ横断で共有
   }
 
   /// 内訳の開閉トグル（外側 widget から呼べる公開メソッド）
