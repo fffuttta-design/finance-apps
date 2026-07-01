@@ -156,9 +156,31 @@ class _CardDetailScreenState extends State<CardDetailScreen>
         paymentMethod: sub.paymentMethod,
         categoryLabel: label,
         sortOrder: sub.sortOrder,
+        reviewed: sub.reviewedMonths[ym] ?? false,
       ));
     }
     return rows;
+  }
+
+  /// 固定費の確認済み（選択中の月）をトグルして保存する。
+  Future<void> _toggleFixedReviewed(String subId, bool value) async {
+    final m = _selectedMonth;
+    if (m == null) return;
+    final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
+    final cfg = await SubscriptionRepository.instance.load();
+    final newSubs = cfg.subscriptions.map((s) {
+      if (s.id != subId) return s;
+      final map = Map<String, bool>.from(s.reviewedMonths);
+      if (value) {
+        map[ym] = true;
+      } else {
+        map.remove(ym);
+      }
+      return s.copyWith(reviewedMonths: map);
+    }).toList();
+    await SubscriptionRepository.instance
+        .save(core.SubscriptionConfig(subscriptions: newSubs));
+    if (mounted) await _load();
   }
 
   /// 手動並び替えの保存。取引は取引の sortOrder、固定費はサブスクの sortOrder。
@@ -356,6 +378,8 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                                           .update(t.copyWith(reviewed: v));
                                       if (mounted) await _load();
                                     },
+                                    onToggleReviewedFixed: (f, v) =>
+                                        _toggleFixedReviewed(f.id, v),
                                     onReorderDay: _saveReorder,
                                     emptyHint: 'この期間の利用はありません',
                                   ),

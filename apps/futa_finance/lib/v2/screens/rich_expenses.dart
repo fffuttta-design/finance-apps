@@ -208,6 +208,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
         paymentMethod: sub.paymentMethod,
         categoryLabel: label,
         sortOrder: sub.sortOrder,
+        reviewed: sub.reviewedMonths[ym] ?? false,
       ));
     }
     return rows;
@@ -234,6 +235,24 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
       await SubscriptionRepository.instance
           .save(core.SubscriptionConfig(subscriptions: newSubs));
     }
+    if (mounted) await _load();
+  }
+
+  /// 固定費の確認済み（表示中の月）をトグルして保存する。
+  Future<void> _toggleFixedReviewed(String subId, bool value) async {
+    final cfg = await SubscriptionRepository.instance.load();
+    final newSubs = cfg.subscriptions.map((s) {
+      if (s.id != subId) return s;
+      final m = Map<String, bool>.from(s.reviewedMonths);
+      if (value) {
+        m[_ymKey] = true;
+      } else {
+        m.remove(_ymKey);
+      }
+      return s.copyWith(reviewedMonths: m);
+    }).toList();
+    await SubscriptionRepository.instance
+        .save(core.SubscriptionConfig(subscriptions: newSubs));
     if (mounted) await _load();
   }
 
@@ -835,6 +854,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                   await _txRepo.update(t.copyWith(reviewed: v));
                   if (mounted) await _load();
                 },
+                // 固定費の確認済み（月別）。
+                onToggleReviewedFixed: (f, v) =>
+                    _toggleFixedReviewed(f.id, v),
                 // 同じ日付内の手動並び替え：新しい順で sortOrder を 0,1,2… と振る。
                 // 取引は取引に、固定費はサブスクに保存する。
                 onReorderDay: _saveReorder,
