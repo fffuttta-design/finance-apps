@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/app_mode.dart';
+import '../data/card_settlement_service.dart';
 import '../data/data_migration_service.dart';
 import '../data/receipt_ocr_cloud.dart';
 import '../data/receipt_ocr_flow.dart';
@@ -63,7 +64,20 @@ class _V2RootState extends State<V2Root>
     // 起動が落ち着いた頃に逆モードのデータを裏で先読み（初回切替を速く）。
     Future.delayed(const Duration(milliseconds: 1200), () {
       RepositoryProvider.prefetchOtherMode();
+      _runCardSettlement(); // クレカ自動引落（引落日を過ぎた分を生成）
     });
+  }
+
+  /// クレカの自動引き落としを生成し、作成できたらスナックバーで知らせる。
+  /// モードごとに1セッション1回（frequentな _onChange で呼んでも短絡する）。
+  Future<void> _runCardSettlement() async {
+    final created = await CardSettlementService.runOncePerMode(
+        AppModeManager.instance.current.name);
+    if (!mounted || created.isEmpty) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('💳 クレカ引落を${created.length}件、自動で記録しました'),
+      duration: const Duration(seconds: 4),
+    ));
   }
 
   @override
@@ -88,6 +102,7 @@ class _V2RootState extends State<V2Root>
     _syncPwaThemeColor(); // モード切替でブラウザ枠の色も切替（Webのみ）
     // 事業モードへ切替時にも移行を試行（個人で起動→事業に切替えた場合に対応）。
     DataMigrationService.migratePLCategoriesIfNeeded();
+    _runCardSettlement(); // 切替先モードの自動引落も生成（モード別に1回）
   }
 
   /// PWA（Web）のタイトルバー色を現モードに合わせて切替える。

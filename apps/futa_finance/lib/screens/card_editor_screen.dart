@@ -54,6 +54,8 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
     final memoCtrl = TextEditingController(text: initial?.memo ?? '');
     // 引き落とし日は Dropdown 選択。null = 未設定。
     int? selectedPaymentDay = initial?.paymentDay;
+    // 引き落とし口座（銀行のid）。null = 自動引落しない。
+    String? selectedSettlementId = initial?.settlementAccountId;
     bool selectedInactive = initial?.inactive ?? false;
 
     // BottomSheet で編集フォーム表示（subscription_list と同じパターン）。
@@ -93,6 +95,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                     iconUrl: iconUrl,
                     memo: memo,
                     paymentDay: paymentDay,
+                    settlementAccountId: selectedSettlementId,
                     inactive: selectedInactive,
                   ));
             } else {
@@ -107,6 +110,8 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                     clearMemo: memo == null,
                     paymentDay: paymentDay,
                     clearPaymentDay: paymentDay == null,
+                    settlementAccountId: selectedSettlementId,
+                    clearSettlementAccount: selectedSettlementId == null,
                     inactive: selectedInactive,
                   ));
             }
@@ -196,6 +201,43 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                             ],
                             onChanged: (v) =>
                                 setLocal(() => selectedPaymentDay = v),
+                          ),
+                          const SizedBox(height: 12),
+                          // 引き落とし口座（銀行）。引落日にこの口座から自動で引く。
+                          DropdownButtonFormField<String?>(
+                            initialValue: selectedSettlementId,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: '引き落とし口座（任意）',
+                              floatingLabelBehavior:
+                                  FloatingLabelBehavior.always,
+                            ),
+                            items: <DropdownMenuItem<String?>>[
+                              const DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('— 自動引落しない —',
+                                    style: TextStyle(
+                                        color: Color(0xFF9CA3AF))),
+                              ),
+                              for (final b
+                                  in (_config?.bankAccounts ?? const [])
+                                      .where((b) =>
+                                          b.accountType == AccountType.bank))
+                                DropdownMenuItem<String?>(
+                                  value: b.id,
+                                  child: Text(b.name,
+                                      overflow: TextOverflow.ellipsis),
+                                ),
+                            ],
+                            onChanged: (v) =>
+                                setLocal(() => selectedSettlementId = v),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            '※引落日になると、対象月（前月利用）のカード利用額を'
+                            'この口座から自動で差し引きます（土日祝は翌営業日）。',
+                            style: TextStyle(
+                                fontSize: 11, color: Color(0xFF6B7280)),
                           ),
                           const SizedBox(height: 12),
                           _logoUrlField(iconUrlCtrl, '💳', setLocal),

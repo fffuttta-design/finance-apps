@@ -1,0 +1,125 @@
+import 'package:finance_core/finance_core.dart' as core;
+
+import '../utils/jp_holidays.dart';
+import 'settings_repository.dart';
+import 'subscription_repository.dart';
+import 'transaction_repository.dart';
+
+/// クレジットカードの「自動引き落とし」を生成するサービス。
+///
+/// カードに引落口座(settlementAccountId)＋引落日(paymentDay)が設定されていると、
+/// 引落日を過ぎた対象月ぶんの利用額を、引落口座から差し引く**振替(transfer)**取引を
+/// 1本自動生成する（＝口座残高が減る／PLには計上しない。カード利用の費用は既に
+/// 明細で計上済みなので二重計上しない）。
+///
+/// 仕様:
+/// - 対象月＝「前月利用→当月払い」。引落月Wの利用月は W-1。
+/// - 引落日が土日祝なら翌営業日にずらす（[JpHolidays.nextBusinessDay]）。
+/// - 金額＝カードの実請求額(monthlyActualBillings)があればそれ、無ければ
+///   予定額（当月の対象カード払い取引＋固定費の合計）。
+/// - **二重生成防止**: 取引IDを `cardsettle_{cardId}_{利用YYYY-MM}` に固定し、
+///   既存があればスキップ（起動のたび呼んでも増えない）。
+/// - **遡り過ぎ防止**: 引落日が「直近62日以内〜今日」のぶんだけ生成する
+///   （設定直後に過去を大量生成しない）。
+class CardSettlementService {
+  CardSettlementService._();
+
+  static final Set<String> _ranModes = {};
+
+  /// モード（business/personal）ごとに1セッション1回だけ走らせる。
+  /// 起動時・モード切替時に呼ぶ想定（payments はモード別なので現モードを処理）。
+  static Future<List<core.Transaction>> runOncePerMode(String modeKey) async {
+    if (_ranModes.contains(modeKey)) return const [];
+    _ranModes.add(modeKey);
+    try {
+      return await run();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// 未処理の自動引落を生成し、作成した振替のリストを返す。
+  static Future<List<core.Transaction>> run() async {
+    final cfg = await SettingsRepository.instance.loadPayments();
+    final txns = await TransactionRepository.instance.loadAll();
+    final subs = (await SubscriptionRepository.instance.load()).subscriptions;
+
+    final today = DateTime.now();
+    final todayD = DateTime(today.year, today.month, today.day);
+    final windowStart = todayD.subtract(const Duration(days: 62));
+    final curYm = '${today.year}-${today.month.toString().padLeft(2, '0')}';
+    final existingIds = txns.map((t) => t.id).toSet();
+
+    final created = <core.Transaction>[];
+    for (final card in cfg.creditCards) {
+      if (card.inactive) continue;
+      final acctId = card.settlementAccountId;
+      final day = card.paymentDay;
+      if (acctId == null || day == null) continue;
+      core.RegisteredBankAccount? bank;
+      for (final b in cfg.bankAccounts) {
+        if (b.id == acctId) {
+          bank = b;
+          break;
+        }
+      }
+      if (bank == null) continue;
+
+      // 引落月 W = 今月〜3か月前 を走査（W-1 が利用月）。windowで直近のみに絞る。
+      for (int back = 0; back <= 3; back++) {
+        final w = DateTime(today.year, today.month - back, 1); // 引落月
+        final usage = DateTime(w.year, w.month - 1, 1); // 利用月（前月）
+        final usageYm =
+            '${usage.year}-${usage.month.toString().padLeft(2, '0')}';
+        // 引落日（月末クランプ）→ 土日祝なら翌営業日。
+        final lastDay = DateTime(w.year, w.month + 1, 0).day;
+        final due = JpHolidays.nextBusinessDay(
+            DateTime(w.year, w.month, day > lastDay ? lastDay : day));
+        if (due.isAfter(todayD) || due.isBefore(windowStart)) continue;
+
+        final id = 'cardsettle_${card.id}_$usageYm';
+        if (existingIds.contains(id)) continue;
+
+        final amount = card.monthlyActualBillings[usageYm] ??
+            _planned(card.name, usageYm, txns, subs, curYm);
+        if (amount <= 0) continue;
+
+        final tx = core.Transaction(
+          id: id,
+          date: due,
+          type: core.TransactionType.transfer,
+          category: const core.Category(major: '振替', sub: ''),
+          paymentMethod: '',
+          description: '${card.name} 引落（${usage.month}月利用分）',
+          amount: amount,
+          transferFromAccount: bank.name,
+          transferToAccount: card.name,
+          memo: '自動引落',
+        );
+        await TransactionRepository.instance.add(tx);
+        existingIds.add(id);
+        created.add(tx);
+      }
+    }
+    return created;
+  }
+
+  /// 予定額（＝ウォレット照合の「予定」と同じ計算）: 当月の対象カード払い取引＋固定費。
+  static int _planned(String name, String ym, List<core.Transaction> txns,
+      List<core.Subscription> subs, String curYm) {
+    final parts = ym.split('-');
+    final year = int.parse(parts[0]);
+    final month = int.parse(parts[1]);
+    final txSum = txns
+        .where((t) =>
+            t.type == core.TransactionType.expense &&
+            t.paymentMethod == name &&
+            t.date.year == year &&
+            t.date.month == month)
+        .fold<int>(0, (s, t) => s + t.amount);
+    final subSum = subs
+        .where((s) => (s.paymentMethod ?? '') == name)
+        .fold<int>(0, (s, sub) => s + sub.plAmountForMonth(ym, curYm));
+    return txSum + subSum;
+  }
+}

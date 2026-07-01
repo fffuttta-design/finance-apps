@@ -186,6 +186,10 @@ class RegisteredCreditCard {
   /// 月末締めチェックリスト等で「来月X日に引き落とし」のリマインド用。
   final int? paymentDay;
 
+  /// 引き落とし口座（RegisteredBankAccount.id）。null は未設定。
+  /// 引落日に、対象月のカード利用額をこの口座から自動で差し引く（自動引落）。
+  final String? settlementAccountId;
+
   /// 未使用フラグ。true=休眠中。
   /// 当月利用が偶々 0 円のアクティブカードと区別するため明示設定。
   final bool inactive;
@@ -204,6 +208,7 @@ class RegisteredCreditCard {
     this.iconUrl,
     this.memo,
     this.paymentDay,
+    this.settlementAccountId,
     this.inactive = false,
     this.monthlyActualBillings = const {},
   });
@@ -220,6 +225,7 @@ class RegisteredCreditCard {
         'iconUrl': iconUrl,
         'memo': memo,
         'paymentDay': paymentDay,
+        'settlementAccountId': settlementAccountId,
         'inactive': inactive,
         'monthlyActualBillings': monthlyActualBillings,
       };
@@ -234,6 +240,7 @@ class RegisteredCreditCard {
         iconUrl: j['iconUrl'] as String?,
         memo: j['memo'] as String?,
         paymentDay: j['paymentDay'] as int?,
+        settlementAccountId: j['settlementAccountId'] as String?,
         inactive: j['inactive'] as bool? ?? false,
         monthlyActualBillings: (j['monthlyActualBillings'] as Map<String, dynamic>?)
                 ?.map((k, v) => MapEntry(k, (v as num).toInt())) ??
@@ -248,10 +255,12 @@ class RegisteredCreditCard {
     String? iconUrl,
     String? memo,
     int? paymentDay,
+    String? settlementAccountId,
     bool? inactive,
     Map<String, int>? monthlyActualBillings,
     bool clearMemo = false,
     bool clearPaymentDay = false,
+    bool clearSettlementAccount = false,
   }) =>
       RegisteredCreditCard(
         id: id,
@@ -263,6 +272,9 @@ class RegisteredCreditCard {
         memo: clearMemo ? null : (memo ?? this.memo),
         paymentDay:
             clearPaymentDay ? null : (paymentDay ?? this.paymentDay),
+        settlementAccountId: clearSettlementAccount
+            ? null
+            : (settlementAccountId ?? this.settlementAccountId),
         inactive: inactive ?? this.inactive,
         monthlyActualBillings:
             monthlyActualBillings ?? this.monthlyActualBillings,
