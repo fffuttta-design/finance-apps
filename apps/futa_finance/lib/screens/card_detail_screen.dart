@@ -136,7 +136,15 @@ class _CardDetailScreenState extends State<CardDetailScreen>
     for (final sub in _subs) {
       if ((sub.paymentMethod ?? '').trim() != name) continue;
       final amt = sub.plAmountForMonth(ym, curYm);
-      if (amt <= 0) continue;
+      final pending = sub.isVariable &&
+          !sub.monthlyActuals.containsKey(ym) &&
+          sub.cycle == core.SubscriptionCycle.monthly &&
+          (sub.startYearMonth == null ||
+              ym.compareTo(sub.startYearMonth!) >= 0) &&
+          (sub.endYearMonth == null ||
+              ym.compareTo(sub.endYearMonth!) <= 0) &&
+          ym.compareTo(curYm) <= 0;
+      if (amt <= 0 && !pending) continue;
       DateTime date;
       if (sub.cycle == core.SubscriptionCycle.annually &&
           sub.nextBillingDate != null) {
@@ -157,9 +165,58 @@ class _CardDetailScreenState extends State<CardDetailScreen>
         categoryLabel: label,
         sortOrder: sub.sortOrder,
         reviewed: sub.reviewedMonths[ym] ?? false,
+        pending: pending,
       ));
     }
     return rows;
+  }
+
+  /// 変動費（入力待ち）の今月の金額を手入力して保存する。
+  Future<void> _inputCardVariableAmount(String subId) async {
+    final m = _selectedMonth;
+    if (m == null) return;
+    final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
+    final ctrl = NoComposingUnderlineController();
+    final v = await showDialog<int>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: const Text('今月の金額を入力'),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          inputFormatters: [
+            HalfWidthDigitsFormatter(),
+            ThousandsSeparatorInputFormatter(),
+          ],
+          decoration: const InputDecoration(
+              prefixText: '¥ ', labelText: '金額（円）'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx),
+              child: const Text('キャンセル')),
+          FilledButton(
+            onPressed: () {
+              final n = parseAmount(ctrl.text);
+              if (n != null) Navigator.pop(dctx, n);
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (v == null) return;
+    final cfg = await SubscriptionRepository.instance.load();
+    final newSubs = cfg.subscriptions.map((s) {
+      if (s.id != subId) return s;
+      final map = Map<String, int>.from(s.monthlyActuals);
+      map[ym] = v;
+      return s.copyWith(monthlyActuals: map);
+    }).toList();
+    await SubscriptionRepository.instance
+        .save(core.SubscriptionConfig(subscriptions: newSubs));
+    if (mounted) await _load();
   }
 
   /// 固定費の確認済み（選択中の月）をトグルして保存する。
@@ -372,7 +429,9 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                                     // 固定費は月モードのときだけ混ぜる
                                     // （範囲指定はまたぐ月が曖昧なので出さない）。
                                     fixedRows: cardFixed,
-                                    onEditFixed: (f) => _editCardFixed(f.id),
+                                    onEditFixed: (f) => f.pending
+                                        ? _inputCardVariableAmount(f.id)
+                                        : _editCardFixed(f.id),
                                     onToggleReviewed: (t, v) async {
                                       await TransactionRepository.instance
                                           .update(t.copyWith(reviewed: v));

@@ -265,7 +265,11 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     final rows = <FixedCostRow>[];
     for (final sub in _subs) {
       final amt = sub.plAmountForMonth(ym, curYm);
-      if (amt <= 0) continue;
+      // 変動費で対象月だが未入力＝「入力待ち」として明細にも出す。
+      final pending = sub.isVariable &&
+          !sub.monthlyActuals.containsKey(ym) &&
+          _variableActiveInMonth(sub, ym, curYm);
+      if (amt <= 0 && !pending) continue;
       DateTime date;
       if (sub.cycle == core.SubscriptionCycle.annually &&
           sub.nextBillingDate != null) {
@@ -287,6 +291,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
         categoryLabel: label,
         sortOrder: sub.sortOrder,
         reviewed: sub.reviewedMonths[ym] ?? false,
+        pending: pending,
       ));
     }
     return rows;
@@ -969,7 +974,10 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 fixedRows: showFixedAndCard
                     ? _fixedTableRows(_month)
                     : const <FixedCostRow>[],
-                onEditFixed: (f) => _editSubscription(f.id),
+                // 入力待ち（変動費）はタップで金額入力、それ以外は編集画面へ。
+                onEditFixed: (f) => f.pending
+                    ? _inputVariableAmount(f.id)
+                    : _editSubscription(f.id),
                 emptyHint: '${_month.month}月の記録はまだありません',
                 // 事業モードのみ、領収書/レシート保存済みチェック列（税理士提出用）。
                 showReceiptCheck: _isBusiness,

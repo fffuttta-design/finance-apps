@@ -28,6 +28,7 @@ import '../../utils/thousands_separator_input_formatter.dart';
 import '../../widgets/brand_logo.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
+import '../../screens/transfer_input_screen.dart';
 import '../theme/typography.dart';
 import '../widgets/month_nav_bar.dart';
 import '../widgets/v2_card.dart';
@@ -497,6 +498,9 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
             ),
             const SizedBox(height: V2Spacing.md),
             _LeftAssetSummary(state: this),
+            const SizedBox(height: V2Spacing.lg),
+            // 振替履歴（全口座横断）。PLに関係しないお金の移動はここに集約。
+            _TransferHistory(state: this),
           ],
         ),
       );
@@ -518,6 +522,113 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
 // ═════════════════════════════════════════════════
 // 左カラム: 総資産 + 口座/カード一覧
 // ═════════════════════════════════════════════════
+
+/// 振替履歴（全口座横断）。資産タブに置く＝振替はPL非計上のお金移動なので、
+/// 収入/支出ではなく口座（資産）の文脈でまとめて見せる。選択中の月ぶん。
+class _TransferHistory extends StatelessWidget {
+  final _V2HomeTopNavScreenState state;
+  const _TransferHistory({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final m = state._selectedMonth;
+    final transfers = state._transactions
+        .where((t) =>
+            t.type == TransactionType.transfer &&
+            t.date.year == m.year &&
+            t.date.month == m.month)
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+    return V2Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.swap_horiz,
+                  size: 18, color: V2Colors.textSecondary),
+              const SizedBox(width: 8),
+              Text('振替履歴',
+                  style: V2Typography.h2
+                      .copyWith(color: V2Colors.textPrimary)),
+              const Spacer(),
+              Text('${transfers.length}件',
+                  style: V2Typography.caption
+                      .copyWith(color: V2Colors.textMuted)),
+            ],
+          ),
+          if (transfers.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: Text('この月の振替はありません',
+                    style: TextStyle(
+                        fontSize: 13, color: V2Colors.textMuted)),
+              ),
+            )
+          else
+            for (int i = 0; i < transfers.length; i++) ...[
+              if (i > 0)
+                const Divider(height: 1, color: V2Colors.divider),
+              _row(context, transfers[i]),
+            ],
+        ],
+      ),
+    );
+  }
+
+  Widget _row(BuildContext context, Transaction t) {
+    final d = t.date;
+    return InkWell(
+      onTap: () => showTransferInputModal(context, editing: t),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 46,
+              child: Text('${d.month}/${d.day}',
+                  style: V2Typography.micro
+                      .copyWith(color: V2Colors.textSecondary)),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(t.transferFromAccount ?? '?',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: V2Typography.body),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 6),
+                    child: Icon(Icons.arrow_forward,
+                        size: 13, color: V2Colors.textMuted),
+                  ),
+                  Flexible(
+                    child: Text(t.transferToAccount ?? '?',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: V2Typography.body),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(formatYen(t.amount),
+                style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFFEA580C),
+                    fontFeatures: V2Typography.tabularNums)),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 /// 総資産カード（v2.1）。
 /// 「総資産」ラベル（大）→ 月初残高 → 当月の増減 → 口座/カードのリスト →

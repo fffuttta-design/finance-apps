@@ -38,6 +38,9 @@ class FixedCostRow {
   /// この月の確認済み（検収）状態。
   final bool reviewed;
 
+  /// 変動費で今月の金額が未入力＝「入力待ち」。金額の代わりにバッジを出す。
+  final bool pending;
+
   const FixedCostRow({
     required this.id,
     required this.name,
@@ -47,6 +50,7 @@ class FixedCostRow {
     this.categoryLabel = '',
     this.sortOrder,
     this.reviewed = false,
+    this.pending = false,
   });
 }
 
@@ -1316,13 +1320,30 @@ class _FixedRow extends StatelessWidget {
             _vGrid(_kHandleW, _kRowH),
             SizedBox(
               width: w.amount,
-              child: Text('-${formatYen(f.amount)}',
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: _kFixedAccent,
-                      fontFeatures: V2Typography.tabularNums)),
+              child: f.pending
+                  ? Align(
+                      alignment: Alignment.centerRight,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text('入力待ち',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFB45309))),
+                      ),
+                    )
+                  : Text('-${formatYen(f.amount)}',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: _kFixedAccent,
+                          fontFeatures: V2Typography.tabularNums)),
             ),
             if (showReceipt) ...[
               _vGrid(_kColGap, _kRowH),
@@ -1699,12 +1720,27 @@ class _NarrowFixedRow extends StatelessWidget {
                           .copyWith(fontWeight: FontWeight.w600)),
                 ),
                 const SizedBox(width: 8),
-                Text('-${formatYen(f.amount)}',
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: _kFixedAccent,
-                        fontFeatures: V2Typography.tabularNums)),
+                if (f.pending)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text('入力待ち',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFB45309))),
+                  )
+                else
+                  Text('-${formatYen(f.amount)}',
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: _kFixedAccent,
+                          fontFeatures: V2Typography.tabularNums)),
               ],
             ),
             const SizedBox(height: 5),
