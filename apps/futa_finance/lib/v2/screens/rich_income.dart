@@ -11,6 +11,7 @@ import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
 import '../widgets/month_closing_bar.dart';
+import '../widgets/month_nav_bar.dart';
 
 /// 新デザイン（リッチUI）の売上／収入タブ。
 /// サマリーカード（合計＋確定/見込み）＋明細リスト。既存 V2IncomeScreen は温存。
@@ -105,13 +106,22 @@ class _RichIncomeScreenState extends State<RichIncomeScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // タブ上部：タイトル＋右上に締め処理チップ。
+              // タブ上部：タイトル＋中央に月セレクタ（資産タブと同じ見た目）
+              // ＋右上に締め処理チップ。
               Row(
                 children: [
                   Text(isBusiness ? '売上' : '収入',
                       style: V2Typography.h1
                           .copyWith(color: V2Colors.textPrimary)),
-                  const Spacer(),
+                  Expanded(
+                    child: Center(
+                      child: MonthNavBar(
+                        label: '${_month.year}年${_month.month}月',
+                        onPrev: () => _shiftMonth(-1),
+                        onNext: () => _shiftMonth(1),
+                      ),
+                    ),
+                  ),
                   MonthClosingBar(
                       month: _month, snapshotIncome: total, dense: true),
                 ],
@@ -128,19 +138,9 @@ class _RichIncomeScreenState extends State<RichIncomeScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Text('${_month.month}月の合計',
-                            style: V2Typography.caption
-                                .copyWith(color: V2Colors.textSecondary)),
-                        const Spacer(),
-                        _MiniStepper(
-                          label: '${_month.year}年${_month.month}月',
-                          onPrev: () => _shiftMonth(-1),
-                          onNext: () => _shiftMonth(1),
-                        ),
-                      ],
-                    ),
+                    Text('${_month.month}月の合計',
+                        style: V2Typography.caption
+                            .copyWith(color: V2Colors.textSecondary)),
                     const SizedBox(height: 6),
                     Text(formatYen(total),
                         style: TextStyle(
@@ -216,39 +216,6 @@ class _RichIncomeScreenState extends State<RichIncomeScreen>
           ),
         ),
       ),
-    );
-  }
-}
-
-class _MiniStepper extends StatelessWidget {
-  final String label;
-  final VoidCallback onPrev;
-  final VoidCallback onNext;
-  const _MiniStepper(
-      {required this.label, required this.onPrev, required this.onNext});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          visualDensity: VisualDensity.compact,
-          iconSize: 20,
-          icon: const Icon(Icons.chevron_left, color: V2Colors.textSecondary),
-          onPressed: onPrev,
-        ),
-        Text(label,
-            style:
-                V2Typography.bodyStrong.copyWith(color: V2Colors.textPrimary)),
-        IconButton(
-          visualDensity: VisualDensity.compact,
-          iconSize: 20,
-          icon:
-              const Icon(Icons.chevron_right, color: V2Colors.textSecondary),
-          onPressed: onNext,
-        ),
-      ],
     );
   }
 }

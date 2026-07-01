@@ -23,6 +23,7 @@ import '../theme/typography.dart';
 import '../widgets/credit_card_reconcile.dart';
 import '../widgets/expense_detail_table.dart';
 import '../widgets/month_closing_bar.dart';
+import '../widgets/month_nav_bar.dart';
 
 /// 新デザイン（リッチUI）の経費／支出タブ。
 /// 月サマリー → カテゴリ内訳 → 明細リスト。既存 V2ExpensesScreen は温存。
@@ -495,31 +496,23 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // タブ上部：タイトル（個人モードのみ）＋ 大きな月セレクタ（主役）
-              // ＋ 右上に締め処理チップ。月切替は最重要操作なのでここで目立たせる。
+              // タブ上部：タイトル（個人モードのみ）＋ 中央に月セレクタ（資産タブと
+              // 同じシンプルな見た目）＋ 右上に締め処理チップ。
               Row(
                 children: [
+                  if (title != null)
+                    Text(title,
+                        style: V2Typography.h1
+                            .copyWith(color: V2Colors.textPrimary)),
                   Expanded(
-                    child: Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: V2Spacing.md,
-                      runSpacing: V2Spacing.sm,
-                      children: [
-                        if (title != null)
-                          Text(title,
-                              style: V2Typography.h1
-                                  .copyWith(color: V2Colors.textPrimary)),
-                        _BigMonthNav(
-                          year: _month.year,
-                          month: _month.month,
-                          accent: accent,
-                          onPrev: () => _shiftMonth(-1),
-                          onNext: () => _shiftMonth(1),
-                        ),
-                      ],
+                    child: Center(
+                      child: MonthNavBar(
+                        label: '${_month.year}年${_month.month}月',
+                        onPrev: () => _shiftMonth(-1),
+                        onNext: () => _shiftMonth(1),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: V2Spacing.sm),
                   MonthClosingBar(
                       month: _month, snapshotExpense: total, dense: true),
                 ],
@@ -786,69 +779,6 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   }
 }
 
-/// 大きな月セレクタ（支出タブ・ヘッダーの主役）。
-/// 「◀ 2026年7月 ▶」を太字大きめで表示し、矢印は丸ボタンでタップしやすく。
-class _BigMonthNav extends StatelessWidget {
-  final int year;
-  final int month;
-  final Color accent;
-  final VoidCallback onPrev;
-  final VoidCallback onNext;
-  const _BigMonthNav({
-    required this.year,
-    required this.month,
-    required this.accent,
-    required this.onPrev,
-    required this.onNext,
-  });
-
-  Widget _arrow(IconData icon, VoidCallback onTap) => Material(
-        color: Colors.transparent,
-        shape: const CircleBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Container(
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 22, color: accent),
-          ),
-        ),
-      );
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      decoration: BoxDecoration(
-        color: V2Colors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: V2Colors.border),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _arrow(Icons.chevron_left, onPrev),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text('$year年$month月',
-                style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: V2Colors.textPrimary,
-                    fontFeatures: V2Typography.tabularNums)),
-          ),
-          _arrow(Icons.chevron_right, onNext),
-        ],
-      ),
-    );
-  }
-}
 
 class _CatBar extends StatefulWidget {
   final String name;

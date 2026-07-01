@@ -28,6 +28,7 @@ import '../../widgets/brand_logo.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
+import '../widgets/month_nav_bar.dart';
 import '../widgets/v2_card.dart';
 
 /// マネフォ ME 風のホーム画面（v2.1）。
@@ -486,7 +487,12 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
             vertical: V2Spacing.xl, horizontal: V2Spacing.md),
         child: Column(
           children: [
-            _AssetMonthBar(state: this),
+            MonthNavBar(
+              label: '${_selectedMonth.year}年${_selectedMonth.month}月',
+              onPrev: () => shiftMonth(-1),
+              onNext: () => shiftMonth(1),
+              center: true,
+            ),
             const SizedBox(height: V2Spacing.md),
             _LeftAssetSummary(state: this),
           ],
@@ -503,33 +509,6 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
         // 総資産は「資産」タブへ移動したため、ホームでは中央カラムのみ。
         return _CenterColumn(state: this);
       }),
-    );
-  }
-}
-
-/// 「資産」タブ用の月切替バー（< 2026年6月 >）。
-class _AssetMonthBar extends StatelessWidget {
-  final _V2HomeTopNavScreenState state;
-  const _AssetMonthBar({required this.state});
-
-  @override
-  Widget build(BuildContext context) {
-    final m = state._selectedMonth;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.chevron_left, color: V2Colors.textSecondary),
-          onPressed: () => state.shiftMonth(-1),
-        ),
-        Text('${m.year}年${m.month}月',
-            style: V2Typography.bodyStrong
-                .copyWith(color: V2Colors.textPrimary)),
-        IconButton(
-          icon: const Icon(Icons.chevron_right, color: V2Colors.textSecondary),
-          onPressed: () => state.shiftMonth(1),
-        ),
-      ],
     );
   }
 }
@@ -883,30 +862,16 @@ class _CenterColumn extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Text(
-                      '${state._selectedMonth.year}年${state._selectedMonth.month}月の収支',
+                  Text('月の収支',
                       style: V2Typography.h2
                           .copyWith(color: V2Colors.textPrimary)),
                   const Spacer(),
-                  // 月送り（前月/翌月）。
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    iconSize: 22,
-                    icon: const Icon(Icons.chevron_left),
-                    onPressed: () => state.shiftMonth(-1),
-                    tooltip: '前の月',
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    iconSize: 22,
-                    icon: const Icon(Icons.chevron_right),
-                    onPressed: () => state.shiftMonth(1),
-                    tooltip: '次の月',
+                  // 月送り（資産タブと同じシンプルな月セレクタ）。
+                  MonthNavBar(
+                    label:
+                        '${state._selectedMonth.year}年${state._selectedMonth.month}月',
+                    onPrev: () => state.shiftMonth(-1),
+                    onNext: () => state.shiftMonth(1),
                   ),
                 ],
               ),

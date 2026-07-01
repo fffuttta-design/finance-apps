@@ -12,6 +12,7 @@ import '../../utils/formatters.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
+import '../widgets/month_nav_bar.dart';
 import '../widgets/v2_card.dart';
 
 /// 損益計算書（PL）の大カテゴリ分類。
@@ -435,14 +436,14 @@ class _V2ReportScreenState extends State<V2ReportScreen>
                 ),
                 // ナビ（当月=月送り / 1年=年度送り）
                 if (_yearView)
-                  _NavBar(
+                  MonthNavBar(
                     label:
                         '$_fyYear 年度（$_fyStartMonth月〜$fyEndYear年$fyEndMonth月）',
                     onPrev: () => _shiftYear(-1),
                     onNext: () => _shiftYear(1),
                   )
                 else
-                  _NavBar(
+                  MonthNavBar(
                     label: '${_selMonth.year}年${_selMonth.month}月',
                     onPrev: () => _shiftMonth(-1),
                     onNext: () => _shiftMonth(1),
@@ -1001,39 +1002,6 @@ class _PLRow {
 // ═════════════════════════════════════════════════
 
 /// 月／年度を前後に送るナビ（◀ ラベル ▶）。
-class _NavBar extends StatelessWidget {
-  final String label;
-  final VoidCallback onPrev;
-  final VoidCallback onNext;
-  const _NavBar(
-      {required this.label, required this.onPrev, required this.onNext});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          visualDensity: VisualDensity.compact,
-          icon: const Icon(Icons.chevron_left, size: 18),
-          onPressed: onPrev,
-        ),
-        Text(
-          label,
-          style: V2Typography.body.copyWith(
-              fontWeight: FontWeight.w700,
-              color: V2Colors.textPrimary),
-        ),
-        IconButton(
-          visualDensity: VisualDensity.compact,
-          icon: const Icon(Icons.chevron_right, size: 18),
-          onPressed: onNext,
-        ),
-      ],
-    );
-  }
-}
-
 class _PLTable extends StatelessWidget {
   final List<DateTime> months;
   final List<_PLRow> rows;
