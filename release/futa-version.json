@@ -1,1 +1,1 @@
-{"version":"1.0.385","buildNumber":"386","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.385/futa-finance-v1.0.385.apk","releaseNotes":"支出・クレカ明細で、同じ日付の中を手で並び替えできるようにしました（順番は保存され、日付で並べ直しても保持されます）。あわせてクレカ明細の利用合計に固定費を含めてウォレットと一致させました。"}
+{"version":"1.0.386","buildNumber":"387","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.386/futa-finance-v1.0.386.apk","releaseNotes":"通帳画面：記録ボタンを分かりやすく、ポップアップの出方を他画面と統一、取引編集が開かない不具合を修正しました。"}
