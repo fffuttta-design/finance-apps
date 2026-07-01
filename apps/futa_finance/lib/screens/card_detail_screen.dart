@@ -217,8 +217,13 @@ class _CardDetailScreenState extends State<CardDetailScreen>
               t.date.month == _selectedMonth!.month)
           .toList();
     }
-    final monthTotal =
-        monthTxns.fold<int>(0, (s, t) => s + t.amount);
+    // このカードの固定費（月モードのみ）。利用合計にも含めて、支出タブの
+    // ウォレット一覧（取引＋固定費で計算）と数字を一致させる。
+    final cardFixed = _range != null
+        ? const <FixedCostRow>[]
+        : _cardFixedRows(_selectedMonth);
+    final monthTotal = monthTxns.fold<int>(0, (s, t) => s + t.amount) +
+        cardFixed.fold<int>(0, (s, f) => s + f.amount);
 
     return Scaffold(
       appBar: AppBar(
@@ -318,9 +323,7 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                                     accent: const Color(0xFFDC2626),
                                     // 固定費は月モードのときだけ混ぜる
                                     // （範囲指定はまたぐ月が曖昧なので出さない）。
-                                    fixedRows: _range != null
-                                        ? const <FixedCostRow>[]
-                                        : _cardFixedRows(_selectedMonth),
+                                    fixedRows: cardFixed,
                                     onEditFixed: (f) => _editCardFixed(f.id),
                                     emptyHint: 'この期間の利用はありません',
                                   ),
