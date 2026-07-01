@@ -1,1 +1,1 @@
-{"version":"1.0.392","buildNumber":"393","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.392/futa-finance-v1.0.392.apk","releaseNotes":"支出明細の固定費にも確認済みチェックを追加（月ごとに管理）。締め処理で固定費も潰せます。"}
+{"version":"1.0.393","buildNumber":"394","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.393/futa-finance-v1.0.393.apk","releaseNotes":"明細の列順を領収書→確認に。固定費一覧のデフォルトを金額の高い順に。毎月の固定費に支払日表示・合計を枠内へ・変動費の入力待ち表示を追加。"}
