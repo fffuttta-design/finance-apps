@@ -42,8 +42,8 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
   /// （グループ分けは常に有効。手動ドラッグにしたいときは並び替えメニューで切替）
   _SortMode _sortMode = _SortMode.amountDesc;
 
-  /// グループ表示モード。デフォルトはカテゴリ別。
-  _GroupMode _groupMode = _GroupMode.byCategory;
+  /// グループ表示モード。デフォルトは「定額/変動別」（変動費を上に目立たせる）。
+  _GroupMode _groupMode = _GroupMode.byAmountType;
 
   @override
   void initState() {
