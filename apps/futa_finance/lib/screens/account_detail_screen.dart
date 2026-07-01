@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
@@ -8,6 +7,7 @@ import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
+import '../utils/modal_input.dart';
 import '../utils/thousands_separator_input_formatter.dart';
 import '../widgets/brand_logo.dart';
 import 'expense_input_screen.dart';
@@ -263,10 +263,25 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                   ),
                 ),
               ),
-            IconButton(
-              icon: const Icon(Icons.add_circle, color: Color(0xFF1A237E)),
-              tooltip: '取引を追加',
-              onPressed: _showAddMenu,
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF1A237E),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                ),
+                onPressed: _showAddMenu,
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('記録',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+                    SizedBox(width: 2),
+                    Icon(Icons.add, size: 18),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -934,199 +949,23 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   // ───────────────────────────────────────────────────────────
 
   Future<void> _showEditDialog(core.Transaction t) async {
-    // 振替は専用の振替エディタで編集（汎用ダイアログは移動元/先を扱えない）。
-    if (t.type == core.TransactionType.transfer) {
-      final changed = await showTransferInputModal(context, editing: t);
-      if (changed == true && mounted) await _load();
-      return;
+    // 種類別に、アプリ共通の入力画面（中央ポップアップ）で編集する。
+    // 以前はこの画面だけ独自の AlertDialog で、広い画面だと中身がグレーの
+    // まま出ない不具合があったため、他画面と同じ入力フォームに統一した。
+    final Widget screen;
+    switch (t.type) {
+      case core.TransactionType.transfer:
+        screen = TransferInputScreen(editing: t);
+        break;
+      case core.TransactionType.income:
+        screen = IncomeInputScreen(editing: t);
+        break;
+      case core.TransactionType.expense:
+        screen = ExpenseInputScreen(editing: t);
+        break;
     }
-    final isTransfer = t.type == core.TransactionType.transfer;
-    final isOut = (t.type == core.TransactionType.expense) ||
-        (isTransfer && t.transferFromAccount == _account.name);
-
-    DateTime editingDate = t.date;
-    final descCtrl = TextEditingController(text: t.description);
-    final amountCtrl = NoComposingUnderlineController(text: formatAmount(t.amount));
-    final memoCtrl = TextEditingController(text: t.memo ?? '');
-
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(builder: (ctx, setLocal) {
-          return AlertDialog(
-            title: const Text('取引を編集',
-                style: TextStyle(fontWeight: FontWeight.w700)),
-            // SingleChildScrollView でラップして広い画面でも content が
-            // 縮退しないようにする（Web ではこの保険がないと中身が消える）
-            content: SizedBox(
-              width: 360,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                  // 取引日
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('取引日',
-                        style: TextStyle(
-                            fontSize: 12, color: Color(0xFF6B7280))),
-                    subtitle: Text(
-                      '${editingDate.year}/${editingDate.month.toString().padLeft(2, '0')}/${editingDate.day.toString().padLeft(2, '0')}',
-                      style: const TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w600),
-                    ),
-                    trailing: const Icon(Icons.calendar_today, size: 16),
-                    onTap: () async {
-                      final picked =
-                          await showCupertinoModalPopup<DateTime>(
-                        context: ctx,
-                        builder: (_) => Container(
-                          height: 280,
-                          color: Colors.white,
-                          child: Column(
-                            children: [
-                              SizedBox(
-                                height: 40,
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.end,
-                                  children: [
-                                    CupertinoButton(
-                                      onPressed: () => Navigator.pop(
-                                          ctx, editingDate),
-                                      child: const Text('完了'),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Expanded(
-                                child: CupertinoDatePicker(
-                                  mode: CupertinoDatePickerMode.date,
-                                  initialDateTime: editingDate,
-                                  onDateTimeChanged: (d) =>
-                                      editingDate = d,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                      if (picked != null) {
-                        setLocal(() => editingDate = picked);
-                      }
-                    },
-                  ),
-                  // 摘要
-                  TextField(
-                    controller: descCtrl,
-                    decoration: const InputDecoration(
-                      labelText: '摘要',
-                      floatingLabelBehavior: FloatingLabelBehavior.always,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  // 金額（出金/入金の方向はそのまま、絶対値だけ編集）
-                  TextField(
-                    controller: amountCtrl,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      HalfWidthDigitsFormatter(),
-                      ThousandsSeparatorInputFormatter(),
-                    ],
-                    decoration: InputDecoration(
-                      labelText: isOut ? '出金額（円）' : '入金額（円）',
-                      floatingLabelBehavior: FloatingLabelBehavior.always,
-                      prefixText: '¥ ',
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  // メモ
-                  TextField(
-                    controller: memoCtrl,
-                    maxLines: 2,
-                    decoration: const InputDecoration(
-                      labelText: 'メモ',
-                      floatingLabelBehavior: FloatingLabelBehavior.always,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  if (isTransfer)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 4),
-                      child: Text(
-                        '※ 振替の移動元/先はここでは変更不可',
-                        style: TextStyle(
-                            fontSize: 10, color: Color(0xFF9CA3AF)),
-                      ),
-                    ),
-                ],
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () async {
-                  // 削除確認
-                  final ok = await showDialog<bool>(
-                    context: ctx,
-                    builder: (delCtx) => AlertDialog(
-                      title: const Text('取引を削除しますか？'),
-                      content: const Text('元に戻せません。'),
-                      actions: [
-                        TextButton(
-                            onPressed: () => Navigator.pop(delCtx, false),
-                            child: const Text('キャンセル')),
-                        FilledButton(
-                          style: FilledButton.styleFrom(
-                              backgroundColor: const Color(0xFFDC2626)),
-                          onPressed: () => Navigator.pop(delCtx, true),
-                          child: const Text('削除'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (ok == true) {
-                    await TransactionRepository.instance.delete(t.id);
-                    if (!ctx.mounted) return;
-                    Navigator.pop(ctx, true);
-                  }
-                },
-                style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFFDC2626)),
-                child: const Text('削除'),
-              ),
-              const Spacer(),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('キャンセル'),
-              ),
-              FilledButton(
-                onPressed: () async {
-                  final newAmount = parseAmount(amountCtrl.text);
-                  if (newAmount == null || newAmount <= 0) return;
-                  final updated = t.copyWith(
-                    date: editingDate,
-                    description: descCtrl.text.trim(),
-                    amount: newAmount,
-                    memo: memoCtrl.text.trim().isEmpty
-                        ? null
-                        : memoCtrl.text.trim(),
-                  );
-                  await TransactionRepository.instance.update(updated);
-                  if (!ctx.mounted) return;
-                  Navigator.pop(ctx, true);
-                },
-                child: const Text('保存'),
-              ),
-            ],
-          );
-        });
-      },
-    );
-    if (saved == true && mounted) {
-      // Stream で自動更新されるはずだが念のため
-      await _load();
-    }
+    final changed = await showInputSheet<bool>(context, screen);
+    if (changed == true && mounted) await _load();
   }
 
   // ───────────────────────────────────────────────────────────
@@ -1135,67 +974,44 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
 
   Future<void> _showAddMenu() async {
     final accountName = _account.name;
-    await showModalBottomSheet<void>(
+    // 他画面と同じ「中央ポップアップ」に統一（下から出るシートはやめる）。
+    final choice = await showDialog<String>(
       context: context,
-      showDragHandle: true,
-      builder: (sheetCtx) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.arrow_downward,
-                    color: Color(0xFF16A34A)),
-                title: const Text('入金（収入）を記録'),
-                subtitle: Text('入金先: $accountName'),
-                onTap: () {
-                  Navigator.pop(sheetCtx);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => IncomeInputScreen(
-                          initialReceiveAccount: accountName),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.arrow_upward,
-                    color: Color(0xFFDC2626)),
-                title: const Text('出金（支出）を記録'),
-                subtitle: Text('支払元: $accountName'),
-                onTap: () {
-                  Navigator.pop(sheetCtx);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ExpenseInputScreen(
-                          initialPaymentMethod: accountName),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.swap_horiz,
-                    color: Color(0xFFEA580C)),
-                title: const Text('振替（他口座へ移動）を記録'),
-                subtitle: Text('移動元: $accountName'),
-                onTap: () {
-                  Navigator.pop(sheetCtx);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => TransferInputScreen(
-                          initialFromAccount: accountName),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
+      builder: (dctx) => SimpleDialog(
+        title: const Text('記録する', style: TextStyle(fontWeight: FontWeight.w700)),
+        children: [
+          _addMenuTile(dctx, 'income', Icons.arrow_downward,
+              const Color(0xFF16A34A), '入金（収入）を記録', '入金先: $accountName'),
+          _addMenuTile(dctx, 'expense', Icons.arrow_upward,
+              const Color(0xFFDC2626), '出金（支出）を記録', '支払元: $accountName'),
+          _addMenuTile(dctx, 'transfer', Icons.swap_horiz,
+              const Color(0xFFEA580C), '振替（他口座へ移動）を記録', '移動元: $accountName'),
+        ],
+      ),
+    );
+    if (choice == null || !mounted) return;
+    final Widget screen;
+    switch (choice) {
+      case 'income':
+        screen = IncomeInputScreen(initialReceiveAccount: accountName);
+        break;
+      case 'transfer':
+        screen = TransferInputScreen(initialFromAccount: accountName);
+        break;
+      default:
+        screen = ExpenseInputScreen(initialPaymentMethod: accountName);
+    }
+    final saved = await showInputSheet<bool>(context, screen);
+    if (saved == true && mounted) await _load();
+  }
+
+  Widget _addMenuTile(BuildContext dctx, String value, IconData icon,
+      Color color, String title, String subtitle) {
+    return ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(title),
+      subtitle: Text(subtitle),
+      onTap: () => Navigator.pop(dctx, value),
     );
   }
 }
