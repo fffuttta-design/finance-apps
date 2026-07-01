@@ -3,12 +3,18 @@ import 'package:finance_core/finance_core.dart';
 
 import '../data/nav_history.dart';
 import '../data/settings_repository.dart';
+import '../data/transaction_repository.dart';
 import '../utils/category_colors.dart';
 import '../utils/emoji_palette.dart';
 import '../utils/subcategory_icon_suggester.dart';
 import '../widgets/centered_body.dart';
 import '../widgets/emoji_picker_dialog.dart';
+import 'category_reassign_screen.dart';
 import 'category_sub_editor_screen.dart';
+
+/// 番号プレフィックス（"7."）を外した素の名前。
+String _bareName(String s) =>
+    s.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
 
 /// 大カテゴリのCRUD + アイコン設定画面。
 ///
@@ -23,6 +29,7 @@ class CategoryEditorScreen extends StatefulWidget {
 class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
   final _repo = SettingsRepository();
   CategoryConfig? _config;
+  List<Transaction> _txns = [];
 
   @override
   void initState() {
@@ -32,8 +39,23 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
 
   Future<void> _load() async {
     final c = await _repo.loadCategories();
+    List<Transaction> txns = const [];
+    try {
+      txns = await TransactionRepository.instance.loadAll();
+    } catch (_) {}
     if (!mounted) return;
-    setState(() => _config = c);
+    setState(() {
+      _config = c;
+      _txns = txns;
+    });
+  }
+
+  /// その大カテゴリに紐づく明細件数（番号を無視して名前一致で数える）。
+  int _majorCount(int index) {
+    final name = _bareName(_config!.majors[index].displayName(index));
+    return _txns
+        .where((t) => _bareName(t.category.major) == name)
+        .length;
   }
 
   Future<void> _save() async {
@@ -133,10 +155,28 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
   }
 
   void _deleteMajor(int index) async {
-    final ok = await _confirm(
-        title: '${_config!.majors[index].displayName(index)} を削除？',
-        body: 'このカテゴリ内の小カテゴリも全て削除されます。');
-    if (!ok) return;
+    final count = _majorCount(index);
+    // 紐づく明細があるときは、先に別カテゴリへ付け替えさせてから削除。
+    if (count > 0) {
+      final done = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CategoryReassignScreen(
+            config: _config!,
+            sourceMajorDisplay: _config!.majors[index].displayName(index),
+          ),
+        ),
+      );
+      if (!mounted) return;
+      await _load(); // 付け替え結果を反映
+      if (done != true) return; // 付け替え未完了なら削除しない
+    } else {
+      final ok = await _confirm(
+          title: '${_config!.majors[index].displayName(index)} を削除？',
+          body: 'このカテゴリ内の小カテゴリも全て削除されます。');
+      if (!ok) return;
+    }
+    if (!mounted) return;
     final list = [..._config!.majors]..removeAt(index);
     _update(list);
   }
@@ -468,7 +508,7 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
                             const SizedBox(width: 6),
                           ],
                           Text(
-                            '${major.subs.length}件の小カテゴリ',
+                            '小カテゴリ${major.subs.length}件 ・ 明細${_majorCount(index)}件',
                             style: const TextStyle(
                                 fontSize: 11, color: Color(0xFF9CA3AF)),
                           ),

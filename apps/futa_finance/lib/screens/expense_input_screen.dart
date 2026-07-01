@@ -14,6 +14,7 @@ import '../utils/duplicate_check.dart';
 import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
 import '../widgets/drive_receipt_picker.dart';
+import 'category_editor_screen.dart';
 import 'receipt_camera_screen.dart';
 import 'receipt_image_screen.dart';
 
@@ -662,6 +663,34 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     });
   }
 
+  /// 支出記録の途中でカテゴリを編集したくなるケース向け。
+  /// カテゴリ編集画面を開き、戻ったら最新のカテゴリを読み直して反映する。
+  Future<void> _openCategoryEditor() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => const CategoryEditorScreen()),
+    );
+    if (!mounted) return;
+    final c = await _settings.loadCategories();
+    if (!mounted) return;
+    setState(() {
+      _categories = c;
+      // 選択中のカテゴリが消えていたら整合を取る。
+      final majorNames = List.generate(
+          c.majors.length, (i) => c.majors[i].displayName(i));
+      if (_majorCategory != null && !majorNames.contains(_majorCategory)) {
+        _majorCategory = null;
+        _subCategory = null;
+      } else if (_subCategory != null &&
+          !_availableSubs.contains(_subCategory)) {
+        _subCategory = null;
+      }
+      // ドロップダウンを作り直して最新の項目を反映。
+      _majorDropdownNonce++;
+      _subDropdownNonce++;
+    });
+  }
+
   Future<void> _pickDate() async {
     // モード別カットオフ（事業=2025/10・個人=2026/01）より前は選べない。
     // PC（広い画面）はカレンダー / スマホはホイール、で出し分け。
@@ -1019,7 +1048,31 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               ),
               const SizedBox(height: 16),
 
-              _label('大カテゴリ'),
+              Row(
+                children: [
+                  Expanded(child: _label('大カテゴリ')),
+                  InkWell(
+                    onTap: _openCategoryEditor,
+                    borderRadius: BorderRadius.circular(6),
+                    child: const Padding(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.tune, size: 14, color: Color(0xFF1A237E)),
+                          SizedBox(width: 3),
+                          Text('カテゴリ編集',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1A237E))),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               DropdownButtonFormField<String>(
                 key: ValueKey('major-$_majorDropdownNonce'),
                 initialValue: _majorCategory,

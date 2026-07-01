@@ -2,9 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart';
 
 import '../data/settings_repository.dart';
+import '../data/transaction_repository.dart';
 import '../utils/emoji_palette.dart';
 import '../widgets/centered_body.dart';
 import '../widgets/emoji_picker_dialog.dart';
+import 'category_reassign_screen.dart';
+
+/// 番号プレフィックス（"7."）を外した素の名前。
+String _bareName(String s) =>
+    s.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
 
 /// 1つの大カテゴリのサブカテゴリ専用CRUD画面。
 ///
@@ -22,6 +28,7 @@ class CategorySubEditorScreen extends StatefulWidget {
 class _CategorySubEditorScreenState extends State<CategorySubEditorScreen> {
   final _repo = SettingsRepository();
   CategoryConfig? _config;
+  List<Transaction> _txns = [];
 
   @override
   void initState() {
@@ -31,8 +38,24 @@ class _CategorySubEditorScreenState extends State<CategorySubEditorScreen> {
 
   Future<void> _load() async {
     final c = await _repo.loadCategories();
+    List<Transaction> txns = const [];
+    try {
+      txns = await TransactionRepository.instance.loadAll();
+    } catch (_) {}
     if (!mounted) return;
-    setState(() => _config = c);
+    setState(() {
+      _config = c;
+      _txns = txns;
+    });
+  }
+
+  /// この小カテゴリに紐づく明細件数。
+  int _subCount(String sub) {
+    final majorName = _bareName(_major.name);
+    return _txns
+        .where((t) =>
+            _bareName(t.category.major) == majorName && t.category.sub == sub)
+        .length;
   }
 
   Future<void> _save() async {
@@ -111,23 +134,43 @@ class _CategorySubEditorScreenState extends State<CategorySubEditorScreen> {
 
   Future<void> _delete(int i) async {
     final subName = _major.subs[i];
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text('$subName を削除？'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('キャンセル')),
-          FilledButton(
-              style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFDC2626)),
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('削除')),
-        ],
-      ),
-    );
-    if (ok != true) return;
+    final count = _subCount(subName);
+    if (count > 0) {
+      // 紐づく明細があるので、先に別カテゴリへ付け替えてから削除。
+      final done = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CategoryReassignScreen(
+            config: _config!,
+            sourceMajorDisplay:
+                _config!.majors[widget.majorIndex].displayName(widget.majorIndex),
+            sourceSub: subName,
+          ),
+        ),
+      );
+      if (!mounted) return;
+      await _load();
+      if (done != true) return;
+    } else {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text('$subName を削除？'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('キャンセル')),
+            FilledButton(
+                style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFDC2626)),
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('削除')),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+    if (!mounted) return;
 
     final subs = [..._major.subs]..removeAt(i);
 
@@ -255,10 +298,21 @@ class _CategorySubEditorScreenState extends State<CategorySubEditorScreen> {
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            child: Text(sub,
-                                style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Color(0xFF111827))),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(sub,
+                                    style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Color(0xFF111827))),
+                                const SizedBox(height: 1),
+                                Text('明細${_subCount(sub)}件',
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF9CA3AF))),
+                              ],
+                            ),
                           ),
                           IconButton(
                             visualDensity: VisualDensity.compact,
