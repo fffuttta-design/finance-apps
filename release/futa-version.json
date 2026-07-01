@@ -1,1 +1,1 @@
-{"version":"1.0.395","buildNumber":"396","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.395/futa-finance-v1.0.395.apk","releaseNotes":"支出明細の並び替えモードでも、確認済みチェックをON/OFFでき、グレーアウトも反映されるようにしました（締め処理を止めずに並び替え可能）。"}
+{"version":"1.0.397","buildNumber":"398","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.397/futa-finance-v1.0.397.apk","releaseNotes":"支出入力の改善（場所が入力できない不具合の修正／日付の直接入力／金額の左寄せ／レシート見るボタン削除）と、固定費一覧の既定表示を『定額/変動別・高い順』に。"}
