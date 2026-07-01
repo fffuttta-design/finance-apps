@@ -495,14 +495,31 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // タブ上部：タイトル（個人モードのみ）＋ 右上に締め処理チップ。
+              // タブ上部：タイトル（個人モードのみ）＋ 大きな月セレクタ（主役）
+              // ＋ 右上に締め処理チップ。月切替は最重要操作なのでここで目立たせる。
               Row(
                 children: [
-                  if (title != null)
-                    Text(title,
-                        style: V2Typography.h1
-                            .copyWith(color: V2Colors.textPrimary)),
-                  const Spacer(),
+                  Expanded(
+                    child: Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: V2Spacing.md,
+                      runSpacing: V2Spacing.sm,
+                      children: [
+                        if (title != null)
+                          Text(title,
+                              style: V2Typography.h1
+                                  .copyWith(color: V2Colors.textPrimary)),
+                        _BigMonthNav(
+                          year: _month.year,
+                          month: _month.month,
+                          accent: accent,
+                          onPrev: () => _shiftMonth(-1),
+                          onNext: () => _shiftMonth(1),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: V2Spacing.sm),
                   MonthClosingBar(
                       month: _month, snapshotExpense: total, dense: true),
                 ],
@@ -527,19 +544,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Text('${_month.month}月の$summaryLabel合計',
-                                    style: V2Typography.caption.copyWith(
-                                        color: V2Colors.textSecondary)),
-                                const Spacer(),
-                                _MiniStepper(
-                                  label: '${_month.year}年${_month.month}月',
-                                  onPrev: () => _shiftMonth(-1),
-                                  onNext: () => _shiftMonth(1),
-                                ),
-                              ],
-                            ),
+                            Text('${_month.month}月の$summaryLabel合計',
+                                style: V2Typography.caption.copyWith(
+                                    color: V2Colors.textSecondary)),
                             const SizedBox(height: 6),
                             Text(formatYen(total),
                                 style: TextStyle(
@@ -779,35 +786,66 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   }
 }
 
-class _MiniStepper extends StatelessWidget {
-  final String label;
+/// 大きな月セレクタ（支出タブ・ヘッダーの主役）。
+/// 「◀ 2026年7月 ▶」を太字大きめで表示し、矢印は丸ボタンでタップしやすく。
+class _BigMonthNav extends StatelessWidget {
+  final int year;
+  final int month;
+  final Color accent;
   final VoidCallback onPrev;
   final VoidCallback onNext;
-  const _MiniStepper(
-      {required this.label, required this.onPrev, required this.onNext});
+  const _BigMonthNav({
+    required this.year,
+    required this.month,
+    required this.accent,
+    required this.onPrev,
+    required this.onNext,
+  });
+
+  Widget _arrow(IconData icon, VoidCallback onTap) => Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 22, color: accent),
+          ),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          visualDensity: VisualDensity.compact,
-          iconSize: 20,
-          icon: const Icon(Icons.chevron_left, color: V2Colors.textSecondary),
-          onPressed: onPrev,
-        ),
-        Text(label,
-            style:
-                V2Typography.bodyStrong.copyWith(color: V2Colors.textPrimary)),
-        IconButton(
-          visualDensity: VisualDensity.compact,
-          iconSize: 20,
-          icon:
-              const Icon(Icons.chevron_right, color: V2Colors.textSecondary),
-          onPressed: onNext,
-        ),
-      ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      decoration: BoxDecoration(
+        color: V2Colors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: V2Colors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _arrow(Icons.chevron_left, onPrev),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text('$year年$month月',
+                style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: V2Colors.textPrimary,
+                    fontFeatures: V2Typography.tabularNums)),
+          ),
+          _arrow(Icons.chevron_right, onNext),
+        ],
+      ),
     );
   }
 }
