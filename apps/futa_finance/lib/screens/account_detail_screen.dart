@@ -9,6 +9,7 @@ import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 import '../utils/modal_input.dart';
 import '../utils/thousands_separator_input_formatter.dart';
+import '../v2/widgets/month_nav_bar.dart';
 import '../widgets/brand_logo.dart';
 import 'expense_input_screen.dart';
 import 'income_input_screen.dart';
@@ -136,25 +137,6 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     return balance;
   }
 
-  /// 月選択肢: 取引がある年月（降順）+ 全期間 + 当月（常に含める）。
-  /// 取引が0件の口座でも残高編集ができるよう、当月は無条件で選択肢に出す。
-  List<DateTime?> _availableMonths() {
-    final name = _account.name;
-    final set = <DateTime>{};
-    // 当月は無条件で含める
-    final now = DateTime.now();
-    set.add(DateTime(now.year, now.month));
-    for (final t in _all) {
-      final isRelated = (t.type == core.TransactionType.transfer)
-          ? (t.transferFromAccount == name || t.transferToAccount == name)
-          : (t.paymentMethod == name);
-      if (!isRelated) continue;
-      set.add(DateTime(t.date.year, t.date.month));
-    }
-    final list = set.toList()..sort((a, b) => b.compareTo(a));
-    return [null, ...list];
-  }
-
   // ───────────────────────────────────────────────────────────
   // UI
   // ───────────────────────────────────────────────────────────
@@ -184,11 +166,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       autoMonthStartBalance = _balanceAt(ascAll, beforeMonth);
       autoMonthEndBalance = _balanceAt(ascAll, monthLast);
     }
-    // 表示用: pending があればそれを使う
-    final dispStart = _pendingMonthStartBalance ?? autoMonthStartBalance;
-    final dispEnd = _pendingMonthEndBalance ?? autoMonthEndBalance;
-
-    // サマリー
+    // サマリー（月初/月末の再計算に使うので先に求める）
     final inSum = filteredAsc
         .where((r) => r.signedAmount > 0)
         .fold<int>(0, (s, r) => s + r.signedAmount);
@@ -196,6 +174,19 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         .where((r) => r.signedAmount < 0)
         .fold<int>(0, (s, r) => s + (-r.signedAmount));
     final netDelta = inSum - outSum;
+
+    // 表示用: pending があればそれを使う。
+    final dispStart = _pendingMonthStartBalance ?? autoMonthStartBalance;
+    // 月末は「月初(表示値) ＋ 当月の増減」で常に自動計算する。
+    // （月初を手入力で書き換えたら、その場で月末も追従する＝ズレ防止。
+    //   月末だけを明示的に上書きしたときのみ、その値を使う）
+    final dispEnd = _pendingMonthEndBalance ??
+        (dispStart != null ? dispStart + netDelta : autoMonthEndBalance);
+    // 途中残高の表示オフセット（月初を手入力で変えたぶん、各行の残高もずらす）。
+    final balanceOffset =
+        (dispStart != null && autoMonthStartBalance != null)
+            ? dispStart - autoMonthStartBalance
+            : 0;
 
     return PopScope(
       canPop: !_hasPendingEdit,
@@ -304,6 +295,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                     displayRows: displayRows,
                     monthStartBalance: dispStart,
                     monthEndBalance: dispEnd,
+                    balanceOffset: balanceOffset,
                   ),
                 ),
               ],
@@ -354,34 +346,62 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     return ok == true;
   }
 
+  /// 月を切り替える（未保存編集があれば確認）。null=全期間。
+  Future<void> _setMonth(DateTime? m) async {
+    if (_hasPendingEdit) {
+      final ok = await _confirmDiscardEdits();
+      if (!ok) return;
+      _clearPending();
+    }
+    if (!mounted) return;
+    setState(() => _selectedMonth = m);
+  }
+
+  void _shiftMonth(int delta) {
+    final now = DateTime.now();
+    final base = _selectedMonth ?? DateTime(now.year, now.month);
+    _setMonth(DateTime(base.year, base.month + delta));
+  }
+
   Widget _monthSelector() {
-    final months = _availableMonths();
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
       child: Row(
         children: [
           const Text('期間: ',
               style: TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
-          DropdownButton<DateTime?>(
-            value: _selectedMonth,
-            underline: const SizedBox.shrink(),
-            items: months.map((m) {
-              final label = m == null ? '全期間' : '${m.year}年${m.month}月';
-              return DropdownMenuItem<DateTime?>(
-                value: m,
-                child: Text(label),
-              );
-            }).toList(),
-            onChanged: (v) async {
-              // 未保存編集があったら確認
-              if (_hasPendingEdit) {
-                final ok = await _confirmDiscardEdits();
-                if (!ok) return;
-                _clearPending();
-              }
-              setState(() => _selectedMonth = v);
-            },
+          // 横矢印で月を前後に切替。全期間のときはラベルだけ。
+          if (_selectedMonth != null)
+            MonthNavBar(
+              label: '${_selectedMonth!.year}年${_selectedMonth!.month}月',
+              onPrev: () => _shiftMonth(-1),
+              onNext: () => _shiftMonth(1),
+            )
+          else
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text('全期間',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF111827))),
+            ),
+          const Spacer(),
+          // 全期間 ⇄ 月別 切替。
+          OutlinedButton.icon(
+            onPressed: () => _setMonth(_selectedMonth == null
+                ? DateTime(DateTime.now().year, DateTime.now().month)
+                : null),
+            icon: Icon(
+                _selectedMonth == null
+                    ? Icons.calendar_view_month
+                    : Icons.all_inclusive,
+                size: 16),
+            label: Text(_selectedMonth == null ? '月別で見る' : '全期間',
+                style: const TextStyle(fontSize: 12)),
+            style: OutlinedButton.styleFrom(
+                visualDensity: VisualDensity.compact),
           ),
         ],
       ),
@@ -553,6 +573,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     required List<_LedgerRow> displayRows,
     int? monthStartBalance,
     int? monthEndBalance,
+    int balanceOffset = 0,
   }) {
     if (displayRows.isEmpty &&
         monthStartBalance == null &&
@@ -597,7 +618,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                 isMonthStart: false,
                 isEdited: _pendingMonthEndBalance != null,
               ),
-            for (final row in displayRows) _txnRow(row),
+            for (final row in displayRows) _txnRow(row, balanceOffset),
             if (monthStartBalance != null && _selectedMonth != null)
               _virtualBalanceRow(
                 label: '月初残高',
@@ -761,7 +782,9 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     if (_selectedMonth == null) return;
     if (autoStart == null) return;
     final newStart = _pendingMonthStartBalance ?? autoStart;
-    final newEnd = _pendingMonthEndBalance ?? autoEnd ?? 0;
+    // 月末を明示上書きしていなければ「月初＋当月増減」を期待値にする
+    // （月初だけ直したときに整合性エラーを出さないため）。
+    final newEnd = _pendingMonthEndBalance ?? (newStart + inSum - outSum);
 
     // 整合性チェック: 月初 + 入金合計 - 出金合計 = 期待月末残高
     final expectedEnd = newStart + inSum - outSum;
@@ -884,8 +907,9 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     }
   }
 
-  TableRow _txnRow(_LedgerRow row) {
+  TableRow _txnRow(_LedgerRow row, [int balanceOffset = 0]) {
     final t = row.txn;
+    final shownBalance = row.balanceAfter + balanceOffset;
     final isOut = row.signedAmount < 0;
     final isTransfer = t.type == core.TransactionType.transfer;
     final desc = isTransfer
@@ -922,11 +946,11 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
           const Color(0xFF16A34A)),
       Padding(
         padding: _cellPad,
-        child: Text(formatYen(row.balanceAfter),
+        child: Text(formatYen(shownBalance),
             textAlign: TextAlign.right,
             style: TextStyle(
                 fontSize: 12,
-                color: row.balanceAfter >= 0
+                color: shownBalance >= 0
                     ? const Color(0xFF111827)
                     : const Color(0xFFDC2626),
                 fontWeight: FontWeight.w700,
