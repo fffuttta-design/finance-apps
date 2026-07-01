@@ -1,1 +1,1 @@
-{"version":"1.0.397","buildNumber":"398","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.397/futa-finance-v1.0.397.apk","releaseNotes":"支出入力の改善（場所が入力できない不具合の修正／日付の直接入力／金額の左寄せ／レシート見るボタン削除）と、固定費一覧の既定表示を『定額/変動別・高い順』に。"}
+{"version":"1.0.398","buildNumber":"399","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.398/futa-finance-v1.0.398.apk","releaseNotes":"ウォレット照合セクションでアクティブな口座/カードを常に表示（休眠は活動月のみ）。クレカ詳細・口座詳細を、タブで選択中の月で開くように。"}
