@@ -290,7 +290,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ...groupByReceipt(recentAll).take(5).map((g) => g.isGroup
               ? ReceiptGroupTile(
                   members: g.members,
-                  childTileBuilder: _txTile,
                   onChanged: () {
                     if (mounted) setState(() {});
                   })

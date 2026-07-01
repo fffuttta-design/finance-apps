@@ -221,7 +221,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         if (g.isGroup)
           ReceiptGroupTile(
               members: g.members,
-              childTileBuilder: _tile,
               onChanged: () {
                 if (mounted) setState(() {});
               })

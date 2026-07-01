@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.89",
-    "buildNumber":  "94",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.89/takuharu-finance-v0.2.89.apk",
-    "releaseNotes":  "月の切り替えを全タブ共通にしました（例：6月にしたまま別タブへ行っても6月のまま）。また「プラン」タブを「資産」タブに置き換え、ワンバンク・UFJ銀行の今の残高と、その月の入出金の動きが見られるようになりました。タブの並びはホーム→支出→収入→資産→分析です。"
+    "version":  "0.2.90",
+    "buildNumber":  "95",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.90/takuharu-finance-v0.2.90.apk",
+    "releaseNotes":  "複数明細レシートを『レシート1枚＝1画面』に統合しました。品目一覧・まとめ編集・コメント欄がひとつにまとまり、コメントもレシート単位で1本になります（今まで品目ごとに付いていたコメントは、そのレシートを開いたときに自動でまとめられます）。"
 }

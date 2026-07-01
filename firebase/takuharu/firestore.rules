@@ -72,6 +72,25 @@ service cloud.firestore {
         }
       }
 
+      // 世帯配下のレシート（同じ receiptId の品目をまとめた単位）とそのチャット。
+      // レシート単位のコメントを1本にまとめて持たせる（品目とは独立）。
+      match /receipts/{receiptId} {
+        function parentMembers() {
+          return get(/databases/$(database)/documents/households/$(hid)).data.members;
+        }
+        allow read, write: if isAllowed()
+            && request.auth.uid in parentMembers();
+
+        // レシートごとのチャット（たく＆はるの会話）
+        match /comments/{commentId} {
+          function members2() {
+            return get(/databases/$(database)/documents/households/$(hid)).data.members;
+          }
+          allow read, write: if isAllowed()
+              && request.auth.uid in members2();
+        }
+      }
+
       // 世帯配下のプランニング項目（やりたいこと/行きたい場所/お店）
       match /plan_items/{itemId} {
         function parentMembers() {

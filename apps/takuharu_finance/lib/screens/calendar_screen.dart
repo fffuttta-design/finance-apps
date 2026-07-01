@@ -194,7 +194,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ...groupByReceipt(items).map((g) => g.isGroup
               ? ReceiptGroupTile(
                   members: g.members,
-                  childTileBuilder: _tile,
                   onChanged: () {
                     if (mounted) setState(() {});
                   })

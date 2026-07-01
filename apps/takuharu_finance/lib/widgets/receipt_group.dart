@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
+import '../data/household_service.dart';
+import '../data/receipt_comment_repository.dart';
+import '../screens/receipt_detail_screen.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
-import 'receipt_actions.dart';
 
 /// 取引リストを「レシート(receiptId)単位」でまとめるためのエントリ。
 /// - [single] != null … 単独取引（まとめ対象でない）
@@ -49,12 +51,10 @@ List<TxGroup> groupByReceipt(List<core.Transaction> rows) {
   return out;
 }
 
-/// レシートまとめ行（親1行 = 店名・合計・🧾○件 → タップで子品目を展開）。
-/// 子品目の見た目は画面ごとに違うので、[childTileBuilder] で各画面の tile を描く。
-class ReceiptGroupTile extends StatefulWidget {
+/// レシートまとめ行（親1行 = 店名・合計・🧾○件）。
+/// タップで「レシート詳細画面」（1画面に品目一覧＋まとめ編集＋コメント1本）へ。
+class ReceiptGroupTile extends StatelessWidget {
   final List<core.Transaction> members;
-  final Widget Function(core.Transaction) childTileBuilder;
-  final double childIndent;
 
   /// まとめて編集／削除でデータが変わったときに呼ばれる（一覧の再読み込み用）。
   final VoidCallback? onChanged;
@@ -62,90 +62,98 @@ class ReceiptGroupTile extends StatefulWidget {
   const ReceiptGroupTile({
     super.key,
     required this.members,
-    required this.childTileBuilder,
-    this.childIndent = 20,
     this.onChanged,
   });
 
   @override
-  State<ReceiptGroupTile> createState() => _ReceiptGroupTileState();
-}
-
-class _ReceiptGroupTileState extends State<ReceiptGroupTile> {
-  bool _expanded = false;
-
-  Future<void> _openMenu() async {
-    final r = await showReceiptActionsSheet(context, widget.members);
-    if (!mounted) return;
-    if (r == ReceiptActionResult.changed) widget.onChanged?.call();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final members = widget.members;
     final first = members.first;
     final total = members.fold<int>(0, (s, t) => s + t.amount);
     final store = members
         .map((t) => t.store?.trim() ?? '')
         .firstWhere((s) => s.isNotEmpty, orElse: () => 'まとめ記録');
-    return Column(
-      children: [
-        Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-            onTap: () => setState(() => _expanded = !_expanded),
-            onLongPress: _openMenu,
-            leading: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                  color: AppColors.pinkSoft,
-                  borderRadius: BorderRadius.circular(14)),
-              child: const Icon(Icons.receipt_long_rounded,
-                  color: AppColors.pinkDark),
-            ),
-            title: Text(store,
-                style:
-                    const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-            subtitle: Text(
-                '${first.date.month}/${first.date.day}　'
-                '🧾 ${members.length}件まとめ',
-                style:
-                    const TextStyle(fontSize: 11, color: AppColors.textSub)),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('-${formatYen(total)}',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                        color: AppColors.expense)),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  icon: const Icon(Icons.more_vert_rounded,
-                      size: 20, color: AppColors.textSub),
-                  tooltip: '編集メニュー',
-                  onPressed: _openMenu,
-                ),
-                const SizedBox(width: 2),
-                Icon(_expanded
-                    ? Icons.expand_less_rounded
-                    : Icons.expand_more_rounded),
-              ],
-            ),
-          ),
+    // 統合前は品目側の commentCount、統合後はレシート側の commentCount を見る。
+    final memberSum = members.fold<int>(0, (s, t) => s + t.commentCount);
+    final hid = HouseholdService.instance.householdId;
+    final rid = first.receiptId;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        onTap: () async {
+          final changed = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(
+                builder: (_) => ReceiptDetailScreen(members: members)),
+          );
+          if (changed == true) onChanged?.call();
+        },
+        leading: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+              color: AppColors.pinkSoft,
+              borderRadius: BorderRadius.circular(14)),
+          child: const Icon(Icons.receipt_long_rounded,
+              color: AppColors.pinkDark),
         ),
-        if (_expanded)
-          for (final t in members)
-            Padding(
-              padding: EdgeInsets.only(left: widget.childIndent),
-              child: widget.childTileBuilder(t),
-            ),
-      ],
+        title: Text(store,
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+        subtitle: Text(
+            '${first.date.month}/${first.date.day}　🧾 ${members.length}件まとめ',
+            style: const TextStyle(fontSize: 11, color: AppColors.textSub)),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (hid != null && rid != null && rid.isNotEmpty)
+              StreamBuilder<int>(
+                stream:
+                    ReceiptCommentRepository.instance.watchCount(hid, rid),
+                builder: (context, snap) {
+                  final n = snap.data ?? 0;
+                  final count = n > memberSum ? n : memberSum;
+                  return _chatBadge(count);
+                },
+              )
+            else
+              _chatBadge(memberSum),
+            Text('-${formatYen(total)}',
+                style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    color: AppColors.expense)),
+            const SizedBox(width: 2),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.textSub),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// コメントが付いているレシートに💬バッジ（件数）。0件のときは何も出さない。
+  Widget _chatBadge(int count) {
+    if (count <= 0) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.pinkSoft,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.chat_bubble_rounded,
+              size: 12, color: AppColors.pinkDark),
+          const SizedBox(width: 3),
+          Text('$count',
+              style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.pinkDark)),
+        ],
+      ),
     );
   }
 }

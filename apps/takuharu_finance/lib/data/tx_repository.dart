@@ -80,6 +80,26 @@ class TxRepository {
     await _coll(hid).doc(id).delete();
   }
 
+  /// 指定 receiptId の品目をすべて取得（レシート詳細の再読み込み用）。
+  /// まとめ編集で品目を足し引きしたあと、最新の品目リストを取り直す。
+  Future<List<core.Transaction>> listByReceiptId(
+      String hid, String receiptId) async {
+    final list = <core.Transaction>[];
+    try {
+      final snap =
+          await _coll(hid).where('receiptId', isEqualTo: receiptId).get();
+      for (final d in snap.docs) {
+        try {
+          list.add(
+              core.Transaction.fromJson(Map<String, dynamic>.from(d.data())));
+        } catch (_) {}
+      }
+    } catch (_) {}
+    // id は登録時刻ベースなので、id 昇順で並びを安定させる。
+    list.sort((a, b) => a.id.compareTo(b.id));
+    return list;
+  }
+
   /// 指定 receiptId の取引すべてに receiptUrl を後付けする（裏のDrive保存完了後）。
   /// 既に保存済みの品目へ、あとから画像リンクを紐付けるために使う。
   Future<void> attachReceiptUrl(
