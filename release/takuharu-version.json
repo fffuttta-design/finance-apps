@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.88",
-    "buildNumber":  "93",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.88/takuharu-finance-v0.2.88.apk",
-    "releaseNotes":  "ホーム画面の「最近の入出金」を月ごと表示に変更しました。7月のタブなら7月の入出金だけが最新5件で表示されます。"
+    "version":  "0.2.89",
+    "buildNumber":  "94",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.89/takuharu-finance-v0.2.89.apk",
+    "releaseNotes":  "月の切り替えを全タブ共通にしました（例：6月にしたまま別タブへ行っても6月のまま）。また「プラン」タブを「資産」タブに置き換え、ワンバンク・UFJ銀行の今の残高と、その月の入出金の動きが見られるようになりました。タブの並びはホーム→支出→収入→資産→分析です。"
 }

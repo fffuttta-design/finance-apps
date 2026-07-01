@@ -4,12 +4,12 @@ import '../data/push_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/startup_update_mixin.dart';
 import 'analysis_screen.dart';
+import 'asset_screen.dart';
 import 'expenses_screen.dart';
 import 'home_screen.dart';
 import 'income_screen.dart';
-import 'planning_screen.dart';
 
-/// ホームとプランニングを下部ナビで切り替えるメインシェル。
+/// ホーム・支出・収入・資産・分析を下部ナビで切り替えるメインシェル。
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -71,8 +71,8 @@ class _MainShellState extends State<MainShell>
               child: HomeScreen(onOpenExpenses: () => _goTo(1))),
           const _KeepAlivePage(child: ExpensesScreen()),
           const _KeepAlivePage(child: IncomeScreen()),
+          const _KeepAlivePage(child: AssetScreen()),
           const _KeepAlivePage(child: AnalysisScreen()),
-          const _KeepAlivePage(child: PlanningScreen()),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -98,15 +98,16 @@ class _MainShellState extends State<MainShell>
             label: '収入',
           ),
           NavigationDestination(
+            icon: Icon(Icons.account_balance_outlined),
+            selectedIcon:
+                Icon(Icons.account_balance_rounded, color: AppColors.pinkDark),
+            label: '資産',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.bar_chart_outlined),
             selectedIcon:
                 Icon(Icons.bar_chart_rounded, color: AppColors.pinkDark),
             label: '分析',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.star_outline_rounded),
-            selectedIcon: Icon(Icons.star_rounded, color: AppColors.pinkDark),
-            label: 'プラン',
           ),
         ],
       ),

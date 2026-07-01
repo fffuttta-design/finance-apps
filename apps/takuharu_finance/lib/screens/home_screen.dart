@@ -10,6 +10,7 @@ import '../widgets/load_error_view.dart';
 import '../data/budget_repository.dart';
 import '../data/categories.dart';
 import '../data/household_service.dart';
+import '../data/month_scope.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
@@ -30,7 +31,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+  // 表示中の月は全タブ共通（MonthScope）。切替は他タブにも反映される。
+  DateTime get _month => MonthScope.instance.month;
 
   // 支出の内訳で展開中のカテゴリ名（タップで開閉）。
   String? _openCat;
@@ -47,12 +49,18 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _initPartnerNotify();
+    MonthScope.instance.notifier.addListener(_onMonthChanged);
   }
 
   @override
   void dispose() {
+    MonthScope.instance.notifier.removeListener(_onMonthChanged);
     _notifySub?.cancel();
     super.dispose();
+  }
+
+  void _onMonthChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _initPartnerNotify() async {
@@ -144,7 +152,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _shift(int d) =>
-      setState(() => _month = DateTime(_month.year, _month.month + d));
+      MonthScope.instance.shift(d);
 
   bool _inMonth(core.Transaction t) =>
       t.date.year == _month.year && t.date.month == _month.month;

@@ -3,6 +3,7 @@ import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/categories.dart';
 import '../data/household_service.dart';
+import '../data/month_scope.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../widgets/settings_button.dart';
@@ -18,10 +19,26 @@ class IncomeScreen extends StatefulWidget {
 }
 
 class _IncomeScreenState extends State<IncomeScreen> {
-  DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+  // 表示中の月は全タブ共通（MonthScope）。切替は他タブにも反映される。
+  DateTime get _month => MonthScope.instance.month;
 
-  void _shift(int d) =>
-      setState(() => _month = DateTime(_month.year, _month.month + d));
+  @override
+  void initState() {
+    super.initState();
+    MonthScope.instance.notifier.addListener(_onMonthChanged);
+  }
+
+  @override
+  void dispose() {
+    MonthScope.instance.notifier.removeListener(_onMonthChanged);
+    super.dispose();
+  }
+
+  void _onMonthChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _shift(int d) => MonthScope.instance.shift(d);
 
   bool _inMonth(core.Transaction t) =>
       t.date.year == _month.year && t.date.month == _month.month;

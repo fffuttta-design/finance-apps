@@ -3,6 +3,7 @@ import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/categories.dart';
 import '../data/household_service.dart';
+import '../data/month_scope.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
@@ -32,19 +33,30 @@ extension _SortLabel on _Sort {
 }
 
 class _ExpensesScreenState extends State<ExpensesScreen> {
-  DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+  // 表示中の月は全タブ共通（MonthScope）。切替は他タブにも反映される。
+  DateTime get _month => MonthScope.instance.month;
   final _searchCtrl = TextEditingController();
   String _query = '';
   _Sort _sort = _Sort.dateDesc;
 
   @override
+  void initState() {
+    super.initState();
+    MonthScope.instance.notifier.addListener(_onMonthChanged);
+  }
+
+  @override
   void dispose() {
+    MonthScope.instance.notifier.removeListener(_onMonthChanged);
     _searchCtrl.dispose();
     super.dispose();
   }
 
-  void _shift(int d) =>
-      setState(() => _month = DateTime(_month.year, _month.month + d));
+  void _onMonthChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _shift(int d) => MonthScope.instance.shift(d);
 
   /// 検索・並び替えを適用。
   List<core.Transaction> _applySearchSort(List<core.Transaction> list) {
