@@ -632,31 +632,63 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
             : (r.txn!.category.sub.trim().isNotEmpty
                 ? r.txn!.category.sub.trim()
                 : r.txn!.category.major.trim()));
+    final reviewed = isFixed ? r.fx!.reviewed : r.txn!.reviewed;
+    // 並び替えモードでも確認チェックをON/OFFできるようにする（締め処理を止めない）。
+    final canReview = isFixed
+        ? widget.onToggleReviewedFixed != null
+        : widget.onToggleReviewed != null;
     return Container(
       decoration: BoxDecoration(
-        color: isFixed ? _kFixedBg : null,
+        color: reviewed ? _kReviewedBg : (isFixed ? _kFixedBg : null),
         border: const Border(top: BorderSide(color: V2Colors.divider)),
       ),
-      padding: const EdgeInsets.fromLTRB(12, 4, 6, 4),
+      padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
       child: Row(
         children: [
+          if (canReview)
+            SizedBox(
+              width: 30,
+              child: Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Checkbox(
+                    value: reviewed,
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    activeColor: const Color(0xFF6B7280),
+                    onChanged: (v) => isFixed
+                        ? widget.onToggleReviewedFixed!(r.fx!, v ?? false)
+                        : widget.onToggleReviewed!(r.txn!, v ?? false),
+                  ),
+                ),
+              ),
+            )
+          else
+            const SizedBox(width: 6),
           if (isFixed) ...[
             const Icon(Icons.event_repeat, size: 13, color: _kFixedAccent),
             const SizedBox(width: 4),
           ],
           Expanded(
-            child: Text(title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: V2Typography.body),
+            child: Opacity(
+              opacity: reviewed ? 0.5 : 1,
+              child: Text(title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: V2Typography.body),
+            ),
           ),
           const SizedBox(width: 8),
-          Text('-${formatYen(r.amount)}',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: isFixed ? _kFixedAccent : V2Colors.negative,
-                  fontFeatures: V2Typography.tabularNums)),
+          Opacity(
+            opacity: reviewed ? 0.5 : 1,
+            child: Text('-${formatYen(r.amount)}',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isFixed ? _kFixedAccent : V2Colors.negative,
+                    fontFeatures: V2Typography.tabularNums)),
+          ),
           const SizedBox(width: 6),
           IconButton(
             visualDensity: VisualDensity.compact,
