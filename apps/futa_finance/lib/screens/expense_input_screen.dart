@@ -145,6 +145,10 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   /// 現在選択中の支払元カテゴリ。デフォルト: クレカ（最も使用頻度が高いため）。
   _PayCategory _payCategory = _PayCategory.card;
   final _descCtrl = TextEditingController();
+  // 取引内容のサジェスト用フォーカス（フォーカス中だけ候補リストを出す）。
+  final _descFocus = FocusNode();
+  // 過去の取引内容 → 出現回数（サジェストの並び＝頻度順に使う）。
+  Map<String, int> _descCounts = const {};
   // composing 下線（入力中の無駄なアンダーバー）を出さないコントローラ。
   final _amountCtrl =
       NoComposingUnderlineController(); // 円金額（USD時はここに概算円）
@@ -242,11 +246,16 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         _receiptUrlCtrl.text = widget.initialReceiptUrl!.trim();
       }
     }
+    // フォーカスの変化で候補リストを出し入れするため再描画。
+    _descFocus.addListener(() {
+      if (mounted) setState(() {});
+    });
     _load();
   }
 
   @override
   void dispose() {
+    _descFocus.dispose();
     _descCtrl.dispose();
     _amountCtrl.dispose();
     _usdAmountCtrl.dispose();
@@ -267,10 +276,19 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       history = await TransactionRepository.instance.loadAll();
     } catch (_) {}
     if (!mounted) return;
+    // 取引内容サジェスト用に、過去の支出の内容を頻度集計しておく。
+    final descCounts = <String, int>{};
+    for (final t in history) {
+      if (t.type != core.TransactionType.expense) continue;
+      final d = t.description.trim();
+      if (d.isEmpty) continue;
+      descCounts[d] = (descCounts[d] ?? 0) + 1;
+    }
     setState(() {
       _categories = c;
       _payments = p;
       _history = history;
+      _descCounts = descCounts;
       final e = widget.editing;
       if (e != null) {
         // 編集モード：取引のカテゴリ・支払方法をそのまま復元。
@@ -362,17 +380,91 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     // 現在の大カテゴリ一覧から、番号を無視して名前一致するものを採用。
     // （並び替えで番号が変わっても過去の予測が効くように）
     String? matchedMajor;
+    int matchedIdx = -1;
     for (var i = 0; i < cfg.majors.length; i++) {
       final dn = cfg.majors[i].displayName(i);
       if (dn == major || norm(dn) == norm(major)) {
         matchedMajor = dn;
+        matchedIdx = i;
         break;
       }
     }
     if (matchedMajor == null) return;
     _majorCategory = matchedMajor;
-    _subCategory = sub.isEmpty ? null : sub;
+    // 予測した小カテゴリは、その大カテゴリの小カテゴリ一覧に在る場合のみ採用
+    // （無い値を入れるとドロップダウンが壊れるため）。
+    final subsOfMajor =
+        matchedIdx >= 0 ? cfg.majors[matchedIdx].subs : const <String>[];
+    _subCategory = (sub.isNotEmpty && subsOfMajor.contains(sub)) ? sub : null;
     _categoryPredicted = true;
+  }
+
+  /// 取引内容のサジェスト候補（過去の入力から・頻度順に最大6件）。
+  /// 入力文字を含む過去の内容を返す（完全一致は除外＝もう入力済みなので）。
+  List<String> _descSuggestions() {
+    final q = _descCtrl.text.trim().toLowerCase();
+    if (q.isEmpty) return const [];
+    final matches = _descCounts.keys.where((d) {
+      final dl = d.toLowerCase();
+      return dl != q && dl.contains(q);
+    }).toList()
+      ..sort((a, b) => _descCounts[b]!.compareTo(_descCounts[a]!));
+    return matches.take(6).toList();
+  }
+
+  /// サジェストを選んだとき：内容を確定し、カテゴリ予測も走らせる。
+  void _applyDescSuggestion(String text) {
+    _descCtrl.text = text;
+    _descCtrl.selection = TextSelection.collapsed(offset: text.length);
+    setState(() {
+      if (!_categoryTouched) _autoPredictCategory();
+    });
+  }
+
+  /// 取引内容のサジェストリスト（Google風・入力欄の直下に出す）。
+  Widget _descSuggestionList() {
+    final suggestions = _descSuggestions();
+    if (suggestions.isEmpty) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        children: [
+          for (int i = 0; i < suggestions.length; i++) ...[
+            if (i > 0)
+              const Divider(height: 1, color: Color(0xFFF1F5F9)),
+            InkWell(
+              onTap: () => _applyDescSuggestion(suggestions[i]),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 11),
+                child: Row(
+                  children: [
+                    const Icon(Icons.history,
+                        size: 16, color: Color(0xFF9CA3AF)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(suggestions[i],
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 14, color: Color(0xFF111827))),
+                    ),
+                    const Icon(Icons.north_west,
+                        size: 14, color: Color(0xFFCBD5E1)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   /// 指定カテゴリの登録項目リスト（並び順そのまま、先頭が最上位）。
@@ -814,20 +906,23 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               _label('取引内容'),
               TextFormField(
                 controller: _descCtrl,
+                focusNode: _descFocus,
                 decoration: _inputDecoration(),
                 onChanged: (_) {
                   // 変換中（IME composing中）は setState で再描画しない。
                   // Windowsデスクトップで「変換しようとスペースを押すとカーソルが
-                  // 先頭へ飛ぶ」フレームワーク不具合を誘発しないため、予測は
-                  // 変換が確定してから走らせる。
+                  // 先頭へ飛ぶ」フレームワーク不具合を誘発しないため、予測と
+                  // サジェスト更新は変換が確定してから走らせる。
                   if (_descCtrl.value.composing.isValid) return;
-                  if (!_categoryTouched) {
-                    setState(() => _autoPredictCategory());
-                  }
+                  setState(() {
+                    if (!_categoryTouched) _autoPredictCategory();
+                  });
                 },
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? '入力してください' : null,
               ),
+              // 過去の取引内容からサジェスト（フォーカス中だけ表示）。
+              if (_descFocus.hasFocus) _descSuggestionList(),
               const SizedBox(height: 16),
               // 金額をヒーローとして大きく表示。
               _heroAmount(),

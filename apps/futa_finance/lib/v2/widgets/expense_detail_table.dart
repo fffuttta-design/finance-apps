@@ -169,7 +169,8 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
       ...widget.rows.map(_Row.txn),
       ...widget.fixedRows.map(_Row.fixed),
     ];
-    final q = _query.trim().toLowerCase();
+    // 全角数字（１２３）でも金額検索できるよう半角化してから照合する。
+    final q = _normalizeDigits(_query).trim().toLowerCase();
     var list =
         q.isEmpty ? rows : rows.where((r) => r.searchHay.contains(q)).toList();
     if (_payFilter != null) {
@@ -425,6 +426,24 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
       ],
     );
   }
+}
+
+/// 全角数字（０-９）と全角カンマ／円記号を半角へ正規化する。
+/// 検索で「１３０４」や「¥1,304」を「1304」と同じに扱えるようにするため。
+String _normalizeDigits(String s) {
+  final buf = StringBuffer();
+  for (final r in s.runes) {
+    if (r >= 0xFF10 && r <= 0xFF19) {
+      buf.writeCharCode(r - 0xFF10 + 0x30); // 全角0-9 → 半角
+    } else if (r == 0xFF0C) {
+      buf.writeCharCode(0x2C); // 全角カンマ → 半角
+    } else if (r == 0xFFE5) {
+      buf.writeCharCode(0xA5); // 全角￥ → 半角¥
+    } else {
+      buf.writeCharCode(r);
+    }
+  }
+  return buf.toString();
 }
 
 /// 大カテゴリ名から安定した色を作る（ユーザー指定色を最優先）。
