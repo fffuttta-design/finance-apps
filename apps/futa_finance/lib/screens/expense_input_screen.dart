@@ -949,6 +949,15 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               // 過去の取引内容からサジェスト（フォーカス中だけ表示）。
               if (_descFocus.hasFocus) _descSuggestionList(),
               const SizedBox(height: 16),
+              // 場所（必須）。店舗名や購入元。明細タブの「場所」列に出る。
+              _label('場所（必須）'),
+              TextFormField(
+                controller: _storeCtrl,
+                decoration: _inputDecoration(hint: '例: ファミリーマート / Amazon'),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? '場所を入力してください' : null,
+              ),
+              const SizedBox(height: 16),
               // 金額をヒーローとして大きく表示。
               _heroAmount(),
               const SizedBox(height: 14),

@@ -155,9 +155,35 @@ class _CardDetailScreenState extends State<CardDetailScreen>
         date: date,
         paymentMethod: sub.paymentMethod,
         categoryLabel: label,
+        sortOrder: sub.sortOrder,
       ));
     }
     return rows;
+  }
+
+  /// 手動並び替えの保存。取引は取引の sortOrder、固定費はサブスクの sortOrder。
+  Future<void> _saveReorder(List<ReorderedItem> dayInNewOrder) async {
+    final subOrders = <String, double>{};
+    for (int i = 0; i < dayInNewOrder.length; i++) {
+      final item = dayInNewOrder[i];
+      if (item.isFixed) {
+        subOrders[item.subscriptionId!] = i.toDouble();
+      } else {
+        await TransactionRepository.instance
+            .update(item.txn!.copyWith(sortOrder: i.toDouble()));
+      }
+    }
+    if (subOrders.isNotEmpty) {
+      final cfg = await SubscriptionRepository.instance.load();
+      final newSubs = cfg.subscriptions
+          .map((s) => subOrders.containsKey(s.id)
+              ? s.copyWith(sortOrder: subOrders[s.id])
+              : s)
+          .toList();
+      await SubscriptionRepository.instance
+          .save(core.SubscriptionConfig(subscriptions: newSubs));
+    }
+    if (mounted) await _load();
   }
 
   /// 固定費行タップ → サブスク編集を開いて再読込。
@@ -325,17 +351,7 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                                     // （範囲指定はまたぐ月が曖昧なので出さない）。
                                     fixedRows: cardFixed,
                                     onEditFixed: (f) => _editCardFixed(f.id),
-                                    onReorderDay: (dayInNewOrder) async {
-                                      for (int i = 0;
-                                          i < dayInNewOrder.length;
-                                          i++) {
-                                        await TransactionRepository.instance
-                                            .update(dayInNewOrder[i]
-                                                .copyWith(
-                                                    sortOrder: i.toDouble()));
-                                      }
-                                      if (mounted) await _load();
-                                    },
+                                    onReorderDay: _saveReorder,
                                     emptyHint: 'この期間の利用はありません',
                                   ),
                                 )

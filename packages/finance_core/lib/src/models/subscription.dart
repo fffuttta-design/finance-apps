@@ -74,6 +74,10 @@ class Subscription {
   /// 未入力の月は 0 扱い。固定費では未使用。月ごとに独立（翌月は未入力=0）。
   final Map<String, int> monthlyActuals;
 
+  /// 支出明細で「同じ日付の中」に混ぜて表示するときの手動並び順（小さいほど上）。
+  /// null は未設定。明細を手で並び替えると振られる（請求日ベースで毎月同じ位置）。
+  final double? sortOrder;
+
   const Subscription({
     required this.id,
     required this.name,
@@ -90,6 +94,7 @@ class Subscription {
     this.startYearMonth,
     this.endYearMonth,
     this.monthlyActuals = const {},
+    this.sortOrder,
   });
 
   /// 指定月("YYYY-MM")の表示金額。変動費は未入力なら0、固定費は定額。
@@ -153,6 +158,7 @@ class Subscription {
         'startYearMonth': startYearMonth,
         'endYearMonth': endYearMonth,
         'monthlyActuals': monthlyActuals,
+        if (sortOrder != null) 'sortOrder': sortOrder,
       };
 
   factory Subscription.fromJson(Map<String, dynamic> j) => Subscription(
@@ -182,6 +188,7 @@ class Subscription {
                 ?.map((k, v) =>
                     MapEntry(k, (v as num?)?.toInt() ?? 0)) ??
             const {},
+        sortOrder: (j['sortOrder'] as num?)?.toDouble(),
       );
 
   Subscription copyWith({
@@ -203,6 +210,7 @@ class Subscription {
     String? endYearMonth,
     bool clearEndYearMonth = false,
     Map<String, int>? monthlyActuals,
+    double? sortOrder,
   }) =>
       Subscription(
         id: id,
@@ -224,6 +232,7 @@ class Subscription {
             ? null
             : (endYearMonth ?? this.endYearMonth),
         monthlyActuals: monthlyActuals ?? this.monthlyActuals,
+        sortOrder: sortOrder ?? this.sortOrder,
       );
 }
 

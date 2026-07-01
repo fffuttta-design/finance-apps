@@ -32,6 +32,9 @@ class FixedCostRow {
   /// 「小カテゴリ」列に出す科目/グループ名（任意・空可）。
   final String categoryLabel;
 
+  /// 同じ日付内の手動並び順（元サブスクの sortOrder）。null は未設定。
+  final double? sortOrder;
+
   const FixedCostRow({
     required this.id,
     required this.name,
@@ -39,7 +42,22 @@ class FixedCostRow {
     required this.date,
     this.paymentMethod,
     this.categoryLabel = '',
+    this.sortOrder,
   });
+}
+
+/// 手動並び替えの結果1件（取引 or 固定費）。呼び出し側で index を sortOrder に振る。
+class ReorderedItem {
+  /// 取引のとき非null。
+  final core.Transaction? txn;
+
+  /// 固定費のとき、その元サブスクのID。
+  final String? subscriptionId;
+
+  const ReorderedItem.txn(this.txn) : subscriptionId = null;
+  const ReorderedItem.fixed(this.subscriptionId) : txn = null;
+
+  bool get isFixed => subscriptionId != null;
 }
 
 /// 支出明細の共通テーブル（PC幅・表形式）。
@@ -75,9 +93,9 @@ class ExpenseDetailTable extends StatefulWidget {
   final Future<void> Function(core.Transaction t, bool value)? onToggleReceipt;
 
   /// 手動並び替えの保存。指定するとヘッダーに「手で並び替え」トグルが出る。
-  /// 引数はその日の取引を新しい上→下の順に並べたリスト（呼び出し側で
-  /// sortOrder を 0,1,2… と振って保存する）。
-  final Future<void> Function(List<core.Transaction> dayInNewOrder)?
+  /// 引数はその日の項目（取引・固定費）を新しい上→下の順に並べたリスト
+  /// （呼び出し側で index を sortOrder として振って保存する）。
+  final Future<void> Function(List<ReorderedItem> dayInNewOrder)?
       onReorderDay;
 
   const ExpenseDetailTable({
@@ -99,11 +117,11 @@ class ExpenseDetailTable extends StatefulWidget {
 }
 
 class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
-  // 列幅（中央5列＝大カテゴリ/小カテゴリ/内容/支払方法/金額 の配分・合計1.0）。
-  // 金額も可変にして、支払方法↔金額の境界をドラッグで調整できるようにする。端末保存。
-  List<double> _colFrac = const [0.16, 0.18, 0.30, 0.18, 0.18];
-  static const _kColFracKey = 'futa.exp_table_col_frac_v3';
-  static const _kColCount = 5;
+  // 列幅（中央6列＝大カテゴリ/小カテゴリ/内容/場所/支払方法/金額 の配分・合計1.0）。
+  // 各境界をドラッグで調整できる。端末保存。
+  List<double> _colFrac = const [0.14, 0.15, 0.24, 0.16, 0.15, 0.16];
+  static const _kColFracKey = 'futa.exp_table_col_frac_v4';
+  static const _kColCount = 6;
 
   // 並び替えは表ヘッダーのクリックで列＋昇順/降順を切替。
   _SortCol _sortCol = _SortCol.date;
@@ -221,6 +239,9 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
         break;
       case _SortCol.content:
         list.sort((a, b) => a.contentText.compareTo(b.contentText));
+        break;
+      case _SortCol.place:
+        list.sort((a, b) => a.placeText.compareTo(b.placeText));
         break;
       case _SortCol.payment:
         list.sort((a, b) => a.paymentText.compareTo(b.paymentText));
@@ -407,17 +428,18 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
               final innerW = cons.maxWidth - 24;
               final receiptExtra =
                   widget.showReceiptCheck ? (_kReceiptW + _kColGap) : 0.0;
-              // 金額も可変列（5列）。固定は date ＋ date|major の隙間 ＋ ハンドル4本。
+              // 中央6列。固定は date ＋ date|major の隙間 ＋ ハンドル5本。
               final fixed =
-                  _kDateW + _kColGap + _kHandleW * 4 + receiptExtra;
-              final mw = (innerW - fixed) < 200 ? 200.0 : innerW - fixed;
+                  _kDateW + _kColGap + _kHandleW * 5 + receiptExtra;
+              final mw = (innerW - fixed) < 240 ? 240.0 : innerW - fixed;
               final w = _ColW(
                 date: _kDateW,
                 major: _colFrac[0] * mw,
                 sub: _colFrac[1] * mw,
                 content: _colFrac[2] * mw,
-                pay: _colFrac[3] * mw,
-                amount: _colFrac[4] * mw,
+                place: _colFrac[3] * mw,
+                pay: _colFrac[4] * mw,
+                amount: _colFrac[5] * mw,
               );
               return Column(
                 children: [
@@ -460,8 +482,13 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
   }
 
   /// 手で並び替えビュー：日付ごとにまとめ、その日の中だけ上下ボタンで並び替え。
+  /// 取引・固定費の両方を対象にする。
   Widget _buildReorderView() {
-    if (widget.rows.isEmpty) {
+    final all = <_Row>[
+      ...widget.rows.map(_Row.txn),
+      ...widget.fixedRows.map(_Row.fixed),
+    ];
+    if (all.isEmpty) {
       return Container(
         padding: const EdgeInsets.symmetric(vertical: 40),
         decoration: BoxDecoration(
@@ -476,23 +503,20 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
         ),
       );
     }
-    // 新しい日が上・日内は手動順（sortOrder）で並べ、日ごとにグループ化。
-    final list = [...widget.rows];
-    list.sort((a, b) {
+    // 新しい日が上・日内は手動順で並べ、日ごとにグループ化。
+    all.sort((a, b) {
       final da = DateTime(a.date.year, a.date.month, a.date.day);
       final db = DateTime(b.date.year, b.date.month, b.date.day);
       final c = db.compareTo(da);
       if (c != 0) return c;
-      final oa = a.sortOrder ?? double.infinity;
-      final ob = b.sortOrder ?? double.infinity;
-      final oc = oa.compareTo(ob);
+      final oc = a.orderKey.compareTo(b.orderKey);
       if (oc != 0) return oc;
       return b.date.compareTo(a.date);
     });
-    final groups = <String, List<core.Transaction>>{};
-    for (final t in list) {
-      final k = '${t.date.year}-${t.date.month}-${t.date.day}';
-      (groups[k] ??= []).add(t);
+    final groups = <String, List<_Row>>{};
+    for (final r in all) {
+      final k = '${r.date.year}-${r.date.month}-${r.date.day}';
+      (groups[k] ??= []).add(r);
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -510,7 +534,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
               Icon(Icons.swap_vert, size: 16, color: widget.accent),
               const SizedBox(width: 6),
               Expanded(
-                child: Text('同じ日付の中で ▲▼ で並び替え。順番は保存され、日付で並べ直しても保持されます。',
+                child: Text('同じ日付の中で ▲▼ で並び替え（固定費もOK）。順番は保存され、日付で並べ直しても保持されます。',
                     style: V2Typography.micro
                         .copyWith(color: V2Colors.textSecondary)),
               ),
@@ -551,22 +575,30 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
     );
   }
 
-  Widget _reorderRow(List<core.Transaction> dayTxns, int i) {
-    final t = dayTxns[i];
+  Widget _reorderRow(List<_Row> dayItems, int i) {
+    final r = dayItems[i];
     final first = i == 0;
-    final last = i == dayTxns.length - 1;
-    final title = t.description.trim().isNotEmpty
-        ? t.description.trim()
-        : (t.category.sub.trim().isNotEmpty
-            ? t.category.sub.trim()
-            : t.category.major.trim());
+    final last = i == dayItems.length - 1;
+    final isFixed = r.isFixed;
+    final title = isFixed
+        ? r.fx!.name
+        : (r.txn!.description.trim().isNotEmpty
+            ? r.txn!.description.trim()
+            : (r.txn!.category.sub.trim().isNotEmpty
+                ? r.txn!.category.sub.trim()
+                : r.txn!.category.major.trim()));
     return Container(
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: V2Colors.divider)),
+      decoration: BoxDecoration(
+        color: isFixed ? _kFixedBg : null,
+        border: const Border(top: BorderSide(color: V2Colors.divider)),
       ),
       padding: const EdgeInsets.fromLTRB(12, 4, 6, 4),
       child: Row(
         children: [
+          if (isFixed) ...[
+            const Icon(Icons.event_repeat, size: 13, color: _kFixedAccent),
+            const SizedBox(width: 4),
+          ],
           Expanded(
             child: Text(title,
                 maxLines: 1,
@@ -574,11 +606,11 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                 style: V2Typography.body),
           ),
           const SizedBox(width: 8),
-          Text('-${formatYen(t.amount)}',
-              style: const TextStyle(
+          Text('-${formatYen(r.amount)}',
+              style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: V2Colors.negative,
+                  color: isFixed ? _kFixedAccent : V2Colors.negative,
                   fontFeatures: V2Typography.tabularNums)),
           const SizedBox(width: 6),
           IconButton(
@@ -586,7 +618,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
             iconSize: 22,
             icon: const Icon(Icons.keyboard_arrow_up),
             color: widget.accent,
-            onPressed: first ? null : () => _moveInDay(dayTxns, i, -1),
+            onPressed: first ? null : () => _moveInDay(dayItems, i, -1),
             tooltip: '上へ',
           ),
           IconButton(
@@ -594,7 +626,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
             iconSize: 22,
             icon: const Icon(Icons.keyboard_arrow_down),
             color: widget.accent,
-            onPressed: last ? null : () => _moveInDay(dayTxns, i, 1),
+            onPressed: last ? null : () => _moveInDay(dayItems, i, 1),
             tooltip: '下へ',
           ),
         ],
@@ -602,13 +634,18 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
     );
   }
 
-  void _moveInDay(List<core.Transaction> dayTxns, int i, int delta) {
+  void _moveInDay(List<_Row> dayItems, int i, int delta) {
     final ni = i + delta;
-    if (ni < 0 || ni >= dayTxns.length) return;
-    final n = [...dayTxns];
+    if (ni < 0 || ni >= dayItems.length) return;
+    final n = [...dayItems];
     final it = n.removeAt(i);
     n.insert(ni, it);
-    widget.onReorderDay?.call(n);
+    widget.onReorderDay?.call([
+      for (final r in n)
+        r.isFixed
+            ? ReorderedItem.fixed(r.fx!.id)
+            : ReorderedItem.txn(r.txn!),
+    ]);
   }
 }
 
@@ -702,7 +739,7 @@ IconData _paymentIcon(String method) {
 }
 
 /// 並び替えの対象列。
-enum _SortCol { date, major, sub, content, payment, amount }
+enum _SortCol { date, major, sub, content, place, payment, amount }
 
 /// 取引行 or 固定費行を統一して扱う内部ラッパ（並び替え・検索を共通化）。
 class _Row {
@@ -717,9 +754,9 @@ class _Row {
   int get amount => txn?.amount ?? fx!.amount;
 
   /// 同じ日付内の並び順キー。手動並び替え(sortOrder)を最優先。
-  /// 未設定の取引は末尾側（+∞）、固定費は先頭側（-∞）に寄せる。
+  /// 未設定は、固定費は先頭側（-∞）／取引は末尾側（+∞）に寄せる。
   double get orderKey {
-    if (isFixed) return double.negativeInfinity;
+    if (isFixed) return fx!.sortOrder ?? double.negativeInfinity;
     return txn!.sortOrder ?? double.infinity;
   }
 
@@ -736,6 +773,9 @@ class _Row {
 
   String get paymentText =>
       (txn?.paymentMethod ?? fx!.paymentMethod ?? '').trim();
+
+  /// 「場所」列の文字。固定費は場所なし。
+  String get placeText => txn != null ? (txn!.store ?? '').trim() : '';
 
   /// 決済手段フィルタ用のキー（空は「未設定」）。
   String get payKey => paymentText.isEmpty ? '未設定' : paymentText;
@@ -790,6 +830,7 @@ class _ColW {
   final double major;
   final double sub;
   final double content;
+  final double place;
   final double pay;
   final double amount;
   const _ColW({
@@ -797,6 +838,7 @@ class _ColW {
     required this.major,
     required this.sub,
     required this.content,
+    required this.place,
     required this.pay,
     required this.amount,
   });
@@ -887,8 +929,10 @@ class _ExpenseTableHeader extends StatelessWidget {
           _handle(1),
           SizedBox(width: w.content, child: _h('内容', _SortCol.content)),
           _handle(2),
-          SizedBox(width: w.pay, child: _h('支払方法', _SortCol.payment)),
+          SizedBox(width: w.place, child: _h('場所', _SortCol.place)),
           _handle(3),
+          SizedBox(width: w.pay, child: _h('支払方法', _SortCol.payment)),
+          _handle(4),
           SizedBox(
               width: w.amount, child: _h('金額', _SortCol.amount, right: true)),
           if (showReceipt) ...[
@@ -994,6 +1038,20 @@ class _ExpenseRow extends StatelessWidget {
                   style: V2Typography.body.copyWith(fontWeight: FontWeight.w600),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1),
+            ),
+            _vGrid(_kHandleW, _kRowH),
+            // 場所（店舗）。
+            SizedBox(
+              width: w.place,
+              child: Text(
+                  (t.store ?? '').trim().isEmpty ? '—' : t.store!.trim(),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: (t.store ?? '').trim().isEmpty
+                          ? V2Colors.textMuted
+                          : V2Colors.textSecondary)),
             ),
             _vGrid(_kHandleW, _kRowH),
             SizedBox(
@@ -1131,6 +1189,13 @@ class _FixedRow extends StatelessWidget {
                   maxLines: 1),
             ),
             _vGrid(_kHandleW, _kRowH),
+            // 場所（固定費は無し）。
+            SizedBox(
+              width: w.place,
+              child: const Text('—',
+                  style: TextStyle(fontSize: 12, color: V2Colors.textMuted)),
+            ),
+            _vGrid(_kHandleW, _kRowH),
             SizedBox(
               width: w.pay,
               child: Row(
@@ -1235,6 +1300,7 @@ class _NarrowSortBar extends StatelessWidget {
     _SortCol.major: '大カテゴリ',
     _SortCol.sub: '小カテゴリ',
     _SortCol.content: '内容',
+    _SortCol.place: '場所',
     _SortCol.payment: '支払方法',
     _SortCol.amount: '金額',
   };
@@ -1384,6 +1450,25 @@ class _NarrowRow extends StatelessWidget {
                     ),
                   ),
                 ),
+                if ((t.store ?? '').trim().isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Row(
+                      children: [
+                        const Icon(Icons.place_outlined,
+                            size: 12, color: Color(0xFF64748B)),
+                        const SizedBox(width: 2),
+                        Flexible(
+                          child: Text(t.store!.trim(),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: const TextStyle(
+                                  fontSize: 12, color: Color(0xFF64748B))),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(width: 10),
                 Flexible(
                   child: Row(

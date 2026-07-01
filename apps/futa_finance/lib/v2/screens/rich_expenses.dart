@@ -207,9 +207,34 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
         date: date,
         paymentMethod: sub.paymentMethod,
         categoryLabel: label,
+        sortOrder: sub.sortOrder,
       ));
     }
     return rows;
+  }
+
+  /// 手動並び替えの保存。取引は取引の sortOrder、固定費はサブスクの sortOrder。
+  Future<void> _saveReorder(List<ReorderedItem> dayInNewOrder) async {
+    final subOrders = <String, double>{};
+    for (int i = 0; i < dayInNewOrder.length; i++) {
+      final item = dayInNewOrder[i];
+      if (item.isFixed) {
+        subOrders[item.subscriptionId!] = i.toDouble();
+      } else {
+        await _txRepo.update(item.txn!.copyWith(sortOrder: i.toDouble()));
+      }
+    }
+    if (subOrders.isNotEmpty) {
+      final cfg = await SubscriptionRepository.instance.load();
+      final newSubs = cfg.subscriptions
+          .map((s) => subOrders.containsKey(s.id)
+              ? s.copyWith(sortOrder: subOrders[s.id])
+              : s)
+          .toList();
+      await SubscriptionRepository.instance
+          .save(core.SubscriptionConfig(subscriptions: newSubs));
+    }
+    if (mounted) await _load();
   }
 
   /// 固定費（サブスク）の編集画面をディープリンクで開く。
@@ -650,8 +675,11 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                                         onTap: () => _editSubscription(f.id)),
                                 ]
                               : [
-                                  for (final t
-                                      in (txnsByMajor[e.key] ?? const []))
+                                  // 展開明細は金額の高い順に並べる。
+                                  for (final t in ([
+                                    ...?txnsByMajor[e.key]
+                                  ]..sort((a, b) =>
+                                      b.amount.compareTo(a.amount))))
                                     _CatDetailRow(
                                         label: t.description.trim().isEmpty
                                             ? formatMonthDay(t.date)
@@ -774,13 +802,8 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                   if (mounted) await _load();
                 },
                 // 同じ日付内の手動並び替え：新しい順で sortOrder を 0,1,2… と振る。
-                onReorderDay: (dayInNewOrder) async {
-                  for (int i = 0; i < dayInNewOrder.length; i++) {
-                    await _txRepo.update(
-                        dayInNewOrder[i].copyWith(sortOrder: i.toDouble()));
-                  }
-                  if (mounted) await _load();
-                },
+                // 取引は取引に、固定費はサブスクに保存する。
+                onReorderDay: _saveReorder,
               ),
             ],
           ),
