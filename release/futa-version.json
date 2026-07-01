@@ -1,1 +1,1 @@
-{"version":"1.0.387","buildNumber":"388","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.387/futa-finance-v1.0.387.apk","releaseNotes":"固定費も手で並び替え可能に。カテゴリ内訳の明細を金額の高い順に。支出に必須の『場所』欄を追加し、明細に場所の列を追加しました。"}
+{"version":"1.0.388","buildNumber":"389","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.388/futa-finance-v1.0.388.apk","releaseNotes":"カテゴリごとの明細件数を表示。カテゴリ削除時は紐づく明細を別カテゴリへ付け替えてから削除。支出記録画面からカテゴリ編集を開けるようにしました。"}
