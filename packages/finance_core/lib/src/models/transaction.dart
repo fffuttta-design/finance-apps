@@ -102,6 +102,11 @@ class Transaction {
   /// デフォルト false。既存データは false で読まれる。
   final bool receiptSaved;
 
+  /// 同じ日付の中での手動並び順（小さいほど上）。
+  /// null は「未設定」＝従来どおりの並び。ユーザーが明細をドラッグで並び替えると
+  /// その日の全取引にこの値が振られ、日付ソートし直しても順序が保持される。
+  final double? sortOrder;
+
   const Transaction({
     required this.id,
     required this.date,
@@ -126,6 +131,7 @@ class Transaction {
     this.commentCount = 0,
     this.createdAt,
     this.receiptSaved = false,
+    this.sortOrder,
   });
 
   Map<String, dynamic> toJson() => {
@@ -152,6 +158,7 @@ class Transaction {
         'personalFor': personalFor,
         'receiptSaved': receiptSaved,
         if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
+        if (sortOrder != null) 'sortOrder': sortOrder,
       };
 
   factory Transaction.fromJson(Map<String, dynamic> j) => Transaction(
@@ -186,6 +193,7 @@ class Transaction {
             ? DateTime.tryParse(j['createdAt'] as String)
             : null,
         receiptSaved: j['receiptSaved'] as bool? ?? false,
+        sortOrder: (j['sortOrder'] as num?)?.toDouble(),
       );
 
   Transaction copyWith({
@@ -214,6 +222,7 @@ class Transaction {
     DateTime? createdAt,
     bool forceCreatedAt = false,
     bool? receiptSaved,
+    double? sortOrder,
   }) =>
       Transaction(
         id: id,
@@ -239,5 +248,6 @@ class Transaction {
         commentCount: commentCount,
         createdAt: forceCreatedAt ? createdAt : (createdAt ?? this.createdAt),
         receiptSaved: receiptSaved ?? this.receiptSaved,
+        sortOrder: sortOrder ?? this.sortOrder,
       );
 }

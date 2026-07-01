@@ -773,6 +773,14 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                   await _txRepo.update(t.copyWith(receiptSaved: v));
                   if (mounted) await _load();
                 },
+                // 同じ日付内の手動並び替え：新しい順で sortOrder を 0,1,2… と振る。
+                onReorderDay: (dayInNewOrder) async {
+                  for (int i = 0; i < dayInNewOrder.length; i++) {
+                    await _txRepo.update(
+                        dayInNewOrder[i].copyWith(sortOrder: i.toDouble()));
+                  }
+                  if (mounted) await _load();
+                },
               ),
             ],
           ),

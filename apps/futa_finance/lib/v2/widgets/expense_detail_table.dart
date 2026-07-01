@@ -74,6 +74,12 @@ class ExpenseDetailTable extends StatefulWidget {
   /// 領収書チェックの切替（保存はここで行う）。showReceiptCheck=true 時は必須。
   final Future<void> Function(core.Transaction t, bool value)? onToggleReceipt;
 
+  /// 手動並び替えの保存。指定するとヘッダーに「手で並び替え」トグルが出る。
+  /// 引数はその日の取引を新しい上→下の順に並べたリスト（呼び出し側で
+  /// sortOrder を 0,1,2… と振って保存する）。
+  final Future<void> Function(List<core.Transaction> dayInNewOrder)?
+      onReorderDay;
+
   const ExpenseDetailTable({
     super.key,
     required this.rows,
@@ -85,6 +91,7 @@ class ExpenseDetailTable extends StatefulWidget {
     this.emptyHint = '記録はまだありません',
     this.showReceiptCheck = false,
     this.onToggleReceipt,
+    this.onReorderDay,
   });
 
   @override
@@ -108,6 +115,9 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
 
   /// 決済手段の絞り込み（null = すべて表示）。
   String? _payFilter;
+
+  /// 手で並び替えモード（ON のとき、同じ日付内をドラッグ順で並び替える簡易表示）。
+  bool _reorderMode = false;
 
   /// ヘッダークリック：同じ列なら昇順/降順をトグル、別列なら列を切替（既定向き）。
   void _onSort(_SortCol col) {
@@ -179,8 +189,19 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
     int cmp;
     switch (_sortCol) {
       case _SortCol.date:
-        list.sort((a, b) => a.date.compareTo(b.date));
-        break;
+        // 日付（日単位）で並べ、同じ日の中は手動並び順（sortOrder）を保持。
+        // 昇順/降順は「日」にだけ効かせ、日内の手動順は常に上→下で一定にする。
+        list.sort((a, b) {
+          final da = DateTime(a.date.year, a.date.month, a.date.day);
+          final db = DateTime(b.date.year, b.date.month, b.date.day);
+          final c = da.compareTo(db);
+          if (c != 0) return _asc ? c : -c;
+          final oc = a.orderKey.compareTo(b.orderKey);
+          if (oc != 0) return oc;
+          return a.date.compareTo(b.date); // 未設定同士は時刻で安定化
+        });
+        // 日付列は上で方向まで確定済み → 末尾の一括反転はしない。
+        return list;
       case _SortCol.amount:
         list.sort((a, b) => a.amount.compareTo(b.amount));
         break;
@@ -248,12 +269,22 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                 style: V2Typography.caption
                     .copyWith(color: V2Colors.textSecondary)),
             const Spacer(),
-            Text('ヘッダーをタップで並び替え',
-                style:
-                    V2Typography.micro.copyWith(color: V2Colors.textMuted)),
+            if (widget.onReorderDay != null)
+              _ReorderToggle(
+                on: _reorderMode,
+                accent: widget.accent,
+                onTap: () => setState(() => _reorderMode = !_reorderMode),
+              )
+            else
+              Text('ヘッダーをタップで並び替え',
+                  style: V2Typography.micro
+                      .copyWith(color: V2Colors.textMuted)),
           ],
         ),
         const SizedBox(height: V2Spacing.sm),
+        if (_reorderMode) ...[
+          _buildReorderView(),
+        ] else ...[
         TextField(
           controller: _searchCtrl,
           onChanged: (v) => setState(() => _query = v),
@@ -423,7 +454,201 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
               );
             }),
           ),
+        ],
       ],
+    );
+  }
+
+  /// 手で並び替えビュー：日付ごとにまとめ、その日の中だけ上下ボタンで並び替え。
+  Widget _buildReorderView() {
+    if (widget.rows.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 40),
+        decoration: BoxDecoration(
+          color: V2Colors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: V2Colors.border),
+        ),
+        child: Center(
+          child: Text(widget.emptyHint,
+              style: V2Typography.caption
+                  .copyWith(color: V2Colors.textSecondary)),
+        ),
+      );
+    }
+    // 新しい日が上・日内は手動順（sortOrder）で並べ、日ごとにグループ化。
+    final list = [...widget.rows];
+    list.sort((a, b) {
+      final da = DateTime(a.date.year, a.date.month, a.date.day);
+      final db = DateTime(b.date.year, b.date.month, b.date.day);
+      final c = db.compareTo(da);
+      if (c != 0) return c;
+      final oa = a.sortOrder ?? double.infinity;
+      final ob = b.sortOrder ?? double.infinity;
+      final oc = oa.compareTo(ob);
+      if (oc != 0) return oc;
+      return b.date.compareTo(a.date);
+    });
+    final groups = <String, List<core.Transaction>>{};
+    for (final t in list) {
+      final k = '${t.date.year}-${t.date.month}-${t.date.day}';
+      (groups[k] ??= []).add(t);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Color.alphaBlend(
+                widget.accent.withValues(alpha: 0.08), Colors.white),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.swap_vert, size: 16, color: widget.accent),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text('同じ日付の中で ▲▼ で並び替え。順番は保存され、日付で並べ直しても保持されます。',
+                    style: V2Typography.micro
+                        .copyWith(color: V2Colors.textSecondary)),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: V2Colors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: V2Colors.border),
+          ),
+          child: Column(
+            children: [
+              for (final entry in groups.entries) ...[
+                _reorderDayHeader(entry.value.first.date),
+                for (int i = 0; i < entry.value.length; i++)
+                  _reorderRow(entry.value, i),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _reorderDayHeader(DateTime d) {
+    const wd = ['月', '火', '水', '木', '金', '土', '日'];
+    final label = wd[d.weekday - 1];
+    return Container(
+      width: double.infinity,
+      color: V2Colors.surfaceMuted,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      child: Text('${d.month}/${d.day}（$label）',
+          style: V2Typography.micro
+              .copyWith(color: V2Colors.textSecondary, fontWeight: FontWeight.w700)),
+    );
+  }
+
+  Widget _reorderRow(List<core.Transaction> dayTxns, int i) {
+    final t = dayTxns[i];
+    final first = i == 0;
+    final last = i == dayTxns.length - 1;
+    final title = t.description.trim().isNotEmpty
+        ? t.description.trim()
+        : (t.category.sub.trim().isNotEmpty
+            ? t.category.sub.trim()
+            : t.category.major.trim());
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: V2Colors.divider)),
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 4, 6, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: V2Typography.body),
+          ),
+          const SizedBox(width: 8),
+          Text('-${formatYen(t.amount)}',
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: V2Colors.negative,
+                  fontFeatures: V2Typography.tabularNums)),
+          const SizedBox(width: 6),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            iconSize: 22,
+            icon: const Icon(Icons.keyboard_arrow_up),
+            color: widget.accent,
+            onPressed: first ? null : () => _moveInDay(dayTxns, i, -1),
+            tooltip: '上へ',
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            iconSize: 22,
+            icon: const Icon(Icons.keyboard_arrow_down),
+            color: widget.accent,
+            onPressed: last ? null : () => _moveInDay(dayTxns, i, 1),
+            tooltip: '下へ',
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _moveInDay(List<core.Transaction> dayTxns, int i, int delta) {
+    final ni = i + delta;
+    if (ni < 0 || ni >= dayTxns.length) return;
+    final n = [...dayTxns];
+    final it = n.removeAt(i);
+    n.insert(ni, it);
+    widget.onReorderDay?.call(n);
+  }
+}
+
+/// 「手で並び替え」ON/OFF トグル。
+class _ReorderToggle extends StatelessWidget {
+  final bool on;
+  final Color accent;
+  final VoidCallback onTap;
+  const _ReorderToggle(
+      {required this.on, required this.accent, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: on
+              ? Color.alphaBlend(accent.withValues(alpha: 0.16), Colors.white)
+              : V2Colors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: on ? accent : V2Colors.border, width: on ? 1.4 : 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(on ? Icons.check : Icons.swap_vert,
+                size: 14, color: on ? accent : V2Colors.textSecondary),
+            const SizedBox(width: 4),
+            Text(on ? '並び替えを終了' : '手で並び替え',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: on ? accent : V2Colors.textSecondary)),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -490,6 +715,13 @@ class _Row {
 
   DateTime get date => txn?.date ?? fx!.date;
   int get amount => txn?.amount ?? fx!.amount;
+
+  /// 同じ日付内の並び順キー。手動並び替え(sortOrder)を最優先。
+  /// 未設定の取引は末尾側（+∞）、固定費は先頭側（-∞）に寄せる。
+  double get orderKey {
+    if (isFixed) return double.negativeInfinity;
+    return txn!.sortOrder ?? double.infinity;
+  }
 
   /// 大カテゴリ並び順。固定費は末尾側に寄せる（取引の後）。
   int get majorOrder => txn?.category.majorOrder ?? (1 << 20);
