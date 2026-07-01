@@ -156,6 +156,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   final _memoCtrl = TextEditingController();
   final _storeCtrl = TextEditingController();
   final _receiptUrlCtrl = TextEditingController();
+  final _dateTextCtrl = TextEditingController(); // 日付の直接入力（例 2026/7/1）
   final _amountFocus = FocusNode();
   bool _saving = false;
 
@@ -246,10 +247,11 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         _receiptUrlCtrl.text = widget.initialReceiptUrl!.trim();
       }
     }
-    // フォーカスの変化で候補リストを出し入れするため再描画。
-    _descFocus.addListener(() {
-      if (mounted) setState(() {});
-    });
+    _dateTextCtrl.text = _fmtDateInput(_date); // 直接入力欄の初期値
+    // ※ 以前はフォーカス変化で setState(フォーム全体を再描画)していたが、
+    //   これが「場所などをタップした瞬間に全体が再構築され、その欄への
+    //   フォーカス取得を潰す＝入力できない」不具合を招いていた。
+    //   サジェストの出し入れは AnimatedBuilder(_descFocus) で局所的に行う。
     _load();
   }
 
@@ -262,6 +264,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     _memoCtrl.dispose();
     _storeCtrl.dispose();
     _receiptUrlCtrl.dispose();
+    _dateTextCtrl.dispose();
     _myShareCtrl.dispose();
     _amountFocus.dispose();
     super.dispose();
@@ -700,15 +703,26 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       first: minDate,
       last: DateTime(2030, 12, 31),
     );
-    if (picked != null) setState(() => _date = picked);
+    if (picked != null) _commitDate(picked);
   }
+
+  /// 日付を確定し、直接入力欄の表示も同期する（矢印/カレンダー/チップ共通の入口）。
+  void _commitDate(DateTime d) {
+    setState(() {
+      _date = d;
+      _dateTextCtrl.text = _fmtDateInput(d);
+    });
+  }
+
+  /// 直接入力欄の書式（例 2026/7/1）。
+  String _fmtDateInput(DateTime d) => '${d.year}/${d.month}/${d.day}';
 
   /// 日付を前後に日単位でずらす（カットオフより前・2030年末より後は不可）。
   void _shiftDate(int deltaDays) {
     final min = AppModeManager.instance.current.minDate;
     final d = DateTime(_date.year, _date.month, _date.day + deltaDays);
     if (d.isBefore(min) || d.isAfter(DateTime(2030, 12, 31))) return;
-    setState(() => _date = d);
+    _commitDate(d);
   }
 
   /// 「今日/昨日/一昨日」など、今日から[daysAgo]日前に一発セット。
@@ -717,7 +731,50 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     final d = DateTime(now.year, now.month, now.day - daysAgo);
     final min = AppModeManager.instance.current.minDate;
     if (d.isBefore(min)) return;
+    _commitDate(d);
+  }
+
+  /// 直接入力（例「2026/7/1」「2026-07-01」「20260701」「7/1」）を解釈して日付に反映。
+  /// 入力途中で不正な間は何もしない（欄のテキストは上書きしない＝タイプ中を邪魔しない）。
+  void _setDateFromText(String s) {
+    final d = _parseInputDate(s);
+    if (d == null) return;
+    final min = AppModeManager.instance.current.minDate;
+    if (d.isBefore(min) || d.isAfter(DateTime(2030, 12, 31))) return;
     setState(() => _date = d);
+  }
+
+  DateTime? _parseInputDate(String s) {
+    s = s.trim();
+    if (s.isEmpty) return null;
+    int? y, m, dd;
+    final digits = s.replaceAll(RegExp(r'[^0-9]'), '');
+    if (RegExp(r'^\d{8}$').hasMatch(s)) {
+      y = int.parse(digits.substring(0, 4));
+      m = int.parse(digits.substring(4, 6));
+      dd = int.parse(digits.substring(6, 8));
+    } else {
+      final parts = s
+          .split(RegExp(r'[^0-9]+'))
+          .where((e) => e.isNotEmpty)
+          .map(int.parse)
+          .toList();
+      if (parts.length >= 3) {
+        y = parts[0];
+        m = parts[1];
+        dd = parts[2];
+      } else if (parts.length == 2) {
+        y = _date.year; // 年省略（月/日）は現在の年で補完
+        m = parts[0];
+        dd = parts[1];
+      } else {
+        return null;
+      }
+    }
+    if (m < 1 || m > 12 || dd < 1 || dd > 31) return null;
+    final dt = DateTime(y, m, dd);
+    if (dt.year != y || dt.month != m || dt.day != dd) return null; // 2/31等を弾く
+    return dt;
   }
 
   bool _dateIsDaysAgo(int daysAgo) {
@@ -975,7 +1032,14 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                     (v == null || v.trim().isEmpty) ? '入力してください' : null,
               ),
               // 過去の取引内容からサジェスト（フォーカス中だけ表示）。
-              if (_descFocus.hasFocus) _descSuggestionList(),
+              // フォーカス変化はここだけを再描画する（フォーム全体は再構築しない）
+              // ＝他の欄をタップした時にフォーカスを奪わない。
+              AnimatedBuilder(
+                animation: _descFocus,
+                builder: (context, _) => _descFocus.hasFocus
+                    ? _descSuggestionList()
+                    : const SizedBox.shrink(),
+              ),
               const SizedBox(height: 16),
               // 場所（必須）。店舗名や購入元。明細タブの「場所」列に出る。
               _label('場所（必須）'),
@@ -989,18 +1053,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               // 金額をヒーローとして大きく表示。
               _heroAmount(),
               const SizedBox(height: 14),
-              // レシート画像（Drive）がある取引は、上部に開くボタンを出す。
-              if (_receiptUrlCtrl.text.trim().isNotEmpty) ...[
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: FilledButton.tonalIcon(
-                    onPressed: _openReceiptLink,
-                    icon: const Icon(Icons.receipt_long, size: 18),
-                    label: const Text('レシートを見る'),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
               _label('日付'),
               // PC でもサッと入れられるよう：前後日の矢印＋日付ボタン（タップで
               // カレンダー）＋「今日/昨日/一昨日」ワンタップチップ。
@@ -1044,6 +1096,26 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                   const SizedBox(width: 8),
                   _quickDateChip('一昨日', 2),
                 ],
+              ),
+              const SizedBox(height: 8),
+              // 年月日を直接タイプして入れたい人向け（PCで便利）。
+              TextField(
+                controller: _dateTextCtrl,
+                keyboardType: TextInputType.datetime,
+                style: const TextStyle(fontSize: 14),
+                decoration: InputDecoration(
+                  isDense: true,
+                  prefixIcon: const Icon(Icons.edit_calendar,
+                      size: 18, color: Color(0xFF6B7280)),
+                  hintText: '直接入力（例 2026/7/1）',
+                  hintStyle:
+                      const TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                onChanged: _setDateFromText,
               ),
               const SizedBox(height: 16),
 
@@ -1575,7 +1647,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
             controller: _amountCtrl,
             focusNode: _amountFocus,
             keyboardType: TextInputType.number,
-            textAlign: TextAlign.right,
+            textAlign: TextAlign.left,
             inputFormatters: [
               HalfWidthDigitsFormatter(),
               ThousandsSeparatorInputFormatter(),
