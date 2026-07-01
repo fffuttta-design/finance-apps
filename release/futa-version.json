@@ -1,1 +1,1 @@
-{"version":"1.0.399","buildNumber":"400","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.399/futa-finance-v1.0.399.apk","releaseNotes":"クレカに『引き落とし口座』を設定できるように。引落日を過ぎると、対象月（前月利用）のカード利用額を引落口座から自動で差し引く振替を生成（土日祝は翌営業日／PL非計上／二重防止）。"}
+{"version":"1.0.400","buildNumber":"401","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.400/futa-finance-v1.0.400.apk","releaseNotes":"制作原価タブの判定を拡張（大分類が『外注費/売上原価/制作原価』を含む取引を制作原価として表示）。既存の原価系ワーカー取引が全月まとめて制作原価タブに表示されるように。"}
