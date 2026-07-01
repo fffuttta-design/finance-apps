@@ -107,6 +107,10 @@ class Transaction {
   /// その日の全取引にこの値が振られ、日付ソートし直しても順序が保持される。
   final double? sortOrder;
 
+  /// 確認済み（検収済み）フラグ。締め処理で1件ずつチェックする用途。
+  /// true の行は明細で薄くグレーアウト表示。デフォルト false。
+  final bool reviewed;
+
   const Transaction({
     required this.id,
     required this.date,
@@ -132,6 +136,7 @@ class Transaction {
     this.createdAt,
     this.receiptSaved = false,
     this.sortOrder,
+    this.reviewed = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -159,6 +164,7 @@ class Transaction {
         'receiptSaved': receiptSaved,
         if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
         if (sortOrder != null) 'sortOrder': sortOrder,
+        if (reviewed) 'reviewed': reviewed,
       };
 
   factory Transaction.fromJson(Map<String, dynamic> j) => Transaction(
@@ -194,6 +200,7 @@ class Transaction {
             : null,
         receiptSaved: j['receiptSaved'] as bool? ?? false,
         sortOrder: (j['sortOrder'] as num?)?.toDouble(),
+        reviewed: j['reviewed'] as bool? ?? false,
       );
 
   Transaction copyWith({
@@ -223,6 +230,7 @@ class Transaction {
     bool forceCreatedAt = false,
     bool? receiptSaved,
     double? sortOrder,
+    bool? reviewed,
   }) =>
       Transaction(
         id: id,
@@ -249,5 +257,6 @@ class Transaction {
         createdAt: forceCreatedAt ? createdAt : (createdAt ?? this.createdAt),
         receiptSaved: receiptSaved ?? this.receiptSaved,
         sortOrder: sortOrder ?? this.sortOrder,
+        reviewed: reviewed ?? this.reviewed,
       );
 }

@@ -830,6 +830,11 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                   await _txRepo.update(t.copyWith(receiptSaved: v));
                   if (mounted) await _load();
                 },
+                // 確認済み（検収）チェック：締め処理で1件ずつ確認する用途。
+                onToggleReviewed: (t, v) async {
+                  await _txRepo.update(t.copyWith(reviewed: v));
+                  if (mounted) await _load();
+                },
                 // 同じ日付内の手動並び替え：新しい順で sortOrder を 0,1,2… と振る。
                 // 取引は取引に、固定費はサブスクに保存する。
                 onReorderDay: _saveReorder,

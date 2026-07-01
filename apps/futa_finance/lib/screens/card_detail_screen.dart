@@ -351,6 +351,11 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                                     // （範囲指定はまたぐ月が曖昧なので出さない）。
                                     fixedRows: cardFixed,
                                     onEditFixed: (f) => _editCardFixed(f.id),
+                                    onToggleReviewed: (t, v) async {
+                                      await TransactionRepository.instance
+                                          .update(t.copyWith(reviewed: v));
+                                      if (mounted) await _load();
+                                    },
                                     onReorderDay: _saveReorder,
                                     emptyHint: 'この期間の利用はありません',
                                   ),

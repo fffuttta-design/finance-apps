@@ -600,7 +600,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
             2: FixedColumnWidth(100),
             3: FixedColumnWidth(100),
             4: FixedColumnWidth(124),
-            5: FixedColumnWidth(40),
+            5: FixedColumnWidth(44), // 確認チェック
+            6: FixedColumnWidth(40), // 編集
           },
           defaultVerticalAlignment: TableCellVerticalAlignment.middle,
           border: const TableBorder(
@@ -655,6 +656,15 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         h('出金', right: true),
         h('入金', right: true),
         h('残高', right: true),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 9),
+          child: Text('確認',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF6B7280))),
+        ),
         const SizedBox.shrink(),
       ],
     );
@@ -706,6 +716,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                   fontWeight: FontWeight.w700,
                   fontFamily: 'monospace')),
         ),
+        // 確認列（残高行にはチェック無し）。
+        const SizedBox.shrink(),
         // 編集列（鉛筆）。
         IconButton(
           icon: Icon(Icons.edit,
@@ -925,13 +937,22 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                   fontWeight: FontWeight.w600,
                   fontFamily: 'monospace')),
         );
-    return TableRow(children: [
+    final reviewed = t.reviewed;
+    return TableRow(
+      // 確認済みは薄いグレー背景。
+      decoration: reviewed
+          ? const BoxDecoration(color: Color(0xFFF3F4F6))
+          : null,
+      children: [
       Padding(
         padding: _cellPad,
         child: Text(
             '${t.date.year}/${t.date.month.toString().padLeft(2, '0')}/${t.date.day.toString().padLeft(2, '0')}',
-            style: const TextStyle(
-                fontSize: 12, color: Color(0xFF6B7280))),
+            style: TextStyle(
+                fontSize: 12,
+                color: reviewed
+                    ? const Color(0xFF9CA3AF)
+                    : const Color(0xFF6B7280))),
       ),
       Padding(
         padding: _cellPad,
@@ -956,6 +977,20 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                 fontWeight: FontWeight.w700,
                 fontFamily: 'monospace')),
       ),
+      // 確認済みチェック（締め処理用）。
+      Center(
+        child: SizedBox(
+          width: 24,
+          height: 24,
+          child: Checkbox(
+            value: reviewed,
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            activeColor: const Color(0xFF6B7280),
+            onChanged: (v) => _toggleReviewed(t, v ?? false),
+          ),
+        ),
+      ),
       IconButton(
         icon: const Icon(Icons.edit_outlined,
             size: 16, color: Color(0xFF6B7280)),
@@ -966,6 +1001,12 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         onPressed: () => _showEditDialog(t),
       ),
     ]);
+  }
+
+  Future<void> _toggleReviewed(core.Transaction t, bool value) async {
+    await TransactionRepository.instance
+        .update(t.copyWith(reviewed: value));
+    if (mounted) await _load();
   }
 
   // ───────────────────────────────────────────────────────────
