@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
+import '../data/month_cursor.dart';
 import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
 import '../data/subscription_repository.dart';
@@ -57,8 +58,8 @@ class _CardDetailScreenState extends State<CardDetailScreen>
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _selectedMonth = DateTime(now.year, now.month);
+    // タブで選択中の月で開く（6月を見ていたら詳細も6月から）。
+    _selectedMonth = MonthCursor.instance.month;
     _load();
     _sub = TransactionRepository.instance.stream.listen((list) {
       if (!mounted) return;
@@ -99,10 +100,15 @@ class _CardDetailScreenState extends State<CardDetailScreen>
     setState(() {
       _all = list;
       _subs = subs.subscriptions;
-      // 初回だけ「利用のある最新月」を初期選択にする（当月が空でも実績月を開く）。
+      // 初回だけ初期月を確定。
+      // ・過去月を選んで開いたとき（＝共有カーソルが当月以外）は、その月を尊重。
+      // ・当月（＝特に月指定していない）のときだけ「利用のある最新月」を既定にする。
       if (!_monthPicked) {
         _monthPicked = true;
-        _selectedMonth = _defaultMonth();
+        final sel = MonthCursor.instance.month;
+        final now = DateTime.now();
+        final isCurrent = sel.year == now.year && sel.month == now.month;
+        _selectedMonth = isCurrent ? _defaultMonth() : sel;
       }
     });
   }
@@ -492,7 +498,11 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                 return DropdownMenuItem<DateTime?>(
                     value: m, child: Text(label));
               }).toList(),
-              onChanged: (v) => setState(() => _selectedMonth = v),
+              onChanged: (v) => setState(() {
+                _selectedMonth = v;
+                // 詳細で月を変えたら共有カーソルにも反映（戻っても揃う）。
+                if (v != null) MonthCursor.instance.month = v;
+              }),
             )
           else
             // 範囲モード：選択中の期間をチップ表示（✕で月モードに戻る）。

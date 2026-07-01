@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
+import '../data/month_cursor.dart';
 import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
@@ -70,8 +71,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _selectedMonth = DateTime(now.year, now.month);
+    // タブで選択中の月で開く（6月を見ていたら口座詳細も6月から）。
+    _selectedMonth = MonthCursor.instance.month;
     _load();
     _sub = TransactionRepository.instance.stream.listen((list) {
       if (!mounted) return;
@@ -355,6 +356,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     }
     if (!mounted) return;
     setState(() => _selectedMonth = m);
+    // 月を変えたら共有カーソルにも反映（他タブ・他詳細と揃う）。全期間(null)は書かない。
+    if (m != null) MonthCursor.instance.month = m;
   }
 
   void _shiftMonth(int delta) {

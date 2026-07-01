@@ -562,12 +562,9 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
           // ── クレカ引落照合 ────────────────────
           if (showCardBilling) ...[
             CreditCardBillingSection(
-              cards: _payments.creditCards
-                  .where((c) => !c.inactive)
-                  .toList(),
-              bankAccounts: _payments.bankAccounts
-                  .where((b) => !b.inactive)
-                  .toList(),
+              // 全カード/口座を渡し表示可否はウィジェット側で（アクティブ=常に/休眠=活動月のみ）。
+              cards: _payments.creditCards,
+              bankAccounts: _payments.bankAccounts,
               transactions: _transactions,
               subscriptions: _subscriptions.subscriptions,
               ym: _ymKey,

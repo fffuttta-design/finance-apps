@@ -835,12 +835,10 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
               // ウォレット（クレカ引落照合・棚卸し）— カテゴリ内訳の下
               if (showFixedAndCard) ...[
                 CreditCardBillingSection(
-                  cards: _payments.creditCards
-                      .where((c) => !c.inactive)
-                      .toList(),
-                  bankAccounts: _payments.bankAccounts
-                      .where((b) => !b.inactive)
-                      .toList(),
+                  // 全カード/口座を渡し、表示可否はウィジェット側で判定する
+                  // （アクティブ=常に表示／休眠=当月に動きがある時だけ表示）。
+                  cards: _payments.creditCards,
+                  bankAccounts: _payments.bankAccounts,
                   transactions: _transactions,
                   subscriptions: _subs,
                   ym: _ymKey,
