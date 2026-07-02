@@ -108,6 +108,10 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
   Widget build(BuildContext context) {
     final t = _t;
     final hasReceipt = t.receiptUrl != null && t.receiptUrl!.trim().isNotEmpty;
+    // 制作原価(外注費/売上原価)や売上(収入)は「請求書」、それ以外は「領収書」と表記。
+    final isInvoice = t.type == core.TransactionType.income ||
+        ['外注費', '売上原価', '制作原価'].any((k) => t.category.major.contains(k));
+    final receiptWord = isInvoice ? '請求書' : '領収書';
     // 表示用に先頭の自動番号（"4." など）を取り除く。
     final majorBare =
         t.category.major.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
@@ -202,7 +206,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                   }
                 },
                 icon: const Icon(Icons.receipt_long, size: 18),
-                label: const Text('領収書を見る'),
+                label: Text('${receiptWord}を見る'),
               ),
             ),
           ],

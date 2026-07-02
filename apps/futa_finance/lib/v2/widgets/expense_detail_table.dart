@@ -97,6 +97,9 @@ class ExpenseDetailTable extends StatefulWidget {
   /// 領収書/レシート保存済みチェック列を出すか（事業モード・税理士提出用）。
   final bool showReceiptCheck;
 
+  /// 証憑列の呼び名（既定「領収書」。制作原価タブでは「請求書」を渡す）。
+  final String receiptLabel;
+
   /// 領収書チェックの切替（保存はここで行う）。showReceiptCheck=true 時は必須。
   final Future<void> Function(core.Transaction t, bool value)? onToggleReceipt;
 
@@ -123,6 +126,7 @@ class ExpenseDetailTable extends StatefulWidget {
     this.title = '明細',
     this.emptyHint = '記録はまだありません',
     this.showReceiptCheck = false,
+    this.receiptLabel = '領収書',
     this.onToggleReceipt,
     this.onToggleReviewed,
     this.onToggleReviewedFixed,
@@ -483,6 +487,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                     showReceipt: widget.showReceiptCheck,
                     showReview: showReview,
                     touched: _sortTouched,
+                    receiptLabel: widget.receiptLabel,
                   ),
                   for (final r in detailRows) ...[
                     const Divider(height: 1, color: V2Colors.divider),
@@ -934,6 +939,7 @@ class _ExpenseTableHeader extends StatelessWidget {
   final bool showReceipt;
   final bool showReview;
   final bool touched;
+  final String receiptLabel;
   const _ExpenseTableHeader({
     required this.w,
     required this.onResize,
@@ -945,6 +951,7 @@ class _ExpenseTableHeader extends StatelessWidget {
     this.showReceipt = false,
     this.showReview = false,
     this.touched = false,
+    this.receiptLabel = '領収書',
   });
 
   /// 並び替え可能な見出しセル（タップで切替）。既定（未操作）のうちは矢印も
@@ -1021,7 +1028,7 @@ class _ExpenseTableHeader extends StatelessWidget {
             _vGrid(_kColGap, _kHeadH),
             SizedBox(
               width: _kReceiptW,
-              child: Text('領収書',
+              child: Text(receiptLabel,
                   textAlign: TextAlign.center,
                   style: V2Typography.micro.copyWith(
                       color: V2Colors.textMuted,
