@@ -115,20 +115,23 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
     return rt == null ? 0 : rt - _total;
   }
 
-  /// 食費の品目が1つでもあるか（一括トグルの表示判定）。
-  bool get _hasFoodItem => _items.any((i) => i.category == '食費');
+  /// 個人わく対象（食費・日用品）の品目が1つでもあるか（一括トグルの表示判定）。
+  bool get _hasFoodItem =>
+      _items.any((i) => isPersonalFoodCategory(i.category ?? ''));
 
-  /// 食費の品目が「すべて」個人わくONになっているか（一括トグルの状態）。
+  /// 対象の品目が「すべて」個人わくONになっているか（一括トグルの状態）。
   bool get _allFoodPersonal =>
       _hasFoodItem &&
-      _items.where((i) => i.category == '食費').every((i) => i.personalFood);
+      _items
+          .where((i) => isPersonalFoodCategory(i.category ?? ''))
+          .every((i) => i.personalFood);
 
-  /// 食費の品目をまとめて個人わくON/OFFする（一括設定）。
+  /// 対象（食費・日用品）の品目をまとめて個人わくON/OFFする（一括設定）。
   void _toggleAllFoodPersonal() {
     final target = !_allFoodPersonal;
     setState(() {
       for (final i in _items) {
-        if (i.category == '食費') i.personalFood = target;
+        if (isPersonalFoodCategory(i.category ?? '')) i.personalFood = target;
       }
     });
   }
@@ -227,9 +230,10 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
         receiptUrl: widget.receiptUrl ??
             DriveReceiptService.instance.urlFor(receiptId),
         paidBy: _payer,
-        // 「食費」で個人わくONの品目は、ログイン中の自分の個人食費わくから引く。
-        // （相手のわくには入れられない＝常に自分のわく）
-        personalFor: (cat == '食費' && i.personalFood) ? uid : null,
+        // 対象カテゴリ（食費・日用品）で個人わくONの品目は、ログイン中の自分の
+        // 個人食費わくから引く。（相手のわくには入れられない＝常に自分のわく）
+        personalFor:
+            (isPersonalFoodCategory(cat) && i.personalFood) ? uid : null,
       ));
     }
     if (txns.isEmpty) {
@@ -657,8 +661,8 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                     ),
                   ),
                 ),
-                // 「食費」の品目だけ：個人の食費わくトグル
-                if (item.category == '食費')
+                // 対象カテゴリ（食費・日用品）の品目だけ：個人の食費わくトグル
+                if (isPersonalFoodCategory(item.category ?? ''))
                   GestureDetector(
                     onTap: () => setState(
                         () => item.personalFood = !item.personalFood),

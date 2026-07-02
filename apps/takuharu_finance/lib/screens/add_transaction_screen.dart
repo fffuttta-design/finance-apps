@@ -88,9 +88,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   /// 新規記録の既定の支払元。
   static const _defaultPayment = 'ワンバンク';
 
-  /// 個人食費わくの対象にできるカテゴリ（今は「食費」だけ）。
-  static const _personalFoodCategory = '食費';
-  bool get _canPersonalFood => !_isIncome && _category == _personalFoodCategory;
+  /// 個人食費わくの対象にできるカテゴリ（食費＋日用品。判定は categories.dart）。
+  bool get _canPersonalFood =>
+      !_isIncome && isPersonalFoodCategory(_category ?? '');
 
   /// レシートの品目メモ（まとめて1件にぶら下がる内訳）。新規=initialMemo、編集=既存メモ。
   String? get _receiptMemo => widget.initialMemo ?? widget.editing?.memo;
@@ -525,7 +525,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 _addCatChip(),
               ],
             ),
-            // 個人の食費わく（カテゴリが「食費」のときだけ表示）。
+            // 個人の食費わく（カテゴリが「食費」「日用品」のときだけ表示）。
             // カテゴリのすぐ下に、目立つ形で出す（探さなくても気づく位置）。
             if (_canPersonalFood) ...[
               const SizedBox(height: 18),

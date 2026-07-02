@@ -78,20 +78,23 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
 
   Map<String, String> get _members => HouseholdService.instance.memberNames;
 
-  /// 食費の品目が1つでもあるか（一括トグルの表示判定）。
-  bool get _hasFoodItem => _items.any((i) => i.category == '食費');
+  /// 個人わく対象（食費・日用品）の品目が1つでもあるか（一括トグルの表示判定）。
+  bool get _hasFoodItem =>
+      _items.any((i) => isPersonalFoodCategory(i.category ?? ''));
 
-  /// 食費の品目が「すべて」個人わくONになっているか（一括トグルの状態）。
+  /// 対象の品目が「すべて」個人わくONになっているか（一括トグルの状態）。
   bool get _allFoodPersonal =>
       _hasFoodItem &&
-      _items.where((i) => i.category == '食費').every((i) => i.personalFood);
+      _items
+          .where((i) => isPersonalFoodCategory(i.category ?? ''))
+          .every((i) => i.personalFood);
 
-  /// 食費の品目をまとめて個人わくON/OFFする（一括設定）。
+  /// 対象（食費・日用品）の品目をまとめて個人わくON/OFFする（一括設定）。
   void _toggleAllFoodPersonal() {
     final target = !_allFoodPersonal;
     setState(() {
       for (final i in _items) {
-        if (i.category == '食費') i.personalFood = target;
+        if (isPersonalFoodCategory(i.category ?? '')) i.personalFood = target;
       }
     });
   }
@@ -254,7 +257,7 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
       // 個人わくは常に「自分（ログイン中）のわく」。相手のわくには入れない。
       // トグルOFFでも、相手のわくに入っている既存品目はそのまま維持する。
       final existingPf = i.source?.personalFor;
-      final pf = (cat == '食費' && i.personalFood)
+      final pf = (isPersonalFoodCategory(cat) && i.personalFood)
           ? uid
           : (existingPf != null && existingPf != uid ? existingPf : null);
       if (i.txId != null && i.source != null) {
@@ -783,7 +786,7 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
                     ),
                   ),
                 ),
-                if (item.category == '食費')
+                if (isPersonalFoodCategory(item.category ?? ''))
                   GestureDetector(
                     onTap: () => setState(
                         () => item.personalFood = !item.personalFood),

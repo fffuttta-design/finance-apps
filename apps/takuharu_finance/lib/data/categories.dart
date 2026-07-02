@@ -37,6 +37,14 @@ const incomeCategories = <TxCategory>[
   TxCategory('その他', Icons.more_horiz_rounded, Color(0xFFA7D9CB)),
 ];
 
+/// 「個人の食費わく」の対象にできる支出カテゴリ。
+/// 食費に加え、レジ袋など食費まわりで一緒に買うことがある日用品も対象にする。
+const personalFoodCategories = <String>{'食費', '日用品'};
+
+/// [major] が「個人の食費わく」の対象カテゴリか。
+bool isPersonalFoodCategory(String major) =>
+    personalFoodCategories.contains(major);
+
 /// カテゴリ名 → 表示用（アイコン/色）。
 /// 既定カテゴリに無い名前（ユーザー追加のカスタム）は、名前から安定したパステル色を付ける。
 TxCategory categoryFor(String name, {required bool income}) {

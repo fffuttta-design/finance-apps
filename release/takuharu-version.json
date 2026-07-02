@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.90",
-    "buildNumber":  "95",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.90/takuharu-finance-v0.2.90.apk",
-    "releaseNotes":  "複数明細レシートを『レシート1枚＝1画面』に統合しました。品目一覧・まとめ編集・コメント欄がひとつにまとまり、コメントもレシート単位で1本になります（今まで品目ごとに付いていたコメントは、そのレシートを開いたときに自動でまとめられます）。"
+    "version":  "0.2.91",
+    "buildNumber":  "96",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.91/takuharu-finance-v0.2.91.apk",
+    "releaseNotes":  "「日用品」も個人の食費わくに入れられるようにしました（レジ袋など食費と一緒に買う日用品向け）。支出の登録・レシートの品目記録・まとめ編集で、食費に加えて日用品でも『個人の食費わくから引く』が選べます。"
 }
