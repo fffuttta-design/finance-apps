@@ -1,1 +1,1 @@
-{"version":"1.0.407","buildNumber":"408","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.407/futa-finance-v1.0.407.apk","releaseNotes":"固定費：同じ月に実取引がある固定費は「予定行」を出さず、経費合計への二重計上もしないように修正（実取引を採用）。重複表示と金額の膨らみを解消。"}
+{"version":"1.0.408","buildNumber":"409","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.408/futa-finance-v1.0.408.apk","releaseNotes":"領収書の保管形態を明細ごとに記録：ドライブ保存分は「請求書/領収書を見る」、店頭レシート等の紙保管分は詳細画面で「紙のレシートで保管済み」にチェック（写真不要）。領収書チェックは紙・電子どちらでも一律で付く。"}

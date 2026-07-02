@@ -27,7 +27,28 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
 
   static const _wd = ['月', '火', '水', '木', '金', '土', '日'];
 
-  core.Transaction get _t => widget.transaction;
+  // 画面内で領収書の保管状態を更新できるよう、可変で保持する。
+  late core.Transaction _cur = widget.transaction;
+  core.Transaction get _t => _cur;
+
+  /// 紙のレシートで保管済み（現物を税理士へ）フラグの切替。
+  /// receiptSaved（対応済みチェック）＝紙でもドライブでも共通、種類は receiptType に記録。
+  Future<void> _setPaperKept(bool v) async {
+    setState(() => _busy = true);
+    final updated =
+        _cur.copyWith(receiptSaved: v, receiptType: v ? 'paper' : null);
+    try {
+      await TransactionRepository.instance.update(updated);
+      if (mounted) setState(() => _cur = updated);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('保存に失敗しました: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   Color get _accent {
     switch (_t.type) {
@@ -184,31 +205,81 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
               ],
             ),
           ),
-          if (hasReceipt) ...[
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  // 所有者本人の権限(drive.readonly)でDriveから取得し、アプリ内表示。
-                  // 取得失敗時はビューア内から外部起動にフォールバックする。
-                  final url = t.receiptUrl;
-                  if (url == null || url.trim().isEmpty) return;
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ReceiptViewerScreen(
-                        driveUrl: url.trim(),
-                        title: receiptWord,
-                      ),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.receipt_long, size: 18),
-                label: Text('$receiptWordを見る'),
-              ),
+          // 領収書/請求書の保管：ドライブ保存なら閲覧ボタン、
+          // 紙で保管する分（店頭レシート・ベンチャーサポート等）は「紙で保管済み」トグル。
+          const SizedBox(height: 16),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
             ),
-          ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+                  child: Row(
+                    children: [
+                      Text(receiptWord,
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF374151))),
+                      const Spacer(),
+                      Text(
+                        hasReceipt
+                            ? '📄 ドライブに保管'
+                            : (t.receiptSaved ? '🧾 紙で保管済み' : '未保管'),
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: (hasReceipt || t.receiptSaved)
+                                ? const Color(0xFF059669)
+                                : const Color(0xFF9CA3AF)),
+                      ),
+                    ],
+                  ),
+                ),
+                if (hasReceipt)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        // 所有者本人の権限(drive.readonly)でDriveから取得し表示。
+                        final url = t.receiptUrl;
+                        if (url == null || url.trim().isEmpty) return;
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ReceiptViewerScreen(
+                              driveUrl: url.trim(),
+                              title: receiptWord,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.receipt_long, size: 18),
+                      label: Text('$receiptWordを見る'),
+                    ),
+                  )
+                else
+                  CheckboxListTile(
+                    value: t.receiptSaved,
+                    onChanged:
+                        _busy ? null : (v) => _setPaperKept(v ?? false),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    dense: true,
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 12),
+                    title: const Text('紙のレシートで保管済み',
+                        style: TextStyle(fontSize: 14)),
+                    subtitle: const Text('現物を保管して税理士へ渡す分（写真は不要）',
+                        style: TextStyle(fontSize: 12)),
+                  ),
+              ],
+            ),
+          ),
           const SizedBox(height: 28),
           // アクション（編集は支出/収入/振替すべてで可能）
           Row(

@@ -116,6 +116,10 @@ class Transaction {
   /// true の行は明細で薄くグレーアウト表示。デフォルト false。
   final bool reviewed;
 
+  /// 領収書の保管形態。'drive'=ドライブ保存 / 'paper'=紙で保管（現物を税理士へ）/ null=未設定。
+  /// receiptSaved（対応済みチェック）とは別に、詳細画面で種類を記録・表示する。
+  final String? receiptType;
+
   const Transaction({
     required this.id,
     required this.date,
@@ -143,6 +147,7 @@ class Transaction {
     this.receiptSaved = false,
     this.sortOrder,
     this.reviewed = false,
+    this.receiptType,
   });
 
   Map<String, dynamic> toJson() => {
@@ -172,6 +177,7 @@ class Transaction {
         if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
         if (sortOrder != null) 'sortOrder': sortOrder,
         if (reviewed) 'reviewed': reviewed,
+        if (receiptType != null) 'receiptType': receiptType,
       };
 
   factory Transaction.fromJson(Map<String, dynamic> j) => Transaction(
@@ -209,6 +215,7 @@ class Transaction {
         receiptSaved: j['receiptSaved'] as bool? ?? false,
         sortOrder: (j['sortOrder'] as num?)?.toDouble(),
         reviewed: j['reviewed'] as bool? ?? false,
+        receiptType: j['receiptType'] as String?,
       );
 
   Transaction copyWith({
@@ -240,6 +247,7 @@ class Transaction {
     bool? receiptSaved,
     double? sortOrder,
     bool? reviewed,
+    String? receiptType,
   }) =>
       Transaction(
         id: id,
@@ -268,5 +276,6 @@ class Transaction {
         receiptSaved: receiptSaved ?? this.receiptSaved,
         sortOrder: sortOrder ?? this.sortOrder,
         reviewed: reviewed ?? this.reviewed,
+        receiptType: receiptType ?? this.receiptType,
       );
 }
