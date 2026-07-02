@@ -104,12 +104,23 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
       setState(() => _transactions = list);
     });
     PaymentsChangeNotifier.instance.addListener(_load);
+    MonthCursor.instance.addListener(_onMonthCursor);
+  }
+
+  /// 他タブで月が変わったら追従（別タブで6月にしたらホームも6月）。
+  void _onMonthCursor() {
+    final m = MonthCursor.instance.month;
+    if (!mounted) return;
+    if (m.year != _selectedMonth.year || m.month != _selectedMonth.month) {
+      setState(() => _selectedMonth = DateTime(m.year, m.month));
+    }
   }
 
   @override
   void dispose() {
     _sub?.cancel();
     PaymentsChangeNotifier.instance.removeListener(_load);
+    MonthCursor.instance.removeListener(_onMonthCursor);
     super.dispose();
   }
 

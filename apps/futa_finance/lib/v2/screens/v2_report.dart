@@ -157,16 +157,27 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     });
     // 法人税の概算設定が変わったら再描画。
     TaxEstimateRepository.instance.addListener(_onTaxSettingChanged);
+    MonthCursor.instance.addListener(_onMonthCursor);
   }
 
   void _onTaxSettingChanged() {
     if (mounted) setState(() {});
   }
 
+  /// 他タブで月が変わったら追従。
+  void _onMonthCursor() {
+    final m = MonthCursor.instance.month;
+    if (!mounted) return;
+    if (m.year != _selMonth.year || m.month != _selMonth.month) {
+      setState(() => _selMonth = DateTime(m.year, m.month));
+    }
+  }
+
   @override
   void dispose() {
     _sub?.cancel();
     TaxEstimateRepository.instance.removeListener(_onTaxSettingChanged);
+    MonthCursor.instance.removeListener(_onMonthCursor);
     super.dispose();
   }
 

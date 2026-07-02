@@ -46,11 +46,22 @@ class _RichIncomeScreenState extends State<RichIncomeScreen>
       if (!mounted) return;
       setState(() => _transactions = list);
     });
+    MonthCursor.instance.addListener(_onMonthCursor);
+  }
+
+  /// 他タブで月が変わったら追従。
+  void _onMonthCursor() {
+    final m = MonthCursor.instance.month;
+    if (!mounted) return;
+    if (m.year != _month.year || m.month != _month.month) {
+      setState(() => _month = DateTime(m.year, m.month));
+    }
   }
 
   @override
   void dispose() {
     _sub?.cancel();
+    MonthCursor.instance.removeListener(_onMonthCursor);
     super.dispose();
   }
 

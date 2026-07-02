@@ -10,7 +10,7 @@ import '../widgets/v2_top_nav.dart' show V2NavItem;
 /// 左にサイドバー（ナビ＋記録ボタン）、右上に細いトップバー（タイトル＋モード切替）、
 /// その下に各タブの本文を配置する。狭い画面（スマホ）では使わず、
 /// 従来どおり下タブのシェルを使う（呼び出し側で出し分け）。
-class RichSidebarShell extends StatelessWidget {
+class RichSidebarShell extends StatefulWidget {
   final List<V2NavItem> items;
   final String currentId;
   final void Function(String id) onSelect;
@@ -45,7 +45,17 @@ class RichSidebarShell extends StatelessWidget {
   });
 
   @override
+  State<RichSidebarShell> createState() => _RichSidebarShellState();
+}
+
+class _RichSidebarShellState extends State<RichSidebarShell> {
+  /// サイドバーの開閉。トップバー左の ☰ で切替える。
+  bool _open = true;
+
+  @override
   Widget build(BuildContext context) {
+    final accent = widget.accent;
+    final personal = widget.personal;
     // 個人モードはオレンジ基調、事業モードは従来のネイビー。
     final sidebarBg =
         personal ? V2Colors.sidebarPersonal : V2Colors.sidebar;
@@ -62,13 +72,20 @@ class RichSidebarShell extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ── サイドバー ──
-            Container(
-              width: V2Spacing.sidebarWidth,
+            // ── サイドバー（開いているときだけ表示。☰で開閉） ──
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeInOut,
+              width: _open ? V2Spacing.sidebarWidth : 0,
               color: sidebarBg,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+              clipBehavior: Clip.hardEdge,
+              child: OverflowBox(
+                minWidth: V2Spacing.sidebarWidth,
+                maxWidth: V2Spacing.sidebarWidth,
+                alignment: Alignment.centerLeft,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                   // ブランド
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
@@ -103,22 +120,23 @@ class RichSidebarShell extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 4),
                       children: [
-                        for (final it in items)
+                        for (final it in widget.items)
                           _SidebarItem(
                             item: it,
-                            selected: it.id == currentId,
+                            selected: it.id == widget.currentId,
                             accent: accent,
                             mutedColor: sidebarMuted,
                             hoverColor: sidebarHover,
                             personal: personal,
-                            onTap: () => onSelect(it.id),
+                            onTap: () => widget.onSelect(it.id),
                           ),
                       ],
                     ),
                   ),
                   // 記録ボタンはトップバー右上へ移設（サイドバー下部からは撤去）。
                   const SizedBox(height: 12),
-                ],
+                  ],
+                ),
               ),
             ),
             // ── メイン ──
@@ -134,18 +152,26 @@ class RichSidebarShell extends StatelessWidget {
                       border: Border(
                           bottom: BorderSide(color: V2Colors.border)),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Row(
                       children: [
-                        Text(title,
+                        // サイドバー開閉ボタン。
+                        IconButton(
+                          icon: Icon(_open ? Icons.menu_open : Icons.menu),
+                          color: V2Colors.textSecondary,
+                          tooltip: _open ? 'サイドバーを閉じる' : 'サイドバーを開く',
+                          onPressed: () => setState(() => _open = !_open),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(widget.title,
                             style: V2Typography.h1
                                 .copyWith(color: V2Colors.textPrimary)),
                         const Spacer(),
                         // モード切替（事業/個人）→ 記録ボタンの順で右上に並べる。
                         // セグメントが潰れないよう十分な幅を確保する。
-                        SizedBox(width: 168, child: modeSwitcher),
+                        SizedBox(width: 168, child: widget.modeSwitcher),
                         const SizedBox(width: 12),
-                        recordButton,
+                        widget.recordButton,
                       ],
                     ),
                   ),
@@ -157,7 +183,7 @@ class RichSidebarShell extends StatelessWidget {
                       child: ConstrainedBox(
                         constraints:
                             const BoxConstraints(maxWidth: 1140),
-                        child: content,
+                        child: widget.content,
                       ),
                     ),
                   ),
