@@ -1,1 +1,1 @@
-{"version":"1.0.412","buildNumber":"413","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.412/futa-finance-v1.0.412.apk","releaseNotes":"①サイドバーの開閉ボタン（トップバー左の☰）を追加。②表示中の月をタブ横断で確実に維持（どこかで6月にしたら他タブ・ホームも6月のまま追従）。"}
+{"version":"1.0.413","buildNumber":"414","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.413/futa-finance-v1.0.413.apk","releaseNotes":"①固定費の明細行に淡いオレンジ背景を復活（実取引化しても固定費が一目で分かる）。②ホーム（PC版）で月を変えるとタブ横断で維持されなかった不具合を修正（ホームがMonthCursorに未連動だった）。"}

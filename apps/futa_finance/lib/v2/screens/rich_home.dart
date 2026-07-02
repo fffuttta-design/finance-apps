@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart';
 
 import '../../data/app_mode.dart';
+import '../../data/month_cursor.dart';
 import '../../data/monthly_snapshot_repository.dart';
 import '../../data/payments_change_notifier.dart';
 import '../../data/settings_repository.dart';
@@ -45,7 +46,8 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
   bool _loading = true;
   String? _error;
 
-  late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+  // 表示月はタブ横断で共有（共有カーソルを初期値に。切替で今月へ戻さない）。
+  late DateTime _month = MonthCursor.instance.month;
 
   @override
   void onModeChanged() => _load();
@@ -59,12 +61,23 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
       setState(() => _transactions = list);
     });
     PaymentsChangeNotifier.instance.addListener(_load);
+    MonthCursor.instance.addListener(_onMonthCursor);
+  }
+
+  /// 他タブで月が変わったら追従。
+  void _onMonthCursor() {
+    final m = MonthCursor.instance.month;
+    if (!mounted) return;
+    if (m.year != _month.year || m.month != _month.month) {
+      setState(() => _month = DateTime(m.year, m.month));
+    }
   }
 
   @override
   void dispose() {
     _sub?.cancel();
     PaymentsChangeNotifier.instance.removeListener(_load);
+    MonthCursor.instance.removeListener(_onMonthCursor);
     super.dispose();
   }
 
@@ -98,6 +111,7 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
 
   void _shiftMonth(int delta) {
     setState(() => _month = DateTime(_month.year, _month.month + delta));
+    MonthCursor.instance.month = _month; // タブ横断で共有
   }
 
   int _subsTotalForMonth(DateTime m) {

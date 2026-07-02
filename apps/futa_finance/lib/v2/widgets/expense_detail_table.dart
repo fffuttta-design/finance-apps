@@ -666,9 +666,12 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
     final canReview = isFixed
         ? widget.onToggleReviewedFixed != null
         : widget.onToggleReviewed != null;
+    // 予定行（固定費サブスク）と、固定費カテゴリの実取引はどちらも淡いオレンジ背景。
+    final isFixedCat =
+        isFixed || (r.txn?.category.major.contains('固定費') ?? false);
     return Container(
       decoration: BoxDecoration(
-        color: reviewed ? _kReviewedBg : (isFixed ? _kFixedBg : null),
+        color: reviewed ? _kReviewedBg : (isFixedCat ? _kFixedBg : null),
         border: const Border(top: BorderSide(color: V2Colors.divider)),
       ),
       padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
@@ -1097,10 +1100,10 @@ class _ExpenseRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final reviewed = t.reviewed;
-    // 固定費は従来どおりオレンジ系で色分け（実取引化しても見た目を保つ）。
-    final accent = t.category.major.contains('固定費')
-        ? _kFixedAccent
-        : expenseCatColor(t.category.major);
+    // 固定費は従来どおりオレンジ系で色分け＋淡い背景（実取引化しても見た目を保つ）。
+    final isFixedCat = t.category.major.contains('固定費');
+    final accent =
+        isFixedCat ? _kFixedAccent : expenseCatColor(t.category.major);
     final major = t.category.major.trim();
     final sub = t.category.sub.trim();
     // 大カテゴリは番号プレフィックス（"1."）を外して表示。
@@ -1119,8 +1122,10 @@ class _ExpenseRow extends StatelessWidget {
       onTap: onTap,
       child: Container(
         height: _kRowH,
-        // 確認済みは薄いグレー背景＋全体を半透明にして「済」を分かりやすく。
-        color: reviewed ? _kReviewedBg : null,
+        // 確認済み=グレー背景 / 固定費=淡いオレンジ背景（それ以外は無し）。
+        color: reviewed
+            ? _kReviewedBg
+            : (isFixedCat ? _kFixedBg : null),
         child: Opacity(
         opacity: reviewed ? 0.5 : 1,
         child: Padding(
@@ -1574,10 +1579,10 @@ class _NarrowRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final reviewed = t.reviewed;
-    // 固定費は従来どおりオレンジ系で色分け（実取引化しても見た目を保つ）。
-    final accent = t.category.major.contains('固定費')
-        ? _kFixedAccent
-        : expenseCatColor(t.category.major);
+    // 固定費は従来どおりオレンジ系で色分け＋淡い背景（実取引化しても見た目を保つ）。
+    final isFixedCat = t.category.major.contains('固定費');
+    final accent =
+        isFixedCat ? _kFixedAccent : expenseCatColor(t.category.major);
     final major = t.category.major.trim();
     final sub = t.category.sub.trim();
     final catLabel = (major.isEmpty && sub.isEmpty)
@@ -1590,7 +1595,9 @@ class _NarrowRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Container(
-        color: reviewed ? _kReviewedBg : null,
+        color: reviewed
+            ? _kReviewedBg
+            : (isFixedCat ? _kFixedBg : null),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Opacity(
         opacity: reviewed ? 0.5 : 1,
