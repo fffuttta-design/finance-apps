@@ -1,1 +1,1 @@
-{"version":"1.0.404","buildNumber":"405","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.404/futa-finance-v1.0.404.apk","releaseNotes":"制作原価タブ：小カテゴリを色分け（YouTube事業=赤/LINE事業=緑）、既定の並びを小カテゴリ昇順→場所降順に。証憑ビューアはマウスのホイールだけで拡大縮小できるように変更。"}
+{"version":"1.0.405","buildNumber":"406","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.405/futa-finance-v1.0.405.apk","releaseNotes":"支出入力の日付を手入力に統一（数字だけで自動的に「/」が入る／カレンダーはアイコンから）。場所は過去履歴からサジェスト（同じ件名で使った場所を優先表示）し、表記ゆれを防止。"}

@@ -1,6 +1,5 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 import 'package:url_launcher/url_launcher.dart';
 
@@ -155,6 +154,13 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   final _usdAmountCtrl = TextEditingController(); // USD金額
   final _memoCtrl = TextEditingController();
   final _storeCtrl = TextEditingController();
+  // 場所のサジェスト用フォーカス（フォーカス中だけ候補リストを出す）。
+  final _storeFocus = FocusNode();
+  // 過去に使った場所 → 出現回数（全体の頻度順に使う）。
+  Map<String, int> _storeCounts = const {};
+  // 取引内容(正規化) → その内容で使った場所ごとの回数。
+  // 同じ件名には同じ場所を提案し、表記ゆれを防ぐために使う。
+  Map<String, Map<String, int>> _descToStores = const {};
   final _receiptUrlCtrl = TextEditingController();
   final _dateTextCtrl = TextEditingController(); // 日付の直接入力（例 2026/7/1）
   final _amountFocus = FocusNode();
@@ -263,6 +269,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     _usdAmountCtrl.dispose();
     _memoCtrl.dispose();
     _storeCtrl.dispose();
+    _storeFocus.dispose();
     _receiptUrlCtrl.dispose();
     _dateTextCtrl.dispose();
     _myShareCtrl.dispose();
@@ -280,18 +287,31 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     } catch (_) {}
     if (!mounted) return;
     // 取引内容サジェスト用に、過去の支出の内容を頻度集計しておく。
+    // あわせて「場所」も、全体頻度＆件名ごとの使用場所を集計（表記ゆれ防止）。
     final descCounts = <String, int>{};
+    final storeCounts = <String, int>{};
+    final descToStores = <String, Map<String, int>>{};
     for (final t in history) {
       if (t.type != core.TransactionType.expense) continue;
       final d = t.description.trim();
-      if (d.isEmpty) continue;
-      descCounts[d] = (descCounts[d] ?? 0) + 1;
+      if (d.isNotEmpty) descCounts[d] = (descCounts[d] ?? 0) + 1;
+      final st = (t.store ?? '').trim();
+      if (st.isNotEmpty) {
+        storeCounts[st] = (storeCounts[st] ?? 0) + 1;
+        final dk = d.toLowerCase();
+        if (dk.isNotEmpty) {
+          final m = descToStores[dk] ??= <String, int>{};
+          m[st] = (m[st] ?? 0) + 1;
+        }
+      }
     }
     setState(() {
       _categories = c;
       _payments = p;
       _history = history;
       _descCounts = descCounts;
+      _storeCounts = storeCounts;
+      _descToStores = descToStores;
       final e = widget.editing;
       if (e != null) {
         // 編集モード：取引のカテゴリ・支払方法をそのまま復元。
@@ -449,6 +469,86 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 child: Row(
                   children: [
                     const Icon(Icons.history,
+                        size: 16, color: Color(0xFF9CA3AF)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(suggestions[i],
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 14, color: Color(0xFF111827))),
+                    ),
+                    const Icon(Icons.north_west,
+                        size: 14, color: Color(0xFFCBD5E1)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// 場所のサジェスト候補（過去履歴から）。
+  /// ①今の「内容(件名)」で過去に使った場所を最優先（表記ゆれ防止）→
+  /// ②全体の頻出場所（場所欄に入力があれば前方/部分一致で絞り込み）。
+  List<String> _storeSuggestions() {
+    final storeQ = _storeCtrl.text.trim().toLowerCase();
+    final descQ = _descCtrl.text.trim().toLowerCase();
+    final score = <String, int>{};
+    // ① 同じ/近い件名で使われた場所（大きく加点）。
+    if (descQ.isNotEmpty) {
+      _descToStores.forEach((desc, stores) {
+        final hit = desc == descQ || desc.contains(descQ) || descQ.contains(desc);
+        if (!hit) return;
+        stores.forEach((s, c) => score[s] = (score[s] ?? 0) + c * 100);
+      });
+    }
+    // ② 全体の頻出場所（場所欄に入力があれば絞り込み）。
+    _storeCounts.forEach((s, c) {
+      if (storeQ.isEmpty || s.toLowerCase().contains(storeQ)) {
+        score[s] = (score[s] ?? 0) + c;
+      }
+    });
+    final list = score.keys
+        .where((s) => s.trim().toLowerCase() != storeQ) // 入力済みと同一は除外
+        .toList()
+      ..sort((a, b) => score[b]!.compareTo(score[a]!));
+    return list.take(6).toList();
+  }
+
+  /// 場所サジェストを選んだとき：場所を確定（表記をそのまま再利用）。
+  void _applyStoreSuggestion(String text) {
+    _storeCtrl.text = text;
+    _storeCtrl.selection = TextSelection.collapsed(offset: text.length);
+    setState(() {});
+  }
+
+  /// 場所のサジェストリスト（内容の直下・場所欄フォーカス中に出す）。
+  Widget _storeSuggestionList() {
+    final suggestions = _storeSuggestions();
+    if (suggestions.isEmpty) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        children: [
+          for (int i = 0; i < suggestions.length; i++) ...[
+            if (i > 0) const Divider(height: 1, color: Color(0xFFF1F5F9)),
+            InkWell(
+              onTap: () => _applyStoreSuggestion(suggestions[i]),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                child: Row(
+                  children: [
+                    const Icon(Icons.place_outlined,
                         size: 16, color: Color(0xFF9CA3AF)),
                     const SizedBox(width: 10),
                     Expanded(
@@ -714,25 +814,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     });
   }
 
-  /// 直接入力欄の書式（例 2026/7/1）。
-  String _fmtDateInput(DateTime d) => '${d.year}/${d.month}/${d.day}';
-
-  /// 日付を前後に日単位でずらす（カットオフより前・2030年末より後は不可）。
-  void _shiftDate(int deltaDays) {
-    final min = AppModeManager.instance.current.minDate;
-    final d = DateTime(_date.year, _date.month, _date.day + deltaDays);
-    if (d.isBefore(min) || d.isAfter(DateTime(2030, 12, 31))) return;
-    _commitDate(d);
-  }
-
-  /// 「今日/昨日/一昨日」など、今日から[daysAgo]日前に一発セット。
-  void _setDateDaysAgo(int daysAgo) {
-    final now = DateTime.now();
-    final d = DateTime(now.year, now.month, now.day - daysAgo);
-    final min = AppModeManager.instance.current.minDate;
-    if (d.isBefore(min)) return;
-    _commitDate(d);
-  }
+  /// 直接入力欄の書式（ゼロ埋め・例 2026/07/01）。自動スラッシュ入力と揃える。
+  String _fmtDateInput(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
 
   /// 直接入力（例「2026/7/1」「2026-07-01」「20260701」「7/1」）を解釈して日付に反映。
   /// 入力途中で不正な間は何もしない（欄のテキストは上書きしない＝タイプ中を邪魔しない）。
@@ -775,14 +859,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     final dt = DateTime(y, m, dd);
     if (dt.year != y || dt.month != m || dt.day != dd) return null; // 2/31等を弾く
     return dt;
-  }
-
-  bool _dateIsDaysAgo(int daysAgo) {
-    final now = DateTime.now();
-    final d = DateTime(now.year, now.month, now.day - daysAgo);
-    return _date.year == d.year &&
-        _date.month == d.month &&
-        _date.day == d.day;
   }
 
   Future<void> _deleteTxn() async {
@@ -1042,76 +1118,59 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               ),
               const SizedBox(height: 16),
               // 場所（必須）。店舗名や購入元。明細タブの「場所」列に出る。
+              // 過去履歴からサジェスト（同じ件名で使った場所を優先）。表記ゆれ防止。
               _label('場所（必須）'),
               TextFormField(
                 controller: _storeCtrl,
+                focusNode: _storeFocus,
                 decoration: _inputDecoration(hint: '例: ファミリーマート / Amazon'),
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? '場所を入力してください' : null,
+                onChanged: (_) {
+                  if (_storeCtrl.value.composing.isValid) return;
+                  setState(() {});
+                },
+              ),
+              // フォーカス中だけ候補リストを表示。
+              AnimatedBuilder(
+                animation: _storeFocus,
+                builder: (context, _) => _storeFocus.hasFocus
+                    ? _storeSuggestionList()
+                    : const SizedBox.shrink(),
               ),
               const SizedBox(height: 16),
               // 金額をヒーローとして大きく表示。
               _heroAmount(),
               const SizedBox(height: 14),
               _label('日付'),
-              // PC でもサッと入れられるよう：前後日の矢印＋日付ボタン（タップで
-              // カレンダー）＋「今日/昨日/一昨日」ワンタップチップ。
-              Row(
-                children: [
-                  _dayArrowButton(Icons.chevron_left, () => _shiftDate(-1)),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: InkWell(
-                      onTap: _pickDate,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 14),
-                        decoration: _fieldDecoration(),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.calendar_today,
-                                size: 18, color: Color(0xFF6B7280)),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${_date.year}年${_date.month}月${_date.day}日（${weekdayKanji(_date)}）',
-                              style: const TextStyle(
-                                  fontSize: 14, color: Color(0xFF111827)),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  _dayArrowButton(Icons.chevron_right, () => _shiftDate(1)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  _quickDateChip('今日', 0),
-                  const SizedBox(width: 8),
-                  _quickDateChip('昨日', 1),
-                  const SizedBox(width: 8),
-                  _quickDateChip('一昨日', 2),
-                ],
-              ),
-              const SizedBox(height: 8),
-              // 年月日を直接タイプして入れたい人向け（PCで便利）。
+              // 手入力に統一。数字だけ打てば自動で「/」が入る（例 20260701→2026/07/01）。
+              // カレンダーで選びたいときは左のアイコンから。
               TextField(
                 controller: _dateTextCtrl,
-                keyboardType: TextInputType.datetime,
-                style: const TextStyle(fontSize: 14),
+                keyboardType: TextInputType.number,
+                inputFormatters: [_SlashDateFormatter()],
+                style: const TextStyle(fontSize: 15, color: Color(0xFF111827)),
                 decoration: InputDecoration(
                   isDense: true,
-                  prefixIcon: const Icon(Icons.edit_calendar,
-                      size: 18, color: Color(0xFF6B7280)),
-                  hintText: '直接入力（例 2026/7/1）',
+                  prefixIcon: IconButton(
+                    icon: const Icon(Icons.event,
+                        size: 20, color: Color(0xFF6B7280)),
+                    tooltip: 'カレンダーから選ぶ',
+                    onPressed: _pickDate,
+                  ),
+                  suffixIcon: Padding(
+                    padding: const EdgeInsets.only(right: 14),
+                    child: Text('（${weekdayKanji(_date)}）',
+                        style: const TextStyle(
+                            fontSize: 14, color: Color(0xFF6B7280))),
+                  ),
+                  suffixIconConstraints:
+                      const BoxConstraints(minWidth: 0, minHeight: 0),
+                  hintText: '数字だけでOK（例 20260701）',
                   hintStyle:
                       const TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
                   contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8)),
                 ),
@@ -1735,50 +1794,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
 
 
   /// 日付を前後にずらす矢印ボタン（日付欄の左右）。
-  Widget _dayArrowButton(IconData icon, VoidCallback onTap) => Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            width: 44,
-            height: 48,
-            alignment: Alignment.center,
-            decoration: _fieldDecoration(),
-            child: Icon(icon, size: 22, color: const Color(0xFF6B7280)),
-          ),
-        ),
-      );
-
-  /// 「今日/昨日/一昨日」ワンタップチップ。該当日は色付きで強調。
-  Widget _quickDateChip(String label, int daysAgo) {
-    final selected = _dateIsDaysAgo(daysAgo);
-    return InkWell(
-      onTap: () => _setDateDaysAgo(daysAgo),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFFEEF2FF) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-              color: selected
-                  ? const Color(0xFF1A237E)
-                  : const Color(0xFFE5E7EB),
-              width: selected ? 1.4 : 1),
-        ),
-        child: Text(label,
-            style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: selected
-                    ? const Color(0xFF1A237E)
-                    : const Color(0xFF6B7280))),
-      ),
-    );
-  }
-
   Widget _label(String text) => Padding(
         padding: const EdgeInsets.only(bottom: 6, left: 2),
         child: Text(
@@ -1810,10 +1825,25 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
           borderRadius: BorderRadius.circular(8),
         ),
       );
+}
 
-  BoxDecoration _fieldDecoration() => BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      );
+/// 日付欄の自動スラッシュ入力。数字だけ打つと YYYY/MM/DD に整形する
+/// （「/」を手で打たなくてよい）。最大8桁。
+class _SlashDateFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    var digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length > 8) digits = digits.substring(0, 8);
+    final b = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      if (i == 4 || i == 6) b.write('/');
+      b.write(digits[i]);
+    }
+    final s = b.toString();
+    return TextEditingValue(
+      text: s,
+      selection: TextSelection.collapsed(offset: s.length),
+    );
+  }
 }
