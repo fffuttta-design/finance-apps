@@ -571,6 +571,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                         rows: gaichu,
                         showFixedAndCard: false,
                         receiptLabel: '請求書',
+                        teamSortDefault: true,
                         title: null,
                         detailLabel: '制作原価明細',
                         showTopHeader: false),
@@ -599,6 +600,8 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     required String detailLabel,
     // 証憑列/ボタンの呼び名（制作原価タブは「請求書」）。
     String receiptLabel = '領収書',
+    // 制作原価タブは既定を「小カテゴリ昇順→場所降順」の複合順にする。
+    bool teamSortDefault = false,
     // 事業モードは月セレクタ＋締めをタブより上に出すため、本文側では隠す。
     bool showTopHeader = true,
   }) {
@@ -977,6 +980,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 onEditTxn: _edit,
                 accent: accent,
                 receiptLabel: receiptLabel,
+                defaultTeamSort: teamSortDefault,
                 fixedRows: showFixedAndCard
                     ? _fixedTableRows(_month)
                     : const <FixedCostRow>[],

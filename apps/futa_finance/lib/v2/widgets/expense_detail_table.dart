@@ -8,6 +8,15 @@ import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
 
+/// 制作原価のチーム別に小カテゴリ文字色を返す（該当しなければ null）。
+/// YouTube事業=赤 / LINE事業=緑。
+Color? _teamColor(String sub) {
+  final s = sub.trim();
+  if (s == 'YouTube事業') return const Color(0xFFD32F2F); // 赤
+  if (s == 'LINE事業') return const Color(0xFF2E7D32); // 緑
+  return null;
+}
+
 /// 明細テーブルに「実際の取引」と混ぜて並べる固定費（サブスク）の1行。
 ///
 /// 固定費は実取引（Transaction）ではなく毎月の引落予定だが、明細を1件ずつ
@@ -100,6 +109,10 @@ class ExpenseDetailTable extends StatefulWidget {
   /// 証憑列の呼び名（既定「領収書」。制作原価タブでは「請求書」を渡す）。
   final String receiptLabel;
 
+  /// 既定の並びを「小カテゴリ昇順 → 場所降順」にする（制作原価タブ用）。
+  /// ヘッダーをタップして手動ソートするまではこの複合順で表示する。
+  final bool defaultTeamSort;
+
   /// 領収書チェックの切替（保存はここで行う）。showReceiptCheck=true 時は必須。
   final Future<void> Function(core.Transaction t, bool value)? onToggleReceipt;
 
@@ -127,6 +140,7 @@ class ExpenseDetailTable extends StatefulWidget {
     this.emptyHint = '記録はまだありません',
     this.showReceiptCheck = false,
     this.receiptLabel = '領収書',
+    this.defaultTeamSort = false,
     this.onToggleReceipt,
     this.onToggleReviewed,
     this.onToggleReviewedFixed,
@@ -224,6 +238,16 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
         q.isEmpty ? rows : rows.where((r) => r.searchHay.contains(q)).toList();
     if (_payFilter != null) {
       list = list.where((r) => r.payKey == _payFilter).toList();
+    }
+    // 制作原価タブの既定：小カテゴリ（チーム）昇順 → 場所（工程）降順の複合順。
+    // ヘッダーを一度でもタップしたら通常の単一列ソートへ切り替わる。
+    if (widget.defaultTeamSort && !_sortTouched) {
+      list.sort((a, b) {
+        final c = a.subText.compareTo(b.subText); // 小カテゴリ昇順
+        if (c != 0) return c;
+        return b.placeText.compareTo(a.placeText); // 場所降順
+      });
+      return list;
     }
     int cmp;
     switch (_sortCol) {
@@ -1081,6 +1105,9 @@ class _ExpenseRow extends StatelessWidget {
         ? '未分類'
         : major.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
     final subDisplay = sub.isEmpty ? '—' : sub;
+    // 制作原価のチーム別に色分け（YouTube事業=赤 / LINE事業=緑）。
+    final subColor = _teamColor(sub) ??
+        (sub.isEmpty ? V2Colors.textMuted : V2Colors.textSecondary);
     final title = t.description.trim().isNotEmpty
         ? t.description.trim()
         : (sub.isNotEmpty ? sub : (major.isNotEmpty ? major : '未分類'));
@@ -1136,9 +1163,10 @@ class _ExpenseRow extends StatelessWidget {
                   maxLines: 1,
                   style: TextStyle(
                       fontSize: 12,
-                      color: sub.isEmpty
-                          ? V2Colors.textMuted
-                          : V2Colors.textSecondary)),
+                      fontWeight: _teamColor(sub) != null
+                          ? FontWeight.w700
+                          : FontWeight.normal,
+                      color: subColor)),
             ),
             _vGrid(_kHandleW, _kRowH),
             SizedBox(

@@ -103,6 +103,9 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
                         calculateInitialZoom: (document, controller,
                                 alternativeFitScale, coverScale) =>
                             alternativeFitScale,
+                        // マウスホイールだけで拡大率を変更できるようにする
+                        // （null にするとホイール＝スクロールではなくズームになる）。
+                        scrollByMouseWheel: null,
                       ),
                     )
                   : InteractiveViewer(
