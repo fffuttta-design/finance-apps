@@ -1,5 +1,6 @@
 import 'package:finance_core/finance_core.dart' as core;
 
+import 'app_mode.dart';
 import 'subscription_repository.dart';
 import 'transaction_repository.dart';
 
@@ -45,13 +46,20 @@ class FixedCostMaterializer {
     final existingIds = txns.map((t) => t.id).toSet();
     final created = <core.Transaction>[];
 
+    // 生成の下限は「記録開始(_floorYm)」と「現在モードの表示下限(minDate)」の
+    // 遅い方。minDate より前に作ると読み戻し(loadAll)で除外され、存在判定が
+    // 効かず毎回作り直してしまう（＝起動のたびにスナックバーが出る不具合の原因）。
+    final md = AppModeManager.instance.current.minDate;
+    final modeFloor = _ym(md.year, md.month);
+    final floorYm = _floorYm.compareTo(modeFloor) > 0 ? _floorYm : modeFloor;
+
     for (final sub in subs) {
       if (sub.cycle != core.SubscriptionCycle.monthly) continue;
       final bd = sub.billingDay ?? 1;
       final nn = _norm(sub.name);
 
-      var startYm = sub.startYearMonth ?? _floorYm;
-      if (startYm.compareTo(_floorYm) < 0) startYm = _floorYm;
+      var startYm = sub.startYearMonth ?? floorYm;
+      if (startYm.compareTo(floorYm) < 0) startYm = floorYm;
       var y = int.tryParse(startYm.split('-')[0]) ?? now.year;
       var m = int.tryParse(startYm.split('-')[1]) ?? now.month;
 
