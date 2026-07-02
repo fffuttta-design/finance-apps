@@ -1,1 +1,1 @@
-{"version":"1.0.413","buildNumber":"414","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.413/futa-finance-v1.0.413.apk","releaseNotes":"①固定費の明細行に淡いオレンジ背景を復活（実取引化しても固定費が一目で分かる）。②ホーム（PC版）で月を変えるとタブ横断で維持されなかった不具合を修正（ホームがMonthCursorに未連動だった）。"}
+{"version":"1.0.414","buildNumber":"415","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.414/futa-finance-v1.0.414.apk","releaseNotes":"①紙保管チェックで削除ボタンが点滅する挙動を修正。②場所欄のプレースホルダーを削除。③固定費マスタで「領収書の受け取り方（紙／ドライブ／指定なし）」を定義でき、実明細化時にカテゴリ・支払方法とともに反映（紙は自動で保管済みに）。"}

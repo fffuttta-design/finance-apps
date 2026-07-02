@@ -80,19 +80,31 @@ class FixedCostMaterializer {
             txns.any((t) => _isSameFixed(t, y, m, amt, nn));
         if (amt > 0 && !already) {
           final tmpl = _template(txns, nn, y, m);
+          // カテゴリ/支払方法/領収書の受け取り方は固定費マスタの設定を優先。
+          // 会計科目(plMajor)を小カテゴリに、無ければ従来の推定(既存取引)を使う。
+          final masterSub = (sub.plMajor?.trim().isNotEmpty ?? false)
+              ? sub.plMajor!.trim()
+              : ((sub.category?.trim().isNotEmpty ?? false)
+                  ? sub.category!.trim()
+                  : (tmpl?.category.sub ?? ''));
+          final pay = (sub.paymentMethod?.trim().isNotEmpty ?? false)
+              ? sub.paymentMethod!.trim()
+              : (tmpl?.paymentMethod ?? '');
+          final rk = sub.receiptKind; // 'paper' / 'drive' / null
           final tx = core.Transaction(
             id: id,
             date: DateTime(y, m, day),
             type: core.TransactionType.expense,
             category: core.Category(
-              major: tmpl?.category.major ??
-                  (sub.isVariable ? '1.固定費(変動)' : '0.固定費(定額)'),
-              sub: tmpl?.category.sub ?? (sub.plMajor ?? sub.category ?? ''),
+              major: sub.isVariable ? '1.固定費(変動)' : '0.固定費(定額)',
+              sub: masterSub,
             ),
-            paymentMethod: tmpl?.paymentMethod ?? (sub.paymentMethod ?? ''),
+            paymentMethod: pay,
             description: sub.name,
             amount: amt,
-            receiptSaved: false,
+            // 紙で受け取る固定費は最初から「保管済み」として作る。
+            receiptSaved: rk == 'paper',
+            receiptType: (rk == 'paper' || rk == 'drive') ? rk : null,
           );
           await TransactionRepository.instance.add(tx);
           existingIds.add(id);

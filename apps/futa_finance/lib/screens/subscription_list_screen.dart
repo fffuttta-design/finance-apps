@@ -111,6 +111,8 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     String? plMajor = initial?.plMajor;
     String? startYm = initial?.startYearMonth;
     String? endYm = initial?.endYearMonth;
+    // 実明細化したときの領収書の受け取り方（'paper'/'drive'/null）。
+    String? receiptKind = initial?.receiptKind;
 
     // 会計科目（PL科目）候補 = 現モードの大カテゴリ名（番号なし素の名前）。
     final catConfig = await _settings.loadCategories();
@@ -325,6 +327,7 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
               iconUrl: iconUrl,
               category: category,
               plMajor: pl,
+              receiptKind: receiptKind,
               startYearMonth:
                   (startYm == null || startYm!.trim().isEmpty)
                       ? null
@@ -569,6 +572,40 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                               ],
                             ),
                           ],
+                          // 領収書の受け取り方（実明細化した取引に反映）。
+                          const SizedBox(height: 16),
+                          const Text('領収書の受け取り方（実明細化時に反映）',
+                              style: TextStyle(
+                                  fontSize: 12, color: Color(0xFF6B7280))),
+                          const SizedBox(height: 2),
+                          const Text(
+                              '紙＝現物を税理士へ（自動で「保管済み」に）／ドライブ＝電子保存／指定なし',
+                              style: TextStyle(
+                                  fontSize: 11, color: Color(0xFF9CA3AF))),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              ChoiceChip(
+                                label: const Text('🧾 紙で保管'),
+                                selected: receiptKind == 'paper',
+                                onSelected: (sel) => setLocal(
+                                    () => receiptKind = sel ? 'paper' : null),
+                              ),
+                              ChoiceChip(
+                                label: const Text('📄 ドライブ'),
+                                selected: receiptKind == 'drive',
+                                onSelected: (sel) => setLocal(
+                                    () => receiptKind = sel ? 'drive' : null),
+                              ),
+                              ChoiceChip(
+                                label: const Text('指定なし'),
+                                selected: receiptKind == null,
+                                onSelected: (_) =>
+                                    setLocal(() => receiptKind = null),
+                              ),
+                            ],
+                          ),
                           // 計上期間（開始月・終了月）。会計科目の有無に関わらず常に設定可。
                           // 契約の開始/解約を記録し、業績PL計上の範囲を絞る。
                           const SizedBox(height: 16),

@@ -82,6 +82,11 @@ class Subscription {
   /// 締め処理で固定費も1件ずつチェックできるように月別で持つ（未チェックの月は無し）。
   final Map<String, bool> reviewedMonths;
 
+  /// 実明細化したときの領収書の受け取り方。
+  /// 'paper'=紙で保管（現物を税理士へ）/ 'drive'=ドライブ保存 / null=指定なし。
+  /// 'paper' の月次明細は receiptSaved=true・receiptType='paper' で生成する。
+  final String? receiptKind;
+
   const Subscription({
     required this.id,
     required this.name,
@@ -100,6 +105,7 @@ class Subscription {
     this.monthlyActuals = const {},
     this.sortOrder,
     this.reviewedMonths = const {},
+    this.receiptKind,
   });
 
   /// 指定月("YYYY-MM")の表示金額。変動費は未入力なら0、固定費は定額。
@@ -165,6 +171,7 @@ class Subscription {
         'monthlyActuals': monthlyActuals,
         if (sortOrder != null) 'sortOrder': sortOrder,
         if (reviewedMonths.isNotEmpty) 'reviewedMonths': reviewedMonths,
+        if (receiptKind != null) 'receiptKind': receiptKind,
       };
 
   factory Subscription.fromJson(Map<String, dynamic> j) => Subscription(
@@ -198,6 +205,7 @@ class Subscription {
         reviewedMonths: (j['reviewedMonths'] as Map<String, dynamic>?)
                 ?.map((k, v) => MapEntry(k, v == true)) ??
             const {},
+        receiptKind: j['receiptKind'] as String?,
       );
 
   Subscription copyWith({
@@ -221,6 +229,8 @@ class Subscription {
     Map<String, int>? monthlyActuals,
     double? sortOrder,
     Map<String, bool>? reviewedMonths,
+    String? receiptKind,
+    bool clearReceiptKind = false,
   }) =>
       Subscription(
         id: id,
@@ -244,6 +254,8 @@ class Subscription {
         monthlyActuals: monthlyActuals ?? this.monthlyActuals,
         sortOrder: sortOrder ?? this.sortOrder,
         reviewedMonths: reviewedMonths ?? this.reviewedMonths,
+        receiptKind:
+            clearReceiptKind ? null : (receiptKind ?? this.receiptKind),
       );
 }
 

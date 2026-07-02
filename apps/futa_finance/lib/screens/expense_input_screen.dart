@@ -1123,7 +1123,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               TextFormField(
                 controller: _storeCtrl,
                 focusNode: _storeFocus,
-                decoration: _inputDecoration(hint: '例: ファミリーマート / Amazon'),
+                decoration: _inputDecoration(),
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? '場所を入力してください' : null,
                 onChanged: (_) {

@@ -34,19 +34,17 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
   /// 紙のレシートで保管済み（現物を税理士へ）フラグの切替。
   /// receiptSaved（対応済みチェック）＝紙でもドライブでも共通、種類は receiptType に記録。
   Future<void> _setPaperKept(bool v) async {
-    setState(() => _busy = true);
+    // 編集/削除ボタンを無効化(_busy)しない＝チェック切替で削除ボタンが点滅しない。
     final updated =
         _cur.copyWith(receiptSaved: v, receiptType: v ? 'paper' : null);
+    setState(() => _cur = updated); // まず即反映
     try {
       await TransactionRepository.instance.update(updated);
-      if (mounted) setState(() => _cur = updated);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('保存に失敗しました: $e')));
       }
-    } finally {
-      if (mounted) setState(() => _busy = false);
     }
   }
 
