@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
-import 'package:url_launcher/url_launcher.dart';
 
-import '../data/drive_receipt_service.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 import '../utils/modal_input.dart';
 import '../widgets/centered_body.dart';
 import 'expense_input_screen.dart';
 import 'income_input_screen.dart';
+import 'receipt_viewer_screen.dart';
 import 'transfer_input_screen.dart';
 
 /// 取引の詳細画面（フル画面）。
@@ -191,22 +190,22 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () async {
-                  // 領収書はDriveの閲覧リンクを外部（ブラウザ/Driveアプリ）で開く。
-                  // 自前ビューアはアカウント違い等で404になりがちなため、
-                  // ログイン済みのDriveセッションに任せる。
-                  final raw = t.receiptUrl!.trim();
-                  final fileId = DriveReceiptService.fileIdFromUrl(raw);
-                  final open = fileId != null
-                      ? 'https://drive.google.com/file/d/$fileId/view'
-                      : raw;
-                  final uri = Uri.tryParse(open);
-                  if (uri != null) {
-                    await launchUrl(uri,
-                        mode: LaunchMode.externalApplication);
-                  }
+                  // 所有者本人の権限(drive.readonly)でDriveから取得し、アプリ内表示。
+                  // 取得失敗時はビューア内から外部起動にフォールバックする。
+                  final url = t.receiptUrl;
+                  if (url == null || url.trim().isEmpty) return;
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ReceiptViewerScreen(
+                        driveUrl: url.trim(),
+                        title: receiptWord,
+                      ),
+                    ),
+                  );
                 },
                 icon: const Icon(Icons.receipt_long, size: 18),
-                label: Text('${receiptWord}を見る'),
+                label: Text('$receiptWordを見る'),
               ),
             ),
           ],

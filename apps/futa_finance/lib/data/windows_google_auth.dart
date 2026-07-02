@@ -43,6 +43,9 @@ class WindowsGoogleAuth {
     'email',
     'profile',
     'https://www.googleapis.com/auth/drive.file',
+    // 証憑（請求書/領収書）は BOT(contact@) が作成したファイル。所有者本人として
+    // 読み取るために drive.readonly を追加（アプリ内ビューアで表示するため）。
+    'https://www.googleapis.com/auth/drive.readonly',
   ];
 
   static const _kRefreshToken = 'futa.win.google.refresh_token';

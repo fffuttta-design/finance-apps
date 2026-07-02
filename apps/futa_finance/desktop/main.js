@@ -31,6 +31,8 @@ const SCOPES = [
   'email',
   'profile',
   'https://www.googleapis.com/auth/drive.file',
+  // 証憑（請求書/領収書）を所有者本人として読み取り、アプリ内ビューアで表示するため。
+  'https://www.googleapis.com/auth/drive.readonly',
 ];
 const AUTH_EP = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_EP = 'https://oauth2.googleapis.com/token';

@@ -20,6 +20,8 @@ class DriveReceiptService {
   static final DriveReceiptService instance = DriveReceiptService._();
 
   static const _scope = 'https://www.googleapis.com/auth/drive.file';
+  // 証憑（BOT=contact@が作成したファイル）を所有者本人として読み取るための追加権限。
+  static const _scopeReadonly = 'https://www.googleapis.com/auth/drive.readonly';
   static const _rootName = 'FutaFinanceレシート';
   static const _rootIdKey = 'futa.drive.receipt_root_id';
 
@@ -220,7 +222,9 @@ class DriveReceiptService {
     if (kIsWeb) {
       // Web: Firebase Auth のポップアップに drive.file スコープを足して
       // OAuth アクセストークンを取得する。
-      final provider = GoogleAuthProvider()..addScope(_scope);
+      final provider = GoogleAuthProvider()
+        ..addScope(_scope)
+        ..addScope(_scopeReadonly);
       final cred = await FirebaseAuth.instance.signInWithPopup(provider);
       final oauth = cred.credential;
       _tokenCache = oauth is OAuthCredential ? oauth.accessToken : null;
@@ -230,9 +234,10 @@ class DriveReceiptService {
       // スコープを認可（初回は同意画面、以降はサイレント）。
       final client = GoogleSignIn.instance.authorizationClient;
       // 強制リフレッシュ時はキャッシュ済み(=期限切れの可能性)を使わず取り直す。
-      var authz =
-          forceRefresh ? null : await client.authorizationForScopes([_scope]);
-      authz ??= await client.authorizeScopes([_scope]);
+      var authz = forceRefresh
+          ? null
+          : await client.authorizationForScopes([_scope, _scopeReadonly]);
+      authz ??= await client.authorizeScopes([_scope, _scopeReadonly]);
       _tokenCache = authz.accessToken;
       return _tokenCache;
     }
