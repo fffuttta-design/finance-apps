@@ -162,7 +162,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   // 同じ件名には同じ場所を提案し、表記ゆれを防ぐために使う。
   Map<String, Map<String, int>> _descToStores = const {};
   final _receiptUrlCtrl = TextEditingController();
-  final _dateTextCtrl = TextEditingController(); // 日付の直接入力（例 2026/7/1）
+  final _dateTextCtrl =
+      NoComposingUnderlineController(); // 日付の直接入力（例 2026/7/1）
   final _amountFocus = FocusNode();
   bool _saving = false;
 
@@ -516,58 +517,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         .toList()
       ..sort((a, b) => score[b]!.compareTo(score[a]!));
     return list.take(6).toList();
-  }
-
-  /// 場所サジェストを選んだとき：場所を確定（表記をそのまま再利用）。
-  void _applyStoreSuggestion(String text) {
-    _storeCtrl.text = text;
-    _storeCtrl.selection = TextSelection.collapsed(offset: text.length);
-    setState(() {});
-  }
-
-  /// 場所のサジェストリスト（内容の直下・場所欄フォーカス中に出す）。
-  Widget _storeSuggestionList() {
-    final suggestions = _storeSuggestions();
-    if (suggestions.isEmpty) return const SizedBox.shrink();
-    return Container(
-      margin: const EdgeInsets.only(top: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Column(
-        children: [
-          for (int i = 0; i < suggestions.length; i++) ...[
-            if (i > 0) const Divider(height: 1, color: Color(0xFFF1F5F9)),
-            InkWell(
-              onTap: () => _applyStoreSuggestion(suggestions[i]),
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                child: Row(
-                  children: [
-                    const Icon(Icons.place_outlined,
-                        size: 16, color: Color(0xFF9CA3AF)),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(suggestions[i],
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 14, color: Color(0xFF111827))),
-                    ),
-                    const Icon(Icons.north_west,
-                        size: 14, color: Color(0xFFCBD5E1)),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
   }
 
   /// 指定カテゴリの登録項目リスト（並び順そのまま、先頭が最上位）。
@@ -1120,24 +1069,38 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               // 場所（必須）。店舗名や購入元。明細タブの「場所」列に出る。
               // 過去履歴からサジェスト（同じ件名で使った場所を優先）。表記ゆれ防止。
               _label('場所（必須）'),
-              TextFormField(
-                controller: _storeCtrl,
-                focusNode: _storeFocus,
-                decoration: _inputDecoration(),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? '場所を入力してください' : null,
-                onChanged: (_) {
-                  if (_storeCtrl.value.composing.isValid) return;
-                  setState(() {});
-                },
-              ),
-              // フォーカス中だけ候補リストを表示。
-              AnimatedBuilder(
-                animation: _storeFocus,
-                builder: (context, _) => _storeFocus.hasFocus
-                    ? _storeSuggestionList()
-                    : const SizedBox.shrink(),
-              ),
+              // RawAutocomplete で「↑↓キー選択・Enter/クリックで確定」を実現。
+              // （自前の候補リストは、クリック時にフォーカスが外れて選べない・
+              //   キー操作できない問題があったため置き換え）。
+              LayoutBuilder(builder: (ctx, cons) {
+                return RawAutocomplete<String>(
+                  textEditingController: _storeCtrl,
+                  focusNode: _storeFocus,
+                  optionsBuilder: (_) => _storeSuggestions(),
+                  onSelected: (_) => setState(() {}),
+                  fieldViewBuilder:
+                      (context, controller, focusNode, onFieldSubmitted) {
+                    return TextFormField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      decoration: _inputDecoration(),
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? '場所を入力してください'
+                          : null,
+                      onChanged: (_) {
+                        if (_storeCtrl.value.composing.isValid) return;
+                        setState(() {});
+                      },
+                    );
+                  },
+                  optionsViewBuilder: (context, onSelected, options) =>
+                      _StoreOptionsView(
+                    width: cons.maxWidth,
+                    options: options.toList(),
+                    onSelected: onSelected,
+                  ),
+                );
+              }),
               const SizedBox(height: 16),
               // 金額をヒーローとして大きく表示。
               _heroAmount(),
@@ -1158,14 +1121,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                     tooltip: 'カレンダーから選ぶ',
                     onPressed: _pickDate,
                   ),
-                  suffixIcon: Padding(
-                    padding: const EdgeInsets.only(right: 14),
-                    child: Text('（${weekdayKanji(_date)}）',
-                        style: const TextStyle(
-                            fontSize: 14, color: Color(0xFF6B7280))),
-                  ),
-                  suffixIconConstraints:
-                      const BoxConstraints(minWidth: 0, minHeight: 0),
                   hintText: '数字だけでOK（例 20260701）',
                   hintStyle:
                       const TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
@@ -1833,7 +1788,16 @@ class _SlashDateFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
       TextEditingValue oldValue, TextEditingValue newValue) {
-    var digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    // 全角数字（０-９）を打っても半角に変換してから整形する。
+    final half = StringBuffer();
+    for (final r in newValue.text.runes) {
+      if (r >= 0xFF10 && r <= 0xFF19) {
+        half.writeCharCode(r - 0xFF10 + 0x30);
+      } else {
+        half.writeCharCode(r);
+      }
+    }
+    var digits = half.toString().replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.length > 8) digits = digits.substring(0, 8);
     final b = StringBuffer();
     for (var i = 0; i < digits.length; i++) {
@@ -1844,6 +1808,81 @@ class _SlashDateFormatter extends TextInputFormatter {
     return TextEditingValue(
       text: s,
       selection: TextSelection.collapsed(offset: s.length),
+    );
+  }
+}
+
+/// 場所サジェストのフロート表示（RawAutocomplete の optionsView）。
+/// ↑↓キーの選択中項目をハイライトし、クリック/Enter で確定する。
+class _StoreOptionsView extends StatelessWidget {
+  const _StoreOptionsView({
+    required this.width,
+    required this.options,
+    required this.onSelected,
+  });
+
+  final double width;
+  final List<String> options;
+  final AutocompleteOnSelected<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final highlight = AutocompleteHighlightedOption.of(context);
+    return Align(
+      alignment: Alignment.topLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Material(
+          elevation: 4,
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            width: width,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 260),
+              child: ListView.separated(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: options.length,
+                separatorBuilder: (_, _) =>
+                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                itemBuilder: (context, i) {
+                  final selected = i == highlight;
+                  return InkWell(
+                    onTap: () => onSelected(options[i]),
+                    child: Container(
+                      color: selected ? const Color(0xFFEEF2FF) : Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 11),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.place_outlined,
+                              size: 16, color: Color(0xFF9CA3AF)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(options[i],
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 14, color: Color(0xFF111827))),
+                          ),
+                          Icon(
+                              selected
+                                  ? Icons.keyboard_return
+                                  : Icons.north_west,
+                              size: 14,
+                              color: selected
+                                  ? const Color(0xFF6366F1)
+                                  : const Color(0xFFCBD5E1)),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

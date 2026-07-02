@@ -279,21 +279,56 @@ class FirestoreTransactionRepository implements TransactionRepository {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
+  /// 書き込み直後に呼ぶ側が `loadAll()` すると、snapshot リスナー到着前は
+  /// 古いキャッシュが返り「変更が一瞬戻る（チェック・並び替えが元に戻る）」
+  /// 不具合になる。書き込みと同時にメモリキャッシュへも即反映し、リスナー
+  /// 購読者にも即通知することで、これを防ぐ（楽観的更新）。
+  void _cacheUpsert(Transaction t) {
+    final mk = _modeKey;
+    final cur = _cache[mk];
+    if (cur == null) return; // 未構築なら次の loadAll/snapshot に任せる
+    if (t.date.isBefore(_minDate(mk))) {
+      _cacheRemove(t.id); // カットオフ前は表示対象外
+      return;
+    }
+    final list = List<Transaction>.from(cur);
+    final idx = list.indexWhere((x) => x.id == t.id);
+    if (idx >= 0) {
+      list[idx] = t;
+    } else {
+      list.add(t);
+    }
+    _cache[mk] = list;
+    _controller.add(List<Transaction>.from(list));
+  }
+
+  void _cacheRemove(String id) {
+    final mk = _modeKey;
+    final cur = _cache[mk];
+    if (cur == null) return;
+    final list = List<Transaction>.from(cur)..removeWhere((x) => x.id == id);
+    _cache[mk] = list;
+    _controller.add(List<Transaction>.from(list));
+  }
+
   @override
   Future<void> add(Transaction t) async {
     final toSave = t.createdAt == null
         ? t.copyWith(createdAt: DateTime.now(), forceCreatedAt: true)
         : t;
+    _cacheUpsert(toSave);
     await _coll.doc(toSave.id).set(_txDoc(toSave));
   }
 
   @override
   Future<void> update(Transaction t) async {
+    _cacheUpsert(t);
     await _coll.doc(t.id).set(_txDoc(t));
   }
 
   @override
   Future<void> delete(String id) async {
+    _cacheRemove(id);
     await _coll.doc(id).delete();
   }
 

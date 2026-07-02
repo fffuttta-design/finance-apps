@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:finance_core/finance_core.dart' as core;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -249,17 +250,25 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
     int cmp;
     switch (_sortCol) {
       case _SortCol.date:
-        // 手動並び順(sortOrder)を最優先＝月内で自由に並べた順を保持。
-        // 未設定(null)の行は日付降順（新しい順）で、手動順の行より上に置く。
+        // 純粋な日付順（手動並び順に左右されない）。既定は降順（新しい順）。
+        list.sort((a, b) {
+          final c = a.date.compareTo(b.date);
+          if (c != 0) return _asc ? c : -c;
+          // 同日はカスタム順→内容で安定化。
+          final ao = a.manualOrder, bo = b.manualOrder;
+          if (ao != null && bo != null && ao != bo) return ao.compareTo(bo);
+          return a.contentText.compareTo(b.contentText);
+        });
+        return list;
+      case _SortCol.custom:
+        // ユーザーが手で並べた順（sortOrder）。未設定(null)の行は日付降順で
+        // 手動順の行より上（新規＝一番上）に置く。
         list.sort((a, b) {
           final ao = a.manualOrder, bo = b.manualOrder;
-          if (ao == null && bo == null) {
-            final c = a.date.compareTo(b.date);
-            return _asc ? c : -c; // 既定は降順（新しい順）
-          }
-          if (ao == null) return -1; // 未設定（新規）は上へ
+          if (ao == null && bo == null) return -a.date.compareTo(b.date);
+          if (ao == null) return -1;
           if (bo == null) return 1;
-          return ao.compareTo(bo); // 手動順（上→下）
+          return ao.compareTo(bo);
         });
         return list;
       case _SortCol.amount:
@@ -332,12 +341,31 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                 style: V2Typography.caption
                     .copyWith(color: V2Colors.textSecondary)),
             const Spacer(),
-            Text(
-                widget.onReorderDay != null
-                    ? '行の右端をドラッグで並び替え'
-                    : 'ヘッダーをタップで並び替え',
-                style: V2Typography.micro
-                    .copyWith(color: V2Colors.textMuted)),
+            if (widget.onReorderDay != null) ...[
+              if (_sortCol == _SortCol.custom)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Text('長押しでドラッグ並び替え',
+                      style: V2Typography.micro
+                          .copyWith(color: V2Colors.textMuted)),
+                ),
+              _CustomOrderToggle(
+                active: _sortCol == _SortCol.custom,
+                accent: widget.accent,
+                onTap: () => setState(() {
+                  _sortTouched = true;
+                  if (_sortCol == _SortCol.custom) {
+                    _sortCol = _SortCol.date;
+                    _asc = false; // 日付・降順（新しい順）に戻す
+                  } else {
+                    _sortCol = _SortCol.custom;
+                  }
+                }),
+              ),
+            ] else
+              Text('ヘッダーをタップで並び替え',
+                  style: V2Typography.micro
+                      .copyWith(color: V2Colors.textMuted)),
           ],
         ),
         const SizedBox(height: V2Spacing.sm),
@@ -535,8 +563,9 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
   /// **行を長押し（PCは押し続け）でドラッグ**して並び替える（タップは詳細を開く）。
   /// 列ソート中など不可のときは通常の縦積み。
   Widget _reorderableRows(List<_Row> rows, Widget Function(_Row r) build) {
+    // 並び替えは「カスタム順」モードのときだけ有効（保存先＝各行の sortOrder）。
     final canReorder =
-        widget.onReorderDay != null && _sortCol == _SortCol.date;
+        widget.onReorderDay != null && _sortCol == _SortCol.custom;
     if (!canReorder) {
       return Column(
         children: [
@@ -553,7 +582,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
       buildDefaultDragHandles: false, // 見えるハンドルは出さない
       itemCount: rows.length,
       onReorder: (oldIndex, newIndex) => _onReorder(oldIndex, newIndex, rows),
-      itemBuilder: (ctx, i) => ReorderableDelayedDragStartListener(
+      itemBuilder: (ctx, i) => _FastReorderListener(
         key: ValueKey(rows[i].keyId),
         index: i,
         child: Column(
@@ -578,6 +607,57 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
     ]);
   }
 
+}
+
+/// 「カスタム順」モードの切替チップ。ON のとき行を長押しドラッグで並び替えられ、
+/// その順番（各行の sortOrder）が保存される。
+class _CustomOrderToggle extends StatelessWidget {
+  const _CustomOrderToggle({
+    required this.active,
+    required this.accent,
+    required this.onTap,
+  });
+
+  final bool active;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: active
+          ? 'カスタム順：ON（長押しで並び替え・自動保存）'
+          : 'カスタム順に切り替え（自由に並び替えて保存）',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: active ? accent.withValues(alpha: 0.12) : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+                color: active ? accent : V2Colors.border,
+                width: active ? 1.4 : 1),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.swap_vert,
+                  size: 15,
+                  color: active ? accent : V2Colors.textSecondary),
+              const SizedBox(width: 4),
+              Text('カスタム順',
+                  style: V2Typography.micro.copyWith(
+                    color: active ? accent : V2Colors.textSecondary,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+                  )),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// 全角数字（０-９）と全角カンマ／円記号を半角へ正規化する。
@@ -628,8 +708,27 @@ IconData _paymentIcon(String method) {
   return Icons.payment_outlined;
 }
 
-/// 並び替えの対象列。
-enum _SortCol { date, major, sub, content, place, payment, amount }
+/// 既定の長押し(500ms)より少し早く(250ms)ドラッグ開始する並び替えリスナー。
+/// タップは詳細を開くので、素早い並び替えと両立させる。
+class _FastReorderListener extends ReorderableDelayedDragStartListener {
+  const _FastReorderListener({
+    super.key,
+    required super.child,
+    required super.index,
+  });
+
+  @override
+  MultiDragGestureRecognizer createRecognizer() {
+    return DelayedMultiDragGestureRecognizer(
+      delay: const Duration(milliseconds: 250),
+      debugOwner: this,
+    );
+  }
+}
+
+/// 並び替えの対象列。`custom` は列ではなく「ユーザーが手で並べた順（カスタム順）」
+/// を表す特別なモード。ヘッダー列には出さず、専用トグルで切り替える。
+enum _SortCol { date, major, sub, content, place, payment, amount, custom }
 
 /// 取引行 or 固定費行を統一して扱う内部ラッパ（並び替え・検索を共通化）。
 class _Row {
