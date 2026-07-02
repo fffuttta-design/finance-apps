@@ -1,1 +1,1 @@
-{"version":"1.0.417","buildNumber":"418","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.417/futa-finance-v1.0.417.apk","releaseNotes":"固定費の自動実明細化がminDate前を毎回作り直す不具合を修正（起動のたびに『固定費を1件、実明細として記録しました』が出ていた原因）。"}
+{"version":"1.0.418","buildNumber":"419","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.418/futa-finance-v1.0.418.apk","releaseNotes":"明細のチェック/並び替えが元に戻る不具合を根治。カスタム並び替えモード追加・日付順の純粋化・長押し高速化。場所サジェストをキー操作/クリックで選べるように。日付欄の全角→半角変換・下線除去・曜日撤去。"}
