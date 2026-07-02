@@ -1,1 +1,1 @@
-{"version":"1.0.418","buildNumber":"419","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.418/futa-finance-v1.0.418.apk","releaseNotes":"明細のチェック/並び替えが元に戻る不具合を根治。カスタム並び替えモード追加・日付順の純粋化・長押し高速化。場所サジェストをキー操作/クリックで選べるように。日付欄の全角→半角変換・下線除去・曜日撤去。"}
+{"version":"1.0.419","buildNumber":"420","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.419/futa-finance-v1.0.419.apk","releaseNotes":"現金/銀行/電子マネーの通帳画面にもカスタム順（長押し並び替え）を追加。カスタム順中は残高列を隠して並び替え・保存します。"}
