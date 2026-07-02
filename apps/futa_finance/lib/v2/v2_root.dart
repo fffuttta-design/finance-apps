@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../data/app_mode.dart';
 import '../data/card_settlement_service.dart';
 import '../data/data_migration_service.dart';
+import '../data/fixed_cost_materializer.dart';
 import '../data/receipt_ocr_cloud.dart';
 import '../data/receipt_ocr_flow.dart';
 import '../data/repository_provider.dart';
@@ -65,7 +66,19 @@ class _V2RootState extends State<V2Root>
     Future.delayed(const Duration(milliseconds: 1200), () {
       RepositoryProvider.prefetchOtherMode();
       _runCardSettlement(); // クレカ自動引落（引落日を過ぎた分を生成）
+      _runFixedCostMaterialize(); // 固定費：請求日を過ぎた分を実明細化
     });
+  }
+
+  /// 固定費（サブスク）の請求日を過ぎた月を実明細化し、作成できたら知らせる。
+  Future<void> _runFixedCostMaterialize() async {
+    final created = await FixedCostMaterializer.runOncePerMode(
+        AppModeManager.instance.current.name);
+    if (!mounted || created.isEmpty) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('🧾 固定費を${created.length}件、実明細として記録しました'),
+      duration: const Duration(seconds: 4),
+    ));
   }
 
   /// クレカの自動引き落としを生成し、作成できたらスナックバーで知らせる。
@@ -103,6 +116,7 @@ class _V2RootState extends State<V2Root>
     // 事業モードへ切替時にも移行を試行（個人で起動→事業に切替えた場合に対応）。
     DataMigrationService.migratePLCategoriesIfNeeded();
     _runCardSettlement(); // 切替先モードの自動引落も生成（モード別に1回）
+    _runFixedCostMaterialize(); // 切替先モードの固定費も実明細化（モード別に1回）
   }
 
   /// PWA（Web）のタイトルバー色を現モードに合わせて切替える。

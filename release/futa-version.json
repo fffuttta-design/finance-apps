@@ -1,1 +1,1 @@
-{"version":"1.0.409","buildNumber":"410","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.409/futa-finance-v1.0.409.apk","releaseNotes":"固定費の明細行を従来どおりオレンジ系の色分けに（実取引化しても見た目を維持）。領収書欄は他の明細と同じチェックボックスのまま。"}
+{"version":"1.0.410","buildNumber":"411","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.410/futa-finance-v1.0.410.apk","releaseNotes":"固定費を自動で実明細化：請求日を過ぎた固定費は起動時に自動で実取引（明細）になり、他の経費と同じくタップで詳細・領収書チェック（電子/紙）が可能に。予定行や二重計上は出ません。"}
