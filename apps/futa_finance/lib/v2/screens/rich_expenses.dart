@@ -120,11 +120,64 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     MonthCursor.instance.month = _month; // タブ横断で共有
   }
 
+  /// 名前の正規化（実取引との照合用）。
+  String _normName(String s) =>
+      s.toLowerCase().replaceAll(RegExp(r'[（）()【】\[\]・:：\s　]'), '');
+
+  /// その月に「実取引が存在する」固定費サブスクのID集合。
+  /// 実取引があるサブスクは、予定行を出さず・二重計上もしない（実取引を採用）。
+  /// 照合＝同月の支出取引を、①名前一致 ②金額一致 の順で1対1に割り当てる。
+  Set<String> _matchedSubIds(DateTime m) {
+    final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
+    final txns = _transactions
+        .where((t) =>
+            t.type == core.TransactionType.expense &&
+            t.date.year == m.year &&
+            t.date.month == m.month)
+        .toList();
+    final claimed = <String>{};
+    final matched = <String>{};
+    for (final sub in _subs) {
+      final exp = sub.isVariable ? sub.monthlyActuals[ym] : sub.amount;
+      final nname = _normName(sub.name);
+      core.Transaction? hit;
+      if (nname.isNotEmpty) {
+        for (final t in txns) {
+          if (claimed.contains(t.id)) continue;
+          final nd = _normName(t.description);
+          if (nd.isNotEmpty && (nd.contains(nname) || nname.contains(nd))) {
+            hit = t;
+            break;
+          }
+        }
+      }
+      if (hit == null && exp != null && exp > 0) {
+        for (final t in txns) {
+          if (claimed.contains(t.id)) continue;
+          if (t.amount == exp) {
+            hit = t;
+            break;
+          }
+        }
+      }
+      if (hit != null) {
+        claimed.add(hit.id);
+        matched.add(sub.id);
+      }
+    }
+    return matched;
+  }
+
   int _subsOf(DateTime m) {
     final now = DateTime.now();
     final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
-    return _subs.fold<int>(0, (s, sub) => s + sub.plAmountForMonth(ym, curYm));
+    final matched = _matchedSubIds(m);
+    return _subs.fold<int>(
+        0,
+        (s, sub) => matched.contains(sub.id)
+            ? s
+            : s + sub.plAmountForMonth(ym, curYm));
   }
 
   /// 指定月に計上される固定費（サブスク）の明細（名前・金額・アイコン）。金額降順。
@@ -193,7 +246,10 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
       int? billingDay,
       bool pending
     })>[];
+    final matched = _matchedSubIds(m);
     for (final sub in _subs) {
+      // 実取引がある固定費は予定行を出さない（実取引を採用）。
+      if (matched.contains(sub.id)) continue;
       final amt = sub.plAmountForMonth(ym, curYm);
       // 変動費で対象月だが未入力＝「入力待ち」として出す。
       final pending = sub.isVariable &&
@@ -267,7 +323,10 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
     final daysInMonth = DateTime(m.year, m.month + 1, 0).day;
     final rows = <FixedCostRow>[];
+    final matched = _matchedSubIds(m);
     for (final sub in _subs) {
+      // 実取引がある固定費は予定行を出さない（実取引を採用）。
+      if (matched.contains(sub.id)) continue;
       final amt = sub.plAmountForMonth(ym, curYm);
       // 変動費で対象月だが未入力＝「入力待ち」として明細にも出す。
       final pending = sub.isVariable &&

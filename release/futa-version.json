@@ -1,1 +1,1 @@
-{"version":"1.0.406","buildNumber":"407","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.406/futa-finance-v1.0.406.apk","releaseNotes":"証憑ビューアで拡大中、マウスカーソルを手の形にして「ドラッグで動かせる」ことが分かるように変更。"}
+{"version":"1.0.407","buildNumber":"408","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.407/futa-finance-v1.0.407.apk","releaseNotes":"固定費：同じ月に実取引がある固定費は「予定行」を出さず、経費合計への二重計上もしないように修正（実取引を採用）。重複表示と金額の膨らみを解消。"}
