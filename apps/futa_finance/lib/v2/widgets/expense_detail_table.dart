@@ -674,27 +674,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
       padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
       child: Row(
         children: [
-          if (canReview)
-            SizedBox(
-              width: 30,
-              child: Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: Checkbox(
-                    value: reviewed,
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    activeColor: const Color(0xFF6B7280),
-                    onChanged: (v) => isFixed
-                        ? widget.onToggleReviewedFixed!(r.fx!, v ?? false)
-                        : widget.onToggleReviewed!(r.txn!, v ?? false),
-                  ),
-                ),
-              ),
-            )
-          else
-            const SizedBox(width: 6),
+          const SizedBox(width: 6),
           if (isFixed) ...[
             const Icon(Icons.event_repeat, size: 13, color: _kFixedAccent),
             const SizedBox(width: 4),
@@ -719,6 +699,26 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                     fontFeatures: V2Typography.tabularNums)),
           ),
           const SizedBox(width: 6),
+          // 確認チェックは通常明細と同じく右側に置く（並び替え時も位置を揃える）。
+          if (canReview)
+            SizedBox(
+              width: 30,
+              child: Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Checkbox(
+                    value: reviewed,
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    activeColor: const Color(0xFF6B7280),
+                    onChanged: (v) => isFixed
+                        ? widget.onToggleReviewedFixed!(r.fx!, v ?? false)
+                        : widget.onToggleReviewed!(r.txn!, v ?? false),
+                  ),
+                ),
+              ),
+            ),
           IconButton(
             visualDensity: VisualDensity.compact,
             iconSize: 22,
