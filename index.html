@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="/finance-apps/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <!-- ノートPC (1366×768 や DPI 150% 環境) で Chrome ズーム (Ctrl + / Ctrl -) を効かせる -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=10.0, user-scalable=yes">
+  <meta name="description" content="FutaFinance - 事業用財務管理アプリ">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="ふたファイナンス">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <!-- PWA タイトルバー色（既定=事業のグレー。個人モードでは実行時にオレンジへ動的変更） -->
+  <meta name="theme-color" content="#3F3F46">
+
+  <title>ふたファイナンス</title>
+  <link rel="manifest" href="manifest.json">
+</head>
+<body style="margin:0">
+  <!-- 起動スプラッシュ: Flutter の初回フレーム描画まで真っ白にならないよう表示。
+       flutter-first-frame イベントでフェードアウトして除去する。 -->
+  <style>
+    #ff-splash{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;
+      justify-content:center;background:#F7F8FA;transition:opacity .35s ease;
+      font-family:'Segoe UI','Hiragino Kaku Gothic ProN','Meiryo',sans-serif}
+    #ff-splash img{width:72px;height:72px;border-radius:16px;
+      box-shadow:0 6px 20px rgba(26,35,126,.18)}
+    #ff-splash .ff-title{margin-top:14px;font-size:17px;font-weight:700;
+      color:#1A237E;letter-spacing:.5px}
+    #ff-splash .ff-spin{width:26px;height:26px;margin:16px auto 0;
+      border:3px solid #C5CAE9;border-top-color:#1A237E;border-radius:50%;
+      animation:ff-rot .8s linear infinite}
+    #ff-splash .ff-sub{margin-top:10px;font-size:12px;color:#6B7280}
+    @keyframes ff-rot{to{transform:rotate(360deg)}}
+  </style>
+  <div id="ff-splash">
+    <div style="text-align:center">
+      <img src="icons/Icon-512.png" alt="FutaFinance">
+      <div class="ff-title">FutaFinance</div>
+      <div class="ff-spin"></div>
+      <div class="ff-sub">起動しています…</div>
+    </div>
+  </div>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var s = document.getElementById('ff-splash');
+      if (!s) return;
+      s.style.opacity = '0';
+      setTimeout(function () { if (s.parentNode) s.parentNode.removeChild(s); }, 400);
+    });
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
