@@ -209,7 +209,7 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _editReceipt,
                   icon: const Icon(Icons.edit_outlined, size: 18),
-                  label: const Text('編集（まとめて）'),
+                  label: const Text('編集'),
                 ),
               ),
               const SizedBox(width: 10),
