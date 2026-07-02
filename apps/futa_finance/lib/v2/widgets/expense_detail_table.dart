@@ -169,9 +169,6 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
   /// 決済手段の絞り込み（null = すべて表示）。
   String? _payFilter;
 
-  /// 手で並び替えモード（ON のとき、同じ日付内をドラッグ順で並び替える簡易表示）。
-  bool _reorderMode = false;
-
   /// ヘッダークリック：同じ列なら昇順/降順をトグル、別列なら列を切替（既定向き）。
   void _onSort(_SortCol col) {
     setState(() {
@@ -252,18 +249,18 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
     int cmp;
     switch (_sortCol) {
       case _SortCol.date:
-        // 日付（日単位）で並べ、同じ日の中は手動並び順（sortOrder）を保持。
-        // 昇順/降順は「日」にだけ効かせ、日内の手動順は常に上→下で一定にする。
+        // 手動並び順(sortOrder)を最優先＝月内で自由に並べた順を保持。
+        // 未設定(null)の行は日付降順（新しい順）で、手動順の行より上に置く。
         list.sort((a, b) {
-          final da = DateTime(a.date.year, a.date.month, a.date.day);
-          final db = DateTime(b.date.year, b.date.month, b.date.day);
-          final c = da.compareTo(db);
-          if (c != 0) return _asc ? c : -c;
-          final oc = a.orderKey.compareTo(b.orderKey);
-          if (oc != 0) return oc;
-          return a.date.compareTo(b.date); // 未設定同士は時刻で安定化
+          final ao = a.manualOrder, bo = b.manualOrder;
+          if (ao == null && bo == null) {
+            final c = a.date.compareTo(b.date);
+            return _asc ? c : -c; // 既定は降順（新しい順）
+          }
+          if (ao == null) return -1; // 未設定（新規）は上へ
+          if (bo == null) return 1;
+          return ao.compareTo(bo); // 手動順（上→下）
         });
-        // 日付列は上で方向まで確定済み → 末尾の一括反転はしない。
         return list;
       case _SortCol.amount:
         list.sort((a, b) => a.amount.compareTo(b.amount));
@@ -335,22 +332,15 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                 style: V2Typography.caption
                     .copyWith(color: V2Colors.textSecondary)),
             const Spacer(),
-            if (widget.onReorderDay != null)
-              _ReorderToggle(
-                on: _reorderMode,
-                accent: widget.accent,
-                onTap: () => setState(() => _reorderMode = !_reorderMode),
-              )
-            else
-              Text('ヘッダーをタップで並び替え',
-                  style: V2Typography.micro
-                      .copyWith(color: V2Colors.textMuted)),
+            Text(
+                widget.onReorderDay != null
+                    ? '行の右端をドラッグで並び替え'
+                    : 'ヘッダーをタップで並び替え',
+                style: V2Typography.micro
+                    .copyWith(color: V2Colors.textMuted)),
           ],
         ),
         const SizedBox(height: V2Spacing.sm),
-        if (_reorderMode) ...[
-          _buildReorderView(),
-        ] else ...[
         TextField(
           controller: _searchCtrl,
           onChanged: (v) => setState(() => _query = v),
@@ -451,27 +441,26 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                       accent: widget.accent,
                       touched: _sortTouched,
                     ),
-                    for (final r in detailRows) ...[
-                      const Divider(height: 1, color: V2Colors.divider),
-                      if (r.isFixed)
-                        _NarrowFixedRow(
-                          f: r.fx!,
-                          onTap: () => widget.onEditFixed?.call(r.fx!),
-                          showReceipt: widget.showReceiptCheck,
-                          showReview:
-                              widget.onToggleReviewedFixed != null,
-                          onToggleReviewed: widget.onToggleReviewedFixed,
-                        )
-                      else
-                        _NarrowRow(
-                          t: r.txn!,
-                          onTap: () => widget.onEditTxn(r.txn!),
-                          showReceipt: widget.showReceiptCheck,
-                          onToggleReceipt: widget.onToggleReceipt,
-                          showReview: widget.onToggleReviewed != null,
-                          onToggleReviewed: widget.onToggleReviewed,
-                        ),
-                    ],
+                    _reorderableRows(
+                      detailRows,
+                      (r) => r.isFixed
+                          ? _NarrowFixedRow(
+                              f: r.fx!,
+                              onTap: () => widget.onEditFixed?.call(r.fx!),
+                              showReceipt: widget.showReceiptCheck,
+                              showReview:
+                                  widget.onToggleReviewedFixed != null,
+                              onToggleReviewed: widget.onToggleReviewedFixed,
+                            )
+                          : _NarrowRow(
+                              t: r.txn!,
+                              onTap: () => widget.onEditTxn(r.txn!),
+                              showReceipt: widget.showReceiptCheck,
+                              onToggleReceipt: widget.onToggleReceipt,
+                              showReview: widget.onToggleReviewed != null,
+                              onToggleReviewed: widget.onToggleReviewed,
+                            ),
+                    ),
                   ],
                 );
               }
@@ -513,290 +502,77 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                     touched: _sortTouched,
                     receiptLabel: widget.receiptLabel,
                   ),
-                  for (final r in detailRows) ...[
-                    const Divider(height: 1, color: V2Colors.divider),
-                    if (r.isFixed)
-                      _FixedRow(
-                        f: r.fx!,
-                        onTap: () => widget.onEditFixed?.call(r.fx!),
-                        w: w,
-                        showReceipt: widget.showReceiptCheck,
-                        showReview: showReview,
-                        onToggleReviewed: widget.onToggleReviewedFixed,
-                      )
-                    else
-                      _ExpenseRow(
-                        t: r.txn!,
-                        onTap: () => widget.onEditTxn(r.txn!),
-                        w: w,
-                        showReceipt: widget.showReceiptCheck,
-                        onToggleReceipt: widget.onToggleReceipt,
-                        showReview: showReview,
-                        onToggleReviewed: widget.onToggleReviewed,
-                      ),
-                  ],
+                  _reorderableRows(
+                    detailRows,
+                    (r) => r.isFixed
+                        ? _FixedRow(
+                            f: r.fx!,
+                            onTap: () => widget.onEditFixed?.call(r.fx!),
+                            w: w,
+                            showReceipt: widget.showReceiptCheck,
+                            showReview: showReview,
+                            onToggleReviewed: widget.onToggleReviewedFixed,
+                          )
+                        : _ExpenseRow(
+                            t: r.txn!,
+                            onTap: () => widget.onEditTxn(r.txn!),
+                            w: w,
+                            showReceipt: widget.showReceiptCheck,
+                            onToggleReceipt: widget.onToggleReceipt,
+                            showReview: showReview,
+                            onToggleReviewed: widget.onToggleReviewed,
+                          ),
+                  ),
                 ],
               );
             }),
           ),
-        ],
       ],
     );
   }
 
-  /// 手で並び替えビュー：日付ごとにまとめ、その日の中だけ上下ボタンで並び替え。
-  /// 取引・固定費の両方を対象にする。
-  Widget _buildReorderView() {
-    var all = <_Row>[
-      ...widget.rows.map(_Row.txn),
-      ...widget.fixedRows.map(_Row.fixed),
-    ];
-    // 絞り込み（検索・決済手段）を反映＝見えているものだけ並び替える。
-    final q = _normalizeDigits(_query).trim().toLowerCase();
-    if (q.isNotEmpty) {
-      all = all.where((r) => r.searchHay.contains(q)).toList();
-    }
-    if (_payFilter != null) {
-      all = all.where((r) => r.payKey == _payFilter).toList();
-    }
-    if (all.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.symmetric(vertical: 40),
-        decoration: BoxDecoration(
-          color: V2Colors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: V2Colors.border),
-        ),
-        child: Center(
-          child: Text(widget.emptyHint,
-              style: V2Typography.caption
-                  .copyWith(color: V2Colors.textSecondary)),
-        ),
+  /// 明細行リスト。並び替え可能なら ReorderableListView（PC は末尾に自動でドラッグ
+  /// ハンドルが出る／スマホは長押し）。列ソート中など不可のときは通常の縦積み。
+  Widget _reorderableRows(List<_Row> rows, Widget Function(_Row r) build) {
+    final canReorder =
+        widget.onReorderDay != null && _sortCol == _SortCol.date;
+    if (!canReorder) {
+      return Column(
+        children: [
+          for (final r in rows) ...[
+            const Divider(height: 1, color: V2Colors.divider),
+            build(r),
+          ],
+        ],
       );
     }
-    // 新しい日が上・日内は手動順で並べ、日ごとにグループ化。
-    all.sort((a, b) {
-      final da = DateTime(a.date.year, a.date.month, a.date.day);
-      final db = DateTime(b.date.year, b.date.month, b.date.day);
-      final c = db.compareTo(da);
-      if (c != 0) return c;
-      final oc = a.orderKey.compareTo(b.orderKey);
-      if (oc != 0) return oc;
-      return b.date.compareTo(a.date);
-    });
-    final groups = <String, List<_Row>>{};
-    for (final r in all) {
-      final k = '${r.date.year}-${r.date.month}-${r.date.day}';
-      (groups[k] ??= []).add(r);
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: Color.alphaBlend(
-                widget.accent.withValues(alpha: 0.08), Colors.white),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.swap_vert, size: 16, color: widget.accent),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                    _payFilter != null
-                        ? '「$_payFilter」で絞り込み中。同じ日付の中で ▲▼ で並び替え（この絞り込み内の順番として保存）。'
-                        : '同じ日付の中で ▲▼ で並び替え（固定費もOK）。順番は保存され、日付で並べ直しても保持されます。',
-                    style: V2Typography.micro
-                        .copyWith(color: V2Colors.textSecondary)),
-              ),
-            ],
-          ),
-        ),
-        Container(
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: V2Colors.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: V2Colors.border),
-          ),
-          child: Column(
-            children: [
-              for (final entry in groups.entries) ...[
-                _reorderDayHeader(entry.value.first.date),
-                for (int i = 0; i < entry.value.length; i++)
-                  _reorderRow(entry.value, i),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _reorderDayHeader(DateTime d) {
-    const wd = ['月', '火', '水', '木', '金', '土', '日'];
-    final label = wd[d.weekday - 1];
-    return Container(
-      width: double.infinity,
-      color: V2Colors.surfaceMuted,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      child: Text('${d.month}/${d.day}（$label）',
-          style: V2Typography.micro
-              .copyWith(color: V2Colors.textSecondary, fontWeight: FontWeight.w700)),
-    );
-  }
-
-  Widget _reorderRow(List<_Row> dayItems, int i) {
-    final r = dayItems[i];
-    final first = i == 0;
-    final last = i == dayItems.length - 1;
-    final isFixed = r.isFixed;
-    final title = isFixed
-        ? r.fx!.name
-        : (r.txn!.description.trim().isNotEmpty
-            ? r.txn!.description.trim()
-            : (r.txn!.category.sub.trim().isNotEmpty
-                ? r.txn!.category.sub.trim()
-                : r.txn!.category.major.trim()));
-    final reviewed = isFixed ? r.fx!.reviewed : r.txn!.reviewed;
-    // 並び替えモードでも確認チェックをON/OFFできるようにする（締め処理を止めない）。
-    final canReview = isFixed
-        ? widget.onToggleReviewedFixed != null
-        : widget.onToggleReviewed != null;
-    // 予定行（固定費サブスク）と、固定費カテゴリの実取引はどちらも淡いオレンジ背景。
-    final isFixedCat =
-        isFixed || (r.txn?.category.major.contains('固定費') ?? false);
-    return Container(
-      decoration: BoxDecoration(
-        color: reviewed ? _kReviewedBg : (isFixedCat ? _kFixedBg : null),
-        border: const Border(top: BorderSide(color: V2Colors.divider)),
-      ),
-      padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
-      child: Row(
+    return ReorderableListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: rows.length,
+      onReorder: (oldIndex, newIndex) => _onReorder(oldIndex, newIndex, rows),
+      itemBuilder: (ctx, i) => Column(
+        key: ValueKey(rows[i].keyId),
         children: [
-          const SizedBox(width: 6),
-          if (isFixed) ...[
-            const Icon(Icons.event_repeat, size: 13, color: _kFixedAccent),
-            const SizedBox(width: 4),
-          ],
-          Expanded(
-            child: Opacity(
-              opacity: reviewed ? 0.5 : 1,
-              child: Text(title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: V2Typography.body),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Opacity(
-            opacity: reviewed ? 0.5 : 1,
-            child: Text('-${formatYen(r.amount)}',
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: isFixed ? _kFixedAccent : V2Colors.negative,
-                    fontFeatures: V2Typography.tabularNums)),
-          ),
-          const SizedBox(width: 6),
-          // 確認チェックは通常明細と同じく右側に置く（並び替え時も位置を揃える）。
-          if (canReview)
-            SizedBox(
-              width: 30,
-              child: Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: Checkbox(
-                    value: reviewed,
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    activeColor: const Color(0xFF6B7280),
-                    onChanged: (v) => isFixed
-                        ? widget.onToggleReviewedFixed!(r.fx!, v ?? false)
-                        : widget.onToggleReviewed!(r.txn!, v ?? false),
-                  ),
-                ),
-              ),
-            ),
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            iconSize: 22,
-            icon: const Icon(Icons.keyboard_arrow_up),
-            color: widget.accent,
-            onPressed: first ? null : () => _moveInDay(dayItems, i, -1),
-            tooltip: '上へ',
-          ),
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            iconSize: 22,
-            icon: const Icon(Icons.keyboard_arrow_down),
-            color: widget.accent,
-            onPressed: last ? null : () => _moveInDay(dayItems, i, 1),
-            tooltip: '下へ',
-          ),
+          const Divider(height: 1, color: V2Colors.divider),
+          build(rows[i]),
         ],
       ),
     );
   }
 
-  void _moveInDay(List<_Row> dayItems, int i, int delta) {
-    final ni = i + delta;
-    if (ni < 0 || ni >= dayItems.length) return;
-    final n = [...dayItems];
-    final it = n.removeAt(i);
-    n.insert(ni, it);
+  /// ドラッグで並べ替えた結果を、月内の並び順(sortOrder)として保存する。
+  void _onReorder(int oldIndex, int newIndex, List<_Row> rows) {
+    if (newIndex > oldIndex) newIndex -= 1;
+    final list = [...rows];
+    final item = list.removeAt(oldIndex);
+    list.insert(newIndex, item);
     widget.onReorderDay?.call([
-      for (final r in n)
-        r.isFixed
-            ? ReorderedItem.fixed(r.fx!.id)
-            : ReorderedItem.txn(r.txn!),
+      for (final r in list)
+        r.isFixed ? ReorderedItem.fixed(r.fx!.id) : ReorderedItem.txn(r.txn!),
     ]);
   }
-}
 
-/// 「手で並び替え」ON/OFF トグル。
-class _ReorderToggle extends StatelessWidget {
-  final bool on;
-  final Color accent;
-  final VoidCallback onTap;
-  const _ReorderToggle(
-      {required this.on, required this.accent, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: on
-              ? Color.alphaBlend(accent.withValues(alpha: 0.16), Colors.white)
-              : V2Colors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-              color: on ? accent : V2Colors.border, width: on ? 1.4 : 1),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(on ? Icons.check : Icons.swap_vert,
-                size: 14, color: on ? accent : V2Colors.textSecondary),
-            const SizedBox(width: 4),
-            Text(on ? '並び替えを終了' : '手で並び替え',
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: on ? accent : V2Colors.textSecondary)),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 /// 全角数字（０-９）と全角カンマ／円記号を半角へ正規化する。
@@ -858,6 +634,12 @@ class _Row {
   _Row.fixed(this.fx) : txn = null;
 
   bool get isFixed => fx != null;
+
+  /// ReorderableListView 用の一意キー。
+  String get keyId => txn != null ? 'tx_${txn!.id}' : 'fx_${fx!.id}';
+
+  /// 手動並び順（生の sortOrder。未設定は null）。月内フリー並び替えに使う。
+  double? get manualOrder => txn != null ? txn!.sortOrder : fx!.sortOrder;
 
   DateTime get date => txn?.date ?? fx!.date;
   int get amount => txn?.amount ?? fx!.amount;
