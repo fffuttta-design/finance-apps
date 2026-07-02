@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/month_cursor.dart';
@@ -480,7 +479,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         children: [
           const Padding(
             padding: EdgeInsets.only(bottom: 6, left: 2),
-            child: Text('長押しでドラッグ並び替え（この順で保存）・残高は日付順のとき表示',
+            child: Text('▲▼ボタンで並び替え（この順で保存）・残高は日付順のとき表示',
                 style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
           ),
           Container(
@@ -490,34 +489,40 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFFE5E7EB)),
             ),
-            child: ReorderableListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              buildDefaultDragHandles: false,
-              itemCount: rows.length,
-              onReorder: (oldIndex, newIndex) {
-                if (newIndex > oldIndex) newIndex -= 1;
-                final list = [...rows];
-                final item = list.removeAt(oldIndex);
-                list.insert(newIndex, item);
-                _saveAccountReorder(list);
-              },
-              itemBuilder: (ctx, i) => _AccountFastReorderListener(
-                key: ValueKey('acc_${rows[i].txn.id}'),
-                index: i,
-                child: Column(
-                  children: [
-                    if (i > 0)
-                      const Divider(height: 1, color: Color(0xFFF1F2F4)),
-                    _reorderRow(rows[i]),
-                  ],
-                ),
-              ),
+            child: Column(
+              children: [
+                for (int i = 0; i < rows.length; i++) ...[
+                  if (i > 0)
+                    const Divider(height: 1, color: Color(0xFFF1F2F4)),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      _AccountMoveButtons(
+                        onUp: i > 0
+                            ? () => _moveAccountRow(i, i - 1, rows)
+                            : null,
+                        onDown: i < rows.length - 1
+                            ? () => _moveAccountRow(i, i + 1, rows)
+                            : null,
+                      ),
+                      Expanded(child: _reorderRow(rows[i])),
+                    ],
+                  ),
+                ],
+              ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  /// 行を1つ上/下へ動かして sortOrder を保存する。
+  void _moveAccountRow(int from, int to, List<_LedgerRow> rows) {
+    final list = [...rows];
+    final item = list.removeAt(from);
+    list.insert(to, item);
+    _saveAccountReorder(list);
   }
 
   Widget _reorderRow(_LedgerRow row) {
@@ -530,12 +535,9 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     final reviewed = t.reviewed;
     return Container(
       color: reviewed ? const Color(0xFFF3F4F6) : Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11),
       child: Row(
         children: [
-          Icon(Icons.drag_indicator,
-              size: 16, color: const Color(0xFFCBD5E1)),
-          const SizedBox(width: 6),
           SizedBox(
             width: 74,
             child: Text(
@@ -1293,19 +1295,34 @@ class _LedgerRow {
   final int balanceAfter;
 }
 
-/// 既定の長押し(500ms)より少し早く(250ms)ドラッグ開始する並び替えリスナー。
-class _AccountFastReorderListener extends ReorderableDelayedDragStartListener {
-  const _AccountFastReorderListener({
-    super.key,
-    required super.child,
-    required super.index,
-  });
+/// カスタム順モードで行の左に置く ▲▼ ボタン（1行ずつ上下へ動かす）。
+class _AccountMoveButtons extends StatelessWidget {
+  const _AccountMoveButtons({required this.onUp, required this.onDown});
+
+  final VoidCallback? onUp;
+  final VoidCallback? onDown;
 
   @override
-  MultiDragGestureRecognizer createRecognizer() {
-    return DelayedMultiDragGestureRecognizer(
-      delay: const Duration(milliseconds: 250),
-      debugOwner: this,
+  Widget build(BuildContext context) {
+    Widget btn(IconData icon, VoidCallback? onTap) => InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(6),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            child: Icon(icon,
+                size: 20,
+                color: onTap == null
+                    ? const Color(0xFFD1D5DB)
+                    : const Color(0xFF1A237E)),
+          ),
+        );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        btn(Icons.keyboard_arrow_up, onUp),
+        btn(Icons.keyboard_arrow_down, onDown),
+      ],
     );
   }
 }

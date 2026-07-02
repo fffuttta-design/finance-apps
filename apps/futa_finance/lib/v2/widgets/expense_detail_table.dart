@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart';
 import 'package:finance_core/finance_core.dart' as core;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -345,7 +344,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
               if (_sortCol == _SortCol.custom)
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: Text('長押しでドラッグ並び替え',
+                  child: Text('▲▼ボタンで並び替え',
                       style: V2Typography.micro
                           .copyWith(color: V2Colors.textMuted)),
                 ),
@@ -456,7 +455,10 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: V2Colors.border),
             ),
-            child: LayoutBuilder(builder: (ctx, cons) {
+            child: (widget.onReorderDay != null &&
+                    _sortCol == _SortCol.custom)
+                ? _customReorderList(detailRows)
+                : LayoutBuilder(builder: (ctx, cons) {
               // 狭い幅（スマホ）は1行表だと潰れるので2行のスリム表示。
               final narrow = cons.maxWidth < 560;
               if (narrow) {
@@ -469,7 +471,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                       accent: widget.accent,
                       touched: _sortTouched,
                     ),
-                    _reorderableRows(
+                    _plainRows(
                       detailRows,
                       (r) => r.isFixed
                           ? _NarrowFixedRow(
@@ -530,7 +532,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                     touched: _sortTouched,
                     receiptLabel: widget.receiptLabel,
                   ),
-                  _reorderableRows(
+                  _plainRows(
                     detailRows,
                     (r) => r.isFixed
                         ? _FixedRow(
@@ -559,48 +561,67 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
     );
   }
 
-  /// 明細行リスト。並び替え可能なら ReorderableListView。ハンドルは出さず、
-  /// **行を長押し（PCは押し続け）でドラッグ**して並び替える（タップは詳細を開く）。
-  /// 列ソート中など不可のときは通常の縦積み。
-  Widget _reorderableRows(List<_Row> rows, Widget Function(_Row r) build) {
-    // 並び替えは「カスタム順」モードのときだけ有効（保存先＝各行の sortOrder）。
-    final canReorder =
-        widget.onReorderDay != null && _sortCol == _SortCol.custom;
-    if (!canReorder) {
-      return Column(
-        children: [
-          for (final r in rows) ...[
-            const Divider(height: 1, color: V2Colors.divider),
-            build(r),
-          ],
+  /// 明細行リスト（通常の縦積み）。並び替えはカスタム順モードで別UI（▲▼）に切替。
+  Widget _plainRows(List<_Row> rows, Widget Function(_Row r) build) {
+    return Column(
+      children: [
+        for (final r in rows) ...[
+          const Divider(height: 1, color: V2Colors.divider),
+          build(r),
         ],
-      );
-    }
-    return ReorderableListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      buildDefaultDragHandles: false, // 見えるハンドルは出さない
-      itemCount: rows.length,
-      onReorder: (oldIndex, newIndex) => _onReorder(oldIndex, newIndex, rows),
-      itemBuilder: (ctx, i) => _FastReorderListener(
-        key: ValueKey(rows[i].keyId),
-        index: i,
-        child: Column(
-          children: [
-            const Divider(height: 1, color: V2Colors.divider),
-            build(rows[i]),
-          ],
-        ),
-      ),
+      ],
     );
   }
 
-  /// ドラッグで並べ替えた結果を、月内の並び順(sortOrder)として保存する。
-  void _onReorder(int oldIndex, int newIndex, List<_Row> rows) {
-    if (newIndex > oldIndex) newIndex -= 1;
+  /// カスタム順モードのリスト。各行の左に ▲▼ ボタンを置き、1行ずつ上下に
+  /// 動かして並び替える（長押しドラッグは扱いづらいのでボタン式に変更）。
+  /// 行はコンパクト表示（ナロー行を再利用）で、幅崩れの心配がない。
+  Widget _customReorderList(List<_Row> rows) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (int i = 0; i < rows.length; i++) ...[
+          if (i > 0)
+            const Divider(height: 1, color: V2Colors.divider),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _MoveButtons(
+                accent: widget.accent,
+                onUp: i > 0 ? () => _moveRow(i, i - 1, rows) : null,
+                onDown:
+                    i < rows.length - 1 ? () => _moveRow(i, i + 1, rows) : null,
+              ),
+              Expanded(
+                child: rows[i].isFixed
+                    ? _NarrowFixedRow(
+                        f: rows[i].fx!,
+                        onTap: () => widget.onEditFixed?.call(rows[i].fx!),
+                        showReceipt: widget.showReceiptCheck,
+                        showReview: widget.onToggleReviewedFixed != null,
+                        onToggleReviewed: widget.onToggleReviewedFixed,
+                      )
+                    : _NarrowRow(
+                        t: rows[i].txn!,
+                        onTap: () => widget.onEditTxn(rows[i].txn!),
+                        showReceipt: widget.showReceiptCheck,
+                        onToggleReceipt: widget.onToggleReceipt,
+                        showReview: widget.onToggleReviewed != null,
+                        onToggleReviewed: widget.onToggleReviewed,
+                      ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// 行を1つ上/下へ動かし、新しい並び順を sortOrder として保存する。
+  void _moveRow(int from, int to, List<_Row> rows) {
     final list = [...rows];
-    final item = list.removeAt(oldIndex);
-    list.insert(newIndex, item);
+    final item = list.removeAt(from);
+    list.insert(to, item);
     widget.onReorderDay?.call([
       for (final r in list)
         r.isFixed ? ReorderedItem.fixed(r.fx!.id) : ReorderedItem.txn(r.txn!),
@@ -626,8 +647,8 @@ class _CustomOrderToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: active
-          ? 'カスタム順：ON（長押しで並び替え・自動保存）'
-          : 'カスタム順に切り替え（自由に並び替えて保存）',
+          ? 'カスタム順：ON（▲▼ボタンで並び替え・自動保存）'
+          : 'カスタム順に切り替え（▲▼で並び替えて保存）',
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),
@@ -708,20 +729,38 @@ IconData _paymentIcon(String method) {
   return Icons.payment_outlined;
 }
 
-/// 既定の長押し(500ms)より少し早く(250ms)ドラッグ開始する並び替えリスナー。
-/// タップは詳細を開くので、素早い並び替えと両立させる。
-class _FastReorderListener extends ReorderableDelayedDragStartListener {
-  const _FastReorderListener({
-    super.key,
-    required super.child,
-    required super.index,
+/// カスタム順モードで行の左に置く ▲▼ ボタン（1行ずつ上下へ動かす）。
+/// 端の行では該当方向を無効化（薄いグレー）する。
+class _MoveButtons extends StatelessWidget {
+  const _MoveButtons({
+    required this.accent,
+    required this.onUp,
+    required this.onDown,
   });
 
+  final Color accent;
+  final VoidCallback? onUp;
+  final VoidCallback? onDown;
+
   @override
-  MultiDragGestureRecognizer createRecognizer() {
-    return DelayedMultiDragGestureRecognizer(
-      delay: const Duration(milliseconds: 250),
-      debugOwner: this,
+  Widget build(BuildContext context) {
+    Widget btn(IconData icon, VoidCallback? onTap) => InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(6),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            child: Icon(icon,
+                size: 20,
+                color: onTap == null ? const Color(0xFFD1D5DB) : accent),
+          ),
+        );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        btn(Icons.keyboard_arrow_up, onUp),
+        btn(Icons.keyboard_arrow_down, onDown),
+      ],
     );
   }
 }
