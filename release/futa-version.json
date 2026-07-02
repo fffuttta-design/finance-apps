@@ -1,1 +1,1 @@
-{"version":"1.0.415","buildNumber":"416","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.415/futa-finance-v1.0.415.apk","releaseNotes":"支出明細・クレカ明細を「並び替えモード」なしで直接ドラッグ並び替えに変更（PCは行の右端ハンドル／スマホは長押し）。月内どこへでも自由に並べ替え、日付見出しは廃止し各行に日付を表示。通常は日付が新しい順、手で動かした順を記憶。※現金/銀行/電子マネーの明細は次回対応。"}
+{"version":"1.0.416","buildNumber":"417","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.416/futa-finance-v1.0.416.apk","releaseNotes":"明細の並び替えを「行を長押ししてドラッグ」に変更（見えるハンドルは廃止＝チェックボックスと被らない）。タップは従来どおり詳細を開く。"}

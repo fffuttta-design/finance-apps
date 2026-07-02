@@ -531,8 +531,9 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
     );
   }
 
-  /// 明細行リスト。並び替え可能なら ReorderableListView（PC は末尾に自動でドラッグ
-  /// ハンドルが出る／スマホは長押し）。列ソート中など不可のときは通常の縦積み。
+  /// 明細行リスト。並び替え可能なら ReorderableListView。ハンドルは出さず、
+  /// **行を長押し（PCは押し続け）でドラッグ**して並び替える（タップは詳細を開く）。
+  /// 列ソート中など不可のときは通常の縦積み。
   Widget _reorderableRows(List<_Row> rows, Widget Function(_Row r) build) {
     final canReorder =
         widget.onReorderDay != null && _sortCol == _SortCol.date;
@@ -549,14 +550,18 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
     return ReorderableListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
+      buildDefaultDragHandles: false, // 見えるハンドルは出さない
       itemCount: rows.length,
       onReorder: (oldIndex, newIndex) => _onReorder(oldIndex, newIndex, rows),
-      itemBuilder: (ctx, i) => Column(
+      itemBuilder: (ctx, i) => ReorderableDelayedDragStartListener(
         key: ValueKey(rows[i].keyId),
-        children: [
-          const Divider(height: 1, color: V2Colors.divider),
-          build(rows[i]),
-        ],
+        index: i,
+        child: Column(
+          children: [
+            const Divider(height: 1, color: V2Colors.divider),
+            build(rows[i]),
+          ],
+        ),
       ),
     );
   }
