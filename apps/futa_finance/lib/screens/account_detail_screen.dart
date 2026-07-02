@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/month_cursor.dart';
@@ -51,6 +52,11 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
 
   /// 月フィルタ。null = 全期間。
   DateTime? _selectedMonth;
+
+  /// カスタム順モード。ON のとき行を長押しドラッグで並び替えでき、その順番を
+  /// 各取引の sortOrder に保存する。※残高は日付順が前提のため、このモード中は
+  /// 残高列・月初/月末残高を隠す。
+  bool _customOrder = false;
 
   // ─── 未保存編集の管理 ─────────────────────
   /// ユーザーが手入力で上書きした月初残高（保存前のローカル状態）。
@@ -292,12 +298,14 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                 ),
                 const Divider(height: 1),
                 Expanded(
-                  child: _ledgerTable(
-                    displayRows: displayRows,
-                    monthStartBalance: dispStart,
-                    monthEndBalance: dispEnd,
-                    balanceOffset: balanceOffset,
-                  ),
+                  child: _customOrder
+                      ? _reorderLedger(_customSorted(displayRows))
+                      : _ledgerTable(
+                          displayRows: displayRows,
+                          monthStartBalance: dispStart,
+                          monthEndBalance: dispEnd,
+                          balanceOffset: balanceOffset,
+                        ),
                 ),
               ],
             );
@@ -391,6 +399,39 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                       color: Color(0xFF111827))),
             ),
           const Spacer(),
+          // カスタム順トグル（ON=長押しで並び替え可能・残高列は隠れる）。
+          Tooltip(
+            message: _customOrder
+                ? 'カスタム順：ON（長押しで並び替え・自動保存／残高は非表示）'
+                : 'カスタム順に切り替え（自由に並び替えて保存）',
+            child: OutlinedButton.icon(
+              onPressed: () => setState(() => _customOrder = !_customOrder),
+              icon: Icon(Icons.swap_vert,
+                  size: 16,
+                  color: _customOrder
+                      ? const Color(0xFF1A237E)
+                      : const Color(0xFF6B7280)),
+              label: Text('カスタム順',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight:
+                          _customOrder ? FontWeight.w700 : FontWeight.w500,
+                      color: _customOrder
+                          ? const Color(0xFF1A237E)
+                          : const Color(0xFF6B7280))),
+              style: OutlinedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                backgroundColor: _customOrder
+                    ? const Color(0xFF1A237E).withValues(alpha: 0.08)
+                    : null,
+                side: BorderSide(
+                    color: _customOrder
+                        ? const Color(0xFF1A237E)
+                        : const Color(0xFFD1D5DB)),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           // 全期間 ⇄ 月別 切替。
           OutlinedButton.icon(
             onPressed: () => _setMonth(_selectedMonth == null
@@ -409,6 +450,157 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         ],
       ),
     );
+  }
+
+  /// カスタム順の並びに整える（sortOrder 昇順、未設定は日付降順で先頭へ）。
+  List<_LedgerRow> _customSorted(List<_LedgerRow> rows) {
+    final list = [...rows];
+    list.sort((a, b) {
+      final ao = a.txn.sortOrder, bo = b.txn.sortOrder;
+      if (ao == null && bo == null) return -a.txn.date.compareTo(b.txn.date);
+      if (ao == null) return -1;
+      if (bo == null) return 1;
+      return ao.compareTo(bo);
+    });
+    return list;
+  }
+
+  /// カスタム順モードのリスト（長押しドラッグで並び替え・残高列なし）。
+  Widget _reorderLedger(List<_LedgerRow> rows) {
+    if (rows.isEmpty) {
+      return const Center(
+        child: Text('この期間の取引はありません',
+            style: TextStyle(color: Color(0xFF9CA3AF))),
+      );
+    }
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(bottom: 6, left: 2),
+            child: Text('長押しでドラッグ並び替え（この順で保存）・残高は日付順のとき表示',
+                style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
+          ),
+          Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: ReorderableListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              buildDefaultDragHandles: false,
+              itemCount: rows.length,
+              onReorder: (oldIndex, newIndex) {
+                if (newIndex > oldIndex) newIndex -= 1;
+                final list = [...rows];
+                final item = list.removeAt(oldIndex);
+                list.insert(newIndex, item);
+                _saveAccountReorder(list);
+              },
+              itemBuilder: (ctx, i) => _AccountFastReorderListener(
+                key: ValueKey('acc_${rows[i].txn.id}'),
+                index: i,
+                child: Column(
+                  children: [
+                    if (i > 0)
+                      const Divider(height: 1, color: Color(0xFFF1F2F4)),
+                    _reorderRow(rows[i]),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _reorderRow(_LedgerRow row) {
+    final t = row.txn;
+    final isOut = row.signedAmount < 0;
+    final isTransfer = t.type == core.TransactionType.transfer;
+    final desc = isTransfer
+        ? '振替 ${t.transferFromAccount ?? '?'} → ${t.transferToAccount ?? '?'}'
+        : t.description;
+    final reviewed = t.reviewed;
+    return Container(
+      color: reviewed ? const Color(0xFFF3F4F6) : Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      child: Row(
+        children: [
+          Icon(Icons.drag_indicator,
+              size: 16, color: const Color(0xFFCBD5E1)),
+          const SizedBox(width: 6),
+          SizedBox(
+            width: 74,
+            child: Text(
+                '${t.date.month.toString().padLeft(2, '0')}/${t.date.day.toString().padLeft(2, '0')}',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: reviewed
+                        ? const Color(0xFF9CA3AF)
+                        : const Color(0xFF6B7280))),
+          ),
+          Expanded(
+            child: Text(desc,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                style: const TextStyle(fontSize: 12, color: Color(0xFF111827))),
+          ),
+          const SizedBox(width: 8),
+          Text(
+              isOut
+                  ? '-${formatYen(-row.signedAmount)}'
+                  : '+${formatYen(row.signedAmount)}',
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'monospace',
+                  color: isOut
+                      ? const Color(0xFFDC2626)
+                      : const Color(0xFF16A34A))),
+          SizedBox(
+            width: 34,
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: Checkbox(
+                  value: reviewed,
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  activeColor: const Color(0xFF6B7280),
+                  onChanged: (v) => _toggleReviewed(t, v ?? false),
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit_outlined,
+                size: 16, color: Color(0xFF6B7280)),
+            padding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints(),
+            tooltip: '編集',
+            onPressed: () => _showEditDialog(t),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 並び替え結果を各取引の sortOrder（0,1,2…）として保存する。
+  Future<void> _saveAccountReorder(List<_LedgerRow> ordered) async {
+    for (int i = 0; i < ordered.length; i++) {
+      await TransactionRepository.instance
+          .update(ordered[i].txn.copyWith(sortOrder: i.toDouble()));
+    }
+    if (mounted) await _load();
   }
 
   static const _cGreen = Color(0xFF16A34A);
@@ -1099,4 +1291,21 @@ class _LedgerRow {
   final core.Transaction txn;
   final int signedAmount;
   final int balanceAfter;
+}
+
+/// 既定の長押し(500ms)より少し早く(250ms)ドラッグ開始する並び替えリスナー。
+class _AccountFastReorderListener extends ReorderableDelayedDragStartListener {
+  const _AccountFastReorderListener({
+    super.key,
+    required super.child,
+    required super.index,
+  });
+
+  @override
+  MultiDragGestureRecognizer createRecognizer() {
+    return DelayedMultiDragGestureRecognizer(
+      delay: const Duration(milliseconds: 250),
+      debugOwner: this,
+    );
+  }
 }
