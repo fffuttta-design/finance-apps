@@ -1,1 +1,1 @@
-{"version":"1.0.402","buildNumber":"403","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.402/futa-finance-v1.0.402.apk","releaseNotes":"証憑（請求書/領収書）をアプリ内ビューアで表示できるように。所有者本人の権限でDriveから取得しPDF/画像を表示（失敗時は外部で開くにフォールバック）。※初回は再ログインで新権限の許可が必要。"}
+{"version":"1.0.403","buildNumber":"404","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.403/futa-finance-v1.0.403.apk","releaseNotes":"証憑ビューアの初期倍率をページ全体フィットに変更（開いた時に全体が見える）。"}
