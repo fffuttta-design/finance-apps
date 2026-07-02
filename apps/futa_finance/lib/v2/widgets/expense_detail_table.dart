@@ -1097,7 +1097,10 @@ class _ExpenseRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final reviewed = t.reviewed;
-    final accent = expenseCatColor(t.category.major);
+    // 固定費は従来どおりオレンジ系で色分け（実取引化しても見た目を保つ）。
+    final accent = t.category.major.contains('固定費')
+        ? _kFixedAccent
+        : expenseCatColor(t.category.major);
     final major = t.category.major.trim();
     final sub = t.category.sub.trim();
     // 大カテゴリは番号プレフィックス（"1."）を外して表示。
@@ -1571,7 +1574,10 @@ class _NarrowRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final reviewed = t.reviewed;
-    final accent = expenseCatColor(t.category.major);
+    // 固定費は従来どおりオレンジ系で色分け（実取引化しても見た目を保つ）。
+    final accent = t.category.major.contains('固定費')
+        ? _kFixedAccent
+        : expenseCatColor(t.category.major);
     final major = t.category.major.trim();
     final sub = t.category.sub.trim();
     final catLabel = (major.isEmpty && sub.isEmpty)

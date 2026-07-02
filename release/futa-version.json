@@ -1,1 +1,1 @@
-{"version":"1.0.408","buildNumber":"409","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.408/futa-finance-v1.0.408.apk","releaseNotes":"領収書の保管形態を明細ごとに記録：ドライブ保存分は「請求書/領収書を見る」、店頭レシート等の紙保管分は詳細画面で「紙のレシートで保管済み」にチェック（写真不要）。領収書チェックは紙・電子どちらでも一律で付く。"}
+{"version":"1.0.409","buildNumber":"410","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.409/futa-finance-v1.0.409.apk","releaseNotes":"固定費の明細行を従来どおりオレンジ系の色分けに（実取引化しても見た目を維持）。領収書欄は他の明細と同じチェックボックスのまま。"}
