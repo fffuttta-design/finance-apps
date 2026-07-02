@@ -1,1 +1,1 @@
-{"version":"1.0.405","buildNumber":"406","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.405/futa-finance-v1.0.405.apk","releaseNotes":"支出入力の日付を手入力に統一（数字だけで自動的に「/」が入る／カレンダーはアイコンから）。場所は過去履歴からサジェスト（同じ件名で使った場所を優先表示）し、表記ゆれを防止。"}
+{"version":"1.0.406","buildNumber":"407","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.406/futa-finance-v1.0.406.apk","releaseNotes":"証憑ビューアで拡大中、マウスカーソルを手の形にして「ドラッグで動かせる」ことが分かるように変更。"}

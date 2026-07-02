@@ -93,25 +93,29 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? _errorView()
-              : _isPdf
-                  ? PdfViewer.data(
-                      _bytes!,
-                      sourceName: widget.driveUrl,
-                      params: PdfViewerParams(
-                        // 既定はcover(埋める=拡大しすぎ)なので、ページ全体が
-                        // 収まるフィット倍率で開く（見やすさ優先）。
-                        calculateInitialZoom: (document, controller,
-                                alternativeFitScale, coverScale) =>
-                            alternativeFitScale,
-                        // マウスホイールだけで拡大率を変更できるようにする
-                        // （null にするとホイール＝スクロールではなくズームになる）。
-                        scrollByMouseWheel: null,
-                      ),
-                    )
-                  : InteractiveViewer(
-                      maxScale: 5,
-                      child: Center(child: Image.memory(_bytes!)),
-                    ),
+              // ドラッグで動かせることが分かるよう、ビューア上は常に「手」カーソルにする。
+              : MouseRegion(
+                  cursor: SystemMouseCursors.grab,
+                  child: _isPdf
+                      ? PdfViewer.data(
+                          _bytes!,
+                          sourceName: widget.driveUrl,
+                          params: PdfViewerParams(
+                            // 既定はcover(埋める=拡大しすぎ)なので、ページ全体が
+                            // 収まるフィット倍率で開く（見やすさ優先）。
+                            calculateInitialZoom: (document, controller,
+                                    alternativeFitScale, coverScale) =>
+                                alternativeFitScale,
+                            // マウスホイールだけで拡大率を変更できるようにする
+                            // （null にするとホイール＝スクロールではなくズームになる）。
+                            scrollByMouseWheel: null,
+                          ),
+                        )
+                      : InteractiveViewer(
+                          maxScale: 5,
+                          child: Center(child: Image.memory(_bytes!)),
+                        ),
+                ),
     );
   }
 
