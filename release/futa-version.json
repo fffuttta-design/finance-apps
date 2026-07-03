@@ -1,1 +1,1 @@
-{"version":"1.0.419","buildNumber":"420","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.419/futa-finance-v1.0.419.apk","releaseNotes":"現金/銀行/電子マネーの通帳画面にもカスタム順（長押し並び替え）を追加。カスタム順中は残高列を隠して並び替え・保存します。"}
+{"version":"1.0.420","buildNumber":"421","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.420/futa-finance-v1.0.420.apk","releaseNotes":"カスタム順の並び替えを、長押しドラッグから▲▼ボタン方式に変更しました（支出/クレカ/現金・銀行・電子マネー）。1行ずつ確実に上下へ動かせます。"}
