@@ -41,6 +41,11 @@ abstract class TransactionRepository {
   Future<void> update(Transaction t);
   Future<void> delete(String id);
 
+  /// 複数取引を一括更新する（並び替え等）。
+  /// 途中経過を通知せず、**1回だけ**変更通知する＝並び替え中のチラつき防止。
+  /// Firestore 実装はバッチ1コミット（サーバ側snapshotも1回）で反映する。
+  Future<void> updateMany(List<Transaction> txns);
+
   /// 全件置換（サンプル投入やバックアップ復元で使用）。
   Future<void> replaceAll(List<Transaction> txns);
 
@@ -137,6 +142,20 @@ class LocalTransactionRepository implements TransactionRepository {
       list[idx] = t;
       await _saveAll(list);
     }
+  }
+
+  @override
+  Future<void> updateMany(List<Transaction> txns) async {
+    final list = await loadAll();
+    for (final t in txns) {
+      final idx = list.indexWhere((x) => x.id == t.id);
+      if (idx >= 0) {
+        list[idx] = t;
+      } else {
+        list.add(t);
+      }
+    }
+    await _saveAll(list);
   }
 
   @override
@@ -324,6 +343,35 @@ class FirestoreTransactionRepository implements TransactionRepository {
   Future<void> update(Transaction t) async {
     _cacheUpsert(t);
     await _coll.doc(t.id).set(_txDoc(t));
+  }
+
+  @override
+  Future<void> updateMany(List<Transaction> txns) async {
+    if (txns.isEmpty) return;
+    // キャッシュを一括更新して **1回だけ** 通知する（並び替え中のチラつき防止）。
+    final mk = _modeKey;
+    final cur = _cache[mk];
+    if (cur != null) {
+      final list = List<Transaction>.from(cur);
+      for (final t in txns) {
+        final idx = list.indexWhere((x) => x.id == t.id);
+        if (t.date.isBefore(_minDate(mk))) {
+          if (idx >= 0) list.removeAt(idx);
+        } else if (idx >= 0) {
+          list[idx] = t;
+        } else {
+          list.add(t);
+        }
+      }
+      _cache[mk] = list;
+      _controller.add(List<Transaction>.from(list));
+    }
+    // Firestore はバッチ1コミット＝サーバ側の snapshot も1回だけ届く。
+    final batch = FirebaseFirestore.instance.batch();
+    for (final t in txns) {
+      batch.set(_coll.doc(t.id), _txDoc(t));
+    }
+    await batch.commit();
   }
 
   @override

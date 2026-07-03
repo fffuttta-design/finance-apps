@@ -597,17 +597,15 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   }
 
   /// 並び替え結果を各取引の sortOrder（0,1,2…）として保存する。
-  /// update() は同期でキャッシュ更新＆stream通知するので await せず投げる＝
-  /// 画面は即座に並び替わる（サーバ書き込みは裏で完了。▲▼の反応遅延を解消）。
+  /// updateMany で一括更新＝通知は1回だけ（並び替え中のチラつき防止）。
+  /// 画面は即反映され、サーバ書き込みは裏で完了。失敗時のみ再読込。
   void _saveAccountReorder(List<_LedgerRow> ordered) {
-    final writes = <Future<void>>[];
-    for (int i = 0; i < ordered.length; i++) {
-      writes.add(TransactionRepository.instance
-          .update(ordered[i].txn.copyWith(sortOrder: i.toDouble())));
-    }
-    unawaited(Future.wait(writes).catchError((_) {
+    final txns = [
+      for (int i = 0; i < ordered.length; i++)
+        ordered[i].txn.copyWith(sortOrder: i.toDouble())
+    ];
+    unawaited(TransactionRepository.instance.updateMany(txns).catchError((_) {
       if (mounted) _load();
-      return <void>[];
     }));
   }
 

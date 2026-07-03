@@ -374,16 +374,21 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   /// 手動並び替えの保存。取引は取引の sortOrder、固定費はサブスクの sortOrder。
   Future<void> _saveReorder(List<ReorderedItem> dayInNewOrder) async {
     final subOrders = <String, double>{};
-    final writes = <Future<void>>[];
+    final txnUpdates = <core.Transaction>[];
     for (int i = 0; i < dayInNewOrder.length; i++) {
       final item = dayInNewOrder[i];
       if (item.isFixed) {
         subOrders[item.subscriptionId!] = i.toDouble();
       } else {
-        // update() は同期でキャッシュ更新＆stream通知するので、await せず投げると
-        // 画面は即座に並び替わる（サーバ書き込みは裏で完了。▲▼の反応遅延を解消）。
-        writes.add(_txRepo.update(item.txn!.copyWith(sortOrder: i.toDouble())));
+        txnUpdates.add(item.txn!.copyWith(sortOrder: i.toDouble()));
       }
+    }
+    // 取引は updateMany で一括更新＝通知は1回だけ（並び替え中のチラつき防止）。
+    // 画面は即反映され、サーバ書き込みは裏で完了。失敗時のみ再読込。
+    if (txnUpdates.isNotEmpty) {
+      unawaited(_txRepo.updateMany(txnUpdates).catchError((_) {
+        if (mounted) _load();
+      }));
     }
     if (subOrders.isNotEmpty) {
       final cfg = await SubscriptionRepository.instance.load();
@@ -395,13 +400,6 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
       await SubscriptionRepository.instance
           .save(core.SubscriptionConfig(subscriptions: newSubs));
       if (mounted) await _load();
-    }
-    // 取引のみのときは stream 経由で即反映されるので待たない。失敗時だけ再読込。
-    if (writes.isNotEmpty) {
-      unawaited(Future.wait(writes).catchError((_) {
-        if (mounted) _load();
-        return <void>[];
-      }));
     }
   }
 
