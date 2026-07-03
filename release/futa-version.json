@@ -1,1 +1,1 @@
-{"version":"1.0.420","buildNumber":"421","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.420/futa-finance-v1.0.420.apk","releaseNotes":"カスタム順の並び替えを、長押しドラッグから▲▼ボタン方式に変更しました（支出/クレカ/現金・銀行・電子マネー）。1行ずつ確実に上下へ動かせます。"}
+{"version":"1.0.421","buildNumber":"422","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.421/futa-finance-v1.0.421.apk","releaseNotes":"カスタム順▲▼ボタンの反応遅延を解消しました。ボタンを押すとすぐに並び替わります（保存は裏で完了）。"}
