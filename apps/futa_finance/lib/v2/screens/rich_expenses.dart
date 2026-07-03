@@ -374,12 +374,15 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   /// 手動並び替えの保存。取引は取引の sortOrder、固定費はサブスクの sortOrder。
   Future<void> _saveReorder(List<ReorderedItem> dayInNewOrder) async {
     final subOrders = <String, double>{};
+    final writes = <Future<void>>[];
     for (int i = 0; i < dayInNewOrder.length; i++) {
       final item = dayInNewOrder[i];
       if (item.isFixed) {
         subOrders[item.subscriptionId!] = i.toDouble();
       } else {
-        await _txRepo.update(item.txn!.copyWith(sortOrder: i.toDouble()));
+        // update() は同期でキャッシュ更新＆stream通知するので、await せず投げると
+        // 画面は即座に並び替わる（サーバ書き込みは裏で完了。▲▼の反応遅延を解消）。
+        writes.add(_txRepo.update(item.txn!.copyWith(sortOrder: i.toDouble())));
       }
     }
     if (subOrders.isNotEmpty) {
@@ -391,8 +394,15 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
           .toList();
       await SubscriptionRepository.instance
           .save(core.SubscriptionConfig(subscriptions: newSubs));
+      if (mounted) await _load();
     }
-    if (mounted) await _load();
+    // 取引のみのときは stream 経由で即反映されるので待たない。失敗時だけ再読込。
+    if (writes.isNotEmpty) {
+      unawaited(Future.wait(writes).catchError((_) {
+        if (mounted) _load();
+        return <void>[];
+      }));
+    }
   }
 
   /// 固定費の確認済み（表示中の月）をトグルして保存する。

@@ -597,12 +597,18 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   }
 
   /// 並び替え結果を各取引の sortOrder（0,1,2…）として保存する。
-  Future<void> _saveAccountReorder(List<_LedgerRow> ordered) async {
+  /// update() は同期でキャッシュ更新＆stream通知するので await せず投げる＝
+  /// 画面は即座に並び替わる（サーバ書き込みは裏で完了。▲▼の反応遅延を解消）。
+  void _saveAccountReorder(List<_LedgerRow> ordered) {
+    final writes = <Future<void>>[];
     for (int i = 0; i < ordered.length; i++) {
-      await TransactionRepository.instance
-          .update(ordered[i].txn.copyWith(sortOrder: i.toDouble()));
+      writes.add(TransactionRepository.instance
+          .update(ordered[i].txn.copyWith(sortOrder: i.toDouble())));
     }
-    if (mounted) await _load();
+    unawaited(Future.wait(writes).catchError((_) {
+      if (mounted) _load();
+      return <void>[];
+    }));
   }
 
   static const _cGreen = Color(0xFF16A34A);
