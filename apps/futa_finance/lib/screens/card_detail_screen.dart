@@ -363,6 +363,11 @@ class _CardDetailScreenState extends State<CardDetailScreen>
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.post_add, color: Color(0xFF1A237E)),
+            tooltip: '支出を記録（このカード払い）',
+            onPressed: _addExpenseForCard,
+          ),
+          IconButton(
             icon: const Icon(Icons.fact_check_outlined,
                 color: Color(0xFF1A237E)),
             tooltip: 'クレカ棚卸し（突合）',
@@ -859,6 +864,26 @@ class _CardDetailScreenState extends State<CardDetailScreen>
   /// 明細テーブル行タップ → 取引を編集して再読込。
   Future<void> _editCardTxn(core.Transaction t) async {
     await showInputSheet<bool>(context, ExpenseInputScreen(editing: t));
+    if (mounted) await _load();
+  }
+
+  /// このカード払いの支出を新規記録する（明細を1件ずつ確認中の記録漏れ補完用）。
+  /// 支払方法はこのカードにプリセット。過去月を表示中ならその月末を初期日付にする。
+  Future<void> _addExpenseForCard() async {
+    final now = DateTime.now();
+    DateTime? preset;
+    if (_selectedMonth != null &&
+        !(_selectedMonth!.year == now.year &&
+            _selectedMonth!.month == now.month)) {
+      preset = DateTime(_selectedMonth!.year, _selectedMonth!.month + 1, 0);
+    }
+    await showInputSheet<bool>(
+      context,
+      ExpenseInputScreen(
+        initialPaymentMethod: _card.name,
+        initialDate: preset,
+      ),
+    );
     if (mounted) await _load();
   }
 
