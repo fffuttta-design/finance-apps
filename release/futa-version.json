@@ -1,1 +1,1 @@
-{"version":"1.0.421","buildNumber":"422","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.421/futa-finance-v1.0.421.apk","releaseNotes":"カスタム順▲▼ボタンの反応遅延を解消しました。ボタンを押すとすぐに並び替わります（保存は裏で完了）。"}
+{"version":"1.0.422","buildNumber":"423","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.422/futa-finance-v1.0.422.apk","releaseNotes":"カスタム順の並び替え中に順番がチラつく（戻って進んで戻る）不具合を解消しました。1回のまとめ書き込みで、押した通りに一度でスッと並びます。"}
