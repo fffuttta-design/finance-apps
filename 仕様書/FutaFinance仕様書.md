@@ -465,6 +465,9 @@ class MonthlySnapshot {
 - **支出明細テーブルの「金額」列も可変列化**（中央5列＝大/小/内容/支払方法/金額）。支払方法↔金額の境界にリサイズハンドル追加。保存キー `..._v3`。
 - **「毎月の固定費」ヘッダーの右合計のはみ出しを修正**（右パディング32で下の各行金額に揃える）。
 
+### 取引詳細の領収書セクションを事業モード限定に（v1.0.425〜）
+- 取引詳細画面（`transaction_detail_screen.dart`）の**領収書/請求書ブロック（閲覧ボタン・「紙のレシートで保管済み」チェック・保管状態バッジ）を事業モードのみ表示**に変更。個人モードでは領収書の保管が税務上不要なため丸ごと非表示（`AppModeManager.instance.current == AppMode.business` で `if (isBusiness)` ガード）。支出入力フォーム側は元から事業モード限定だったのに合わせた。
+
 ### 領収書保存チェック列＋テーブルヘッダー色付け（v1.0.371〜）
 - **`Transaction.receiptSaved`（bool・既定false）を追加**（toJson/fromJson/copyWith・Firestore永続化対応）。領収書URL保存済み or 現物レシート保管済みを手動チェックする税理士提出用フラグ。
 - **支出明細テーブルに「領収書」チェック列を追加**（`ExpenseDetailTable.showReceiptCheck` / `onToggleReceipt`）。**事業モードのみ表示**（`rich_expenses` が `_isBusiness` で渡す）。チェック切替で `TransactionRepository.update` 保存＋再読込。緑チェックボックス。PC/スマホ両対応。
