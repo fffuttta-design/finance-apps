@@ -336,7 +336,7 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
             t.type == core.TransactionType.expense &&
             t.date.year == m.year &&
             t.date.month == m.month)
-        .fold<int>(0, (s, t) => s + t.amount);
+        .fold<int>(0, (s, t) => s + t.effectiveAmount);
 
     // 年度サマリー / 会計風月次表は「業績」タブへ移動済み。
     // ここでは月次推移とカテゴリ別経費の比率に使う合計のみ残す。
@@ -350,7 +350,7 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
       final months12Ago = DateTime(now.year, now.month - 11, 1);
       if (t.date.isBefore(months12Ago)) continue;
       categoryTotals[t.category.major] =
-          (categoryTotals[t.category.major] ?? 0) + t.amount;
+          (categoryTotals[t.category.major] ?? 0) + t.effectiveAmount;
     }
     final sortedCategories = categoryTotals.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
@@ -1377,9 +1377,9 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
         sales += t.amount;
       } else if (t.type == core.TransactionType.expense) {
         if (_isCostOfSales(t.category.major)) {
-          cogs += t.amount;
+          cogs += t.effectiveAmount;
         } else {
-          sga += t.amount;
+          sga += t.effectiveAmount;
         }
       }
     }

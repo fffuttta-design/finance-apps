@@ -174,7 +174,7 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
     final income = incomeConfirmed + incomePending;
     final txExpense = monthTxns
         .where((t) => t.type == TransactionType.expense)
-        .fold<int>(0, (s, t) => s + t.amount);
+        .fold<int>(0, (s, t) => s + t.effectiveAmount);
     final subTotal = _subsTotalForMonth(_month);
     final expense = txExpense + subTotal;
     final net = income - expense;
@@ -200,7 +200,7 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
       final major =
           t.category.major.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
       if (major.isEmpty) continue;
-      byMajor[major] = (byMajor[major] ?? 0) + t.amount;
+      byMajor[major] = (byMajor[major] ?? 0) + t.effectiveAmount;
       (txnsByMajor[major] ??= []).add(t);
     }
     // 固定費（サブスク）当月分の明細（名前・金額）。
@@ -235,7 +235,7 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
     final byMethod = <String, int>{};
     for (final t in monthTxns) {
       if (t.type != TransactionType.expense) continue;
-      byMethod[t.paymentMethod] = (byMethod[t.paymentMethod] ?? 0) + t.amount;
+      byMethod[t.paymentMethod] = (byMethod[t.paymentMethod] ?? 0) + t.effectiveAmount;
     }
     if (subTotal > 0) {
       byMethod['固定費・サブスク'] =

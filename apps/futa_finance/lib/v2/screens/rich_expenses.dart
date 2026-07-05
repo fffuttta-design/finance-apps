@@ -588,8 +588,8 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
       final gaichu = all.where(_isGaichu).toList();
       final keihi = all.where((t) => !_isGaichu(t)).toList();
       final keihiTotal =
-          keihi.fold<int>(0, (s, t) => s + t.amount) + _subsOf(_month);
-      final gaichuTotal = gaichu.fold<int>(0, (s, t) => s + t.amount);
+          keihi.fold<int>(0, (s, t) => s + t.effectiveAmount) + _subsOf(_month);
+      final gaichuTotal = gaichu.fold<int>(0, (s, t) => s + t.effectiveAmount);
       return Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 960),
@@ -685,7 +685,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   }) {
     final accent = widget.accent;
     final summaryLabel = detailLabel.replaceAll('明細', '');
-    final txTotal = rows.fold<int>(0, (s, t) => s + t.amount);
+    final txTotal = rows.fold<int>(0, (s, t) => s + t.effectiveAmount);
     final subTotal = showFixedAndCard ? _subsOf(_month) : 0;
     final total = txTotal + subTotal;
     final fixedLines = showFixedAndCard
@@ -706,7 +706,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
       final major =
           t.category.major.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
       if (major.isEmpty) continue;
-      byMajor[major] = (byMajor[major] ?? 0) + t.amount;
+      byMajor[major] = (byMajor[major] ?? 0) + t.effectiveAmount;
       (txnsByMajor[major] ??= []).add(t);
     }
     if (subTotal > 0) {
@@ -720,7 +720,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     for (final t in rows) {
       final pm =
           t.paymentMethod.trim().isEmpty ? '未設定' : t.paymentMethod.trim();
-      byPayment[pm] = (byPayment[pm] ?? 0) + t.amount;
+      byPayment[pm] = (byPayment[pm] ?? 0) + t.effectiveAmount;
     }
     if (showFixedAndCard) {
       final now = DateTime.now();

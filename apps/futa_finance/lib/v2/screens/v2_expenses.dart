@@ -422,7 +422,7 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     }
     final expenses = _monthExpenses;
     final entries = _monthEntries;
-    final total = expenses.fold<int>(0, (s, t) => s + t.amount);
+    final total = expenses.fold<int>(0, (s, t) => s + t.effectiveAmount);
     final fixedTotal =
         _monthlyCharges.fold<int>(0, (s, c) => s + c.amountForMonth(_ymKey));
 
@@ -476,9 +476,9 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
       final shokeihiExpenses =
           expenses.where((t) => !_isGaichu(t)).toList();
       final shokeihiTotal =
-          shokeihiExpenses.fold<int>(0, (s, t) => s + t.amount);
+          shokeihiExpenses.fold<int>(0, (s, t) => s + t.effectiveAmount);
       final gaichuTotal =
-          gaichuExpenses.fold<int>(0, (s, t) => s + t.amount);
+          gaichuExpenses.fold<int>(0, (s, t) => s + t.effectiveAmount);
 
       return Column(
         children: [

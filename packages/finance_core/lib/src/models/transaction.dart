@@ -120,6 +120,22 @@ class Transaction {
   /// receiptSaved（対応済みチェック）とは別に、詳細画面で種類を記録・表示する。
   final String? receiptType;
 
+  /// 立替精算で「あとで戻ってくる額（立替回収額）」。支出のみ・任意。
+  /// 例: 合計1,200円を立て替え、自己負担600円なら reimbursed=600。
+  /// amount(1,200) はカード明細と一致させるため満額のまま保持し、
+  /// 「実質のコスト」= amount - reimbursed（=effectiveAmount）を集計に使う。
+  /// null/0 は立替なし（実質コスト=amount）。
+  final int? reimbursed;
+
+  /// 実質のコスト（集計・PL・収支で「いくら使ったか」に使う額）。
+  /// 支出で立替回収額があればそのぶん差し引く。収入/振替や立替なしは amount と同じ。
+  /// 口座残高・カード請求・クレカ突合は amount（満額）を使うこと。
+  int get effectiveAmount => (type == TransactionType.expense &&
+          reimbursed != null &&
+          reimbursed! > 0)
+      ? (amount - reimbursed! < 0 ? 0 : amount - reimbursed!)
+      : amount;
+
   const Transaction({
     required this.id,
     required this.date,
@@ -148,6 +164,7 @@ class Transaction {
     this.sortOrder,
     this.reviewed = false,
     this.receiptType,
+    this.reimbursed,
   });
 
   Map<String, dynamic> toJson() => {
@@ -178,6 +195,7 @@ class Transaction {
         if (sortOrder != null) 'sortOrder': sortOrder,
         if (reviewed) 'reviewed': reviewed,
         if (receiptType != null) 'receiptType': receiptType,
+        if (reimbursed != null && reimbursed! > 0) 'reimbursed': reimbursed,
       };
 
   factory Transaction.fromJson(Map<String, dynamic> j) => Transaction(
@@ -216,6 +234,7 @@ class Transaction {
         sortOrder: (j['sortOrder'] as num?)?.toDouble(),
         reviewed: j['reviewed'] as bool? ?? false,
         receiptType: j['receiptType'] as String?,
+        reimbursed: (j['reimbursed'] as num?)?.toInt(),
       );
 
   Transaction copyWith({
@@ -248,6 +267,9 @@ class Transaction {
     double? sortOrder,
     bool? reviewed,
     String? receiptType,
+    int? reimbursed,
+    /// true にすると reimbursed を null に戻す（立替の解除）。
+    bool clearReimbursed = false,
   }) =>
       Transaction(
         id: id,
@@ -277,5 +299,6 @@ class Transaction {
         sortOrder: sortOrder ?? this.sortOrder,
         reviewed: reviewed ?? this.reviewed,
         receiptType: receiptType ?? this.receiptType,
+        reimbursed: clearReimbursed ? null : (reimbursed ?? this.reimbursed),
       );
 }

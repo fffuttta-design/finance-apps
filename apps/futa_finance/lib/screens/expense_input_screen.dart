@@ -386,11 +386,10 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         weight = 4; // 店舗完全一致を最優先
       } else if (desc.isNotEmpty && tDesc.isNotEmpty && tDesc == desc) {
         weight = 3; // 件名（取引内容）の完全一致を強めに
-      } else if (desc.isNotEmpty &&
-          tDesc.isNotEmpty &&
-          (tDesc.contains(desc) || desc.contains(tDesc))) {
-        weight = 1; // 部分一致
       }
+      // 旧: 部分一致(contains)でも weight=1 で拾っていたが、入力途中の文字が
+      // 別カテゴリの履歴に部分一致して誤爆する(例:「あつた」がタクシー履歴
+      // 「→あつた皮膚科」に一致し交通費を提案)。確実な完全一致のみに限定する。
       if (weight == 0) continue;
       final key = '${t.category.major}${t.category.sub}';
       tally[key] = (tally[key] ?? 0) + weight;
@@ -893,6 +892,15 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         : (widget.receiptId != null
             ? DriveReceiptService.instance.urlFor(widget.receiptId!)
             : null);
+    // 立替精算の「あとで戻る額（立替回収額）」。金額(amount)は満額のまま保持し、
+    // 実質コスト = amount - reimbursed を集計に使う（詳細/明細で「実質負担」を表示）。
+    // 新規で立替ONのときだけ算出。編集時は 立替UIが無いので既存値を引き継ぐ。
+    final int? reimbursedVal = (_treatSplit && _splitReceiveWallet != null)
+        ? (() {
+            final r = amount - (parseAmount(_myShareCtrl.text) ?? 0);
+            return r > 0 ? r : null;
+          })()
+        : editing?.reimbursed;
     final tx = core.Transaction(
       id: editing?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
       date: _date,
@@ -902,6 +910,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       paymentMethod: _paymentMethod!,
       description: _descCtrl.text.trim(),
       amount: amount,
+      reimbursed: reimbursedVal,
       memo: _memoCtrl.text.trim().isEmpty ? null : _memoCtrl.text.trim(),
       store: _storeCtrl.text.trim().isEmpty ? null : _storeCtrl.text.trim(),
       receiptUrl: receiptUrlVal,

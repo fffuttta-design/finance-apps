@@ -131,6 +131,10 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
     final isBusiness =
         AppModeManager.instance.current == AppMode.business;
     final hasReceipt = t.receiptUrl != null && t.receiptUrl!.trim().isNotEmpty;
+    // 立替精算：金額(amount)は満額のまま、実質負担 = amount - 立替回収額。
+    final reimbursed = t.reimbursed ?? 0;
+    final hasReimbursed =
+        t.type == core.TransactionType.expense && reimbursed > 0;
     // 制作原価(外注費/売上原価)や売上(収入)は「請求書」、それ以外は「領収書」と表記。
     final isInvoice = t.type == core.TransactionType.income ||
         ['外注費', '売上原価', '制作原価'].any((k) => t.category.major.contains(k));
@@ -177,6 +181,32 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                       fontWeight: FontWeight.w800,
                       color: _accent),
                 ),
+                if (hasReimbursed) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE7F6EF),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.south_east,
+                            size: 15, color: Color(0xFF059669)),
+                        const SizedBox(width: 6),
+                        Text(
+                          '実質のあなたの負担　${formatYen(t.effectiveAmount)}',
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF059669)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -208,6 +238,60 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
               ],
             ),
           ),
+          // 立替精算の内訳（実質いくら自分が負担したか）。
+          if (hasReimbursed) ...[
+            const SizedBox(height: 16),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFB7E3CE)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.volunteer_activism,
+                            size: 18, color: Color(0xFF059669)),
+                        SizedBox(width: 8),
+                        Text('立替精算',
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF374151))),
+                      ],
+                    ),
+                  ),
+                  _splitRow('支払った合計', formatYen(t.amount), null),
+                  _splitRow('立替（あとで戻る分）',
+                      '−${formatYen(reimbursed)}', const Color(0xFF6B7280)),
+                  Container(
+                    color: const Color(0xFFE7F6EF),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    child: Row(
+                      children: [
+                        const Text('実質の負担',
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF059669))),
+                        const Spacer(),
+                        Text(formatYen(t.effectiveAmount),
+                            style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF059669))),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           // 領収書/請求書の保管：ドライブ保存なら閲覧ボタン、
           // 紙で保管する分（店頭レシート・ベンチャーサポート等）は「紙で保管済み」トグル。
           // ※事業モードのみ表示（個人は税務上の証憑保管が不要なため出さない）。
@@ -325,6 +409,26 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
   }
 
   Widget _div() => const Divider(height: 1, color: Color(0xFFEEF0F3));
+
+  /// 立替精算の内訳の1行（ラベル＋金額）。
+  Widget _splitRow(String label, String value, Color? valueColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        children: [
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 14, color: Color(0xFF6B7280))),
+          const Spacer(),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: valueColor ?? const Color(0xFF111827))),
+        ],
+      ),
+    );
+  }
 
   Widget _row(String label, String value) {
     return Padding(

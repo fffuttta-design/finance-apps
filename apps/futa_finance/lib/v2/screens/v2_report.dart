@@ -312,7 +312,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
       final idx = months.indexWhere(
           (m) => m.year == t.date.year && m.month == t.date.month);
       if (idx < 0) continue;
-      result[idx] += t.amount;
+      result[idx] += t.effectiveAmount;
     }
     // サブスク（会計科目を紐付けたもの）を合算。
     final subs = _subsMonthlyForCategory(c);
@@ -332,7 +332,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
       final idx = months.indexWhere(
           (m) => m.year == t.date.year && m.month == t.date.month);
       if (idx < 0) continue;
-      result[idx] += t.amount;
+      result[idx] += t.effectiveAmount;
     }
     // この科目に紐付くサブスクを合算（同じ大カテゴリのときのみ）。
     if (_classifyExpenseMajor(major) == c) {
@@ -493,7 +493,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
         if (t.type == core.TransactionType.income) {
           inc += t.amount;
         } else if (t.type == core.TransactionType.expense) {
-          exp += t.amount;
+          exp += t.effectiveAmount;
         }
       }
       final net = inc - exp;

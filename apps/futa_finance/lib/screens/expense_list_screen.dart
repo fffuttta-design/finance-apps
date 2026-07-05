@@ -382,6 +382,26 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
         ),
       );
 
+  /// 立替精算バッジ（実質いくら自分が負担したか）。
+  Widget _reimbursedChip(core.Transaction t) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE7F6EF),
+          borderRadius: BorderRadius.circular(3),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.volunteer_activism,
+                size: 11, color: Color(0xFF059669)),
+            const SizedBox(width: 2),
+            Text('立替・実質 ${formatYen(t.effectiveAmount)}',
+                style: const TextStyle(
+                    fontSize: 11, color: Color(0xFF059669))),
+          ],
+        ),
+      );
+
   /// 振替金額（中立色・マイナスなし）。
   Widget _transferAmount(int amount) => Text(formatYen(amount),
       style: const TextStyle(
@@ -571,6 +591,9 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                         ? _transferBadge()
                         : _catBadge(t.category, accent),
                     _paymentChip(payLabel),
+                    if (!isTransfer &&
+                        (t.reimbursed ?? 0) > 0)
+                      _reimbursedChip(t),
                   ],
                 ),
               ],

@@ -910,7 +910,7 @@ class _CenterColumn extends StatelessWidget {
     final income = incomeConfirmed + incomePending;
     final txExpense = monthTxns
         .where((t) => t.type == TransactionType.expense)
-        .fold<int>(0, (s, t) => s + t.amount);
+        .fold<int>(0, (s, t) => s + t.effectiveAmount);
     // 固定費（サブスク）の当月分を「当月経費」にあらかじめ加算。
     final subTotal = state.subsTotalForMonth(state._selectedMonth);
     final expense = txExpense + subTotal;
@@ -922,7 +922,7 @@ class _CenterColumn extends StatelessWidget {
     for (final t in monthTxns) {
       if (t.type != TransactionType.expense) continue;
       expenseByMethod[t.paymentMethod] =
-          (expenseByMethod[t.paymentMethod] ?? 0) + t.amount;
+          (expenseByMethod[t.paymentMethod] ?? 0) + t.effectiveAmount;
     }
     if (subTotal > 0) {
       expenseByMethod['固定費・サブスク'] =
@@ -960,7 +960,7 @@ class _CenterColumn extends StatelessWidget {
       final major =
           t.category.major.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
       if (major.isEmpty) continue;
-      byMajor[major] = (byMajor[major] ?? 0) + t.amount;
+      byMajor[major] = (byMajor[major] ?? 0) + t.effectiveAmount;
       (txnsByMajor[major] ??= []).add(t);
     }
     // 固定費（サブスク）の当月分も大カテゴリ別内訳に1行として加える。

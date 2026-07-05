@@ -465,6 +465,13 @@ class MonthlySnapshot {
 - **支出明細テーブルの「金額」列も可変列化**（中央5列＝大/小/内容/支払方法/金額）。支払方法↔金額の境界にリサイズハンドル追加。保存キー `..._v3`。
 - **「毎月の固定費」ヘッダーの右合計のはみ出しを修正**（右パディング32で下の各行金額に揃える）。
 
+### 立替精算に「実質負担額」＋カテゴリ予測の誤爆修正（v1.0.426〜）
+- **立替精算の実質コスト化**: `Transaction` に `reimbursed`（立替回収額・任意）と `effectiveAmount`（= 支出なら `amount - reimbursed`、他は `amount`）を追加。`amount` はカード明細/クレカ突合と一致させるため**満額のまま保持**し、**集計・PL・収支・支出合計・カテゴリ/支払方法別内訳は `effectiveAmount`（実質コスト）で計算**する。口座残高・カード請求・クレカ突合・通帳は `amount`（満額）のまま。
+  - 集計を effectiveAmount 化した箇所: `v2_report`（PL `_monthlyForCategory`/`_monthlyForItem`・家庭用月別収支）, `v2_home_topnav`（当月支出・支払方法別・大カテゴリ別）, `rich_home`, `v2_expenses`（合計・諸経費/外注費）, `rich_expenses`, `dev_lab_screen`（年度PL/BS・カテゴリ集計）。
+  - 表示: 取引詳細に「実質のあなたの負担 ¥○」＋「立替精算」内訳（支払合計/立替/実質）を表示（`transaction_detail_screen.dart`）。支出明細一覧の行に「立替・実質 ¥○」バッジ（`expense_list_screen.dart` `_reimbursedChip`）。
+  - 入力: `expense_input_screen._save` で立替ON時に `reimbursed = amount - 自己負担額` を支出取引へ保存（現金回収の振替はこれまで通り別レコードで作成）。
+- **カテゴリ自動予測の誤爆修正**: `_autoPredictCategory` の履歴学習から「あいまいな部分一致(contains, weight=1)」を撤去。入力途中の文字（例「あつた」）が別カテゴリの履歴（タクシー「→あつた皮膚科」）に部分一致して交通費を誤提案する事象を解消。**店舗/取引内容の完全一致のみ**で予測（確実な一致が無ければ無提案）。
+
 ### 取引詳細の領収書セクションを事業モード限定に（v1.0.425〜）
 - 取引詳細画面（`transaction_detail_screen.dart`）の**領収書/請求書ブロック（閲覧ボタン・「紙のレシートで保管済み」チェック・保管状態バッジ）を事業モードのみ表示**に変更。個人モードでは領収書の保管が税務上不要なため丸ごと非表示（`AppModeManager.instance.current == AppMode.business` で `if (isBusiness)` ガード）。支出入力フォーム側は元から事業モード限定だったのに合わせた。
 
