@@ -50,6 +50,8 @@ class _CardDetailScreenState extends State<CardDetailScreen>
   bool _monthPicked = false;
   // 月締め処理中フラグ（ボタン多重押し防止）。
   bool _busyCardClose = false;
+  // 明細をカスタム順（手動並び替え）で表示するか。締めバーのボタンで切替。
+  bool _cardCustom = false;
   // カード×月ごとの「締め済み」状態（明示的にボタンを押したときだけ立つ）。
   core.MonthClosingConfig _closing = core.MonthClosingConfig.empty();
   late final TabController _tabController =
@@ -395,6 +397,28 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                       : const Color(0xFF6B7280)),
             ),
           ),
+          // カスタム順トグル（締めボタンの隣・固定位置。スクロールで消えない）。
+          Tooltip(
+            message: _cardCustom ? '日付順に戻す' : '手動で並び替える',
+            child: OutlinedButton.icon(
+              onPressed: () => setState(() => _cardCustom = !_cardCustom),
+              icon: Icon(
+                  _cardCustom ? Icons.sort : Icons.swap_vert,
+                  size: 16),
+              label: Text(_cardCustom ? '日付順' : 'カスタム順'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _cardCustom
+                    ? const Color(0xFF059669)
+                    : const Color(0xFF6B7280),
+                side: BorderSide(
+                    color: _cardCustom
+                        ? const Color(0xFF059669)
+                        : const Color(0xFFD1D5DB)),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           if (closed)
             TextButton(
               onPressed: _busyCardClose
@@ -640,6 +664,7 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                                     onToggleReviewedFixed: (f, v) =>
                                         _toggleFixedReviewed(f.id, v),
                                     onReorderDay: _saveReorder,
+                                    customOrder: _cardCustom,
                                     emptyHint: 'この期間の利用はありません',
                                   ),
                                 )

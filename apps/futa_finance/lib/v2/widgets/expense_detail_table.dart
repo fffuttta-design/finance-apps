@@ -129,6 +129,11 @@ class ExpenseDetailTable extends StatefulWidget {
   final Future<void> Function(List<ReorderedItem> dayInNewOrder)?
       onReorderDay;
 
+  /// カスタム順の ON/OFF を外から制御する（非 null のとき、内部のカスタム順トグルは
+  /// 隠し、この値でカスタム順モードを決める）。カード詳細では締めボタンの隣の固定
+  /// ヘッダーにトグルを置くためこれを使う。
+  final bool? customOrder;
+
   const ExpenseDetailTable({
     super.key,
     required this.rows,
@@ -145,6 +150,7 @@ class ExpenseDetailTable extends StatefulWidget {
     this.onToggleReviewed,
     this.onToggleReviewedFixed,
     this.onReorderDay,
+    this.customOrder,
   });
 
   @override
@@ -161,6 +167,10 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
   // 並び替えは表ヘッダーのクリックで列＋昇順/降順を切替。
   _SortCol _sortCol = _SortCol.date;
   bool _asc = false; // 日付は既定で降順（新しい順）。
+
+  /// 有効なカスタム順モード。外部制御(widget.customOrder)があればそれを優先。
+  bool get _isCustomOrder =>
+      widget.customOrder ?? (_sortCol == _SortCol.custom);
   // ユーザーが一度でも並び替えを操作したか。既定（日付順）のうちは矢印を出さない。
   bool _sortTouched = false;
   final _searchCtrl = TextEditingController();
@@ -243,6 +253,18 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
         final c = a.subText.compareTo(b.subText); // 小カテゴリ昇順
         if (c != 0) return c;
         return b.placeText.compareTo(a.placeText); // 場所降順
+      });
+      return list;
+    }
+    // 外部制御(カード詳細の固定ヘッダー)でカスタム順のときは、_sortCol に関係なく
+    // 手動並び順(sortOrder)で並べる。
+    if (_isCustomOrder) {
+      list.sort((a, b) {
+        final ao = a.manualOrder, bo = b.manualOrder;
+        if (ao == null && bo == null) return -a.date.compareTo(b.date);
+        if (ao == null) return -1;
+        if (bo == null) return 1;
+        return ao.compareTo(bo);
       });
       return list;
     }
@@ -341,26 +363,28 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                     .copyWith(color: V2Colors.textSecondary)),
             const Spacer(),
             if (widget.onReorderDay != null) ...[
-              if (_sortCol == _SortCol.custom)
+              if (_isCustomOrder)
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: Text('ハンドルをドラッグで並び替え',
                       style: V2Typography.micro
                           .copyWith(color: V2Colors.textMuted)),
                 ),
-              _CustomOrderToggle(
-                active: _sortCol == _SortCol.custom,
-                accent: widget.accent,
-                onTap: () => setState(() {
-                  _sortTouched = true;
-                  if (_sortCol == _SortCol.custom) {
-                    _sortCol = _SortCol.date;
-                    _asc = false; // 日付・降順（新しい順）に戻す
-                  } else {
-                    _sortCol = _SortCol.custom;
-                  }
-                }),
-              ),
+              // 外部制御(カード詳細の固定ヘッダー)のときは内部トグルを出さない。
+              if (widget.customOrder == null)
+                _CustomOrderToggle(
+                  active: _sortCol == _SortCol.custom,
+                  accent: widget.accent,
+                  onTap: () => setState(() {
+                    _sortTouched = true;
+                    if (_sortCol == _SortCol.custom) {
+                      _sortCol = _SortCol.date;
+                      _asc = false; // 日付・降順（新しい順）に戻す
+                    } else {
+                      _sortCol = _SortCol.custom;
+                    }
+                  }),
+                ),
             ] else
               Text('ヘッダーをタップで並び替え',
                   style: V2Typography.micro
@@ -455,8 +479,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: V2Colors.border),
             ),
-            child: (widget.onReorderDay != null &&
-                    _sortCol == _SortCol.custom)
+            child: (widget.onReorderDay != null && _isCustomOrder)
                 ? _customReorderList(detailRows)
                 : LayoutBuilder(builder: (ctx, cons) {
               // 狭い幅（スマホ）は1行表だと潰れるので2行のスリム表示。
