@@ -1,1 +1,1 @@
-{"version":"1.0.456","buildNumber":"457","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.456/futa-finance-v1.0.456.apk","releaseNotes":"振替の「移動先」にクレジットカードを選べるようにしました（カード引落の記録用／休眠でも前月利用があれば表示）。クレカ引落などの自動記録メッセージが毎回出る問題も直しました。"}
+{"version":"1.0.457","buildNumber":"458","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.457/futa-finance-v1.0.457.apk","releaseNotes":"月の切り替えを一番上のバー（事業/個人の並び）に移しました。ホーム・支出・収入で共通して上から月を切り替えられます。"}
