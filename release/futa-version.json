@@ -1,1 +1,1 @@
-{"version":"1.0.427","buildNumber":"428","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.427/futa-finance-v1.0.427.apk","releaseNotes":"立替精算に「実質負担額」を表示（集計は実質コストで計算）。カテゴリの「明細◯件」をタップで中身を表示。支出入力に「小カテゴリ編集」。カテゴリ自動予測の誤爆を修正。"}
+{"version":"1.0.428","buildNumber":"429","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.428/futa-finance-v1.0.428.apk","releaseNotes":"支出入力/編集を軽くしました。カテゴリは「カテゴリを提案」ボタンで手動提案に（入力途中の誤提案を解消）。固定費編集の会計科目をプルダウンに統一。"}
