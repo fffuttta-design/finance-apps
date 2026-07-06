@@ -939,14 +939,15 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         ),
         child: Table(
           columnWidths: const {
-            0: FixedColumnWidth(100),
-            1: FlexColumnWidth(),
-            2: FixedColumnWidth(92), // 支出
-            3: FixedColumnWidth(92), // 収入
-            4: FixedColumnWidth(112), // 振替
-            5: FixedColumnWidth(116), // 残高
-            6: FixedColumnWidth(44), // 確認チェック
-            7: FixedColumnWidth(40), // 編集
+            0: FixedColumnWidth(92), // 取引日
+            1: FixedColumnWidth(78), // 種別
+            2: FlexColumnWidth(), // 摘要
+            3: FixedColumnWidth(88), // 支出
+            4: FixedColumnWidth(88), // 収入
+            5: FixedColumnWidth(104), // 振替
+            6: FixedColumnWidth(108), // 残高
+            7: FixedColumnWidth(44), // 確認チェック
+            8: FixedColumnWidth(40), // 編集
           },
           defaultVerticalAlignment: TableCellVerticalAlignment.middle,
           border: const TableBorder(
@@ -997,6 +998,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       decoration: const BoxDecoration(color: Color(0xFFF3F4F6)),
       children: [
         h('取引日'),
+        h('種別'),
         h('摘要'),
         h('支出', right: true),
         h('収入', right: true),
@@ -1039,6 +1041,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF6B7280))),
         ),
+        const SizedBox.shrink(), // 種別
         Padding(
           padding: _cellPad,
           child: Text(label,
@@ -1338,6 +1341,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                     ? const Color(0xFF9CA3AF)
                     : const Color(0xFF6B7280))),
       ),
+      // 種別（入金/出金/振替）。タップで変更（振替は移動先を尋ねる）。
+      _typeCell(t),
       Padding(
         padding: _cellPad,
         child: Text(desc,
@@ -1401,6 +1406,46 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         onPressed: () => _showEditDialog(t),
       ),
     ]);
+  }
+
+  /// 種別ラベル（入金/出金/振替）を色付きチップで表示（読み取り専用）。
+  Widget _typeCell(core.Transaction t) {
+    final String label;
+    final Color fg;
+    final Color bg;
+    switch (t.type) {
+      case core.TransactionType.transfer:
+        label = '振替';
+        fg = _cTransfer;
+        bg = const Color(0xFFEFF6FF);
+        break;
+      case core.TransactionType.income:
+        label = '入金';
+        fg = _cGreen;
+        bg = const Color(0xFFF0FDF4);
+        break;
+      case core.TransactionType.expense:
+        label = '出金';
+        fg = _cRed;
+        bg = const Color(0xFFFEF2F2);
+        break;
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(label,
+              style: TextStyle(
+                  fontSize: 11, fontWeight: FontWeight.w700, color: fg)),
+        ),
+      ),
+    );
   }
 
   Future<void> _toggleReviewed(core.Transaction t, bool value) async {
