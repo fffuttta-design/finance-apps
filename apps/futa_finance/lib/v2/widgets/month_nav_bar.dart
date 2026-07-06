@@ -30,15 +30,20 @@ class MonthNavBar extends StatelessWidget {
       children: [
         IconButton(
           visualDensity: VisualDensity.compact,
-          icon: const Icon(Icons.chevron_left, color: V2Colors.textSecondary),
+          icon: const Icon(Icons.chevron_left,
+              size: 26, color: V2Colors.textSecondary),
           onPressed: onPrev,
         ),
+        // 月は重要情報なので大きく見せる（全タブ共通）。
         Text(label,
-            style: V2Typography.bodyStrong
-                .copyWith(color: V2Colors.textPrimary)),
+            style: V2Typography.bodyStrong.copyWith(
+                color: V2Colors.textPrimary,
+                fontSize: 20,
+                fontWeight: FontWeight.w700)),
         IconButton(
           visualDensity: VisualDensity.compact,
-          icon: const Icon(Icons.chevron_right, color: V2Colors.textSecondary),
+          icon: const Icon(Icons.chevron_right,
+              size: 26, color: V2Colors.textSecondary),
           onPressed: onNext,
         ),
       ],

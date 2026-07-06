@@ -56,6 +56,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   /// 各取引の sortOrder に保存する。※残高は日付順が前提のため、このモード中は
   /// 残高列・月初/月末残高を隠す。
   bool _customOrder = false;
+  // 月締め処理中フラグ（ボタン多重押し防止）。
+  bool _busyClose = false;
 
   // ─── 未保存編集の管理 ─────────────────────
   /// ユーザーが手入力で上書きした月初残高（保存前のローカル状態）。
@@ -288,6 +290,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
             final content = Column(
               children: [
                 _monthSelector(),
+                _closeMonthBar(),
                 _summaryCard(
                   inSum: inSum,
                   outSum: outSum,
@@ -1208,6 +1211,133 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     await TransactionRepository.instance
         .update(t.copyWith(reviewed: value));
     if (mounted) await _load();
+  }
+
+  /// 選択中の月で、このウォレットに関係する取引（支払元/入金先/振替の相手）。
+  List<core.Transaction> _monthRelatedTxns() {
+    final m = _selectedMonth;
+    if (m == null) return const [];
+    final name = _account.name;
+    return _all.where((t) {
+      if (t.date.year != m.year || t.date.month != m.month) return false;
+      if (t.type == core.TransactionType.transfer) {
+        return t.transferFromAccount == name || t.transferToAccount == name;
+      }
+      return t.paymentMethod == name;
+    }).toList();
+  }
+
+  /// この月を締める＝この月のこのウォレットの取引を全部「確認済み」にする。
+  Future<void> _closeMonth() async {
+    final m = _selectedMonth;
+    if (m == null) return;
+    final txns = _monthRelatedTxns();
+    final todo = txns.where((t) => !t.reviewed).toList();
+    if (todo.isEmpty) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: Text('${m.month}月を締めますか？'),
+        content: Text(
+            '「${_account.name}」の${m.year}年${m.month}月の取引 ${txns.length}件を、'
+            'すべて「確認済み（金額に間違いなし）」にします。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dctx, true),
+              child: const Text('締める')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _busyClose = true);
+    for (final t in todo) {
+      await TransactionRepository.instance.update(t.copyWith(reviewed: true));
+    }
+    if (!mounted) return;
+    await _load();
+    if (!mounted) return;
+    setState(() => _busyClose = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${m.month}月を締めました（${todo.length}件を確認済みに）')));
+  }
+
+  /// 締めを解除＝この月のこのウォレットの取引の確認済みを外す。
+  Future<void> _reopenMonth() async {
+    final m = _selectedMonth;
+    if (m == null) return;
+    final done = _monthRelatedTxns().where((t) => t.reviewed).toList();
+    if (done.isEmpty) return;
+    setState(() => _busyClose = true);
+    for (final t in done) {
+      await TransactionRepository.instance
+          .update(t.copyWith(reviewed: false));
+    }
+    if (!mounted) return;
+    await _load();
+    if (!mounted) return;
+    setState(() => _busyClose = false);
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('${m.month}月の締めを解除しました')));
+  }
+
+  /// 月の締めバー（月選択時のみ）。全部確認済みなら「締め済み」、そうでなければ締めボタン。
+  Widget _closeMonthBar() {
+    final m = _selectedMonth;
+    if (m == null) return const SizedBox.shrink();
+    final txns = _monthRelatedTxns();
+    if (txns.isEmpty) return const SizedBox.shrink();
+    final allReviewed = txns.every((t) => t.reviewed);
+    final doneCount = txns.where((t) => t.reviewed).length;
+    return Container(
+      color: allReviewed ? const Color(0xFFE7F6EF) : const Color(0xFFF7F8FA),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Row(
+        children: [
+          Icon(allReviewed ? Icons.verified : Icons.fact_check_outlined,
+              size: 18,
+              color: allReviewed
+                  ? const Color(0xFF059669)
+                  : const Color(0xFF6B7280)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              allReviewed
+                  ? '${m.month}月は締め済み（全${txns.length}件 確認済み）'
+                  : '確認済み $doneCount/${txns.length}件',
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: allReviewed
+                      ? const Color(0xFF059669)
+                      : const Color(0xFF6B7280)),
+            ),
+          ),
+          if (allReviewed)
+            TextButton(
+              onPressed: _busyClose ? null : _reopenMonth,
+              child: const Text('締め解除'),
+            )
+          else
+            FilledButton.icon(
+              onPressed: _busyClose ? null : _closeMonth,
+              icon: _busyClose
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.check_circle, size: 16),
+              label: Text('${m.month}月を締める'),
+              style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF059669),
+                  visualDensity: VisualDensity.compact),
+            ),
+        ],
+      ),
+    );
   }
 
   // ───────────────────────────────────────────────────────────
