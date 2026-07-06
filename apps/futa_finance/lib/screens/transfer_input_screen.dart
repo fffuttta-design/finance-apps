@@ -549,9 +549,9 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
                   _inputDecoration(hint: '例: 生活費の移動・カード引落用'),
             ),
             const SizedBox(height: 16),
-            // 備考
+            // 備考（見出しは上の _label で出すので、枠内のラベルは空にして重複を消す）
             _label('備考（任意）'),
-            MemoField(controller: _memoCtrl),
+            MemoField(controller: _memoCtrl, label: ''),
             const SizedBox(height: 8),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
