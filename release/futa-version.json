@@ -1,1 +1,1 @@
-{"version":"1.0.466","buildNumber":"467","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.466/futa-finance-v1.0.466.apk","releaseNotes":"通帳で並び替えた順番が、通常表示にもそのまま残るようにしました（日付順に戻らない）。残高も表示順で計算します。"}
+{"version":"1.0.467","buildNumber":"468","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.467/futa-finance-v1.0.467.apk","releaseNotes":"振替の「移動先」に、登録済みのクレジットカードを全部出すようにしました（楽天カードなどが選べなかった不具合を修正）。"}
