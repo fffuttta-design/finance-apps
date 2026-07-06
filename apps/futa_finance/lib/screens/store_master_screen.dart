@@ -232,15 +232,21 @@ class _StoreMasterScreenState extends State<StoreMasterScreen> {
     }
   }
 
+  // 「未分類」グループの内部キー（実在のセクション名と衝突しない番兵）。
+  static const _unassignedKey = ' __unassigned__';
+
   @override
   Widget build(BuildContext context) {
-    final sorted = [..._stores]
-      ..sort((a, b) => _count(b).compareTo(_count(a)));
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       appBar: AppBar(
         title: const Text('場所マスタ'),
         actions: [
+          TextButton.icon(
+            onPressed: _busy ? null : _addSection,
+            icon: const Icon(Icons.create_new_folder_outlined, size: 18),
+            label: const Text('セクション追加'),
+          ),
           TextButton.icon(
             onPressed: _busy ? null : _importFromHistory,
             icon: const Icon(Icons.download, size: 18),
@@ -257,17 +263,218 @@ class _StoreMasterScreenState extends State<StoreMasterScreen> {
           ? const Center(child: CircularProgressIndicator())
           : CenteredBody(
               maxWidth: 640,
-              child: sorted.isEmpty
-                  ? _empty()
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
-                      itemCount: sorted.length,
-                      separatorBuilder: (_, index) =>
-                          const SizedBox(height: 6),
-                      itemBuilder: (_, i) => _row(sorted[i]),
-                    ),
+              child: _stores.isEmpty ? _empty() : _sectionedList(),
             ),
     );
+  }
+
+  /// セクションごとに場所をまとめて表示。各セクション内はドラッグで並び替え。
+  Widget _sectionedList() {
+    final sectionNames = _repo.sections;
+    final groups = <String, List<String>>{
+      for (final s in sectionNames) s: <String>[],
+      _unassignedKey: <String>[],
+    };
+    for (final store in _stores) {
+      final sec = _repo.sectionOf(store);
+      if (sec != null && groups.containsKey(sec)) {
+        groups[sec]!.add(store);
+      } else {
+        groups[_unassignedKey]!.add(store);
+      }
+    }
+    final order = [...sectionNames, _unassignedKey];
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+      children: [
+        for (final key in order)
+          if (key != _unassignedKey || groups[key]!.isNotEmpty)
+            _sectionCard(key, groups[key]!),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(4, 4, 4, 0),
+          child: Text(
+              'ハンドル（⋮⋮）をドラッグで並び替え。フォルダ🗂ボタンでセクションを変更できます。',
+              style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
+        ),
+      ],
+    );
+  }
+
+  Widget _sectionCard(String key, List<String> stores) {
+    final isUnassigned = key == _unassignedKey;
+    final title = isUnassigned ? '未分類' : key;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      padding: const EdgeInsets.fromLTRB(10, 8, 6, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(isUnassigned ? Icons.inbox_outlined : Icons.folder_outlined,
+                  size: 18, color: const Color(0xFF6B7280)),
+              const SizedBox(width: 8),
+              Text('$title（${stores.length}）',
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w800)),
+              const Spacer(),
+              if (!isUnassigned) ...[
+                IconButton(
+                  tooltip: 'セクション名を変更',
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.edit_outlined,
+                      size: 16, color: Color(0xFF6B7280)),
+                  onPressed: _busy ? null : () => _renameSection(key),
+                ),
+                IconButton(
+                  tooltip: 'セクションを削除（中の場所は未分類に戻る）',
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.delete_outline,
+                      size: 16, color: Color(0xFFDC2626)),
+                  onPressed: _busy ? null : () => _deleteSection(key),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 4),
+          if (stores.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+              child: Text('（このセクションの場所はありません）',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF))),
+            )
+          else
+            ReorderableListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              buildDefaultDragHandles: false,
+              itemCount: stores.length,
+              onReorder: (o, n) => _reorderWithin(key, stores, o, n),
+              itemBuilder: (_, i) => Padding(
+                key: ValueKey('$key|${stores[i]}'),
+                padding: const EdgeInsets.only(bottom: 6),
+                child: _row(stores[i], i),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// セクション内の並びを、_stores 全体の該当位置に書き戻して保存する。
+  void _reorderWithin(
+      String key, List<String> sectionStores, int oldIndex, int newIndex) {
+    if (newIndex > oldIndex) newIndex -= 1;
+    final reordered = [...sectionStores];
+    final item = reordered.removeAt(oldIndex);
+    reordered.insert(newIndex, item);
+    // _stores の中で、このセクションに属する要素の位置を集める。
+    bool belongs(String s) {
+      final sec = _repo.sectionOf(s);
+      return key == _unassignedKey
+          ? (sec == null || !_repo.sections.contains(sec))
+          : sec == key;
+    }
+
+    final positions = <int>[];
+    for (int i = 0; i < _stores.length; i++) {
+      if (belongs(_stores[i])) positions.add(i);
+    }
+    final next = [..._stores];
+    for (int j = 0; j < positions.length && j < reordered.length; j++) {
+      next[positions[j]] = reordered[j];
+    }
+    setState(() => _stores = next);
+    _repo.save(next);
+  }
+
+  Future<void> _addSection() async {
+    final name = await _promptText('セクションを追加', '');
+    if (name == null || name.trim().isEmpty) return;
+    await _repo.saveSections([..._repo.sections, name.trim()]);
+    await _load();
+    _snack('セクション「${name.trim()}」を追加しました');
+  }
+
+  Future<void> _renameSection(String old) async {
+    final name = await _promptText('セクション名を変更', old);
+    if (name == null || name.trim().isEmpty || name.trim() == old) return;
+    await _repo.renameSection(old, name.trim());
+    await _load();
+  }
+
+  Future<void> _deleteSection(String name) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: Text('「$name」を削除'),
+        content: const Text('セクションを削除します（中の場所は「未分類」に戻ります。場所自体は消えません）。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dctx, true),
+              child: const Text('削除する')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await _repo.saveSections(_repo.sections.where((s) => s != name).toList());
+    await _load();
+  }
+
+  /// 場所を別のセクションへ移す（未分類も選べる）。
+  Future<void> _moveToSection(String store) async {
+    final current = _repo.sectionOf(store);
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text('セクションを選ぶ',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.inbox_outlined),
+              title: const Text('未分類'),
+              trailing: current == null ? const Icon(Icons.check) : null,
+              onTap: () => Navigator.pop(sctx, _unassignedKey),
+            ),
+            for (final s in _repo.sections)
+              ListTile(
+                leading: const Icon(Icons.folder_outlined),
+                title: Text(s),
+                trailing: current == s ? const Icon(Icons.check) : null,
+                onTap: () => Navigator.pop(sctx, s),
+              ),
+            ListTile(
+              leading: const Icon(Icons.add),
+              title: const Text('新しいセクションを作る…'),
+              onTap: () => Navigator.pop(sctx, ''),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null) return;
+    if (choice.isEmpty) {
+      final name = await _promptText('セクションを追加', '');
+      if (name == null || name.trim().isEmpty) return;
+      await _repo.assignSection(store, name.trim());
+    } else {
+      await _repo.assignSection(
+          store, choice == _unassignedKey ? null : choice);
+    }
+    await _load();
   }
 
   Widget _empty() => Center(
@@ -292,7 +499,7 @@ class _StoreMasterScreenState extends State<StoreMasterScreen> {
         ),
       );
 
-  Widget _row(String store) {
+  Widget _row(String store, int index) {
     final cnt = _count(store);
     return Container(
       decoration: BoxDecoration(
@@ -300,12 +507,21 @@ class _StoreMasterScreenState extends State<StoreMasterScreen> {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
-      padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
+      padding: const EdgeInsets.fromLTRB(4, 8, 6, 8),
       child: Row(
         children: [
+          // ドラッグハンドル（このセクション内で並び替え）。
+          ReorderableDragStartListener(
+            index: index,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 6),
+              child: Icon(Icons.drag_indicator,
+                  size: 18, color: Color(0xFF9CA3AF)),
+            ),
+          ),
           const Icon(Icons.place_outlined,
               size: 18, color: Color(0xFF6B7280)),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -321,6 +537,13 @@ class _StoreMasterScreenState extends State<StoreMasterScreen> {
                         fontSize: 11, color: Color(0xFF9CA3AF))),
               ],
             ),
+          ),
+          IconButton(
+            tooltip: 'セクションを変更',
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.folder_outlined,
+                size: 18, color: Color(0xFF6B7280)),
+            onPressed: _busy ? null : () => _moveToSection(store),
           ),
           IconButton(
             tooltip: '名前を変更',
