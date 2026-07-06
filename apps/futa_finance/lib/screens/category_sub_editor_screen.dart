@@ -7,6 +7,7 @@ import '../utils/emoji_palette.dart';
 import '../widgets/centered_body.dart';
 import '../widgets/emoji_picker_dialog.dart';
 import 'category_reassign_screen.dart';
+import 'category_txns_screen.dart';
 
 /// 番号プレフィックス（"7."）を外した素の名前。
 String _bareName(String s) =>
@@ -56,6 +57,23 @@ class _CategorySubEditorScreenState extends State<CategorySubEditorScreen> {
         .where((t) =>
             _bareName(t.category.major) == majorName && t.category.sub == sub)
         .length;
+  }
+
+  /// 「明細◯件」タップ：その小カテゴリに紐づく明細一覧を開く。
+  Future<void> _openSubTxns(String sub) async {
+    final majorName = _bareName(_major.name);
+    final txns = _txns
+        .where((t) =>
+            _bareName(t.category.major) == majorName && t.category.sub == sub)
+        .toList();
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CategoryTxnsScreen(
+            title: '${_major.name} › $sub', transactions: txns),
+      ),
+    );
+    if (changed == true) await _load();
   }
 
   Future<void> _save() async {
@@ -307,10 +325,19 @@ class _CategorySubEditorScreenState extends State<CategorySubEditorScreen> {
                                         fontSize: 14,
                                         color: Color(0xFF111827))),
                                 const SizedBox(height: 1),
-                                Text('明細${_subCount(sub)}件',
-                                    style: const TextStyle(
-                                        fontSize: 11,
-                                        color: Color(0xFF9CA3AF))),
+                                InkWell(
+                                  onTap: () => _openSubTxns(sub),
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 1),
+                                    child: Text('明細${_subCount(sub)}件 ›',
+                                        style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF2563EB))),
+                                  ),
+                                ),
                               ],
                             ),
                           ),

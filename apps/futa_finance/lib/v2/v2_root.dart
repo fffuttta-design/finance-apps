@@ -438,8 +438,9 @@ class _RecordMenuButton extends StatelessWidget {
       tooltip: '記録する',
       onSelected: onSelected,
       itemBuilder: (_) => [
-        // レシート読み取り（OCRが使える環境＝キー注入済みのAndroidのみ表示）。
-        if (ReceiptOcrCloud.available)
+        // レシート読み取り（端末カメラで撮る前提のためAndroidのみ表示）。
+        // デスクトップ(Electron=中身はWeb)やブラウザでは出さない（kIsWebで除外）。
+        if (ReceiptOcrCloud.available && !kIsWeb)
           PopupMenuItem(
             value: 'receipt',
             child: Row(

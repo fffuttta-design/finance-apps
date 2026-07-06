@@ -14,6 +14,7 @@ import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
 import '../widgets/drive_receipt_picker.dart';
 import 'category_editor_screen.dart';
+import 'category_sub_editor_screen.dart';
 import 'receipt_camera_screen.dart';
 
 /// 支払元のカテゴリ。UI 上はまずこれを選択 → 該当の項目プルダウンが切り替わる。
@@ -741,6 +742,43 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     });
   }
 
+  /// 小カテゴリの編集画面（選択中の大カテゴリのサブ一覧）を直接開く。
+  /// 大カテゴリ未選択なら選ぶよう促す。戻ったら最新カテゴリを読み直す。
+  Future<void> _openSubCategoryEditor() async {
+    final cfg = _categories;
+    if (cfg == null) return;
+    if (_majorCategory == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('先に大カテゴリを選んでください')),
+      );
+      return;
+    }
+    String norm(String s) => s.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
+    final majorIndex = List.generate(cfg.majors.length, (i) => i).firstWhere(
+      (i) =>
+          cfg.majors[i].displayName(i) == _majorCategory ||
+          norm(cfg.majors[i].displayName(i)) == norm(_majorCategory!),
+      orElse: () => -1,
+    );
+    if (majorIndex < 0) return;
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CategorySubEditorScreen(majorIndex: majorIndex),
+      ),
+    );
+    if (!mounted) return;
+    final c = await _settings.loadCategories();
+    if (!mounted) return;
+    setState(() {
+      _categories = c;
+      if (_subCategory != null && !_availableSubs.contains(_subCategory)) {
+        _subCategory = null;
+      }
+      _subDropdownNonce++;
+    });
+  }
+
   Future<void> _pickDate() async {
     // モード別カットオフ（事業=2025/10・個人=2026/01）より前は選べない。
     // PC（広い画面）はカレンダー / スマホはホイール、で出し分け。
@@ -1227,7 +1265,31 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               ],
               const SizedBox(height: 16),
 
-              _label('小カテゴリ'),
+              Row(
+                children: [
+                  Expanded(child: _label('小カテゴリ')),
+                  InkWell(
+                    onTap: _openSubCategoryEditor,
+                    borderRadius: BorderRadius.circular(6),
+                    child: const Padding(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.tune, size: 14, color: Color(0xFF1A237E)),
+                          SizedBox(width: 3),
+                          Text('小カテゴリ編集',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1A237E))),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               DropdownButtonFormField<String>(
                 key: ValueKey('sub-$_majorCategory-$_subDropdownNonce'),
                 initialValue: _subCategory,

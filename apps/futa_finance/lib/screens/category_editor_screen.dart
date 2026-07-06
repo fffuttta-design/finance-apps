@@ -11,6 +11,7 @@ import '../widgets/centered_body.dart';
 import '../widgets/emoji_picker_dialog.dart';
 import 'category_reassign_screen.dart';
 import 'category_sub_editor_screen.dart';
+import 'category_txns_screen.dart';
 
 /// 番号プレフィックス（"7."）を外した素の名前。
 String _bareName(String s) =>
@@ -56,6 +57,22 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
     return _txns
         .where((t) => _bareName(t.category.major) == name)
         .length;
+  }
+
+  /// 「明細◯件」タップ：その大カテゴリに紐づく明細一覧を開く。
+  Future<void> _openMajorTxns(int index) async {
+    final major = _config!.majors[index];
+    final name = _bareName(major.displayName(index));
+    final txns =
+        _txns.where((t) => _bareName(t.category.major) == name).toList();
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            CategoryTxnsScreen(title: major.name, transactions: txns),
+      ),
+    );
+    if (changed == true) await _load(); // 編集/削除されたら件数を取り直す
   }
 
   Future<void> _save() async {
@@ -508,9 +525,25 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
                             const SizedBox(width: 6),
                           ],
                           Text(
-                            '小カテゴリ${major.subs.length}件 ・ 明細${_majorCount(index)}件',
+                            '小カテゴリ${major.subs.length}件 ・ ',
                             style: const TextStyle(
                                 fontSize: 11, color: Color(0xFF9CA3AF)),
+                          ),
+                          // 「明細◯件」タップで、そのカテゴリの明細一覧を開く。
+                          InkWell(
+                            onTap: () => _openMajorTxns(index),
+                            borderRadius: BorderRadius.circular(4),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 2, vertical: 1),
+                              child: Text(
+                                '明細${_majorCount(index)}件 ›',
+                                style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF2563EB)),
+                              ),
+                            ),
                           ),
                         ],
                       ),

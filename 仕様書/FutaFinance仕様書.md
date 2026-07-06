@@ -465,6 +465,11 @@ class MonthlySnapshot {
 - **支出明細テーブルの「金額」列も可変列化**（中央5列＝大/小/内容/支払方法/金額）。支払方法↔金額の境界にリサイズハンドル追加。保存キー `..._v3`。
 - **「毎月の固定費」ヘッダーの右合計のはみ出しを修正**（右パディング32で下の各行金額に揃える）。
 
+### カテゴリ明細ビュー＋小カテゴリ編集ボタン＋デスクトップでレシート非表示（v1.0.427〜）
+- **カテゴリの「明細◯件」をタップで中身を表示**: 大カテゴリ編集（`category_editor_screen`）・小カテゴリ編集（`category_sub_editor_screen`）の「明細◯件」を青リンク化。タップで共通の `CategoryTxnsScreen`（`screens/category_txns_screen.dart`）にそのカテゴリの取引一覧を表示（日付/内容/金額・立替は実質バッジ）。行タップで取引詳細（編集/削除）へ。編集/削除して戻ると件数を再読込。
+- **支出入力の小カテゴリにも「小カテゴリ編集」ボタン**: 大カテゴリの「カテゴリ編集」に加え、小カテゴリ欄の見出し右に「小カテゴリ編集」を追加（`expense_input_screen._openSubCategoryEditor`）。押すと選択中の大カテゴリの `CategorySubEditorScreen` を直接開く（大カテゴリ未選択ならトーストで促す）。戻ると小カテゴリ候補を再読込。
+- **デスクトップ/ブラウザでは「レシートで記録」を出さない**: 記録メニューの「レシートで記録」を `ReceiptOcrCloud.available && !kIsWeb` に変更。端末カメラ前提のためAndroidのみ表示（Electronデスクトップは中身がWeb＝kIsWebが真なので除外）。
+
 ### 立替精算に「実質負担額」＋カテゴリ予測の誤爆修正（v1.0.426〜）
 - **立替精算の実質コスト化**: `Transaction` に `reimbursed`（立替回収額・任意）と `effectiveAmount`（= 支出なら `amount - reimbursed`、他は `amount`）を追加。`amount` はカード明細/クレカ突合と一致させるため**満額のまま保持**し、**集計・PL・収支・支出合計・カテゴリ/支払方法別内訳は `effectiveAmount`（実質コスト）で計算**する。口座残高・カード請求・クレカ突合・通帳は `amount`（満額）のまま。
   - 集計を effectiveAmount 化した箇所: `v2_report`（PL `_monthlyForCategory`/`_monthlyForItem`・家庭用月別収支）, `v2_home_topnav`（当月支出・支払方法別・大カテゴリ別）, `rich_home`, `v2_expenses`（合計・諸経費/外注費）, `rich_expenses`, `dev_lab_screen`（年度PL/BS・カテゴリ集計）。
