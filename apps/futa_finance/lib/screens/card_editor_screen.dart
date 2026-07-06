@@ -54,9 +54,11 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
     final memoCtrl = TextEditingController(text: initial?.memo ?? '');
     // 引き落とし日は Dropdown 選択。null = 未設定。
     int? selectedPaymentDay = initial?.paymentDay;
-    // 引き落とし口座（銀行のid）。null = 自動引落しない。
+    // 引き落とし口座（銀行のid）。必須。
     String? selectedSettlementId = initial?.settlementAccountId;
     bool selectedInactive = initial?.inactive ?? false;
+    // ロゴURLの入力欄を開いているか（既にロゴがあれば畳んで「ロゴを編集」だけ）。
+    bool logoEditing = (initial?.iconUrl ?? '').trim().isEmpty;
 
     // BottomSheet で編集フォーム表示（subscription_list と同じパターン）。
     final result = await showModalBottomSheet<RegisteredCreditCard?>(
@@ -69,7 +71,9 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
       ),
       builder: (sheetCtx) => StatefulBuilder(
         builder: (ctx, setLocal) {
-          final isValid = nameCtrl.text.trim().isNotEmpty;
+          // 引き落とし口座は必須（設定されていないと保存できない）。
+          final isValid = nameCtrl.text.trim().isNotEmpty &&
+              selectedSettlementId != null;
 
           void onSave() {
             final name = nameCtrl.text.trim();
@@ -208,17 +212,12 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                             initialValue: selectedSettlementId,
                             isExpanded: true,
                             decoration: const InputDecoration(
-                              labelText: '引き落とし口座（任意）',
+                              labelText: '引き落とし口座',
+                              hintText: '選択してください',
                               floatingLabelBehavior:
                                   FloatingLabelBehavior.always,
                             ),
                             items: <DropdownMenuItem<String?>>[
-                              const DropdownMenuItem<String?>(
-                                value: null,
-                                child: Text('— 自動引落しない —',
-                                    style: TextStyle(
-                                        color: Color(0xFF9CA3AF))),
-                              ),
                               for (final b
                                   in (_config?.bankAccounts ?? const [])
                                       .where((b) =>
@@ -240,7 +239,10 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                                 fontSize: 11, color: Color(0xFF6B7280)),
                           ),
                           const SizedBox(height: 12),
-                          _logoUrlField(iconUrlCtrl, '💳', setLocal),
+                          _logoUrlField(iconUrlCtrl, '💳', setLocal,
+                              editing: logoEditing,
+                              onToggleEdit: () =>
+                                  setLocal(() => logoEditing = true)),
                           const SizedBox(height: 12),
                           // 未使用フラグ。設定の「未使用を隠す」が ON のとき
                           // ホーム/資産/クレカタブ から除外される。
@@ -560,8 +562,30 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
   }
 
   /// ロゴURL入力欄（共通）。
+  /// 既にロゴが設定済み（editing=false）のときは、URLを毎回表示せず
+  /// ロゴ＋「ロゴを編集」ボタンだけを出す（onToggleEdit で展開）。
   Widget _logoUrlField(TextEditingController ctrl, String fallbackEmoji,
-      void Function(VoidCallback fn) setLocal) {
+      void Function(VoidCallback fn) setLocal,
+      {bool editing = true, VoidCallback? onToggleEdit}) {
+    final hasLogo = ctrl.text.trim().isNotEmpty;
+    if (hasLogo && !editing) {
+      return Row(
+        children: [
+          BrandLogo(
+            iconUrl: ctrl.text.trim(),
+            fallbackEmoji: fallbackEmoji,
+            size: 40,
+          ),
+          const SizedBox(width: 12),
+          OutlinedButton.icon(
+            onPressed: onToggleEdit,
+            icon: const Icon(Icons.edit_outlined, size: 16),
+            label: const Text('ロゴを編集'),
+          ),
+        ],
+      );
+    }
+
     void convertDomain() {
       final input = ctrl.text.trim();
       if (input.isEmpty) return;

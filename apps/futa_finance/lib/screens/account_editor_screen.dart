@@ -56,6 +56,8 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
             : '');
     AccountType selectedType = initial?.accountType ?? AccountType.bank;
     bool selectedInactive = initial?.inactive ?? false;
+    // ロゴURLの入力欄を開いているか（既にロゴがあれば畳んで「ロゴを編集」だけ）。
+    bool logoEditing = (initial?.iconUrl ?? '').trim().isEmpty;
     // last4 は UI 入力廃止。既存値があれば保持して破壊しない。
     final initialLast4 = initial?.last4;
 
@@ -222,7 +224,10 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
                           MemoField(controller: memoCtrl),
                           const SizedBox(height: 16),
                           _logoUrlField(
-                              iconUrlCtrl, selectedType.emoji, setLocal),
+                              iconUrlCtrl, selectedType.emoji, setLocal,
+                              editing: logoEditing,
+                              onToggleEdit: () =>
+                                  setLocal(() => logoEditing = true)),
                           const SizedBox(height: 12),
                           // 未使用フラグ。ON にすると「未使用を隠す」設定下で
                           // 各画面（ホーム/資産/クレカ）の表示から除外される。
@@ -485,8 +490,29 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
 
   /// ロゴURL入力欄 + プレビュー。
   /// 共通化されたコンポーネント。ドメインを入れて 🔄 タップで favicon URL に変換可能。
+  /// 既にロゴ設定済み（editing=false）なら、URLを毎回出さずロゴ＋「ロゴを編集」だけ。
   Widget _logoUrlField(TextEditingController ctrl, String fallbackEmoji,
-      void Function(VoidCallback fn) setLocal) {
+      void Function(VoidCallback fn) setLocal,
+      {bool editing = true, VoidCallback? onToggleEdit}) {
+    final hasLogo = ctrl.text.trim().isNotEmpty;
+    if (hasLogo && !editing) {
+      return Row(
+        children: [
+          BrandLogo(
+            iconUrl: ctrl.text.trim(),
+            fallbackEmoji: fallbackEmoji,
+            size: 40,
+          ),
+          const SizedBox(width: 12),
+          OutlinedButton.icon(
+            onPressed: onToggleEdit,
+            icon: const Icon(Icons.edit_outlined, size: 16),
+            label: const Text('ロゴを編集'),
+          ),
+        ],
+      );
+    }
+
     void convertDomain() {
       final input = ctrl.text.trim();
       if (input.isEmpty) return;
