@@ -768,17 +768,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     final paymentEntries = byPayment.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    return LayoutBuilder(builder: (context, constraints) {
-      // 中身は最大幅960で中央寄せ。余った横幅は左右パディングに振り分ける。
-      // SingleChildScrollView(=全行を常に描画) をやめて ListView にすることで、
-      // 画面外の行（＝Webでは <img> プラットフォームビュー）が描画対象から外れ、
-      // スクロールのカクつきが大きく減る。
-      final side =
-          ((constraints.maxWidth - 960) / 2).clamp(0.0, double.infinity);
-      return ListView(
-        padding: EdgeInsets.fromLTRB(V2Spacing.md + side, V2Spacing.lg,
-            V2Spacing.md + side, V2Spacing.lg),
-        children: [
+    // 支出本文のセクション群を組み立てて、レイアウトに応じて出し分ける。
+    return LayoutBuilder(builder: (context, c) {
+      final children = <Widget>[
               // タブ上部：タイトル（個人モードのみ）＋ 中央に月セレクタ（資産タブと
               // 同じシンプルな見た目）＋ 右上に締め処理チップ。
               // 事業モードでは月セレクタをタブより上に出すため、ここは省略する。
@@ -1121,9 +1113,38 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 // 取引は取引に、固定費はサブスクに保存する。
                 onReorderDay: _saveReorder,
               ),
-            ],
-          );
-        });
+            ];
+      // 高さが有界（PC/Webの列レイアウト）なら ListView で画面外の行を間引き、
+      // Webの<img>プラットフォームビューを描画対象から外してスクロールを軽くする。
+      // スマホのシェルは本文へ高さを unbounded で渡すため ListView は使えない
+      // （真っ白＝グレーのエラー枠になる）ので SingleChildScrollView にする。
+      if (c.hasBoundedHeight) {
+        return Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 960),
+            child: ListView(
+              padding: const EdgeInsets.symmetric(
+                  vertical: V2Spacing.lg, horizontal: V2Spacing.md),
+              children: children,
+            ),
+          ),
+        );
+      }
+      return SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(
+            vertical: V2Spacing.lg, horizontal: V2Spacing.md),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 960),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: children,
+            ),
+          ),
+        ),
+      );
+    });
   }
 }
 
