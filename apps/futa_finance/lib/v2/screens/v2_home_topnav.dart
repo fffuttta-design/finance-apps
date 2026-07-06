@@ -440,8 +440,13 @@ class _V2HomeTopNavScreenState extends State<V2HomeTopNavScreen>
 
   /// 各銀行口座の「現在残高」（startingBalance + 全期間の取引差分、振替対応）。
   int _bankBalanceOf(RegisteredBankAccount b) {
+    // 「表示中の月の月末時点」の残高（通帳の月末残高と一致させる）。
+    // 月末より後の取引は含めない。当月を見ているときは実質"現在残高"と同じ。
+    final cutoff = DateTime(
+        _selectedMonth.year, _selectedMonth.month + 1, 0, 23, 59, 59);
     int delta = 0;
     for (final t in _transactions) {
+      if (t.date.isAfter(cutoff)) continue;
       if (t.type == TransactionType.transfer) {
         if (t.transferFromAccount == b.name) delta -= t.amount;
         if (t.transferToAccount == b.name) delta += t.amount;
