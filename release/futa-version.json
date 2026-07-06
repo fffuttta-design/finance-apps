@@ -1,1 +1,1 @@
-{"version":"1.0.434","buildNumber":"435","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.434/futa-finance-v1.0.434.apk","releaseNotes":"各ウォレットの通帳に「この月を締める」ボタンを追加（その月の取引を一括で確認済みに）。月の表示を大きく見やすくしました。"}
+{"version":"1.0.435","buildNumber":"436","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.435/futa-finance-v1.0.435.apk","releaseNotes":"月末残高を手で正しい額に直すと「差額調整」を入れてピタッと合わせられるようにしました（アプリ導入前のズレ合わせ用）。明細検索で未登録の支払方法も選べます。"}
