@@ -1,1 +1,1 @@
-{"version":"1.0.468","buildNumber":"469","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.468/futa-finance-v1.0.468.apk","releaseNotes":"振替を記録する画面の備考欄で、見出しと重複していた枠内の表示を消しました。"}
+{"version":"1.0.469","buildNumber":"470","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.469/futa-finance-v1.0.469.apk","releaseNotes":"締め済みの月の取引を変更しようとすると、確認アラートが出るようにしました（通帳・カード詳細）。うっかり締めた月をいじる事故を防ぎます。"}
