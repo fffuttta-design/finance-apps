@@ -1,1 +1,1 @@
-{"version":"1.0.465","buildNumber":"466","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.465/futa-finance-v1.0.465.apk","releaseNotes":"通帳のカスタム順（並び替え）でも残高を表示するようにしました。並び替えると、その表示順に沿って残高が再計算されます。"}
+{"version":"1.0.466","buildNumber":"467","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.466/futa-finance-v1.0.466.apk","releaseNotes":"通帳で並び替えた順番が、通常表示にもそのまま残るようにしました（日付順に戻らない）。残高も表示順で計算します。"}
