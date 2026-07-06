@@ -1,1 +1,1 @@
-{"version":"1.0.443","buildNumber":"444","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.443/futa-finance-v1.0.443.apk","releaseNotes":"カード/口座の編集で、一度ロゴを設定したらURLを毎回出さず「ロゴを編集」ボタンだけに。カードの引き落とし口座を必須にしました。"}
+{"version":"1.0.444","buildNumber":"445","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.444/futa-finance-v1.0.444.apk","releaseNotes":"集計タブに「支出の内訳」円グラフを追加。カードの自動引落を過去分までさかのぼって確実に発行するようにしました。"}
