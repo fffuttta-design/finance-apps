@@ -449,35 +449,60 @@ class _CardDetailScreenState extends State<CardDetailScreen>
   }
 
   /// 手動並び替えの保存。取引は取引の sortOrder、固定費はサブスクの sortOrder。
+  ///
+  /// 通帳（銀行）と同じ「ドロップ位置を即ローカル反映 → 書き込みは裏で」方式。
+  /// ⚠ 以前は取引を unawaited 更新しつつ固定費側で `await _load()` していたため、
+  ///   取引の書き込みが未反映のまま再読込が走り、取引=旧順・固定費=新順の
+  ///   チグハグな状態で並び替わり、さらに stream 通知でもう一度並び替わって
+  ///   「一気に動かず、上から辿って徐々にその位置に来る」挙動になっていた。
+  ///   ここでは _all / _subs を1回の setState で新順に確定させ、再読込レースを断つ。
   Future<void> _saveReorder(List<ReorderedItem> dayInNewOrder) async {
     final subOrders = <String, double>{};
-    final txnUpdates = <core.Transaction>[];
+    final txnOrders = <String, double>{};
     for (int i = 0; i < dayInNewOrder.length; i++) {
       final item = dayInNewOrder[i];
       if (item.isFixed) {
         subOrders[item.subscriptionId!] = i.toDouble();
       } else {
-        txnUpdates.add(item.txn!.copyWith(sortOrder: i.toDouble()));
+        txnOrders[item.txn!.id] = i.toDouble();
       }
     }
-    // 取引は updateMany で一括更新＝通知は1回だけ（並び替え中のチラつき防止）。
-    // 画面は即反映され、サーバ書き込みは裏で完了。失敗時のみ再読込。
-    if (txnUpdates.isNotEmpty) {
-      unawaited(TransactionRepository.instance.updateMany(txnUpdates)
+    // ① ドロップ位置をその場で確定（再読込を待たない＝チラつき/戻りを防ぐ）。
+    setState(() {
+      if (txnOrders.isNotEmpty) {
+        _all = [
+          for (final t in _all)
+            txnOrders.containsKey(t.id)
+                ? t.copyWith(sortOrder: txnOrders[t.id])
+                : t,
+        ];
+      }
+      if (subOrders.isNotEmpty) {
+        _subs = [
+          for (final s in _subs)
+            subOrders.containsKey(s.id)
+                ? s.copyWith(sortOrder: subOrders[s.id])
+                : s,
+        ];
+      }
+    });
+    // ② 永続化は裏で（失敗時のみ再読込）。
+    if (txnOrders.isNotEmpty) {
+      final txnUpdates = [
+        for (final t in _all) if (txnOrders.containsKey(t.id)) t,
+      ];
+      unawaited(TransactionRepository.instance
+          .updateMany(txnUpdates)
           .catchError((_) {
         if (mounted) _load();
       }));
     }
     if (subOrders.isNotEmpty) {
-      final cfg = await SubscriptionRepository.instance.load();
-      final newSubs = cfg.subscriptions
-          .map((s) => subOrders.containsKey(s.id)
-              ? s.copyWith(sortOrder: subOrders[s.id])
-              : s)
-          .toList();
-      await SubscriptionRepository.instance
-          .save(core.SubscriptionConfig(subscriptions: newSubs));
-      if (mounted) await _load();
+      unawaited(SubscriptionRepository.instance
+          .save(core.SubscriptionConfig(subscriptions: _subs))
+          .catchError((_) {
+        if (mounted) _load();
+      }));
     }
   }
 
