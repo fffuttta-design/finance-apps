@@ -1,1 +1,1 @@
-{"version":"1.0.425","buildNumber":"426","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.425/futa-finance-v1.0.425.apk","releaseNotes":"個人モードでは取引詳細の領収書セクションを非表示にしました（領収書の保管は事業モードのみ）。"}
+{"version":"1.0.427","buildNumber":"428","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.427/futa-finance-v1.0.427.apk","releaseNotes":"立替精算に「実質負担額」を表示（集計は実質コストで計算）。カテゴリの「明細◯件」をタップで中身を表示。支出入力に「小カテゴリ編集」。カテゴリ自動予測の誤爆を修正。"}
