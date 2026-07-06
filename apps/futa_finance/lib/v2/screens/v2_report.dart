@@ -511,6 +511,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     final balances = <int?>[];
     final labels = <String>[];
     var yearNet = 0;
+    var yearIncome = 0, yearExpense = 0;
     var hasAnyTx = false;
     for (int m = 1; m <= 12; m++) {
       var inc = 0, exp = 0;
@@ -526,10 +527,36 @@ class _V2ReportScreenState extends State<V2ReportScreen>
       final net = inc - exp;
       nets.add(net);
       yearNet += net;
+      yearIncome += inc;
+      yearExpense += exp;
       balances.add(_snapshots.forMonth(year, m)?.initialBalance);
       labels.add('$m');
     }
     final hasAnyBalance = balances.any((b) => b != null);
+
+    // 前年の収入/支出（前年比の算出用）。
+    var prevIncome = 0, prevExpense = 0;
+    for (final t in _transactions) {
+      if (t.date.year != year - 1) continue;
+      if (t.type == core.TransactionType.income) {
+        prevIncome += t.amount;
+      } else if (t.type == core.TransactionType.expense) {
+        prevExpense += t.effectiveAmount;
+      }
+    }
+    final prevNet = prevIncome - prevExpense;
+    // 貯蓄率＝収支 ÷ 収入（収入が無ければ 0）。
+    final savingsRate = yearIncome > 0 ? yearNet / yearIncome : 0.0;
+    final prevSavingsRate = prevIncome > 0 ? prevNet / prevIncome : 0.0;
+
+    // 大きい出費 TOP5（その年の支出取引・実質コスト降順）。
+    final top5 = _transactions
+        .where((t) =>
+            t.date.year == year &&
+            t.type == core.TransactionType.expense &&
+            t.effectiveAmount > 0)
+        .toList()
+      ..sort((a, b) => b.effectiveAmount.compareTo(a.effectiveAmount));
 
     // 支出の内訳（その年・大カテゴリ別・実質コスト）。円グラフ用。
     final byMajor = <String, int>{};
@@ -590,6 +617,20 @@ class _V2ReportScreenState extends State<V2ReportScreen>
               ],
             ),
           ),
+          // 年間サマリーKPI（収入/支出/収支/貯蓄率・前年比つき）。
+          _yearKpiCard(
+            year: year,
+            income: yearIncome,
+            expense: yearExpense,
+            net: yearNet,
+            savingsRate: savingsRate,
+            prevIncome: prevIncome,
+            prevExpense: prevExpense,
+            prevNet: prevNet,
+            prevSavingsRate: prevSavingsRate,
+            hasAnyTx: hasAnyTx,
+          ),
+          const SizedBox(height: V2Spacing.lg),
           _chartCard(
             title: '月別の収支（収入 − 支出）',
             trailing: '年間 ${formatYen(yearNet, withSign: true)}',
@@ -599,6 +640,9 @@ class _V2ReportScreenState extends State<V2ReportScreen>
             emptyText: '$year年の記録がまだありません',
             child: _MiniBarChart(values: nets, labels: labels, signed: true),
           ),
+          const SizedBox(height: V2Spacing.lg),
+          // 大きい出費 TOP5。
+          _topExpensesCard(top5),
           const SizedBox(height: V2Spacing.lg),
           _chartCard(
             title: _breakdownByStore ? '支出の内訳（場所別）' : '支出の内訳（カテゴリ別）',
@@ -648,6 +692,179 @@ class _V2ReportScreenState extends State<V2ReportScreen>
                 values: balances, labels: labels, signed: false),
           ),
           const SizedBox(height: V2Spacing.lg),
+        ],
+      ),
+    );
+  }
+
+  /// 年間サマリーKPI（収入/支出/収支/貯蓄率）。前年比を▲▼で添える。
+  Widget _yearKpiCard({
+    required int year,
+    required int income,
+    required int expense,
+    required int net,
+    required double savingsRate,
+    required int prevIncome,
+    required int prevExpense,
+    required int prevNet,
+    required double prevSavingsRate,
+    required bool hasAnyTx,
+  }) {
+    return V2Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('$year年のサマリー',
+              style: V2Typography.h2.copyWith(color: V2Colors.textPrimary)),
+          const SizedBox(height: V2Spacing.md),
+          if (!hasAnyTx)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: Text('$year年の記録がまだありません',
+                    style: V2Typography.caption
+                        .copyWith(color: V2Colors.textSecondary)),
+              ),
+            )
+          else ...[
+            Row(children: [
+              _kpiTile('収入', formatYen(income), V2Colors.positive,
+                  income - prevIncome),
+              const SizedBox(width: V2Spacing.sm),
+              _kpiTile('支出', formatYen(expense), V2Colors.negative,
+                  expense - prevExpense,
+                  invertGood: true),
+            ]),
+            const SizedBox(height: V2Spacing.sm),
+            Row(children: [
+              _kpiTile(
+                  '収支',
+                  formatYen(net, withSign: true),
+                  net >= 0 ? V2Colors.positive : V2Colors.negative,
+                  net - prevNet),
+              const SizedBox(width: V2Spacing.sm),
+              _kpiTile(
+                  '貯蓄率',
+                  '${(savingsRate * 100).round()}%',
+                  savingsRate >= 0 ? V2Colors.positive : V2Colors.negative,
+                  ((savingsRate - prevSavingsRate) * 100).round(),
+                  unit: 'pt'),
+            ]),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// KPIタイル（ラベル＋数値＋前年比）。delta は「今年−前年」。
+  /// invertGood=true のとき、増加を赤（悪い）で示す（支出用）。
+  Widget _kpiTile(String label, String value, Color color, int delta,
+      {bool invertGood = false, String unit = ''}) {
+    final up = delta > 0;
+    final flat = delta == 0;
+    final goodUp = !invertGood;
+    final deltaColor = flat
+        ? V2Colors.textMuted
+        : (up == goodUp ? V2Colors.positive : V2Colors.negative);
+    final arrow = flat ? '±' : (up ? '▲' : '▼');
+    final deltaText = unit == 'pt'
+        ? '$arrow${delta.abs()}pt'
+        : '$arrow${formatYen(delta.abs())}';
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(V2Spacing.md),
+        decoration: BoxDecoration(
+          color: V2Colors.surfaceMuted,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label,
+                style: V2Typography.micro
+                    .copyWith(color: V2Colors.textSecondary)),
+            const SizedBox(height: 4),
+            Text(value,
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                    fontFeatures: V2Typography.tabularNums)),
+            const SizedBox(height: 2),
+            Text('前年比 $deltaText',
+                style: V2Typography.micro.copyWith(color: deltaColor)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 大きい出費 TOP5。
+  Widget _topExpensesCard(List<core.Transaction> top5) {
+    return V2Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('大きい出費 TOP5',
+              style: V2Typography.h2.copyWith(color: V2Colors.textPrimary)),
+          const SizedBox(height: V2Spacing.sm),
+          if (top5.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: Text('支出がまだありません',
+                    style: V2Typography.caption
+                        .copyWith(color: V2Colors.textSecondary)),
+              ),
+            )
+          else
+            for (int i = 0; i < top5.length; i++) ...[
+              if (i > 0) const Divider(height: 1, color: V2Colors.divider),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 22,
+                      height: 22,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: V2Colors.surfaceMuted,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text('${i + 1}',
+                          style: V2Typography.micro.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: V2Colors.textSecondary)),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                              top5[i].description.trim().isEmpty
+                                  ? (top5[i].store ?? '（無題）')
+                                  : top5[i].description.trim(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: V2Typography.body),
+                          Text(
+                              '${formatMonthDay(top5[i].date)}・${top5[i].category.major}',
+                              style: V2Typography.micro
+                                  .copyWith(color: V2Colors.textMuted)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(formatYen(top5[i].effectiveAmount),
+                        style: V2Typography.bodyStrong.copyWith(
+                            color: V2Colors.negative,
+                            fontFeatures: V2Typography.tabularNums)),
+                  ],
+                ),
+              ),
+            ],
         ],
       ),
     );
