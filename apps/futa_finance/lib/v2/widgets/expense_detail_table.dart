@@ -134,6 +134,11 @@ class ExpenseDetailTable extends StatefulWidget {
   /// ヘッダーにトグルを置くためこれを使う。
   final bool? customOrder;
 
+  /// カスタム順のとき、ハンドルでのドラッグ編集を許可するか。
+  /// false なら「カスタム順の並びで固定表示（ハンドルなし＝誤操作で動かない）」。
+  /// 既定 true（内部トグル運用の制作原価タブ等は従来どおり編集可能）。
+  final bool customEditable;
+
   const ExpenseDetailTable({
     super.key,
     required this.rows,
@@ -151,6 +156,7 @@ class ExpenseDetailTable extends StatefulWidget {
     this.onToggleReviewedFixed,
     this.onReorderDay,
     this.customOrder,
+    this.customEditable = true,
   });
 
   @override
@@ -363,7 +369,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                     .copyWith(color: V2Colors.textSecondary)),
             const Spacer(),
             if (widget.onReorderDay != null) ...[
-              if (_isCustomOrder) ...[
+              if (_isCustomOrder && widget.customEditable) ...[
                 // まず日付順（新しい順）に整えてから、手でドラッグ微調整する用。
                 // 通帳（銀行）のカスタム順と同じ導線に揃える。
                 TextButton.icon(
@@ -505,7 +511,9 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: V2Colors.border),
             ),
-            child: (widget.onReorderDay != null && _isCustomOrder)
+            child: (widget.onReorderDay != null &&
+                    _isCustomOrder &&
+                    widget.customEditable)
                 ? _customReorderList(detailRows)
                 : LayoutBuilder(builder: (ctx, cons) {
               // 狭い幅（スマホ）は1行表だと潰れるので2行のスリム表示。
