@@ -83,6 +83,31 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   String get _ymKey =>
       '${_month.year}-${_month.month.toString().padLeft(2, '0')}';
 
+  /// 全体締めの前に締めておくべきウォレット（当月に動きがあるものだけ）。
+  /// 締めキーは account_detail / card_detail と同じ w:/card: 形式。
+  List<({String key, String label})> _walletsToClose() {
+    final y = _month.year, mo = _month.month;
+    final monthTx = _transactions
+        .where((t) => t.date.year == y && t.date.month == mo)
+        .toList();
+    final out = <({String key, String label})>[];
+    for (final b in _payments.bankAccounts) {
+      if (b.inactive) continue;
+      final active = monthTx.any((t) =>
+          t.paymentMethod == b.name ||
+          t.transferFromAccount == b.name ||
+          t.transferToAccount == b.name);
+      if (active) out.add((key: 'w:${b.name}:$_ymKey', label: b.name));
+    }
+    for (final c in _payments.creditCards) {
+      if (c.inactive) continue;
+      final active = monthTx.any((t) =>
+          t.paymentMethod == c.name || t.transferToAccount == c.name);
+      if (active) out.add((key: 'card:${c.name}:$_ymKey', label: c.name));
+    }
+    return out;
+  }
+
   bool get _isBusiness =>
       AppModeManager.instance.current == AppMode.business;
 
@@ -633,6 +658,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                         month: _month,
                         snapshotExpense: keihiTotal + gaichuTotal,
                         dense: true,
+                        walletsToClose: _walletsToClose(),
                         onChanged: _load),
                   ],
                 ),
@@ -777,6 +803,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                         month: _month,
                         snapshotExpense: total,
                         dense: true,
+                        walletsToClose: _walletsToClose(),
                         onChanged: _load),
                   ],
                 ),

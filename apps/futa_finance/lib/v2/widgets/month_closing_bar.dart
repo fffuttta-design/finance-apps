@@ -26,6 +26,10 @@ class MonthClosingBar extends StatefulWidget {
   /// 締め/取消の直後に呼ばれる（呼び元でグレーアウト等を更新するため）。
   final VoidCallback? onChanged;
 
+  /// 全体締めの前に「締め済みであるべきウォレット」。未締めがあるうちは締めさせず
+  /// アラートを出す（支出タブの全体締め用）。key=複合キー(w:/card:) / label=表示名。
+  final List<({String key, String label})>? walletsToClose;
+
   const MonthClosingBar({
     super.key,
     required this.month,
@@ -34,6 +38,7 @@ class MonthClosingBar extends StatefulWidget {
     this.compact = false,
     this.dense = false,
     this.onChanged,
+    this.walletsToClose,
   });
 
   @override
@@ -64,6 +69,29 @@ class _MonthClosingBarState extends State<MonthClosingBar> {
       _cfg.forMonth(widget.month.year, widget.month.month);
 
   Future<void> _close() async {
+    // まだ締めていないウォレットがあれば、全体締めをブロックしてアラート。
+    final pending = (widget.walletsToClose ?? const [])
+        .where((w) =>
+            !_cfg.closings.any((c) => c.yearMonth == w.key && c.isClosed))
+        .map((w) => w.label)
+        .toList();
+    if (pending.isNotEmpty) {
+      await showDialog<void>(
+        context: context,
+        builder: (dctx) => AlertDialog(
+          title: const Text('まだ締めていないウォレットがあります'),
+          content: Text(
+              '${widget.month.month}月の全体を締める前に、次のウォレットを先に締めてください：\n\n'
+              '・${pending.join('\n・')}'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(dctx),
+                child: const Text('OK')),
+          ],
+        ),
+      );
+      return;
+    }
     final key =
         core.MonthClosing.monthKey(widget.month.year, widget.month.month);
     final existing = _closing ?? core.MonthClosing(yearMonth: key);
