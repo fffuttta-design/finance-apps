@@ -7,6 +7,7 @@ import '../data/app_mode.dart';
 import '../data/drive_receipt_service.dart';
 import '../data/receipt_ocr.dart';
 import '../data/settings_repository.dart';
+import '../data/store_master_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/date_pick.dart';
 import '../utils/duplicate_check.dart';
@@ -311,6 +312,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     });
 
     // ② 過去取引はフォーム表示後に裏で読み込む（サジェスト/カテゴリ提案用）。
+    // 場所マスタも温めておく（場所欄の候補に出すため）。
+    StoreMasterRepository.instance.load();
     List<core.Transaction> history = const [];
     try {
       history = await TransactionRepository.instance.loadAll();
@@ -474,6 +477,12 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         score[s] = (score[s] ?? 0) + c;
       }
     });
+    // ③ 場所マスタの登録名（履歴に無くても候補に出す＝表記ゆれ防止）。
+    for (final s in StoreMasterRepository.instance.cached) {
+      if (storeQ.isEmpty || s.toLowerCase().contains(storeQ)) {
+        score[s] = (score[s] ?? 0) + 1;
+      }
+    }
     final list = score.keys
         .where((s) => s.trim().toLowerCase() != storeQ) // 入力済みと同一は除外
         .toList()
@@ -901,6 +910,11 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
             return r > 0 ? r : null;
           })()
         : editing?.reimbursed;
+    // 入力した場所は場所マスタに自動登録（次回から候補に出る＝表記ゆれ防止）。
+    final storeVal = _storeCtrl.text.trim();
+    if (storeVal.isNotEmpty) {
+      StoreMasterRepository.instance.add(storeVal);
+    }
     final tx = core.Transaction(
       id: editing?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
       date: _date,

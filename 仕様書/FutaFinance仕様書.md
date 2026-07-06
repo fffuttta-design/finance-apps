@@ -465,6 +465,12 @@ class MonthlySnapshot {
 - **支出明細テーブルの「金額」列も可変列化**（中央5列＝大/小/内容/支払方法/金額）。支払方法↔金額の境界にリサイズハンドル追加。保存キー `..._v3`。
 - **「毎月の固定費」ヘッダーの右合計のはみ出しを修正**（右パディング32で下の各行金額に揃える）。
 
+### 場所マスタ（購入場所のマスタ化・統合で過去も一括書き換え）（v1.0.437〜）
+- **場所マスタ**: `data/store_master_repository.dart`（`StoreMasterRepository`・**事業/個人で共通＝モード非依存**・Firestore `users/{uid}/config/store_master` の json／未ログインは prefs）。場所名の List<String>。`add`/`addAll`/`save`/`load`。
+- **管理画面**: `screens/store_master_screen.dart`（`StoreMasterScreen`）。追加／名前変更／削除／**統合（merge）**／**履歴から取込**。設定 → マスタデータ →「場所マスタ」（`v2_settings` に `storeMaster` ケース追加）。
+  - **統合・名前変更は過去の明細も一括書き換え**（`_rewriteStore`：`t.store==from` の取引を全部 `to` に `update`）。表記ゆれ（ファミマ→ファミリーマート）を過去分ごと揃えられる。ユーザー確定＝共通・過去も書き換え。
+- **支出入力との連携**: 場所欄の候補にマスタ登録名を含める（`_storeSuggestions` に `StoreMasterRepository.instance.cached` を加点）。保存時に入力した場所を**自動でマスタ登録**（`_save` で `add`）。フォーム表示後に裏でマスタを `load`。
+
 ### 未登録支払方法の一覧表示＋締め済みの月をグレーアウト（v1.0.436〜）
 - **未登録の支払方法だけを絞り込み**: 明細検索（`transaction_search_screen`）の支払方法フィルタに「⚠ 未登録のみ」を追加。登録済み口座/カードに無い支払方法（例「クレカ」）の明細だけを一覧表示 → 正しいカードに付け替えできる（`_registeredNames`/`_unregSentinel`）。
 - **締め済みの月をグレーアウト**: 支出タブ（`rich_expenses`）で、その月が締め処理済み（`MonthClosing.isClosed`）なら本文（サマリー/カテゴリ内訳/明細）を `Opacity 0.5` で薄く表示（`_grey`/`_isMonthClosed`）。締めバー(`MonthClosingBar`)は締め/取消時に `onChanged` コールバックで即再読込しグレーアウトを更新。
