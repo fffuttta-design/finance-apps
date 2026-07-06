@@ -768,15 +768,17 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     final paymentEntries = byPayment.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(
-          vertical: V2Spacing.lg, horizontal: V2Spacing.md),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+    return LayoutBuilder(builder: (context, constraints) {
+      // 中身は最大幅960で中央寄せ。余った横幅は左右パディングに振り分ける。
+      // SingleChildScrollView(=全行を常に描画) をやめて ListView にすることで、
+      // 画面外の行（＝Webでは <img> プラットフォームビュー）が描画対象から外れ、
+      // スクロールのカクつきが大きく減る。
+      final side =
+          ((constraints.maxWidth - 960) / 2).clamp(0.0, double.infinity);
+      return ListView(
+        padding: EdgeInsets.fromLTRB(V2Spacing.md + side, V2Spacing.lg,
+            V2Spacing.md + side, V2Spacing.lg),
+        children: [
               // タブ上部：タイトル（個人モードのみ）＋ 中央に月セレクタ（資産タブと
               // 同じシンプルな見た目）＋ 右上に締め処理チップ。
               // 事業モードでは月セレクタをタブより上に出すため、ここは省略する。
@@ -1120,10 +1122,8 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 onReorderDay: _saveReorder,
               ),
             ],
-          ),
-        ),
-      ),
-    );
+          );
+        });
   }
 }
 
