@@ -465,6 +465,9 @@ class MonthlySnapshot {
 - **支出明細テーブルの「金額」列も可変列化**（中央5列＝大/小/内容/支払方法/金額）。支払方法↔金額の境界にリサイズハンドル追加。保存キー `..._v3`。
 - **「毎月の固定費」ヘッダーの右合計のはみ出しを修正**（右パディング32で下の各行金額に揃える）。
 
+### クレジットカードにも月締めボタン（全ウォレット対応）（v1.0.438〜）
+- カード詳細（`card_detail_screen`）の月モードに締めバーを追加（`_cardCloseMonthBar`）。「この月を締める」で、その月の**取引(reviewed)＋固定費(reviewedMonths[ym])を全部確認済み**にする（`_closeCardMonth`/`_reopenCardMonth`/`_setCardMonthReviewed`・取引は `updateMany`、固定費はサブスクを1回で保存）。全件確認済みなら「締め済み」＋締め解除。これで銀行/現金/電子マネー（v1.0.434）に続き**クレカも含む全ウォレットで月締め**が可能に。
+
 ### 場所マスタ（購入場所のマスタ化・統合で過去も一括書き換え）（v1.0.437〜）
 - **場所マスタ**: `data/store_master_repository.dart`（`StoreMasterRepository`・**事業/個人で共通＝モード非依存**・Firestore `users/{uid}/config/store_master` の json／未ログインは prefs）。場所名の List<String>。`add`/`addAll`/`save`/`load`。
 - **管理画面**: `screens/store_master_screen.dart`（`StoreMasterScreen`）。追加／名前変更／削除／**統合（merge）**／**履歴から取込**。設定 → マスタデータ →「場所マスタ」（`v2_settings` に `storeMaster` ケース追加）。

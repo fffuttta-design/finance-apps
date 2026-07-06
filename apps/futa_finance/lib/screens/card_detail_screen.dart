@@ -47,6 +47,8 @@ class _CardDetailScreenState extends State<CardDetailScreen>
 
   /// 初回ロードで「利用のある最新月」を初期選択にしたか（以後はユーザー操作を尊重）。
   bool _monthPicked = false;
+  // 月締め処理中フラグ（ボタン多重押し防止）。
+  bool _busyCardClose = false;
   late final TabController _tabController =
       TabController(length: 2, vsync: this);
 
@@ -246,6 +248,149 @@ class _CardDetailScreenState extends State<CardDetailScreen>
     if (mounted) await _load();
   }
 
+  /// この月を締める＝この月の利用（取引＋固定費）を全部「確認済み」にする。
+  Future<void> _closeCardMonth(
+      List<core.Transaction> monthTxns, List<FixedCostRow> fixed) async {
+    final m = _selectedMonth;
+    if (m == null) return;
+    final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
+    final total = monthTxns.length + fixed.length;
+    if (total == 0) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: Text('${m.month}月を締めますか？'),
+        content: Text(
+            '「${_card.name}」の${m.year}年${m.month}月の利用 $total件を、'
+            'すべて「確認済み（金額に間違いなし）」にします。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx, false),
+              child: const Text('キャンセル')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dctx, true),
+              child: const Text('締める')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _busyCardClose = true);
+    await _setCardMonthReviewed(monthTxns, fixed, ym, true);
+    if (!mounted) return;
+    await _load();
+    if (!mounted) return;
+    setState(() => _busyCardClose = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${m.month}月を締めました')));
+  }
+
+  Future<void> _reopenCardMonth(
+      List<core.Transaction> monthTxns, List<FixedCostRow> fixed) async {
+    final m = _selectedMonth;
+    if (m == null) return;
+    final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
+    setState(() => _busyCardClose = true);
+    await _setCardMonthReviewed(monthTxns, fixed, ym, false);
+    if (!mounted) return;
+    await _load();
+    if (!mounted) return;
+    setState(() => _busyCardClose = false);
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('${m.month}月の締めを解除しました')));
+  }
+
+  /// 取引の reviewed と、固定費の reviewedMonths[ym] をまとめて value に。
+  Future<void> _setCardMonthReviewed(List<core.Transaction> monthTxns,
+      List<FixedCostRow> fixed, String ym, bool value) async {
+    final txUpdates = monthTxns
+        .where((t) => t.reviewed != value)
+        .map((t) => t.copyWith(reviewed: value))
+        .toList();
+    if (txUpdates.isNotEmpty) {
+      await TransactionRepository.instance.updateMany(txUpdates);
+    }
+    if (fixed.isNotEmpty) {
+      final subIds = fixed.map((f) => f.id).toSet();
+      final cfg = await SubscriptionRepository.instance.load();
+      final newSubs = cfg.subscriptions.map((s) {
+        if (!subIds.contains(s.id)) return s;
+        final map = Map<String, bool>.from(s.reviewedMonths);
+        if (value) {
+          map[ym] = true;
+        } else {
+          map.remove(ym);
+        }
+        return s.copyWith(reviewedMonths: map);
+      }).toList();
+      await SubscriptionRepository.instance
+          .save(core.SubscriptionConfig(subscriptions: newSubs));
+    }
+  }
+
+  /// カードの月締めバー（月モードのみ）。全部確認済みなら締め済み表示。
+  Widget _cardCloseMonthBar(
+      List<core.Transaction> monthTxns, List<FixedCostRow> fixed) {
+    if (_selectedMonth == null || _range != null) {
+      return const SizedBox.shrink();
+    }
+    final total = monthTxns.length + fixed.length;
+    if (total == 0) return const SizedBox.shrink();
+    final done = monthTxns.where((t) => t.reviewed).length +
+        fixed.where((f) => f.reviewed).length;
+    final allReviewed = done == total;
+    return Container(
+      color: allReviewed ? const Color(0xFFE7F6EF) : const Color(0xFFF7F8FA),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Row(
+        children: [
+          Icon(allReviewed ? Icons.verified : Icons.fact_check_outlined,
+              size: 18,
+              color: allReviewed
+                  ? const Color(0xFF059669)
+                  : const Color(0xFF6B7280)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              allReviewed
+                  ? '${_selectedMonth!.month}月は締め済み（全$total件 確認済み）'
+                  : '確認済み $done/$total件',
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: allReviewed
+                      ? const Color(0xFF059669)
+                      : const Color(0xFF6B7280)),
+            ),
+          ),
+          if (allReviewed)
+            TextButton(
+              onPressed: _busyCardClose
+                  ? null
+                  : () => _reopenCardMonth(monthTxns, fixed),
+              child: const Text('締め解除'),
+            )
+          else
+            FilledButton.icon(
+              onPressed: _busyCardClose
+                  ? null
+                  : () => _closeCardMonth(monthTxns, fixed),
+              icon: _busyCardClose
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.check_circle, size: 16),
+              label: Text('${_selectedMonth!.month}月を締める'),
+              style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF059669),
+                  visualDensity: VisualDensity.compact),
+            ),
+        ],
+      ),
+    );
+  }
+
   /// 手動並び替えの保存。取引は取引の sortOrder、固定費はサブスクの sortOrder。
   Future<void> _saveReorder(List<ReorderedItem> dayInNewOrder) async {
     final subOrders = <String, double>{};
@@ -427,6 +572,7 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                     Column(
                       children: [
                         _monthSelector(),
+                        _cardCloseMonthBar(monthTxns, cardFixed),
                         const Divider(height: 1),
                         Expanded(
                           // PC幅は支出明細と同じ表（検索・並び替え・列幅）。
