@@ -363,13 +363,39 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                     .copyWith(color: V2Colors.textSecondary)),
             const Spacer(),
             if (widget.onReorderDay != null) ...[
-              if (_isCustomOrder)
+              if (_isCustomOrder) ...[
+                // まず日付順（新しい順）に整えてから、手でドラッグ微調整する用。
+                // 通帳（銀行）のカスタム順と同じ導線に揃える。
+                TextButton.icon(
+                  onPressed: () {
+                    final byDate = [...detailRows]
+                      ..sort((a, b) => -a.date.compareTo(b.date));
+                    widget.onReorderDay?.call([
+                      for (final r in byDate)
+                        r.isFixed
+                            ? ReorderedItem.fixed(r.fx!.id)
+                            : ReorderedItem.txn(r.txn!),
+                    ]);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('日付順（新しい順）に並べ直しました'),
+                          duration: Duration(seconds: 2)),
+                    );
+                  },
+                  icon: const Icon(Icons.sort, size: 16),
+                  label: const Text('日付順に並べ直す',
+                      style: TextStyle(fontSize: 12)),
+                  style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      foregroundColor: widget.accent),
+                ),
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: Text('ハンドルをドラッグで並び替え',
                       style: V2Typography.micro
                           .copyWith(color: V2Colors.textMuted)),
                 ),
+              ],
               // 外部制御(カード詳細の固定ヘッダー)のときは内部トグルを出さない。
               if (widget.customOrder == null)
                 _CustomOrderToggle(
