@@ -598,11 +598,29 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
       },
       itemBuilder: (context, i) {
         final r = rows[i];
+        final isFixed = r.isFixed;
+        final date = isFixed ? r.fx!.date : r.txn!.date;
+        final title = isFixed
+            ? (r.fx!.name.trim().isEmpty ? '固定費' : r.fx!.name.trim())
+            : (r.txn!.description.trim().isNotEmpty
+                ? r.txn!.description.trim()
+                : (r.txn!.category.sub.trim().isNotEmpty
+                    ? r.txn!.category.sub.trim()
+                    : (r.txn!.category.major.trim().isEmpty
+                        ? '未分類'
+                        : r.txn!.category.major.trim())));
+        final amount = isFixed ? r.fx!.amount : r.txn!.amount;
+        final pending = isFixed && r.fx!.pending;
+        final reviewed = isFixed ? r.fx!.reviewed : r.txn!.reviewed;
+        final showReview = widget.onToggleReviewed != null ||
+            widget.onToggleReviewedFixed != null;
+        // 通帳（銀行）のカスタム順と同じ「ハンドル＋日付＋内容＋金額＋確認＋編集」の1行。
         return DecoratedBox(
-          key: ValueKey(r.isFixed ? 'fx_${r.fx!.id}' : 'tx_${r.txn!.id}'),
-          decoration: const BoxDecoration(
+          key: ValueKey(isFixed ? 'fx_${r.fx!.id}' : 'tx_${r.txn!.id}'),
+          decoration: BoxDecoration(
+            color: reviewed ? const Color(0xFFF3F4F6) : Colors.white,
             border:
-                Border(bottom: BorderSide(color: V2Colors.divider)),
+                const Border(bottom: BorderSide(color: V2Colors.divider)),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -615,23 +633,80 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                       size: 20, color: Color(0xFF9CA3AF)),
                 ),
               ),
+              SizedBox(
+                width: 50,
+                child: Text(
+                    '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: reviewed
+                            ? const Color(0xFF9CA3AF)
+                            : const Color(0xFF6B7280))),
+              ),
               Expanded(
-                child: r.isFixed
-                    ? _NarrowFixedRow(
-                        f: r.fx!,
-                        onTap: () => widget.onEditFixed?.call(r.fx!),
-                        showReceipt: widget.showReceiptCheck,
-                        showReview: widget.onToggleReviewedFixed != null,
-                        onToggleReviewed: widget.onToggleReviewedFixed,
-                      )
-                    : _NarrowRow(
-                        t: r.txn!,
-                        onTap: () => widget.onEditTxn(r.txn!),
-                        showReceipt: widget.showReceiptCheck,
-                        onToggleReceipt: widget.onToggleReceipt,
-                        showReview: widget.onToggleReviewed != null,
-                        onToggleReviewed: widget.onToggleReviewed,
+                child: Text(title,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: const TextStyle(
+                        fontSize: 13, color: Color(0xFF111827))),
+              ),
+              const SizedBox(width: 8),
+              if (pending)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text('入力待ち',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFB45309))),
+                )
+              else
+                Text('-${formatYen(amount)}',
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: V2Colors.negative,
+                        fontFeatures: V2Typography.tabularNums)),
+              if (showReview) ...[
+                const SizedBox(width: 4),
+                SizedBox(
+                  width: 30,
+                  child: Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: Checkbox(
+                        value: reviewed,
+                        visualDensity: VisualDensity.compact,
+                        materialTapTargetSize:
+                            MaterialTapTargetSize.shrinkWrap,
+                        activeColor: const Color(0xFF6B7280),
+                        onChanged: (v) => isFixed
+                            ? widget.onToggleReviewedFixed
+                                ?.call(r.fx!, v ?? false)
+                            : widget.onToggleReviewed
+                                ?.call(r.txn!, v ?? false),
                       ),
+                    ),
+                  ),
+                ),
+              ],
+              IconButton(
+                icon: const Icon(Icons.edit_outlined,
+                    size: 16, color: Color(0xFF6B7280)),
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                constraints:
+                    const BoxConstraints(minWidth: 32, minHeight: 32),
+                tooltip: '編集',
+                onPressed: () => isFixed
+                    ? widget.onEditFixed?.call(r.fx!)
+                    : widget.onEditTxn(r.txn!),
               ),
             ],
           ),
