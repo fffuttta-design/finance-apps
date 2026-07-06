@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/settings_repository.dart';
+import '../data/store_master_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 import '../widgets/centered_body.dart';
@@ -58,9 +59,12 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
     super.dispose();
   }
 
+  List<String> _storeMaster = const [];
+
   Future<void> _load() async {
     final c = await _settings.loadCategories();
     final p = await _settings.loadPayments();
+    final stores = await StoreMasterRepository.instance.load();
     List<core.Transaction> all = const [];
     try {
       all = await TransactionRepository.instance.loadAll();
@@ -69,6 +73,7 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
     setState(() {
       _categories = c;
       _payments = p;
+      _storeMaster = stores;
       _all = all;
       _loading = false;
     });
@@ -309,6 +314,70 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
     await _applyToSelected(
       (t) => t.copyWith(paymentMethod: pm),
       '支払方法「$pm」に変更しました',
+    );
+  }
+
+  Future<void> _bulkChangeStore() async {
+    // 場所マスタから選ぶ（表記ゆれ防止）＋手入力もできる。
+    final ctrl = TextEditingController();
+    final options = [..._storeMaster];
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => StatefulBuilder(
+        builder: (dctx, setLocal) => AlertDialog(
+          title: Text('${_selected.length}件の場所を変更'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: ctrl,
+                decoration: const InputDecoration(
+                    labelText: '場所', border: OutlineInputBorder()),
+              ),
+              if (options.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                const Text('マスタから選ぶ',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+                const SizedBox(height: 6),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 180),
+                  child: SingleChildScrollView(
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final s in options)
+                          ActionChip(
+                            label: Text(s),
+                            onPressed: () =>
+                                setLocal(() => ctrl.text = s),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(dctx, false),
+                child: const Text('キャンセル')),
+            FilledButton(
+                onPressed: () => Navigator.pop(dctx, true),
+                child: const Text('この内容で更新')),
+          ],
+        ),
+      ),
+    );
+    if (result != true) return;
+    final store = ctrl.text.trim();
+    if (store.isEmpty) return;
+    await StoreMasterRepository.instance.add(store);
+    await _applyToSelected(
+      (t) => t.copyWith(store: store),
+      '場所「$store」に変更しました',
     );
   }
 
@@ -622,27 +691,40 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
           color: Colors.white,
           border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text('$selCount件 選択中',
                 style: const TextStyle(fontWeight: FontWeight.w700)),
-            const Spacer(),
-            OutlinedButton.icon(
-              onPressed: _busy ? null : _bulkChangeCategory,
-              icon: const Icon(Icons.sell_outlined, size: 16),
-              label: const Text('カテゴリ変更'),
-            ),
-            const SizedBox(width: 8),
-            FilledButton.icon(
-              onPressed: _busy ? null : _bulkChangePayment,
-              icon: _busy
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.credit_card, size: 16),
-              label: const Text('支払方法変更'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.end,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _bulkChangeCategory,
+                  icon: const Icon(Icons.sell_outlined, size: 16),
+                  label: const Text('カテゴリ変更'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _bulkChangeStore,
+                  icon: const Icon(Icons.place_outlined, size: 16),
+                  label: const Text('場所変更'),
+                ),
+                FilledButton.icon(
+                  onPressed: _busy ? null : _bulkChangePayment,
+                  icon: _busy
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.credit_card, size: 16),
+                  label: const Text('支払方法変更'),
+                ),
+              ],
             ),
           ],
         ),

@@ -130,6 +130,25 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
     });
   }
 
+  /// 収入マスタの編集画面を開き、戻ったら候補を読み直す。
+  Future<void> _openIncomeMasterEditor() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => const IncomeMasterScreen()),
+    );
+    if (!mounted) return;
+    final s = await IncomeSourceRepository.instance.load();
+    if (!mounted) return;
+    setState(() {
+      _sources = s;
+      // 選択中の収入源が消えていたら選択を外す。
+      if (_selectedSource != null &&
+          !s.sources.any((x) => x.id == _selectedSource!.id)) {
+        _selectedSource = null;
+      }
+    });
+  }
+
   void _onSourceSelected(core.IncomeSource? s) {
     setState(() {
       _selectedSource = s;
@@ -337,7 +356,32 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    _label('収入マスタ'),
+                    Row(
+                      children: [
+                        Expanded(child: _label('収入マスタ')),
+                        InkWell(
+                          onTap: _openIncomeMasterEditor,
+                          borderRadius: BorderRadius.circular(6),
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.tune,
+                                    size: 14, color: Color(0xFF1A237E)),
+                                SizedBox(width: 3),
+                                Text('収入マスタ編集',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF1A237E))),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                     DropdownButtonFormField<core.IncomeSource>(
                       initialValue: _selectedSource,
                       isExpanded: true,

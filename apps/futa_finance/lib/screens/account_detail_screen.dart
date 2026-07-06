@@ -283,20 +283,68 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
             Padding(
               padding:
                   const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A237E),
+              // HOMEと同じ「ボタン脇に出るポップアップメニュー」（画面中央を奪わない）。
+              child: PopupMenuButton<String>(
+                tooltip: '記録する',
+                onSelected: _openRecord,
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'income',
+                    child: Row(
+                      children: const [
+                        Icon(Icons.add_circle_outline,
+                            size: 16, color: Color(0xFF10B981)),
+                        SizedBox(width: 8),
+                        Text('入金（収入）を記録'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'expense',
+                    child: Row(
+                      children: const [
+                        Icon(Icons.remove_circle_outline,
+                            size: 16, color: Color(0xFFEF4444)),
+                        SizedBox(width: 8),
+                        Text('出金（支出）を記録'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'transfer',
+                    child: Row(
+                      children: const [
+                        Icon(Icons.swap_horiz,
+                            size: 16, color: Color(0xFF64748B)),
+                        SizedBox(width: 8),
+                        Text('振替（他口座へ移動）を記録'),
+                      ],
+                    ),
+                  ),
+                ],
+                child: Container(
+                  height: 36,
                   padding: const EdgeInsets.symmetric(horizontal: 14),
-                ),
-                onPressed: _showAddMenu,
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('記録',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
-                    SizedBox(width: 2),
-                    Icon(Icons.add, size: 18),
-                  ],
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A237E),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  alignment: Alignment.center,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.add, size: 14, color: Colors.white),
+                      SizedBox(width: 4),
+                      Text('記録',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700)),
+                      SizedBox(width: 2),
+                      Icon(Icons.arrow_drop_down,
+                          size: 16, color: Colors.white),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1438,31 +1486,11 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   // 「+」ボタンの追加メニュー
   // ───────────────────────────────────────────────────────────
 
-  Future<void> _showAddMenu() async {
+  /// ポップアップメニューから選ばれた種別で入力画面を開く（このウォレットをプリフィル）。
+  Future<void> _openRecord(String kind) async {
     final accountName = _account.name;
-    // 他画面と同じ「中央ポップアップ」に統一（下から出るシートはやめる）。
-    final choice = await showDialog<String>(
-      context: context,
-      builder: (dctx) => SimpleDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-        contentPadding: const EdgeInsets.only(bottom: 12),
-        title: const Text('記録する',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
-        children: [
-          _addMenuTile(dctx, 'income', Icons.south_west,
-              const Color(0xFF16A34A), '入金（収入）を記録', '入金先: $accountName'),
-          _addMenuTile(dctx, 'expense', Icons.north_east,
-              const Color(0xFFDC2626), '出金（支出）を記録', '支払元: $accountName'),
-          _addMenuTile(dctx, 'transfer', Icons.swap_horiz,
-              const Color(0xFFEA580C), '振替（他口座へ移動）を記録', '移動元: $accountName'),
-        ],
-      ),
-    );
-    if (choice == null || !mounted) return;
     final Widget screen;
-    switch (choice) {
+    switch (kind) {
       case 'income':
         screen = IncomeInputScreen(initialReceiveAccount: accountName);
         break;
@@ -1474,62 +1502,6 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     }
     final saved = await showInputSheet<bool>(context, screen);
     if (saved == true && mounted) await _load();
-  }
-
-  Widget _addMenuTile(BuildContext dctx, String value, IconData icon,
-      Color color, String title, String subtitle) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () => Navigator.pop(dctx, value),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: color, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(title,
-                          style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF111827))),
-                      const SizedBox(height: 2),
-                      Text(subtitle,
-                          style: const TextStyle(
-                              fontSize: 12, color: Color(0xFF6B7280))),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_right,
-                    size: 18, color: Color(0xFFCBD5E1)),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }
 
