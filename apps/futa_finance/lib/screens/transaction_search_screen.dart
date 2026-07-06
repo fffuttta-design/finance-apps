@@ -207,6 +207,39 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
         .showSnackBar(SnackBar(content: Text('$ok件を$doneMsg')));
   }
 
+  /// 選択中の明細のタイトル（取引内容 description）をまとめて変更する。
+  Future<void> _bulkChangeTitle() async {
+    final ctrl = TextEditingController();
+    final newTitle = await showDialog<String>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: Text('${_selected.length}件のタイトルを変更'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(
+              labelText: '新しいタイトル（取引内容）',
+              hintText: '例）電車代',
+              border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx),
+              child: const Text('キャンセル')),
+          FilledButton(
+              onPressed: () {
+                if (ctrl.text.trim().isEmpty) return;
+                Navigator.pop(dctx, ctrl.text.trim());
+              },
+              child: const Text('変更する')),
+        ],
+      ),
+    );
+    if (newTitle == null || newTitle.isEmpty) return;
+    await _applyToSelected(
+        (t) => t.copyWith(description: newTitle), 'タイトルを「$newTitle」に変更');
+  }
+
   Future<void> _bulkChangeCategory() async {
     final cfg = _categories;
     if (cfg == null) return;
@@ -709,6 +742,11 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
               runSpacing: 8,
               alignment: WrapAlignment.end,
               children: [
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _bulkChangeTitle,
+                  icon: const Icon(Icons.title, size: 16),
+                  label: const Text('タイトル変更'),
+                ),
                 OutlinedButton.icon(
                   onPressed: _busy ? null : _bulkChangeCategory,
                   icon: const Icon(Icons.sell_outlined, size: 16),
