@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/app_mode.dart';
 import '../data/card_settlement_service.dart';
@@ -70,25 +71,47 @@ class _V2RootState extends State<V2Root>
     });
   }
 
-  /// 固定費（サブスク）の請求日を過ぎた月を実明細化し、作成できたら知らせる。
+  /// 自動生成した明細のうち「まだ知らせていないID」だけを返す。
+  /// 生成が毎回走っても、同じ明細のメッセージは二度と出さない
+  /// （＝「同じお知らせが毎回出る」問題の対策）。
+  Future<Set<String>> _unnotifiedIds(String key, Iterable<String> ids) async {
+    final prefs = await SharedPreferences.getInstance();
+    final notified = (prefs.getStringList(key) ?? <String>[]).toSet();
+    final fresh = ids.where((id) => !notified.contains(id)).toSet();
+    if (fresh.isEmpty) return fresh;
+    notified.addAll(fresh);
+    final list = notified.toList();
+    // 肥大化防止に直近500件だけ保持。
+    await prefs.setStringList(
+        key, list.length > 500 ? list.sublist(list.length - 500) : list);
+    return fresh;
+  }
+
+  /// 固定費（サブスク）の請求日を過ぎた月を実明細化し、初回だけ知らせる。
   Future<void> _runFixedCostMaterialize() async {
     final created = await FixedCostMaterializer.runOncePerMode(
         AppModeManager.instance.current.name);
-    if (!mounted || created.isEmpty) return;
+    if (created.isEmpty) return;
+    final fresh =
+        await _unnotifiedIds('futa.fixedcost.notified', created.map((t) => t.id));
+    if (!mounted || fresh.isEmpty) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('🧾 固定費を${created.length}件、実明細として記録しました'),
+      content: Text('🧾 固定費を${fresh.length}件、実明細として記録しました'),
       duration: const Duration(seconds: 4),
     ));
   }
 
-  /// クレカの自動引き落としを生成し、作成できたらスナックバーで知らせる。
+  /// クレカの自動引き落としを生成し、初回だけスナックバーで知らせる。
   /// モードごとに1セッション1回（frequentな _onChange で呼んでも短絡する）。
   Future<void> _runCardSettlement() async {
     final created = await CardSettlementService.runOncePerMode(
         AppModeManager.instance.current.name);
-    if (!mounted || created.isEmpty) return;
+    if (created.isEmpty) return;
+    final fresh = await _unnotifiedIds(
+        'futa.cardsettle.notified', created.map((t) => t.id));
+    if (!mounted || fresh.isEmpty) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('💳 クレカ引落を${created.length}件、自動で記録しました'),
+      content: Text('💳 クレカ引落を${fresh.length}件、自動で記録しました'),
       duration: const Duration(seconds: 4),
     ));
   }
