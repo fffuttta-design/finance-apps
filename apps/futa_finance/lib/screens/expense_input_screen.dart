@@ -453,61 +453,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     return matches.take(6).toList();
   }
 
-  /// サジェストを選んだとき：内容を確定し、カテゴリ予測も走らせる。
-  void _applyDescSuggestion(String text) {
-    _descCtrl.text = text;
-    _descCtrl.selection = TextSelection.collapsed(offset: text.length);
-    setState(() {
-      if (!_categoryTouched) _autoPredictCategory();
-    });
-  }
-
-  /// 取引内容のサジェストリスト（Google風・入力欄の直下に出す）。
-  Widget _descSuggestionList() {
-    final suggestions = _descSuggestions();
-    if (suggestions.isEmpty) return const SizedBox.shrink();
-    return Container(
-      margin: const EdgeInsets.only(top: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Column(
-        children: [
-          for (int i = 0; i < suggestions.length; i++) ...[
-            if (i > 0)
-              const Divider(height: 1, color: Color(0xFFF1F5F9)),
-            InkWell(
-              onTap: () => _applyDescSuggestion(suggestions[i]),
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 11),
-                child: Row(
-                  children: [
-                    const Icon(Icons.history,
-                        size: 16, color: Color(0xFF9CA3AF)),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(suggestions[i],
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 14, color: Color(0xFF111827))),
-                    ),
-                    const Icon(Icons.north_west,
-                        size: 14, color: Color(0xFFCBD5E1)),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   /// 場所のサジェスト候補（過去履歴から）。
   /// ①今の「内容(件名)」で過去に使った場所を最優先（表記ゆれ防止）→
   /// ②全体の頻出場所（場所欄に入力があれば前方/部分一致で絞り込み）。
@@ -1109,32 +1054,43 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               ],
               // 取引内容を一番上に（要望：先に内容を書くのが入力しやすい）。
               _label('取引内容'),
-              TextFormField(
-                controller: _descCtrl,
-                focusNode: _descFocus,
-                decoration: _inputDecoration(),
-                onChanged: (_) {
-                  // 変換中（IME composing中）は setState で再描画しない。
-                  // Windowsデスクトップで「変換しようとスペースを押すとカーソルが
-                  // 先頭へ飛ぶ」フレームワーク不具合を誘発しないため、サジェスト
-                  // 更新は変換が確定してから走らせる。
-                  // ※カテゴリの自動予測は入力途中で走らせない（重さ・誤爆の元）。
-                  //   代わりにカテゴリ欄の「カテゴリを提案」ボタンで手動実行する。
-                  if (_descCtrl.value.composing.isValid) return;
-                  setState(() {});
-                },
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? '入力してください' : null,
-              ),
-              // 過去の取引内容からサジェスト（フォーカス中だけ表示）。
-              // フォーカス変化はここだけを再描画する（フォーム全体は再構築しない）
-              // ＝他の欄をタップした時にフォーカスを奪わない。
-              AnimatedBuilder(
-                animation: _descFocus,
-                builder: (context, _) => _descFocus.hasFocus
-                    ? _descSuggestionList()
-                    : const SizedBox.shrink(),
-              ),
+              // 過去の取引内容からサジェスト。RawAutocomplete 方式にして、
+              // 候補タップ時にフォーカスが外れて選べない不具合を解消（場所欄と同じ）。
+              LayoutBuilder(builder: (ctx, cons) {
+                return RawAutocomplete<String>(
+                  textEditingController: _descCtrl,
+                  focusNode: _descFocus,
+                  optionsBuilder: (_) => _descSuggestions(),
+                  onSelected: (_) => setState(() {
+                    // 候補を選んだら（新規のみ）カテゴリ予測も走らせる。
+                    if (!_categoryTouched) _autoPredictCategory();
+                  }),
+                  fieldViewBuilder:
+                      (context, controller, focusNode, onFieldSubmitted) {
+                    return TextFormField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      decoration: _inputDecoration(),
+                      // 変換中（IME composing中）は setState で再描画しない
+                      // （カーソルが先頭へ飛ぶFlutter不具合の回避）。
+                      onChanged: (_) {
+                        if (_descCtrl.value.composing.isValid) return;
+                        setState(() {});
+                      },
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? '入力してください'
+                          : null,
+                    );
+                  },
+                  optionsViewBuilder: (context, onSelected, options) =>
+                      _StoreOptionsView(
+                    width: cons.maxWidth,
+                    options: options.toList(),
+                    onSelected: onSelected,
+                    icon: Icons.history,
+                  ),
+                );
+              }),
               const SizedBox(height: 16),
               // 場所（必須）。店舗名や購入元。明細タブの「場所」列に出る。
               // 過去履歴からサジェスト（同じ件名で使った場所を優先）。表記ゆれ防止。
@@ -1936,11 +1892,13 @@ class _StoreOptionsView extends StatelessWidget {
     required this.width,
     required this.options,
     required this.onSelected,
+    this.icon = Icons.place_outlined,
   });
 
   final double width;
   final List<String> options;
   final AutocompleteOnSelected<String> onSelected;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
@@ -1972,8 +1930,8 @@ class _StoreOptionsView extends StatelessWidget {
                           horizontal: 12, vertical: 11),
                       child: Row(
                         children: [
-                          const Icon(Icons.place_outlined,
-                              size: 16, color: Color(0xFF9CA3AF)),
+                          Icon(icon,
+                              size: 16, color: const Color(0xFF9CA3AF)),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(options[i],
