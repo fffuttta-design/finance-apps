@@ -17,6 +17,7 @@ import '../widgets/drive_receipt_picker.dart';
 import 'category_editor_screen.dart';
 import 'category_sub_editor_screen.dart';
 import 'receipt_camera_screen.dart';
+import 'store_master_screen.dart';
 
 /// 支払元のカテゴリ。UI 上はまずこれを選択 → 該当の項目プルダウンが切り替わる。
 /// 表示順 = クレカ・電子・現金・銀行（使用頻度の高い順）。
@@ -728,6 +729,18 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     });
   }
 
+  /// 場所マスタの編集画面を開き、戻ったら最新のマスタを読み直して候補に反映する。
+  Future<void> _openStoreMasterEditor() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => const StoreMasterScreen()),
+    );
+    if (!mounted) return;
+    await StoreMasterRepository.instance.load();
+    if (!mounted) return;
+    setState(() {});
+  }
+
   /// 小カテゴリの編集画面（選択中の大カテゴリのサブ一覧）を直接開く。
   /// 大カテゴリ未選択なら選ぶよう促す。戻ったら最新カテゴリを読み直す。
   Future<void> _openSubCategoryEditor() async {
@@ -1152,7 +1165,32 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               const SizedBox(height: 16),
               // 場所（必須）。店舗名や購入元。明細タブの「場所」列に出る。
               // 過去履歴からサジェスト（同じ件名で使った場所を優先）。表記ゆれ防止。
-              _label('場所'),
+              Row(
+                children: [
+                  Expanded(child: _label('場所')),
+                  // 場所マスタ（固定入力の候補）を直接編集する。
+                  InkWell(
+                    onTap: _openStoreMasterEditor,
+                    borderRadius: BorderRadius.circular(6),
+                    child: const Padding(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.tune, size: 14, color: Color(0xFF1A237E)),
+                          SizedBox(width: 3),
+                          Text('場所マスタ編集',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1A237E))),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               // RawAutocomplete で「↑↓キー選択・Enter/クリックで確定」を実現。
               // （自前の候補リストは、クリック時にフォーカスが外れて選べない・
               //   キー操作できない問題があったため置き換え）。
