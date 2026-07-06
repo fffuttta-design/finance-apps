@@ -117,6 +117,40 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     return _closing.closings.any((c) => c.yearMonth == key && c.isClosed);
   }
 
+  /// 指定取引の「この口座の月」が締め済みか（全期間表示でも取引日で判定）。
+  bool _isClosedForTxn(core.Transaction t) {
+    final key = 'w:${_account.name}:'
+        '${t.date.year}-${t.date.month.toString().padLeft(2, '0')}';
+    return _closing.closings.any((c) => c.yearMonth == key && c.isClosed);
+  }
+
+  /// 締め済みの月の取引を変更しようとしたとき、確認アラートを出す。
+  /// 「変更する」を選んだときだけ true を返す（それ以外は false＝編集させない）。
+  Future<bool> _confirmEditClosed(core.Transaction t) async {
+    if (!_isClosedForTxn(t)) return true;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: const Text('締め済みの月です'),
+        content: Text(
+            '${t.date.month}月は締め済みです。この取引の金額や内容を変更すると、'
+            '締めた月の集計・残高が変わります。それでも変更しますか？'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx, false),
+              child: const Text('やめる')),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626)),
+            onPressed: () => Navigator.pop(dctx, true),
+            child: const Text('変更する'),
+          ),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
   // ───────────────────────────────────────────────────────────
   // 計算ロジック
   // ───────────────────────────────────────────────────────────
@@ -1625,6 +1659,9 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   // ───────────────────────────────────────────────────────────
 
   Future<void> _showEditDialog(core.Transaction t) async {
+    // 締め済みの月の取引なら、まず確認アラート。「変更する」以外は編集しない。
+    if (!await _confirmEditClosed(t)) return;
+    if (!mounted) return;
     // 種類別に、アプリ共通の入力画面（中央ポップアップ）で編集する。
     // 以前はこの画面だけ独自の AlertDialog で、広い画面だと中身がグレーの
     // まま出ない不具合があったため、他画面と同じ入力フォームに統一した。

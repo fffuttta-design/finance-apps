@@ -1039,7 +1039,38 @@ class _CardDetailScreenState extends State<CardDetailScreen>
   }
 
   /// 明細テーブル行タップ → 取引を編集して再読込。
+  /// 締め済みの月の取引を変更しようとしたとき、確認アラートを出す。
+  /// 「変更する」を選んだときだけ true。
+  Future<bool> _confirmEditClosed(core.Transaction t) async {
+    final key = _cardMonthKey(DateTime(t.date.year, t.date.month));
+    final closed = _closing.closings.any((c) => c.yearMonth == key && c.isClosed);
+    if (!closed) return true;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: const Text('締め済みの月です'),
+        content: Text(
+            '${t.date.month}月は締め済みです。この取引の金額や内容を変更すると、'
+            '締めた月の集計・請求が変わります。それでも変更しますか？'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx, false),
+              child: const Text('やめる')),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626)),
+            onPressed: () => Navigator.pop(dctx, true),
+            child: const Text('変更する'),
+          ),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
   Future<void> _editCardTxn(core.Transaction t) async {
+    if (!await _confirmEditClosed(t)) return;
+    if (!mounted) return;
     await showInputSheet<bool>(context, ExpenseInputScreen(editing: t));
     if (mounted) await _load();
   }
