@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../../data/app_mode.dart';
+import '../../data/month_closing_repository.dart';
 import '../../data/month_cursor.dart';
 import '../../data/nav_history.dart';
 import '../../data/settings_repository.dart';
@@ -47,7 +48,12 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   core.PaymentMethodsConfig _payments = core.PaymentMethodsConfig.empty();
   /// 大カテゴリ名 → アイコンキー（カテゴリ内訳のアイコン表示用）。
   Map<String, String?> _catIcons = {};
+  // 月締めの状態（締め済みの月は本体をグレーアウトするのに使う）。
+  core.MonthClosingConfig _closing = core.MonthClosingConfig.empty();
   bool _loading = true;
+
+  bool get _isMonthClosed =>
+      _closing.forMonth(_month.year, _month.month)?.isClosed ?? false;
 
   /// 支出合計カードの内訳を展開しているか。
   bool _summaryOpen = false;
@@ -116,12 +122,14 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     final subs = await SubscriptionRepository.instance.load();
     final payments = await _settings.loadPayments();
     final cats = await _settings.loadCategories();
+    final closing = await MonthClosingRepository.instance.load();
     if (!mounted) return;
     setState(() {
       _transactions = txns;
       _subs = subs.subscriptions;
       _payments = payments;
       _catIcons = {for (final m in cats.majors) m.name: m.iconKey};
+      _closing = closing;
       _loading = false;
     });
   }
@@ -620,7 +628,8 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                     MonthClosingBar(
                         month: _month,
                         snapshotExpense: keihiTotal + gaichuTotal,
-                        dense: true),
+                        dense: true,
+                        onChanged: _load),
                   ],
                 ),
               ),
@@ -639,20 +648,20 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 child: TabBarView(
                   controller: _subTab,
                   children: [
-                    _buildBody(
+                    _grey(_buildBody(
                         rows: keihi,
                         showFixedAndCard: true,
                         title: null,
                         detailLabel: '経費明細',
-                        showTopHeader: false),
-                    _buildBody(
+                        showTopHeader: false)),
+                    _grey(_buildBody(
                         rows: gaichu,
                         showFixedAndCard: false,
                         receiptLabel: '請求書',
                         teamSortDefault: true,
                         title: null,
                         detailLabel: '制作原価明細',
-                        showTopHeader: false),
+                        showTopHeader: false)),
                   ],
                 ),
               ),
@@ -662,12 +671,16 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
       );
     }
     // 個人モード（従来レイアウト）
-    return _buildBody(
+    return _grey(_buildBody(
         rows: _monthExpenses,
         showFixedAndCard: true,
         title: '支出',
-        detailLabel: '支出明細');
+        detailLabel: '支出明細'));
   }
+
+  /// 締め処理済みの月は本文を薄く（グレーアウト）して「もう確定」を示す。
+  Widget _grey(Widget child) =>
+      _isMonthClosed ? Opacity(opacity: 0.5, child: child) : child;
 
   /// 支出本文（タブ共用）。title が null ならタイトル見出しは出さない（タブ側で表示済）。
   /// showFixedAndCard=false（制作原価タブ）では固定費・クレカ照合を出さない。
@@ -767,7 +780,10 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                       ),
                     ),
                     MonthClosingBar(
-                        month: _month, snapshotExpense: total, dense: true),
+                        month: _month,
+                        snapshotExpense: total,
+                        dense: true,
+                        onChanged: _load),
                   ],
                 ),
                 const SizedBox(height: V2Spacing.md),

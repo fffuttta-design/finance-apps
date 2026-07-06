@@ -23,6 +23,9 @@ class MonthClosingBar extends StatefulWidget {
   /// 小さい操作チップ（タブ右上用）。未締め→「締める」、締め済→「締め済・取消」。
   final bool dense;
 
+  /// 締め/取消の直後に呼ばれる（呼び元でグレーアウト等を更新するため）。
+  final VoidCallback? onChanged;
+
   const MonthClosingBar({
     super.key,
     required this.month,
@@ -30,6 +33,7 @@ class MonthClosingBar extends StatefulWidget {
     this.snapshotIncome,
     this.compact = false,
     this.dense = false,
+    this.onChanged,
   });
 
   @override
@@ -70,6 +74,7 @@ class _MonthClosingBarState extends State<MonthClosingBar> {
     ));
     await MonthClosingRepository.instance.save(cfg);
     if (mounted) setState(() => _cfg = cfg);
+    widget.onChanged?.call();
   }
 
   Future<void> _reopen() async {
@@ -78,6 +83,7 @@ class _MonthClosingBarState extends State<MonthClosingBar> {
     final cfg = _cfg.upsert(existing.copyWith(clearClosedAt: true));
     await MonthClosingRepository.instance.save(cfg);
     if (mounted) setState(() => _cfg = cfg);
+    widget.onChanged?.call();
   }
 
   @override

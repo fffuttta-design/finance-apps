@@ -25,6 +25,8 @@ class TransactionSearchScreen extends StatefulWidget {
 class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
   final _settings = SettingsRepository();
   static const _wd = ['月', '火', '水', '木', '金', '土', '日'];
+  // 支払方法フィルタの特別値：「未登録の支払方法だけ」を表示する。
+  static const _unregSentinel = '__unregistered__';
 
   bool _loading = true;
   bool _busy = false;
@@ -72,11 +74,13 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
     });
   }
 
+  Set<String> get _registeredNames => <String>{
+        ...?_payments?.bankAccounts.map((b) => b.name),
+        ...?_payments?.creditCards.map((c) => c.name),
+      };
+
   List<String> get _paymentNames {
-    final reg = <String>{
-      ...?_payments?.bankAccounts.map((b) => b.name),
-      ...?_payments?.creditCards.map((c) => c.name),
-    };
+    final reg = _registeredNames;
     final ordered = <String>[...reg];
     // 取引に出てくる「未登録の支払方法」（例:クレカ）も候補に含める。
     // これで検索→選択→支払方法を一括変更、で正しいカードに付け替えて掃除できる。
@@ -102,7 +106,12 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
       if (majorBare != null && _bareName(t.category.major) != majorBare) {
         return false;
       }
-      if (_paymentFilter != null && t.paymentMethod != _paymentFilter) {
+      if (_paymentFilter == _unregSentinel) {
+        // 未登録のみ：登録済みの支払方法（口座/カード）に無いものだけ残す。
+        final pm = t.paymentMethod.trim();
+        if (pm.isEmpty || _registeredNames.contains(pm)) return false;
+      } else if (_paymentFilter != null &&
+          t.paymentMethod != _paymentFilter) {
         return false;
       }
       if (_reviewedFilter != null && t.reviewed != _reviewedFilter) {
@@ -395,6 +404,7 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
                 value: _paymentFilter,
                 items: [
                   (null, 'すべて'),
+                  (_unregSentinel, '⚠ 未登録のみ'),
                   for (final n in _paymentNames) (n, n),
                 ],
                 onChanged: (v) => setState(() => _paymentFilter = v),
