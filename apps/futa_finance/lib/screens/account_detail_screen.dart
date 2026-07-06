@@ -544,7 +544,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     return list;
   }
 
-  /// カスタム順モードのリスト（長押しドラッグで並び替え・残高列なし）。
+  /// カスタム順モードのリスト（ハンドルをドラッグで並び替え・残高列なし）。
+  /// クレカ明細と同じ「ドラッグ並び替え」に統一（銀行/現金/電子マネー共通）。
   Widget _reorderLedger(List<_LedgerRow> rows) {
     if (rows.isEmpty) {
       return const Center(
@@ -552,57 +553,57 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
             style: TextStyle(color: Color(0xFF9CA3AF))),
       );
     }
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(bottom: 6, left: 2),
-            child: Text('▲▼ボタンで並び替え（この順で保存）・残高は日付順のとき表示',
-                style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
-          ),
-          Container(
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-            ),
-            child: Column(
-              children: [
-                for (int i = 0; i < rows.length; i++) ...[
-                  if (i > 0)
-                    const Divider(height: 1, color: Color(0xFFF1F2F4)),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      _AccountMoveButtons(
-                        onUp: i > 0
-                            ? () => _moveAccountRow(i, i - 1, rows)
-                            : null,
-                        onDown: i < rows.length - 1
-                            ? () => _moveAccountRow(i, i + 1, rows)
-                            : null,
-                      ),
-                      Expanded(child: _reorderRow(rows[i])),
-                    ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(18, 8, 18, 6),
+          child: Text('ハンドル（⋮⋮）をドラッグで並び替え（この順で保存）・残高は日付順のとき表示',
+              style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
+        ),
+        Expanded(
+          child: ReorderableListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            itemCount: rows.length,
+            buildDefaultDragHandles: false,
+            onReorder: (oldIndex, newIndex) {
+              if (newIndex > oldIndex) newIndex -= 1;
+              final list = [...rows];
+              final item = list.removeAt(oldIndex);
+              list.insert(newIndex, item);
+              _saveAccountReorder(list);
+            },
+            itemBuilder: (context, i) {
+              final row = rows[i];
+              return DecoratedBox(
+                key: ValueKey('acctreorder_${row.txn.id}'),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(
+                    bottom: BorderSide(color: Color(0xFFF1F2F4)),
                   ),
-                ],
-              ],
-            ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    ReorderableDragStartListener(
+                      index: i,
+                      child: const Padding(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                        child: Icon(Icons.drag_indicator,
+                            size: 20, color: Color(0xFF9CA3AF)),
+                      ),
+                    ),
+                    Expanded(child: _reorderRow(row)),
+                  ],
+                ),
+              );
+            },
           ),
-        ],
-      ),
+        ),
+      ],
     );
-  }
-
-  /// 行を1つ上/下へ動かして sortOrder を保存する。
-  void _moveAccountRow(int from, int to, List<_LedgerRow> rows) {
-    final list = [...rows];
-    final item = list.removeAt(from);
-    list.insert(to, item);
-    _saveAccountReorder(list);
   }
 
   Widget _reorderRow(_LedgerRow row) {
@@ -1531,36 +1532,4 @@ class _LedgerRow {
   final core.Transaction txn;
   final int signedAmount;
   final int balanceAfter;
-}
-
-/// カスタム順モードで行の左に置く ▲▼ ボタン（1行ずつ上下へ動かす）。
-class _AccountMoveButtons extends StatelessWidget {
-  const _AccountMoveButtons({required this.onUp, required this.onDown});
-
-  final VoidCallback? onUp;
-  final VoidCallback? onDown;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget btn(IconData icon, VoidCallback? onTap) => InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(6),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            child: Icon(icon,
-                size: 20,
-                color: onTap == null
-                    ? const Color(0xFFD1D5DB)
-                    : const Color(0xFF1A237E)),
-          ),
-        );
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        btn(Icons.keyboard_arrow_up, onUp),
-        btn(Icons.keyboard_arrow_down, onDown),
-      ],
-    );
-  }
 }
