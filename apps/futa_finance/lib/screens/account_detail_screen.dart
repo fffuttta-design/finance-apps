@@ -200,6 +200,24 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         .where((r) => r.signedAmount < 0)
         .fold<int>(0, (s, r) => s + (-r.signedAmount));
     final netDelta = inSum - outSum;
+    // 「振替（口座間の移動）」と「実収入/実支出」を分けて集計する。
+    // 振替は残高は動かすが"本物の収入・支出"ではないので、サマリーで別立てにして
+    // 月の実像（実収入・実支出）が振替に埋もれないようにする（案A）。
+    int realIn = 0, realOut = 0, transferIn = 0, transferOut = 0;
+    for (final r in filteredAsc) {
+      if (r.txn.type == core.TransactionType.transfer) {
+        if (r.signedAmount > 0) {
+          transferIn += r.signedAmount;
+        } else {
+          transferOut += -r.signedAmount;
+        }
+      } else if (r.signedAmount > 0) {
+        realIn += r.signedAmount;
+      } else {
+        realOut += -r.signedAmount;
+      }
+    }
+    final transferNet = transferIn - transferOut;
 
     // 表示用: pending があればそれを使う。
     final dispStart = _pendingMonthStartBalance ?? autoMonthStartBalance;
@@ -368,6 +386,9 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                           inSum: inSum,
                           outSum: outSum,
                           netDelta: netDelta,
+                          realIn: realIn,
+                          realOut: realOut,
+                          transferNet: transferNet,
                           startBalance: dispStart,
                           endBalance: dispEnd,
                         ),
@@ -556,10 +577,35 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(18, 8, 18, 6),
-          child: Text('ハンドル（⋮⋮）をドラッグで並び替え（この順で保存）・残高は日付順のとき表示',
-              style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 6, 10, 4),
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text('ハンドル（⋮⋮）をドラッグで並び替え（この順で保存）',
+                    style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
+              ),
+              // まず日付順（新しい順）に整えてから、手でドラッグ微調整する用。
+              TextButton.icon(
+                onPressed: () {
+                  final byDate = [...rows]
+                    ..sort((a, b) => -a.txn.date.compareTo(b.txn.date));
+                  _saveAccountReorder(byDate);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('日付順（新しい順）に並べ直しました'),
+                        duration: Duration(seconds: 2)),
+                  );
+                },
+                icon: const Icon(Icons.sort, size: 16),
+                label: const Text('日付順に並べ直す',
+                    style: TextStyle(fontSize: 12)),
+                style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: const Color(0xFF1A237E)),
+              ),
+            ],
+          ),
         ),
         Expanded(
           child: ReorderableListView.builder(
@@ -693,11 +739,16 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   static const _cGreen = Color(0xFF16A34A);
   static const _cRed = Color(0xFFDC2626);
   static const _cSky = Color(0xFF0284C7);
+  // 振替（口座間の移動）を表す青。支出/収入の赤緑と区別する。
+  static const _cTransfer = Color(0xFF2563EB);
 
   Widget _summaryCard({
     required int inSum,
     required int outSum,
     required int netDelta,
+    required int realIn,
+    required int realOut,
+    required int transferNet,
     int? startBalance,
     int? endBalance,
   }) {
@@ -706,14 +757,18 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       color: const Color(0xFFFAFAFA),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: hasMonth
-          ? _balanceFlowStrip(startBalance, endBalance, inSum, outSum, netDelta)
-          // 全期間は月初/月末が無いので、入金/出金/差引のみ。
+          ? _balanceFlowStrip(
+              startBalance, endBalance, realIn, realOut, transferNet, netDelta)
+          // 全期間は月初/月末が無いので、実収入/実支出/振替/差引を並べる。
           : Row(
               children: [
-                _summaryItem('入金合計', formatYen(inSum), _cGreen),
-                const SizedBox(width: 10),
-                _summaryItem('出金合計', formatYen(outSum), _cRed),
-                const SizedBox(width: 10),
+                _summaryItem('実収入', formatYen(realIn), _cGreen),
+                const SizedBox(width: 8),
+                _summaryItem('実支出', formatYen(realOut), _cRed),
+                const SizedBox(width: 8),
+                _summaryItem('振替',
+                    formatYen(transferNet, withSign: true), _cTransfer),
+                const SizedBox(width: 8),
                 _summaryItem('差引', formatYen(netDelta, withSign: true),
                     netDelta >= 0 ? _cGreen : _cRed),
               ],
@@ -721,9 +776,9 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     );
   }
 
-  /// 月初 → ＋入金/−出金 → 月末 の残高フロー帯（案A）。
-  Widget _balanceFlowStrip(
-      int start, int end, int inSum, int outSum, int net) {
+  /// 月初 → 実収入/実支出/振替 → 月末 の残高フロー帯（案A）。
+  Widget _balanceFlowStrip(int start, int end, int realIn, int realOut,
+      int transferNet, int net) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -750,16 +805,23 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
               ],
             ),
           ),
-          // 入金 / 出金
+          // 実収入 / 実支出 / 振替
           SizedBox(
-            width: 150,
+            width: 168,
             child: Column(
               children: [
-                _flowChip('入金', '+${formatYen(inSum)}', _cGreen,
+                _flowChip('実収入', '+${formatYen(realIn)}', _cGreen,
                     const Color(0xFFF0FDF4), Icons.south_west),
                 const SizedBox(height: 6),
-                _flowChip('出金', '−${formatYen(outSum)}', _cRed,
+                _flowChip('実支出', '−${formatYen(realOut)}', _cRed,
                     const Color(0xFFFEF2F2), Icons.north_east),
+                const SizedBox(height: 6),
+                _flowChip(
+                    '振替',
+                    formatYen(transferNet, withSign: true),
+                    _cTransfer,
+                    const Color(0xFFEFF6FF),
+                    Icons.swap_horiz),
               ],
             ),
           ),
@@ -877,13 +939,14 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         ),
         child: Table(
           columnWidths: const {
-            0: FixedColumnWidth(108),
+            0: FixedColumnWidth(100),
             1: FlexColumnWidth(),
-            2: FixedColumnWidth(100),
-            3: FixedColumnWidth(100),
-            4: FixedColumnWidth(124),
-            5: FixedColumnWidth(44), // 確認チェック
-            6: FixedColumnWidth(40), // 編集
+            2: FixedColumnWidth(92), // 支出
+            3: FixedColumnWidth(92), // 収入
+            4: FixedColumnWidth(112), // 振替
+            5: FixedColumnWidth(116), // 残高
+            6: FixedColumnWidth(44), // 確認チェック
+            7: FixedColumnWidth(40), // 編集
           },
           defaultVerticalAlignment: TableCellVerticalAlignment.middle,
           border: const TableBorder(
@@ -935,8 +998,9 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       children: [
         h('取引日'),
         h('摘要'),
-        h('出金', right: true),
-        h('入金', right: true),
+        h('支出', right: true),
+        h('収入', right: true),
+        h('振替', right: true),
         h('残高', right: true),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 9),
@@ -983,8 +1047,9 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                   fontWeight: FontWeight.w700,
                   color: Color(0xFF374151))),
         ),
-        const SizedBox.shrink(),
-        const SizedBox.shrink(),
+        const SizedBox.shrink(), // 支出
+        const SizedBox.shrink(), // 収入
+        const SizedBox.shrink(), // 振替
         // 残高：他の行と同じ右端に揃える（鉛筆は次の編集列へ）。
         Padding(
           padding: _cellPad,
@@ -1286,10 +1351,20 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                     ? const Color(0xFFDC2626)
                     : const Color(0xFF111827))),
       ),
-      money(isOut ? formatYen(-row.signedAmount) : '',
+      // 支出列：振替以外の出金だけ（赤）。
+      money(!isTransfer && isOut ? formatYen(-row.signedAmount) : '',
           const Color(0xFFDC2626)),
-      money(isOut ? '' : formatYen(row.signedAmount),
+      // 収入列：振替以外の入金だけ（緑）。
+      money(!isTransfer && !isOut ? formatYen(row.signedAmount) : '',
           const Color(0xFF16A34A)),
+      // 振替列：口座間の移動だけ（青・符号付き）。支出/収入とは別立て。
+      money(
+          isTransfer
+              ? (isOut
+                  ? '−${formatYen(-row.signedAmount)}'
+                  : '+${formatYen(row.signedAmount)}')
+              : '',
+          _cTransfer),
       Padding(
         padding: _cellPad,
         child: Text(formatYen(shownBalance),
