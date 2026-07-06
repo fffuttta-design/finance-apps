@@ -53,9 +53,9 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   /// 月フィルタ。null = 全期間。
   DateTime? _selectedMonth;
 
-  /// カスタム順モード。ON のとき行を長押しドラッグで並び替えでき、その順番を
-  /// 各取引の sortOrder に保存する。※残高は日付順が前提のため、このモード中は
-  /// 残高列・月初/月末残高を隠す。
+  /// カスタム順モード。ON のとき行をドラッグで並び替えでき、その順番を
+  /// 各取引の sortOrder に保存する。残高はこのモードでも表示し、
+  /// 「表示順に沿って積み上げた値」を出す（並び替えるたびに再計算される）。
   bool _customOrder = false;
   // 月締め処理中フラグ（ボタン多重押し防止）。
   bool _busyClose = false;
@@ -395,7 +395,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                         const Divider(height: 1),
                         Expanded(
                           child: _customOrder
-                              ? _reorderLedger(_customSorted(displayRows))
+                              ? _reorderLedger(_customSorted(displayRows),
+                                  dispStart ?? (_account.startingBalance ?? 0))
                               : _ledgerTable(
                                   displayRows: displayRows,
                                   monthStartBalance: dispStart,
@@ -567,12 +568,21 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
 
   /// カスタム順モードのリスト（ハンドルをドラッグで並び替え・残高列なし）。
   /// クレカ明細と同じ「ドラッグ並び替え」に統一（銀行/現金/電子マネー共通）。
-  Widget _reorderLedger(List<_LedgerRow> rows) {
+  Widget _reorderLedger(List<_LedgerRow> rows, int seedBalance) {
     if (rows.isEmpty) {
       return const Center(
         child: Text('この期間の取引はありません',
             style: TextStyle(color: Color(0xFF9CA3AF))),
       );
+    }
+    // 表示順（上＝新しい／下＝古い）に沿って残高を積み上げる。
+    // 下（古い方）から月初残高に足していき、各行に「その行まで反映した残高」を出す。
+    // ＝並び替えるたびに、この表示順で残高が再計算される。
+    final balances = List<int>.filled(rows.length, seedBalance);
+    int running = seedBalance;
+    for (int i = rows.length - 1; i >= 0; i--) {
+      running += rows[i].signedAmount;
+      balances[i] = running;
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -582,7 +592,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
           child: Row(
             children: [
               const Expanded(
-                child: Text('ハンドル（⋮⋮）をドラッグで並び替え（この順で保存）',
+                child: Text('ハンドル（⋮⋮）をドラッグで並び替え（この順で保存・残高もこの順で再計算）',
                     style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
               ),
               // まず日付順（新しい順）に整えてから、手でドラッグ微調整する用。
@@ -641,7 +651,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                             size: 20, color: Color(0xFF9CA3AF)),
                       ),
                     ),
-                    Expanded(child: _reorderRow(row)),
+                    Expanded(child: _reorderRow(row, balances[i])),
                   ],
                 ),
               );
@@ -652,7 +662,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     );
   }
 
-  Widget _reorderRow(_LedgerRow row) {
+  Widget _reorderRow(_LedgerRow row, int balanceAfter) {
     final t = row.txn;
     final isOut = row.signedAmount < 0;
     final isTransfer = t.type == core.TransactionType.transfer;
@@ -693,6 +703,20 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                   color: isOut
                       ? const Color(0xFFDC2626)
                       : const Color(0xFF16A34A))),
+          // 残高（この表示順で積み上げた値）。
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 96,
+            child: Text(formatYen(balanceAfter),
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'monospace',
+                    color: balanceAfter >= 0
+                        ? const Color(0xFF111827)
+                        : const Color(0xFFDC2626))),
+          ),
           SizedBox(
             width: 34,
             child: Center(
