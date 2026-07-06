@@ -1,1 +1,1 @@
-{"version":"1.0.469","buildNumber":"470","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.469/futa-finance-v1.0.469.apk","releaseNotes":"締め済みの月の取引を変更しようとすると、確認アラートが出るようにしました（通帳・カード詳細）。うっかり締めた月をいじる事故を防ぎます。"}
+{"version":"1.0.470","buildNumber":"471","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.470/futa-finance-v1.0.470.apk","releaseNotes":"締め済みの月を薄い青のトーンで表示し、背景と区別しやすくしました（支出タブ・通帳・カード詳細）。"}
