@@ -1,1 +1,1 @@
-{"version":"1.0.472","buildNumber":"473","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.472/futa-finance-v1.0.472.apk","releaseNotes":"締めた後に「謎の引落明細」が湧く不具合を修正しました（締め済みの月にはクレカ自動引落を作りません）。"}
+{"version":"1.0.473","buildNumber":"474","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.473/futa-finance-v1.0.473.apk","releaseNotes":"総資産タブの口座残高を「表示中の月の月末残高」にして、通帳の月末残高と一致するようにしました。"}
