@@ -148,6 +148,9 @@ class _CardDetailScreenState extends State<CardDetailScreen>
     final rows = <FixedCostRow>[];
     for (final sub in _subs) {
       if ((sub.paymentMethod ?? '').trim() != name) continue;
+      // 既に「実明細化」された固定費は monthTxns（実取引）側に出るので、
+      // ここでは出さない（利用合計の二重計上を防ぎ、ウォレット一覧と一致させる）。
+      if (_all.any((t) => t.id == 'fixedcost_${sub.id}_$ym')) continue;
       final amt = sub.plAmountForMonth(ym, curYm);
       final pending = sub.isVariable &&
           !sub.monthlyActuals.containsKey(ym) &&
