@@ -1,1 +1,1 @@
-{"version":"1.0.436","buildNumber":"437","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.436/futa-finance-v1.0.436.apk","releaseNotes":"明細検索に「未登録のみ」フィルタを追加（未登録の支払方法だけを一覧表示→付け替え）。締め処理済みの月は支出タブがグレーアウトします。"}
+{"version":"1.0.437","buildNumber":"438","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.437/futa-finance-v1.0.437.apk","releaseNotes":"購入場所を「場所マスタ」で管理できるようにしました（設定→マスタデータ→場所マスタ）。表記ゆれは「統合」でまとめると過去の明細も一括で揃います。事業・個人で共通です。"}
