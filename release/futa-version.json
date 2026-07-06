@@ -1,1 +1,1 @@
-{"version":"1.0.441","buildNumber":"442","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.441/futa-finance-v1.0.441.apk","releaseNotes":"支出編集で現在のカテゴリが正しく表示されるよう修正。固定費を編集すると過去の明細にも反映。ウォレット金額の二重計上（固定費）を修正。"}
+{"version":"1.0.442","buildNumber":"443","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.442/futa-finance-v1.0.442.apk","releaseNotes":"明細検索・一括編集に「場所変更」を追加。収入を記録に「収入マスタ編集」。各ウォレットの記録メニューをボタン脇のポップアップにしました。"}
