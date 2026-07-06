@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
+import '../data/month_closing_repository.dart';
 import '../data/month_cursor.dart';
 import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
@@ -58,6 +59,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   bool _customOrder = false;
   // 月締め処理中フラグ（ボタン多重押し防止）。
   bool _busyClose = false;
+  // ウォレット×月ごとの「締め済み」状態（明示的にボタンを押したときだけ立つ）。
+  core.MonthClosingConfig _closing = core.MonthClosingConfig.empty();
 
   // ─── 未保存編集の管理 ─────────────────────
   /// ユーザーが手入力で上書きした月初残高（保存前のローカル状態）。
@@ -95,8 +98,23 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
 
   Future<void> _load() async {
     final list = await TransactionRepository.instance.loadAll();
+    final closing = await MonthClosingRepository.instance.load();
     if (!mounted) return;
-    setState(() => _all = list);
+    setState(() {
+      _all = list;
+      _closing = closing;
+    });
+  }
+
+  /// ウォレット×月の締めキー（月グローバルの締めと衝突しない接頭辞付き）。
+  String _walletMonthKey(DateTime m) =>
+      'w:${_account.name}:${m.year}-${m.month.toString().padLeft(2, '0')}';
+
+  bool get _isMonthClosed {
+    final m = _selectedMonth;
+    if (m == null) return false;
+    final key = _walletMonthKey(m);
+    return _closing.closings.any((c) => c.yearMonth == key && c.isClosed);
   }
 
   // ───────────────────────────────────────────────────────────
@@ -1271,19 +1289,31 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   }
 
   /// この月を締める＝この月のこのウォレットの取引を全部「確認済み」にする。
+  Future<void> _setClosedFlag(DateTime m, bool closed) async {
+    final key = _walletMonthKey(m);
+    final existing = _closing.closings.firstWhere(
+      (c) => c.yearMonth == key,
+      orElse: () => core.MonthClosing(yearMonth: key),
+    );
+    final updated = closed
+        ? existing.copyWith(closedAt: DateTime.now())
+        : existing.copyWith(clearClosedAt: true);
+    await MonthClosingRepository.instance.save(_closing.upsert(updated));
+  }
+
+  /// この月を締める＝取引を全部「確認済み」にして、明示的な締めフラグを立てる。
   Future<void> _closeMonth() async {
     final m = _selectedMonth;
     if (m == null) return;
     final txns = _monthRelatedTxns();
     final todo = txns.where((t) => !t.reviewed).toList();
-    if (todo.isEmpty) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (dctx) => AlertDialog(
         title: Text('${m.month}月を締めますか？'),
         content: Text(
             '「${_account.name}」の${m.year}年${m.month}月の取引 ${txns.length}件を、'
-            'すべて「確認済み（金額に間違いなし）」にします。'),
+            'すべて「確認済み（金額に間違いなし）」にして締めます。'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(dctx, false),
@@ -1299,25 +1329,21 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     for (final t in todo) {
       await TransactionRepository.instance.update(t.copyWith(reviewed: true));
     }
+    await _setClosedFlag(m, true);
     if (!mounted) return;
     await _load();
     if (!mounted) return;
     setState(() => _busyClose = false);
     ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${m.month}月を締めました（${todo.length}件を確認済みに）')));
+        SnackBar(content: Text('${m.month}月を締めました')));
   }
 
-  /// 締めを解除＝この月のこのウォレットの取引の確認済みを外す。
+  /// 締めを解除＝締めフラグを外す（確認チェックはそのまま残す）。
   Future<void> _reopenMonth() async {
     final m = _selectedMonth;
     if (m == null) return;
-    final done = _monthRelatedTxns().where((t) => t.reviewed).toList();
-    if (done.isEmpty) return;
     setState(() => _busyClose = true);
-    for (final t in done) {
-      await TransactionRepository.instance
-          .update(t.copyWith(reviewed: false));
-    }
+    await _setClosedFlag(m, false);
     if (!mounted) return;
     await _load();
     if (!mounted) return;
@@ -1326,39 +1352,40 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         .showSnackBar(SnackBar(content: Text('${m.month}月の締めを解除しました')));
   }
 
-  /// 月の締めバー（月選択時のみ）。全部確認済みなら「締め済み」、そうでなければ締めボタン。
+  /// 月の締めバー（月選択時のみ）。
+  /// 締め済みは「ユーザーが締めボタンを押したとき」だけ（チェック全部でも自動では締めない）。
   Widget _closeMonthBar() {
     final m = _selectedMonth;
     if (m == null) return const SizedBox.shrink();
     final txns = _monthRelatedTxns();
     if (txns.isEmpty) return const SizedBox.shrink();
-    final allReviewed = txns.every((t) => t.reviewed);
+    final closed = _isMonthClosed;
     final doneCount = txns.where((t) => t.reviewed).length;
     return Container(
-      color: allReviewed ? const Color(0xFFE7F6EF) : const Color(0xFFF7F8FA),
+      color: closed ? const Color(0xFFE7F6EF) : const Color(0xFFF7F8FA),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Row(
         children: [
-          Icon(allReviewed ? Icons.verified : Icons.fact_check_outlined,
+          Icon(closed ? Icons.verified : Icons.fact_check_outlined,
               size: 18,
-              color: allReviewed
+              color: closed
                   ? const Color(0xFF059669)
                   : const Color(0xFF6B7280)),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              allReviewed
+              closed
                   ? '${m.month}月は締め済み（全${txns.length}件 確認済み）'
                   : '確認済み $doneCount/${txns.length}件',
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: allReviewed
+                  color: closed
                       ? const Color(0xFF059669)
                       : const Color(0xFF6B7280)),
             ),
           ),
-          if (allReviewed)
+          if (closed)
             TextButton(
               onPressed: _busyClose ? null : _reopenMonth,
               child: const Text('締め解除'),

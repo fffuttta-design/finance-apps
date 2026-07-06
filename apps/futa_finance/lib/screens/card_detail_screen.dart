@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
+import '../data/month_closing_repository.dart';
 import '../data/month_cursor.dart';
 import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
@@ -49,6 +50,8 @@ class _CardDetailScreenState extends State<CardDetailScreen>
   bool _monthPicked = false;
   // 月締め処理中フラグ（ボタン多重押し防止）。
   bool _busyCardClose = false;
+  // カード×月ごとの「締め済み」状態（明示的にボタンを押したときだけ立つ）。
+  core.MonthClosingConfig _closing = core.MonthClosingConfig.empty();
   late final TabController _tabController =
       TabController(length: 2, vsync: this);
 
@@ -98,10 +101,12 @@ class _CardDetailScreenState extends State<CardDetailScreen>
   Future<void> _load() async {
     final list = await TransactionRepository.instance.loadAll();
     final subs = await SubscriptionRepository.instance.load();
+    final closing = await MonthClosingRepository.instance.load();
     if (!mounted) return;
     setState(() {
       _all = list;
       _subs = subs.subscriptions;
+      _closing = closing;
       // 初回だけ初期月を確定。
       // ・過去月を選んで開いたとき（＝共有カーソルが当月以外）は、その月を尊重。
       // ・当月（＝特に月指定していない）のときだけ「利用のある最新月」を既定にする。
@@ -248,7 +253,30 @@ class _CardDetailScreenState extends State<CardDetailScreen>
     if (mounted) await _load();
   }
 
-  /// この月を締める＝この月の利用（取引＋固定費）を全部「確認済み」にする。
+  /// カード×月の締めキー（月グローバル・口座の締めと衝突しない接頭辞付き）。
+  String _cardMonthKey(DateTime m) =>
+      'card:${_card.name}:${m.year}-${m.month.toString().padLeft(2, '0')}';
+
+  bool get _isCardMonthClosed {
+    final m = _selectedMonth;
+    if (m == null || _range != null) return false;
+    final key = _cardMonthKey(m);
+    return _closing.closings.any((c) => c.yearMonth == key && c.isClosed);
+  }
+
+  Future<void> _setCardClosedFlag(DateTime m, bool closed) async {
+    final key = _cardMonthKey(m);
+    final existing = _closing.closings.firstWhere(
+      (c) => c.yearMonth == key,
+      orElse: () => core.MonthClosing(yearMonth: key),
+    );
+    final updated = closed
+        ? existing.copyWith(closedAt: DateTime.now())
+        : existing.copyWith(clearClosedAt: true);
+    await MonthClosingRepository.instance.save(_closing.upsert(updated));
+  }
+
+  /// この月を締める＝この月の利用（取引＋固定費）を全部「確認済み」にして締めフラグを立てる。
   Future<void> _closeCardMonth(
       List<core.Transaction> monthTxns, List<FixedCostRow> fixed) async {
     final m = _selectedMonth;
@@ -276,6 +304,7 @@ class _CardDetailScreenState extends State<CardDetailScreen>
     if (ok != true) return;
     setState(() => _busyCardClose = true);
     await _setCardMonthReviewed(monthTxns, fixed, ym, true);
+    await _setCardClosedFlag(m, true);
     if (!mounted) return;
     await _load();
     if (!mounted) return;
@@ -284,13 +313,13 @@ class _CardDetailScreenState extends State<CardDetailScreen>
         SnackBar(content: Text('${m.month}月を締めました')));
   }
 
+  /// 締めを解除＝締めフラグを外す（確認チェックはそのまま残す）。
   Future<void> _reopenCardMonth(
       List<core.Transaction> monthTxns, List<FixedCostRow> fixed) async {
     final m = _selectedMonth;
     if (m == null) return;
-    final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
     setState(() => _busyCardClose = true);
-    await _setCardMonthReviewed(monthTxns, fixed, ym, false);
+    await _setCardClosedFlag(m, false);
     if (!mounted) return;
     await _load();
     if (!mounted) return;
@@ -337,32 +366,33 @@ class _CardDetailScreenState extends State<CardDetailScreen>
     if (total == 0) return const SizedBox.shrink();
     final done = monthTxns.where((t) => t.reviewed).length +
         fixed.where((f) => f.reviewed).length;
-    final allReviewed = done == total;
+    // 締め済みは「ユーザーが締めボタンを押したとき」だけ（チェック全部でも自動では締めない）。
+    final closed = _isCardMonthClosed;
     return Container(
-      color: allReviewed ? const Color(0xFFE7F6EF) : const Color(0xFFF7F8FA),
+      color: closed ? const Color(0xFFE7F6EF) : const Color(0xFFF7F8FA),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Row(
         children: [
-          Icon(allReviewed ? Icons.verified : Icons.fact_check_outlined,
+          Icon(closed ? Icons.verified : Icons.fact_check_outlined,
               size: 18,
-              color: allReviewed
+              color: closed
                   ? const Color(0xFF059669)
                   : const Color(0xFF6B7280)),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              allReviewed
+              closed
                   ? '${_selectedMonth!.month}月は締め済み（全$total件 確認済み）'
                   : '確認済み $done/$total件',
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: allReviewed
+                  color: closed
                       ? const Color(0xFF059669)
                       : const Color(0xFF6B7280)),
             ),
           ),
-          if (allReviewed)
+          if (closed)
             TextButton(
               onPressed: _busyCardClose
                   ? null
