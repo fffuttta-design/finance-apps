@@ -683,6 +683,9 @@ class _V2ReportScreenState extends State<V2ReportScreen>
             ),
           ),
           const SizedBox(height: V2Spacing.lg),
+          // 日別支出のカレンダーヒートマップ（濃いほど多い）。
+          _heatmapCard(year),
+          const SizedBox(height: V2Spacing.lg),
           _chartCard(
             title: '貯金（月初残高）の推移',
             empty: !hasAnyBalance,
@@ -795,6 +798,129 @@ class _V2ReportScreenState extends State<V2ReportScreen>
                 style: V2Typography.micro.copyWith(color: deltaColor)),
           ],
         ),
+      ),
+    );
+  }
+
+  /// 日別支出のカレンダーヒートマップ（GitHub風・その年）。濃いほど支出が多い。
+  Widget _heatmapCard(int year) {
+    // 日別の支出合計（実質コスト）。
+    final daily = <String, int>{};
+    for (final t in _transactions) {
+      if (t.date.year != year) continue;
+      if (t.type != core.TransactionType.expense) continue;
+      final k = '${t.date.month}-${t.date.day}';
+      daily[k] = (daily[k] ?? 0) + t.effectiveAmount;
+    }
+    final maxDaily = daily.values.fold<int>(0, (m, v) => v > m ? v : m);
+    Color cellColor(int amount) {
+      if (amount <= 0 || maxDaily <= 0) return const Color(0xFFEFF1F4);
+      final r = amount / maxDaily;
+      if (r < 0.25) return const Color(0xFFFBD0D0);
+      if (r < 0.5) return const Color(0xFFF39A9A);
+      if (r < 0.75) return const Color(0xFFE85D5D);
+      return const Color(0xFFDC2626);
+    }
+
+    final firstDay = DateTime(year, 1, 1);
+    final lead = firstDay.weekday - 1; // 月曜=0
+    final totalDays = DateTime(year, 12, 31).difference(firstDay).inDays + 1;
+    final weeks = ((lead + totalDays) / 7).ceil();
+    // 週(列)ごとに7日(行)を並べる。
+    final columns = <Widget>[];
+    for (int w = 0; w < weeks; w++) {
+      final cells = <Widget>[];
+      for (int dow = 0; dow < 7; dow++) {
+        final di = w * 7 + dow - lead;
+        Widget cell;
+        if (di < 0 || di >= totalDays) {
+          cell = const SizedBox(width: 11, height: 11);
+        } else {
+          final d = firstDay.add(Duration(days: di));
+          final amt = daily['${d.month}-${d.day}'] ?? 0;
+          cell = Container(
+            width: 11,
+            height: 11,
+            decoration: BoxDecoration(
+              color: cellColor(amt),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          );
+        }
+        cells.add(Padding(padding: const EdgeInsets.all(1.5), child: cell));
+      }
+      columns.add(Column(mainAxisSize: MainAxisSize.min, children: cells));
+    }
+
+    return V2Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text('日別の支出（濃いほど多い）',
+                    style: V2Typography.h2
+                        .copyWith(color: V2Colors.textPrimary)),
+              ),
+              if (maxDaily > 0)
+                Text('最多 ${formatYen(maxDaily)}/日',
+                    style: V2Typography.micro
+                        .copyWith(color: V2Colors.textSecondary)),
+            ],
+          ),
+          const SizedBox(height: V2Spacing.sm),
+          if (maxDaily <= 0)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: Text('$year年の支出がまだありません',
+                    style: V2Typography.caption
+                        .copyWith(color: V2Colors.textSecondary)),
+              ),
+            )
+          else ...[
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: columns,
+              ),
+            ),
+            const SizedBox(height: V2Spacing.sm),
+            // 凡例（少 → 多）。
+            Row(
+              children: [
+                Text('少',
+                    style: V2Typography.micro
+                        .copyWith(color: V2Colors.textMuted)),
+                const SizedBox(width: 6),
+                for (final c in const [
+                  Color(0xFFEFF1F4),
+                  Color(0xFFFBD0D0),
+                  Color(0xFFF39A9A),
+                  Color(0xFFE85D5D),
+                  Color(0xFFDC2626),
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 3),
+                    child: Container(
+                      width: 11,
+                      height: 11,
+                      decoration: BoxDecoration(
+                        color: c,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 3),
+                Text('多',
+                    style: V2Typography.micro
+                        .copyWith(color: V2Colors.textMuted)),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
