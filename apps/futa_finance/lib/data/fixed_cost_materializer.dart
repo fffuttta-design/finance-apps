@@ -99,17 +99,31 @@ class FixedCostMaterializer {
               ? sub.paymentMethod!.trim()
               : (tmpl?.paymentMethod ?? '');
           final rk = sub.receiptKind; // 'paper' / 'drive' / null
+          // 大/小カテゴリは「普通のカテゴリ」を使い、固定費かどうかは isFixed で表す。
+          // categoryMajor 未設定の古い固定費は従来どおり「固定費(定額)/(変動)」で明細化。
+          final hasNormalCat =
+              sub.categoryMajor != null && sub.categoryMajor!.trim().isNotEmpty;
+          final core.Category cat = hasNormalCat
+              ? core.Category(
+                  major: sub.categoryMajor!.trim(),
+                  sub: (sub.categorySub?.trim().isNotEmpty ?? false)
+                      ? sub.categorySub!.trim()
+                      : '',
+                )
+              : core.Category(
+                  major: sub.isVariable ? '1.固定費(変動)' : '0.固定費(定額)',
+                  sub: masterSub,
+                );
           final tx = core.Transaction(
             id: id,
             date: DateTime(y, m, day),
             type: core.TransactionType.expense,
-            category: core.Category(
-              major: sub.isVariable ? '1.固定費(変動)' : '0.固定費(定額)',
-              sub: masterSub,
-            ),
+            category: cat,
             paymentMethod: pay,
             description: sub.name,
             amount: amt,
+            // 固定費（サブスク）由来の明細であることを示すフラグ。
+            isFixed: true,
             // 紙で受け取る固定費は最初から「保管済み」として作る。
             receiptSaved: rk == 'paper',
             receiptType: (rk == 'paper' || rk == 'drive') ? rk : null,
@@ -136,7 +150,8 @@ class FixedCostMaterializer {
     final nd = _norm(t.description);
     final nameHit =
         nn.isNotEmpty && nd.isNotEmpty && (nd.contains(nn) || nn.contains(nd));
-    final amtHit = t.amount == amt && t.category.major.contains('固定費');
+    final amtHit = t.amount == amt &&
+        (t.isFixed || t.category.major.contains('固定費'));
     return nameHit || amtHit;
   }
 
@@ -147,7 +162,7 @@ class FixedCostMaterializer {
     var bestDist = 1 << 30;
     final target = y * 12 + m;
     for (final t in txns) {
-      if (!t.category.major.contains('固定費')) continue;
+      if (!t.isFixed && !t.category.major.contains('固定費')) continue;
       final nd = _norm(t.description);
       if (nn.isEmpty || nd.isEmpty) continue;
       if (!(nd.contains(nn) || nn.contains(nd))) continue;

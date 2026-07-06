@@ -234,6 +234,13 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     final catConfig = await _settings.loadCategories();
     final accountingMajors =
         catConfig.majors.map((m) => m.name).toList();
+    final categoryOptions = [
+      for (int i = 0; i < catConfig.majors.length; i++)
+        (
+          major: catConfig.majors[i].displayName(i),
+          subs: catConfig.majors[i].subs,
+        ),
+    ];
     if (!mounted) return;
     final edited = await showSubscriptionEditSheet(
       context,
@@ -241,6 +248,7 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
       paymentMethods: paymentMethods,
       categories: categories,
       accountingMajors: accountingMajors,
+      categoryOptions: categoryOptions,
     );
     if (edited == null) return;
     final newList = [..._subscriptions.subscriptions];

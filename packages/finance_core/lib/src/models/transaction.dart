@@ -136,6 +136,11 @@ class Transaction {
       ? (amount - reimbursed! < 0 ? 0 : amount - reimbursed!)
       : amount;
 
+  /// 固定費フラグ。固定費（サブスク）から明細化した取引に付く目印。
+  /// 大/小カテゴリは普通のカテゴリを使い、「固定費かどうか」はこのフラグで判別する。
+  /// デフォルト false。既存データは false で読まれる。
+  final bool isFixed;
+
   const Transaction({
     required this.id,
     required this.date,
@@ -165,6 +170,7 @@ class Transaction {
     this.reviewed = false,
     this.receiptType,
     this.reimbursed,
+    this.isFixed = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -196,6 +202,7 @@ class Transaction {
         if (reviewed) 'reviewed': reviewed,
         if (receiptType != null) 'receiptType': receiptType,
         if (reimbursed != null && reimbursed! > 0) 'reimbursed': reimbursed,
+        if (isFixed) 'isFixed': isFixed,
       };
 
   factory Transaction.fromJson(Map<String, dynamic> j) => Transaction(
@@ -235,6 +242,7 @@ class Transaction {
         reviewed: j['reviewed'] as bool? ?? false,
         receiptType: j['receiptType'] as String?,
         reimbursed: (j['reimbursed'] as num?)?.toInt(),
+        isFixed: j['isFixed'] as bool? ?? false,
       );
 
   Transaction copyWith({
@@ -270,6 +278,7 @@ class Transaction {
     int? reimbursed,
     /// true にすると reimbursed を null に戻す（立替の解除）。
     bool clearReimbursed = false,
+    bool? isFixed,
   }) =>
       Transaction(
         id: id,
@@ -300,5 +309,6 @@ class Transaction {
         reviewed: reviewed ?? this.reviewed,
         receiptType: receiptType ?? this.receiptType,
         reimbursed: clearReimbursed ? null : (reimbursed ?? this.reimbursed),
+        isFixed: isFixed ?? this.isFixed,
       );
 }

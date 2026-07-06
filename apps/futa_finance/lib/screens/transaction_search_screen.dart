@@ -40,6 +40,7 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
   String? _majorFilter; // null=すべて（素の名前で照合）
   String? _paymentFilter; // null=すべて
   bool? _reviewedFilter; // null=すべて / true=済 / false=未
+  bool? _fixedFilter; // null=すべて / true=固定費のみ / false=固定費以外
 
   final _selected = <String>{};
 
@@ -93,6 +94,9 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
         return false;
       }
       if (_reviewedFilter != null && t.reviewed != _reviewedFilter) {
+        return false;
+      }
+      if (_fixedFilter != null && t.isFixed != _fixedFilter) {
         return false;
       }
       if (kw.isNotEmpty) {
@@ -394,6 +398,17 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
                 ],
                 onChanged: (v) => setState(() => _reviewedFilter = v),
               ),
+              // 固定費フラグ
+              _dropChip<bool?>(
+                label: '固定費',
+                value: _fixedFilter,
+                items: const [
+                  (null, 'すべて'),
+                  (true, '固定費のみ'),
+                  (false, '固定費以外'),
+                ],
+                onChanged: (v) => setState(() => _fixedFilter = v),
+              ),
               // 期間
               OutlinedButton.icon(
                 onPressed: () => _pickDate(true),
@@ -409,7 +424,8 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
               ),
               if (_from != null || _to != null || _type != null ||
                   _majorFilter != null || _paymentFilter != null ||
-                  _reviewedFilter != null || _kwCtrl.text.isNotEmpty)
+                  _reviewedFilter != null || _fixedFilter != null ||
+                  _kwCtrl.text.isNotEmpty)
                 TextButton(
                   onPressed: () => setState(() {
                     _kwCtrl.clear();
@@ -419,6 +435,7 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
                     _majorFilter = null;
                     _paymentFilter = null;
                     _reviewedFilter = null;
+                    _fixedFilter = null;
                   }),
                   child: const Text('条件クリア'),
                 ),

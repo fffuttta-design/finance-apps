@@ -109,15 +109,33 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     DateTime? nextDate = initial?.nextBillingDate;
     String? paymentMethod = initial?.paymentMethod;
     String? plMajor = initial?.plMajor;
+    String? categoryMajor = initial?.categoryMajor;
+    String? categorySub = initial?.categorySub;
     String? startYm = initial?.startYearMonth;
     String? endYm = initial?.endYearMonth;
     // 実明細化したときの領収書の受け取り方（'paper'/'drive'/null）。
     String? receiptKind = initial?.receiptKind;
 
-    // 会計科目（PL科目）候補 = 現モードの大カテゴリ名（番号なし素の名前）。
+    // カテゴリ設定を読み込む。
     final catConfig = await _settings.loadCategories();
-    final accountingMajors =
-        catConfig.majors.map((m) => m.name).toList();
+    // 明細に付ける「普通の大/小カテゴリ」候補（大＝表示名／小＝その大の小一覧）。
+    final categoryOptions = [
+      for (int i = 0; i < catConfig.majors.length; i++)
+        (
+          major: catConfig.majors[i].displayName(i),
+          subs: catConfig.majors[i].subs,
+        ),
+    ];
+    String bareName(String s) =>
+        s.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
+    List<String> subsOfMajor(String? m) {
+      if (m == null) return const [];
+      for (final o in categoryOptions) {
+        if (o.major == m) return o.subs;
+      }
+      return const [];
+    }
+
     if (!context.mounted) return null;
 
     Future<void> pickAnnualDate(StateSetter setLocal) async {
@@ -307,11 +325,20 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
             final iconUrl = iconUrlCtrl.text.trim().isEmpty
                 ? null
                 : iconUrlCtrl.text.trim();
-            final pl = (plMajor == null || plMajor!.trim().isEmpty)
+            // 大カテゴリを選んでいれば、それをPL科目・セクションにも兼用（素の名前）。
+            final cm = (categoryMajor == null || categoryMajor!.trim().isEmpty)
                 ? null
-                : plMajor!.trim();
-            // カテゴリ（まとめ表示用）は会計科目を兼用する。
+                : categoryMajor!.trim();
+            final pl = cm != null
+                ? bareName(cm)
+                : ((plMajor == null || plMajor.trim().isEmpty)
+                    ? null
+                    : plMajor.trim());
+            // カテゴリ（まとめ表示用）は大カテゴリ/会計科目を兼用する。
             final category = pl;
+            final cs = (categorySub == null || categorySub!.trim().isEmpty)
+                ? null
+                : categorySub!.trim();
             final result = Subscription(
               id: initial?.id ?? _genId(),
               name: name,
@@ -327,6 +354,8 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
               iconUrl: iconUrl,
               category: category,
               plMajor: pl,
+              categoryMajor: cm,
+              categorySub: cs,
               receiptKind: receiptKind,
               startYearMonth:
                   (startYm == null || startYm!.trim().isEmpty)
@@ -547,39 +576,74 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                               onChanged: (v) =>
                                   setLocal(() => paymentMethod = v),
                             ),
-                          if (accountingMajors.isNotEmpty) ...[
+                          if (categoryOptions.isNotEmpty) ...[
                             const SizedBox(height: 16),
-                            const Text('会計科目（カテゴリ兼用・業績PLに合算）',
+                            const Text('カテゴリ（明細に付く大/小カテゴリ）',
                                 style: TextStyle(
                                     fontSize: 12, color: Color(0xFF6B7280))),
                             const SizedBox(height: 2),
                             const Text(
-                                '同じ科目でまとめてセクション表示。実体の科目（通信費・賃借料等）でPLにも反映',
+                                '「固定費」はフラグとして持ち、大/小カテゴリは普通のカテゴリ（食費・自己投資など）を使います',
                                 style: TextStyle(
                                     fontSize: 11, color: Color(0xFF9CA3AF))),
                             const SizedBox(height: 8),
-                            // 会計科目は「支出を記録」と同じくプルダウンで選ぶ。
                             DropdownButtonFormField<String>(
-                              initialValue: plMajor,
+                              initialValue: categoryMajor,
                               isExpanded: true,
                               decoration: const InputDecoration(
                                 isDense: true,
                                 border: OutlineInputBorder(),
+                                labelText: '大カテゴリ',
                                 hintText: '選択してください（任意）',
                               ),
                               items: [
                                 const DropdownMenuItem<String>(
                                     value: null, child: Text('指定なし')),
-                                if (plMajor != null &&
-                                    plMajor!.trim().isNotEmpty &&
-                                    !accountingMajors.contains(plMajor))
+                                if (categoryMajor != null &&
+                                    categoryMajor!.trim().isNotEmpty &&
+                                    !categoryOptions
+                                        .any((o) => o.major == categoryMajor))
                                   DropdownMenuItem(
-                                      value: plMajor, child: Text(plMajor!)),
-                                for (final m in accountingMajors)
-                                  DropdownMenuItem(value: m, child: Text(m)),
+                                      value: categoryMajor,
+                                      child: Text(bareName(categoryMajor!))),
+                                for (final o in categoryOptions)
+                                  DropdownMenuItem(
+                                      value: o.major,
+                                      child: Text(bareName(o.major))),
                               ],
-                              onChanged: (v) => setLocal(() => plMajor = v),
+                              onChanged: (v) => setLocal(() {
+                                categoryMajor = v;
+                                final subs = subsOfMajor(v);
+                                categorySub =
+                                    subs.isNotEmpty ? subs.first : null;
+                              }),
                             ),
+                            if (categoryMajor != null &&
+                                subsOfMajor(categoryMajor).isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<String>(
+                                initialValue: subsOfMajor(categoryMajor)
+                                        .contains(categorySub)
+                                    ? categorySub
+                                    : null,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
+                                  labelText: '小カテゴリ',
+                                  hintText: '選択してください（任意）',
+                                ),
+                                items: [
+                                  const DropdownMenuItem<String>(
+                                      value: null, child: Text('指定なし')),
+                                  for (final s in subsOfMajor(categoryMajor))
+                                    DropdownMenuItem(
+                                        value: s, child: Text(s)),
+                                ],
+                                onChanged: (v) =>
+                                    setLocal(() => categorySub = v),
+                              ),
+                            ],
                           ],
                           // 領収書の受け取り方（実明細化した取引に反映）。
                           const SizedBox(height: 16),

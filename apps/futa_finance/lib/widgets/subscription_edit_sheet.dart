@@ -17,6 +17,8 @@ Future<Subscription?> showSubscriptionEditSheet(
   required List<String> paymentMethods,
   required List<String> categories,
   List<String> accountingMajors = const [],
+  // 大カテゴリ（表示名）＋その小カテゴリ一覧。固定費に普通のカテゴリを付けるため。
+  List<({String major, List<String> subs})> categoryOptions = const [],
 }) {
   final nameCtrl = TextEditingController(text: initial?.name ?? '');
   // 変換中（composing）下線が金額欄に出ないコントローラ。
@@ -36,8 +38,21 @@ Future<Subscription?> showSubscriptionEditSheet(
   String? paymentMethod = initial?.paymentMethod;
   // 紐づける会計科目（PL科目）。accountingMajors に無い値でも保持する。
   String? plMajor = initial?.plMajor;
+  // 明細化に使う「普通の大/小カテゴリ」（固定費はフラグで表す）。
+  String? categoryMajor = initial?.categoryMajor;
+  String? categorySub = initial?.categorySub;
   // PL計上の開始年月（"YYYY-MM"）。これより前は業績PLに計上しない。
   String? startYm = initial?.startYearMonth;
+
+  String bareName(String s) =>
+      s.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
+  List<String> subsOfMajor(String? m) {
+    if (m == null) return const [];
+    for (final o in categoryOptions) {
+      if (o.major == m) return o.subs;
+    }
+    return const [];
+  }
 
   Future<void> pickAnnualDate(StateSetter setLocal) async {
     DateTime temp = nextDate ?? DateTime.now();
@@ -231,11 +246,21 @@ Future<Subscription?> showSubscriptionEditSheet(
           final iconUrl = iconUrlCtrl.text.trim().isEmpty
               ? null
               : iconUrlCtrl.text.trim();
-          final pl = (plMajor == null || plMajor!.trim().isEmpty)
+          // 大カテゴリを選んでいれば、それをPL科目・セクションにも兼用する
+          // （番号プレフィックスを外した素の名前）。未選択なら従来の会計科目。
+          final cm = (categoryMajor == null || categoryMajor!.trim().isEmpty)
               ? null
-              : plMajor!.trim();
-          // カテゴリ（まとめ表示用）は会計科目を兼用する。
+              : categoryMajor!.trim();
+          final pl = cm != null
+              ? bareName(cm)
+              : ((plMajor == null || plMajor.trim().isEmpty)
+                  ? null
+                  : plMajor.trim());
+          // カテゴリ（まとめ表示用）は大カテゴリ/会計科目を兼用する。
           final category = pl;
+          final cs = (categorySub == null || categorySub!.trim().isEmpty)
+              ? null
+              : categorySub!.trim();
           final result = Subscription(
             id: initial?.id ??
                 DateTime.now().microsecondsSinceEpoch.toString(),
@@ -252,12 +277,19 @@ Future<Subscription?> showSubscriptionEditSheet(
             iconUrl: iconUrl,
             category: category,
             plMajor: pl,
+            categoryMajor: cm,
+            categorySub: cs,
             startYearMonth:
                 (startYm == null || startYm!.trim().isEmpty)
                     ? null
                     : startYm,
             // 変動費の月別実額は編集で消さない（保持）。
             monthlyActuals: initial?.monthlyActuals ?? const {},
+            // 領収書の受け取り方など、その他の既存項目も保持。
+            receiptKind: initial?.receiptKind,
+            reviewedMonths: initial?.reviewedMonths ?? const {},
+            sortOrder: initial?.sortOrder,
+            endYearMonth: initial?.endYearMonth,
           );
           Navigator.pop(ctx, result);
         }
@@ -459,41 +491,76 @@ Future<Subscription?> showSubscriptionEditSheet(
                             onChanged: (v) =>
                                 setLocal(() => paymentMethod = v),
                           ),
-                        if (accountingMajors.isNotEmpty) ...[
+                        if (categoryOptions.isNotEmpty) ...[
                           const SizedBox(height: 16),
-                          const Text('会計科目（カテゴリ兼用・業績PLに合算）',
+                          const Text('カテゴリ（明細に付く大/小カテゴリ）',
                               style: TextStyle(
                                   fontSize: 12, color: Color(0xFF6B7280))),
                           const SizedBox(height: 2),
                           const Text(
-                              '同じ科目でまとめてセクション表示。実体の科目（通信費・賃借料等）でPLにも反映',
+                              '「固定費」はフラグとして持ち、大/小カテゴリは普通のカテゴリ（食費・自己投資など）を使います',
                               style: TextStyle(
                                   fontSize: 11, color: Color(0xFF9CA3AF))),
                           const SizedBox(height: 8),
-                          // 会計科目は「支出を記録」と同じくプルダウンで選ぶ。
+                          // 大カテゴリ（支出を記録と同じ普通のカテゴリ）。
                           DropdownButtonFormField<String>(
-                            initialValue: plMajor,
+                            initialValue: categoryMajor,
                             isExpanded: true,
                             decoration: const InputDecoration(
                               isDense: true,
                               border: OutlineInputBorder(),
+                              labelText: '大カテゴリ',
                               hintText: '選択してください（任意）',
                             ),
                             items: [
                               const DropdownMenuItem<String>(
                                   value: null, child: Text('指定なし')),
-                              // 一覧に無い値（旧データ等）も選択肢として保持。
-                              if (plMajor != null &&
-                                  plMajor!.trim().isNotEmpty &&
-                                  !accountingMajors.contains(plMajor))
+                              if (categoryMajor != null &&
+                                  categoryMajor!.trim().isNotEmpty &&
+                                  !categoryOptions
+                                      .any((o) => o.major == categoryMajor))
                                 DropdownMenuItem(
-                                    value: plMajor, child: Text(plMajor!)),
-                              for (final m in accountingMajors)
-                                DropdownMenuItem(value: m, child: Text(m)),
+                                    value: categoryMajor,
+                                    child: Text(bareName(categoryMajor!))),
+                              for (final o in categoryOptions)
+                                DropdownMenuItem(
+                                    value: o.major,
+                                    child: Text(bareName(o.major))),
                             ],
-                            onChanged: (v) => setLocal(() => plMajor = v),
+                            onChanged: (v) => setLocal(() {
+                              categoryMajor = v;
+                              final subs = subsOfMajor(v);
+                              categorySub =
+                                  subs.isNotEmpty ? subs.first : null;
+                            }),
                           ),
-                          if (plMajor != null) ...[
+                          if (categoryMajor != null &&
+                              subsOfMajor(categoryMajor).isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            DropdownButtonFormField<String>(
+                              initialValue:
+                                  subsOfMajor(categoryMajor).contains(categorySub)
+                                      ? categorySub
+                                      : null,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                isDense: true,
+                                border: OutlineInputBorder(),
+                                labelText: '小カテゴリ',
+                                hintText: '選択してください（任意）',
+                              ),
+                              items: [
+                                const DropdownMenuItem<String>(
+                                    value: null, child: Text('指定なし')),
+                                for (final s in subsOfMajor(categoryMajor))
+                                  DropdownMenuItem(
+                                      value: s, child: Text(s)),
+                              ],
+                              onChanged: (v) =>
+                                  setLocal(() => categorySub = v),
+                            ),
+                          ],
+                          if (categoryMajor != null) ...[
                             const SizedBox(height: 10),
                             InkWell(
                               onTap: () => pickStartMonth(setLocal),

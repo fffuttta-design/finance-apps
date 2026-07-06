@@ -465,6 +465,15 @@ class MonthlySnapshot {
 - **支出明細テーブルの「金額」列も可変列化**（中央5列＝大/小/内容/支払方法/金額）。支払方法↔金額の境界にリサイズハンドル追加。保存キー `..._v3`。
 - **「毎月の固定費」ヘッダーの右合計のはみ出しを修正**（右パディング32で下の各行金額に揃える）。
 
+### 固定費を「大カテゴリ」でなく「フラグ」に（v1.0.432〜）
+- **方針**: 固定費（サブスク）を明細化するとき、大カテゴリを「固定費(定額)/(変動)」にするのをやめ、**普通の大/小カテゴリ**を適用。「固定費かどうか」は取引の **`isFixed` フラグ** で表す。
+- **Transaction**: `bool isFixed`（既定false）を追加（toJson/fromJson/copyWith）。
+- **Subscription**: `categoryMajor`（明細に付ける大カテゴリ＝表示名）／`categorySub`（小カテゴリ）を追加。編集で大カテゴリを選ぶと `plMajor`／`category`（セクション/PL用）にはその素の名前を兼用セット（既存PL集計と整合）。
+- **明細化（`fixed_cost_materializer`）**: `categoryMajor` があれば `Category(major: categoryMajor, sub: categorySub)`＋`isFixed:true` で生成。無い旧固定費は従来どおり「固定費(定額)/(変動)」。重複判定（`_isSameFixed`/`_template`）も `isFixed` を見るよう更新。
+- **編集UI**: 固定費編集（共通シート `subscription_edit_sheet` ＋ 設定画面 `subscription_list_screen`）の「会計科目1個選択」を、**大カテゴリ＋小カテゴリのプルダウン**（支出記録と同じ）に変更。呼び出し元（`v2_expenses`）は `categoryOptions`（大＝表示名／小＝その小一覧）を渡す。
+- **検索**: 明細検索（`transaction_search_screen`）に **「固定費」フィルタ**（すべて/固定費のみ/固定費以外）を追加。
+- **移行**: 既存の「大カテゴリ＝固定費」の過去明細は今後分から新方式（過去は検索・一括編集で手動修正）＝ユーザー決定。
+
 ### 取引内容の履歴サジェストがタップで反映されない不具合を修正（v1.0.431〜）
 - 取引内容（`_descCtrl`）のサジェストを、自前の「フォーカス中だけ表示するリスト」から **`RawAutocomplete` 方式** に変更（場所欄と同じ）。候補をタップした瞬間にフォーカスが外れてリストが消え、選択が成立しなかった不具合を解消。`_StoreOptionsView` に `icon` 引数を追加して取引内容（履歴アイコン）でも再利用。旧 `_applyDescSuggestion`/`_descSuggestionList` は削除。
 

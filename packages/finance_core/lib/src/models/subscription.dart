@@ -87,6 +87,14 @@ class Subscription {
   /// 'paper' の月次明細は receiptSaved=true・receiptType='paper' で生成する。
   final String? receiptKind;
 
+  /// 明細化したときに適用する「普通の大カテゴリ」（CategoryConfig の表示名＝番号付き）。
+  /// 「固定費」は取引の isFixed フラグで表し、大/小カテゴリは通常のカテゴリを使う方針。
+  /// null なら従来どおり「固定費(定額)/(変動)」で明細化（後方互換）。
+  final String? categoryMajor;
+
+  /// 明細化したときに適用する「普通の小カテゴリ」。任意。
+  final String? categorySub;
+
   const Subscription({
     required this.id,
     required this.name,
@@ -106,6 +114,8 @@ class Subscription {
     this.sortOrder,
     this.reviewedMonths = const {},
     this.receiptKind,
+    this.categoryMajor,
+    this.categorySub,
   });
 
   /// 指定月("YYYY-MM")の表示金額。変動費は未入力なら0、固定費は定額。
@@ -172,6 +182,8 @@ class Subscription {
         if (sortOrder != null) 'sortOrder': sortOrder,
         if (reviewedMonths.isNotEmpty) 'reviewedMonths': reviewedMonths,
         if (receiptKind != null) 'receiptKind': receiptKind,
+        if (categoryMajor != null) 'categoryMajor': categoryMajor,
+        if (categorySub != null) 'categorySub': categorySub,
       };
 
   factory Subscription.fromJson(Map<String, dynamic> j) => Subscription(
@@ -206,6 +218,8 @@ class Subscription {
                 ?.map((k, v) => MapEntry(k, v == true)) ??
             const {},
         receiptKind: j['receiptKind'] as String?,
+        categoryMajor: j['categoryMajor'] as String?,
+        categorySub: j['categorySub'] as String?,
       );
 
   Subscription copyWith({
@@ -231,6 +245,10 @@ class Subscription {
     Map<String, bool>? reviewedMonths,
     String? receiptKind,
     bool clearReceiptKind = false,
+    String? categoryMajor,
+    bool clearCategoryMajor = false,
+    String? categorySub,
+    bool clearCategorySub = false,
   }) =>
       Subscription(
         id: id,
@@ -256,6 +274,11 @@ class Subscription {
         reviewedMonths: reviewedMonths ?? this.reviewedMonths,
         receiptKind:
             clearReceiptKind ? null : (receiptKind ?? this.receiptKind),
+        categoryMajor: clearCategoryMajor
+            ? null
+            : (categoryMajor ?? this.categoryMajor),
+        categorySub:
+            clearCategorySub ? null : (categorySub ?? this.categorySub),
       );
 }
 
