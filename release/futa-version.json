@@ -1,1 +1,1 @@
-{"version":"1.0.439","buildNumber":"440","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.439/futa-finance-v1.0.439.apk","releaseNotes":"各ウォレットの月締めを「締めるボタンを押したときだけ締め済み」に変更（チェックが全部入っても自動では締めません）。クレジットカードでも月締めができます。"}
+{"version":"1.0.440","buildNumber":"441","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.440/futa-finance-v1.0.440.apk","releaseNotes":"締めたウォレットは、支出タブのウォレット一覧で薄く（締め済）表示されます。"}
