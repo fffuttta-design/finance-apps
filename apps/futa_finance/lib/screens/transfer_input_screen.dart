@@ -424,6 +424,11 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
     final isEditing = widget.editing != null;
     return Scaffold(
       appBar: AppBar(
+        // 他フォーム（支出/収入）と同じく「✕ 閉じる」に統一。
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: Text(isEditing ? '振替を編集' : '振替を記録',
             style: const TextStyle(fontWeight: FontWeight.w700)),
         actions: [
@@ -450,68 +455,8 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
             // よく使う振替（テンプレ）
             _buildTemplateSection(),
             const SizedBox(height: 12),
-            // 日付
-            InkWell(
-              onTap: _pickDate,
-              child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: '日付',
-                  floatingLabelBehavior: FloatingLabelBehavior.always,
-                  border: OutlineInputBorder(),
-                ),
-                child: Text(
-                  '${_date.year}/${_date.month.toString().padLeft(2, '0')}/${_date.day.toString().padLeft(2, '0')}',
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            // 振替元
-            DropdownButtonFormField<String>(
-              key: ValueKey('from_$_fromAccount'),
-              initialValue: _fromAccount,
-              decoration: const InputDecoration(
-                labelText: '移動元（必須）',
-                border: OutlineInputBorder(),
-              ),
-              items: fromCandidates
-                  .map((c) =>
-                      DropdownMenuItem(value: c.value, child: Text(c.label)))
-                  .toList(),
-              onChanged: (v) => setState(() => _fromAccount = v),
-            ),
-            const SizedBox(height: 8),
-            const Center(
-              child: Icon(Icons.arrow_downward,
-                  color: Color(0xFF9CA3AF), size: 20),
-            ),
-            const SizedBox(height: 8),
-            // 振替先
-            DropdownButtonFormField<String>(
-              key: ValueKey('to_$_toAccount'),
-              initialValue: _toAccount,
-              decoration: const InputDecoration(
-                labelText: '移動先（必須）',
-                border: OutlineInputBorder(),
-              ),
-              items: toCandidates
-                  .map((c) =>
-                      DropdownMenuItem(value: c.value, child: Text(c.label)))
-                  .toList(),
-              onChanged: (v) => setState(() => _toAccount = v),
-            ),
-            const SizedBox(height: 12),
-            // 名前（任意）。未入力なら「移動元 → 移動先」を自動で名前にする。
-            TextField(
-              controller: _nameCtrl,
-              decoration: const InputDecoration(
-                labelText: '名前（任意）',
-                hintText: '例: 生活費の移動・カード引落用',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.label_outline, size: 18),
-              ),
-            ),
-            const SizedBox(height: 12),
-            // 金額
+            // 金額（他フォームと同じく一番上に大きく）。
+            _label('金額（円）'),
             TextField(
               controller: _amountCtrl,
               keyboardType: TextInputType.number,
@@ -519,11 +464,9 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
                 HalfWidthDigitsFormatter(),
                 ThousandsSeparatorInputFormatter(),
               ],
-              decoration: const InputDecoration(
-                labelText: '金額（円）',
-                prefixText: '¥ ',
-                border: OutlineInputBorder(),
-              ),
+              style: const TextStyle(
+                  fontFamily: 'monospace', fontSize: 18),
+              decoration: _inputDecoration(hint: '0').copyWith(prefixText: '¥ '),
               onChanged: (_) => setState(() {}),
             ),
             if (_amountCtrl.text.isNotEmpty)
@@ -541,8 +484,62 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
                   );
                 }),
               ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
+            // 日付
+            _label('日付'),
+            InkWell(
+              onTap: _pickDate,
+              child: InputDecorator(
+                decoration: _inputDecoration(),
+                child: Text(
+                  '${_date.year}/${_date.month.toString().padLeft(2, '0')}/${_date.day.toString().padLeft(2, '0')}',
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // 移動元
+            _label('移動元'),
+            DropdownButtonFormField<String>(
+              key: ValueKey('from_$_fromAccount'),
+              initialValue: _fromAccount,
+              isExpanded: true,
+              decoration: _inputDecoration(hint: '選択してください'),
+              items: fromCandidates
+                  .map((c) =>
+                      DropdownMenuItem(value: c.value, child: Text(c.label)))
+                  .toList(),
+              onChanged: (v) => setState(() => _fromAccount = v),
+            ),
+            const SizedBox(height: 8),
+            const Center(
+              child: Icon(Icons.arrow_downward,
+                  color: Color(0xFF9CA3AF), size: 20),
+            ),
+            const SizedBox(height: 8),
+            // 移動先
+            _label('移動先'),
+            DropdownButtonFormField<String>(
+              key: ValueKey('to_$_toAccount'),
+              initialValue: _toAccount,
+              isExpanded: true,
+              decoration: _inputDecoration(hint: '選択してください'),
+              items: toCandidates
+                  .map((c) =>
+                      DropdownMenuItem(value: c.value, child: Text(c.label)))
+                  .toList(),
+              onChanged: (v) => setState(() => _toAccount = v),
+            ),
+            const SizedBox(height: 16),
+            // 名前（任意）。未入力なら「移動元 → 移動先」を自動で名前にする。
+            _label('名前（任意）'),
+            TextField(
+              controller: _nameCtrl,
+              decoration:
+                  _inputDecoration(hint: '例: 生活費の移動・カード引落用'),
+            ),
+            const SizedBox(height: 16),
             // 備考
+            _label('備考（任意）'),
             MemoField(controller: _memoCtrl),
             const SizedBox(height: 8),
             const Padding(
@@ -553,64 +550,68 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
                     fontSize: 11, color: Color(0xFF6B7280)),
               ),
             ),
+            const SizedBox(height: 24),
+            // 記録ボタン（支出/収入フォームと同じく末尾に配置）。
+            FilledButton.icon(
+              onPressed: canSave ? _save : null,
+              icon: _saving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.check),
+              label: Text(_saving
+                  ? '保存中…'
+                  : (isEditing ? '更新する' : '記録する')),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF1A237E),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
           ],
         ),
       ),
         ),
       ),
           ),
-          _bottomActions(canSave),
         ],
       ),
     );
   }
 
-  // 下部アクションバー（左=キャンセル / 右=保存）。よくある入力パネルの形。
-  Widget _bottomActions(bool canSave) {
-    return SafeArea(
-      top: false,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+  /// 見出し（支出/収入フォームと同じスタイル）。
+  Widget _label(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 6, left: 2),
+        child: Text(
+          text,
+          style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF6B7280)),
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed:
-                    _saving ? null : () => Navigator.of(context).pop(false),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('キャンセル'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: FilledButton(
-                onPressed: canSave ? _save : null,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                child: _saving
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
-                    : const Text('保存',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
-              ),
-            ),
-          ],
+      );
+
+  /// 入力欄の装飾（支出/収入フォームと同じ・見出しは別で付ける）。
+  InputDecoration _inputDecoration({String? hint}) => InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(fontSize: 14, color: Color(0xFF9CA3AF)),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: OutlineInputBorder(
+          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          borderRadius: BorderRadius.circular(8),
         ),
-      ),
-    );
-  }
+        enabledBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: Color(0xFF1A237E), width: 2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+      );
+
 }
