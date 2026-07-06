@@ -1244,11 +1244,16 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     final choice = await showDialog<String>(
       context: context,
       builder: (dctx) => SimpleDialog(
-        title: const Text('記録する', style: TextStyle(fontWeight: FontWeight.w700)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+        contentPadding: const EdgeInsets.only(bottom: 12),
+        title: const Text('記録する',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
         children: [
-          _addMenuTile(dctx, 'income', Icons.arrow_downward,
+          _addMenuTile(dctx, 'income', Icons.south_west,
               const Color(0xFF16A34A), '入金（収入）を記録', '入金先: $accountName'),
-          _addMenuTile(dctx, 'expense', Icons.arrow_upward,
+          _addMenuTile(dctx, 'expense', Icons.north_east,
               const Color(0xFFDC2626), '出金（支出）を記録', '支払元: $accountName'),
           _addMenuTile(dctx, 'transfer', Icons.swap_horiz,
               const Color(0xFFEA580C), '振替（他口座へ移動）を記録', '移動元: $accountName'),
@@ -1273,11 +1278,57 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
 
   Widget _addMenuTile(BuildContext dctx, String value, IconData icon,
       Color color, String title, String subtitle) {
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(title),
-      subtitle: Text(subtitle),
-      onTap: () => Navigator.pop(dctx, value),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => Navigator.pop(dctx, value),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: color, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(title,
+                          style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF111827))),
+                      const SizedBox(height: 2),
+                      Text(subtitle,
+                          style: const TextStyle(
+                              fontSize: 12, color: Color(0xFF6B7280))),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right,
+                    size: 18, color: Color(0xFFCBD5E1)),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -1094,7 +1094,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               const SizedBox(height: 16),
               // 場所（必須）。店舗名や購入元。明細タブの「場所」列に出る。
               // 過去履歴からサジェスト（同じ件名で使った場所を優先）。表記ゆれ防止。
-              _label('場所（必須）'),
+              _label('場所'),
               // RawAutocomplete で「↑↓キー選択・Enter/クリックで確定」を実現。
               // （自前の候補リストは、クリック時にフォーカスが外れて選べない・
               //   キー操作できない問題があったため置き換え）。
