@@ -604,7 +604,10 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                         _monthSelector(),
                         _cardCloseMonthBar(monthTxns, cardFixed),
                         const Divider(height: 1),
+                        // 締め済みの月は本文（明細）を薄く（グレーアウト）。
                         Expanded(
+                          child: Opacity(
+                            opacity: _isCardMonthClosed ? 0.5 : 1.0,
                           // PC幅は支出明細と同じ表（検索・並び替え・列幅）。
                           // スマホ幅は従来のカード型リスト。
                           child: constraints.maxWidth >= 900
@@ -633,6 +636,7 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                                   ),
                                 )
                               : _historyList(monthTxns),
+                          ),
                         ),
                       ],
                     ),

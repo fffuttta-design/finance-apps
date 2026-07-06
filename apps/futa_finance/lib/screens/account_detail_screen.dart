@@ -353,27 +353,38 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         // メインカラムレイアウト: 広い画面では中央寄せ + 最大幅
         body: LayoutBuilder(
           builder: (ctx, constraints) {
+            // 締め済みの月は本文（残高カード＋明細）を薄く（グレーアウト）。
+            final closed = _isMonthClosed;
             final content = Column(
               children: [
                 _monthSelector(),
                 _closeMonthBar(),
-                _summaryCard(
-                  inSum: inSum,
-                  outSum: outSum,
-                  netDelta: netDelta,
-                  startBalance: dispStart,
-                  endBalance: dispEnd,
-                ),
-                const Divider(height: 1),
                 Expanded(
-                  child: _customOrder
-                      ? _reorderLedger(_customSorted(displayRows))
-                      : _ledgerTable(
-                          displayRows: displayRows,
-                          monthStartBalance: dispStart,
-                          monthEndBalance: dispEnd,
-                          balanceOffset: balanceOffset,
+                  child: Opacity(
+                    opacity: closed ? 0.5 : 1.0,
+                    child: Column(
+                      children: [
+                        _summaryCard(
+                          inSum: inSum,
+                          outSum: outSum,
+                          netDelta: netDelta,
+                          startBalance: dispStart,
+                          endBalance: dispEnd,
                         ),
+                        const Divider(height: 1),
+                        Expanded(
+                          child: _customOrder
+                              ? _reorderLedger(_customSorted(displayRows))
+                              : _ledgerTable(
+                                  displayRows: displayRows,
+                                  monthStartBalance: dispStart,
+                                  monthEndBalance: dispEnd,
+                                  balanceOffset: balanceOffset,
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             );

@@ -332,6 +332,26 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
+                    // 金額は一番上に（支出フォームと同じく最初に目立たせる）。
+                    _label(_isPending ? '見込み売上額（円）' : '入金額（円）'),
+                    TextFormField(
+                      controller: _amountCtrl,
+                      focusNode: _amountFocus,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        HalfWidthDigitsFormatter(),
+                        ThousandsSeparatorInputFormatter(),
+                      ],
+                      decoration: _inputDecoration(),
+                      style: const TextStyle(
+                          fontFamily: 'monospace', fontSize: 18),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return '入力してください';
+                        if (parseAmount(v) == null) return '数字のみで入力';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
                     _label('日付'),
                     InkWell(
                       onTap: _pickDate,
@@ -494,26 +514,6 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                                 : const Color(0xFF6B7280)),
                       ),
                     ),
-
-                    _label(_isPending ? '見込み売上額（円）' : '入金額（円）'),
-                    TextFormField(
-                      controller: _amountCtrl,
-                      focusNode: _amountFocus,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        HalfWidthDigitsFormatter(),
-                        ThousandsSeparatorInputFormatter(),
-                      ],
-                      decoration: _inputDecoration(),
-                      style: const TextStyle(
-                          fontFamily: 'monospace', fontSize: 16),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return '入力してください';
-                        if (parseAmount(v) == null) return '数字のみで入力';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
 
                     _label('備考（任意）'),
                     TextFormField(
