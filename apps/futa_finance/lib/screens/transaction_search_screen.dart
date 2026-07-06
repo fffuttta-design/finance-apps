@@ -660,7 +660,13 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
                       ],
                     ),
                     const SizedBox(height: 2),
-                    Text('$cat ・ ${t.paymentMethod.isEmpty ? '—' : t.paymentMethod}',
+                    Text(
+                        [
+                          cat,
+                          if ((t.store ?? '').trim().isNotEmpty)
+                            '📍${t.store!.trim()}',
+                          t.paymentMethod.isEmpty ? '—' : t.paymentMethod,
+                        ].join(' ・ '),
                         style: const TextStyle(
                             fontSize: 11, color: Color(0xFF6B7280)),
                         maxLines: 1,

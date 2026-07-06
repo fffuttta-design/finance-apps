@@ -978,27 +978,26 @@ class _CenterColumn extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // カンタン入力セクションは廃止（右上「記録」ボタンで代替）。
+        // 月の切替は、他タブ（支出/集計）と同じ「上部・中央の大きな月表示」に統一。
+        Padding(
+          padding: const EdgeInsets.only(bottom: V2Spacing.md),
+          child: Center(
+            child: MonthNavBar(
+              label:
+                  '${state._selectedMonth.year}年${state._selectedMonth.month}月',
+              onPrev: () => state.shiftMonth(-1),
+              onNext: () => state.shiftMonth(1),
+            ),
+          ),
+        ),
         // ── 月の収支（最新の入出金より上に表示）──────────────────
         V2Card(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Text('月の収支',
-                      style: V2Typography.h2
-                          .copyWith(color: V2Colors.textPrimary)),
-                  const Spacer(),
-                  // 月送り（資産タブと同じシンプルな月セレクタ）。
-                  MonthNavBar(
-                    label:
-                        '${state._selectedMonth.year}年${state._selectedMonth.month}月',
-                    onPrev: () => state.shiftMonth(-1),
-                    onNext: () => state.shiftMonth(1),
-                  ),
-                ],
-              ),
+              Text('月の収支',
+                  style: V2Typography.h2
+                      .copyWith(color: V2Colors.textPrimary)),
               const SizedBox(height: V2Spacing.sm),
               // 月切替は見出し横の ◁ ▷（矢印式）に一本化。
               // 横並びの月ボックス（_MonthChipsBar）は廃止。

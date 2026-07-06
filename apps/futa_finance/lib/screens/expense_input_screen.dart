@@ -925,10 +925,38 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
             return r > 0 ? r : null;
           })()
         : editing?.reimbursed;
-    // 入力した場所は場所マスタに自動登録（次回から候補に出る＝表記ゆれ防止）。
+    // 場所マスタの「固定入力」：マスタに無い場所はそのまま保存せず、
+    // 追加するか確認する（＝表記ゆれをここで弾く）。
     final storeVal = _storeCtrl.text.trim();
     if (storeVal.isNotEmpty) {
-      StoreMasterRepository.instance.add(storeVal);
+      if (!StoreMasterRepository.instance.isLoaded) {
+        await StoreMasterRepository.instance.load();
+      }
+      final master = StoreMasterRepository.instance.cached;
+      if (!master.contains(storeVal)) {
+        if (!mounted) return;
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (dctx) => AlertDialog(
+            title: const Text('新しい場所ですか？'),
+            content: Text('「$storeVal」は場所マスタにありません。\n'
+                '表記ゆれを防ぐため、候補から選ぶか、マスタに追加して保存してください。'),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(dctx, false),
+                  child: const Text('場所を選び直す')),
+              FilledButton(
+                  onPressed: () => Navigator.pop(dctx, true),
+                  child: const Text('マスタに追加して保存')),
+            ],
+          ),
+        );
+        if (ok != true) {
+          if (mounted) setState(() => _saving = false);
+          return;
+        }
+      }
+      await StoreMasterRepository.instance.add(storeVal);
     }
     final tx = core.Transaction(
       id: editing?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
@@ -967,6 +995,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       return;
     }
     // 新規追加：同じ日付・同じ金額の既存データがあれば確認（秘書登録分も検知）。
+    if (!mounted) return;
     if (!await confirmIfDuplicateTransaction(context, tx)) {
       if (mounted) setState(() => _saving = false);
       return;
