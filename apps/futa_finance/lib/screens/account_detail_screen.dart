@@ -409,7 +409,12 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                 _monthSelector(),
                 _closeMonthBar(),
                 Expanded(
-                  child: Opacity(
+                  // 締め済みは薄い青のトーンを重ねて背景と区別（灰色だと紛らわしい）。
+                  child: ColoredBox(
+                    color: closed
+                        ? const Color(0xFFB4CCEC)
+                        : Colors.transparent,
+                    child: Opacity(
                     opacity: closed ? 0.5 : 1.0,
                     child: Column(
                       children: [
@@ -438,6 +443,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                         ),
                       ],
                     ),
+                  ),
                   ),
                 ),
               ],

@@ -682,9 +682,14 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
         detailLabel: '支出明細'));
   }
 
-  /// 締め処理済みの月は本文を薄く（グレーアウト）して「もう確定」を示す。
-  Widget _grey(Widget child) =>
-      _isMonthClosed ? Opacity(opacity: 0.5, child: child) : child;
+  /// 締め処理済みの月は本文に「薄い青のトーン」を重ねて「もう確定」を示す。
+  /// （以前は不透明度を下げるだけで背景の灰色と紛らわしかったので色味を付けた）
+  Widget _grey(Widget child) => _isMonthClosed
+      ? ColoredBox(
+          color: const Color(0xFFB4CCEC),
+          child: Opacity(opacity: 0.5, child: child),
+        )
+      : child;
 
   /// 支出本文（タブ共用）。title が null ならタイトル見出しは出さない（タブ側で表示済）。
   /// showFixedAndCard=false（制作原価タブ）では固定費・クレカ照合を出さない。

@@ -609,7 +609,12 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                         const Divider(height: 1),
                         // 締め済みの月は本文（明細）を薄く（グレーアウト）。
                         Expanded(
-                          child: Opacity(
+                          // 締め済みは薄い青のトーンを重ねて背景と区別。
+                          child: ColoredBox(
+                            color: _isCardMonthClosed
+                                ? const Color(0xFFB4CCEC)
+                                : Colors.transparent,
+                            child: Opacity(
                             opacity: _isCardMonthClosed ? 0.5 : 1.0,
                           // PC幅は支出明細と同じ表（検索・並び替え・列幅）。
                           // スマホ幅は従来のカード型リスト。
@@ -639,6 +644,7 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                                   ),
                                 )
                               : _historyList(monthTxns),
+                          ),
                           ),
                         ),
                       ],
