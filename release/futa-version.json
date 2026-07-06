@@ -1,1 +1,1 @@
-{"version":"1.0.440","buildNumber":"441","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.440/futa-finance-v1.0.440.apk","releaseNotes":"締めたウォレットは、支出タブのウォレット一覧で薄く（締め済）表示されます。"}
+{"version":"1.0.441","buildNumber":"442","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.441/futa-finance-v1.0.441.apk","releaseNotes":"支出編集で現在のカテゴリが正しく表示されるよう修正。固定費を編集すると過去の明細にも反映。ウォレット金額の二重計上（固定費）を修正。"}
