@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
@@ -527,6 +528,20 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     }
     final hasAnyBalance = balances.any((b) => b != null);
 
+    // 支出の内訳（その年・大カテゴリ別・実質コスト）。円グラフ用。
+    final byMajor = <String, int>{};
+    for (final t in _transactions) {
+      if (t.date.year != year) continue;
+      if (t.type != core.TransactionType.expense) continue;
+      final major =
+          t.category.major.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
+      if (major.isEmpty) continue;
+      byMajor[major] = (byMajor[major] ?? 0) + t.effectiveAmount;
+    }
+    final catEntries = byMajor.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final catTotal = byMajor.values.fold<int>(0, (s, v) => s + v);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(vertical: V2Spacing.xl),
       child: Column(
@@ -563,6 +578,14 @@ class _V2ReportScreenState extends State<V2ReportScreen>
             empty: !hasAnyTx,
             emptyText: '$year年の記録がまだありません',
             child: _MiniBarChart(values: nets, labels: labels, signed: true),
+          ),
+          const SizedBox(height: V2Spacing.lg),
+          _chartCard(
+            title: '支出の内訳',
+            trailing: '年間 ${formatYen(catTotal)}',
+            empty: catTotal <= 0,
+            emptyText: '$year年の支出がまだありません',
+            child: _PieBreakdown(entries: catEntries, total: catTotal),
           ),
           const SizedBox(height: V2Spacing.lg),
           _chartCard(
@@ -1345,4 +1368,124 @@ class _MiniBarChart extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 家庭用レポートの支出内訳（ドーナツ円グラフ＋凡例）。依存ライブラリ無し・自前描画。
+class _PieBreakdown extends StatelessWidget {
+  final List<MapEntry<String, int>> entries;
+  final int total;
+  const _PieBreakdown({required this.entries, required this.total});
+
+  static const _palette = [
+    Color(0xFF6366F1),
+    Color(0xFFEC4899),
+    Color(0xFF10B981),
+    Color(0xFFF59E0B),
+    Color(0xFF3B82F6),
+    Color(0xFFEF4444),
+    Color(0xFF8B5CF6),
+    Color(0xFF14B8A6),
+    Color(0xFFF97316),
+    Color(0xFF64748B),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    if (total <= 0) return const SizedBox.shrink();
+    // 上位8＋その他にまとめる。
+    final top = entries.take(8).toList();
+    final restSum = entries.skip(8).fold<int>(0, (s, e) => s + e.value);
+    final segs = <(String, int)>[for (final e in top) (e.key, e.value)];
+    if (restSum > 0) segs.add(('その他', restSum));
+
+    final donut = SizedBox(
+      width: 150,
+      height: 150,
+      child: CustomPaint(
+        painter: _DonutPainter(
+            segs.map((s) => s.$2).toList(growable: false), _palette),
+      ),
+    );
+    Widget legend() => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (int i = 0; i < segs.length; i++)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: _palette[i % _palette.length],
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(segs[i].$1,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13)),
+                    ),
+                    Text('${(segs[i].$2 * 100 / total).round()}%',
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF6B7280))),
+                    const SizedBox(width: 10),
+                    Text(formatYen(segs[i].$2),
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+          ],
+        );
+
+    return LayoutBuilder(builder: (ctx, cons) {
+      final wide = cons.maxWidth >= 420;
+      if (wide) {
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            donut,
+            const SizedBox(width: 20),
+            Expanded(child: legend()),
+          ],
+        );
+      }
+      return Column(children: [donut, const SizedBox(height: 14), legend()]);
+    });
+  }
+}
+
+class _DonutPainter extends CustomPainter {
+  final List<int> values;
+  final List<Color> palette;
+  _DonutPainter(this.values, this.palette);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final total = values.fold<int>(0, (s, v) => s + v);
+    if (total <= 0) return;
+    final center = size.center(Offset.zero);
+    final radius = size.shortestSide / 2;
+    final stroke = radius * 0.42;
+    final rect = Rect.fromCircle(center: center, radius: radius - stroke / 2);
+    var start = -math.pi / 2;
+    for (int i = 0; i < values.length; i++) {
+      final sweep = 2 * math.pi * values[i] / total;
+      final p = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = stroke
+        ..color = palette[i % palette.length];
+      canvas.drawArc(rect, start, sweep, false, p);
+      start += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DonutPainter old) =>
+      old.values != values;
 }

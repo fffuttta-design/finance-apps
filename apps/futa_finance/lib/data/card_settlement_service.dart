@@ -46,7 +46,8 @@ class CardSettlementService {
 
     final today = DateTime.now();
     final todayD = DateTime(today.year, today.month, today.day);
-    final windowStart = todayD.subtract(const Duration(days: 62));
+    // 利用月の下限（記録開始）。ここ以降の引落は、引落口座設定後にさかのぼって発行する。
+    final floorUsage = DateTime(2025, 11, 1);
     final curYm = '${today.year}-${today.month.toString().padLeft(2, '0')}';
     final existingIds = txns.map((t) => t.id).toSet();
 
@@ -65,17 +66,20 @@ class CardSettlementService {
       }
       if (bank == null) continue;
 
-      // 引落月 W = 今月〜3か月前 を走査（W-1 が利用月）。windowで直近のみに絞る。
-      for (int back = 0; back <= 3; back++) {
+      // 引落月 W を今月から過去へ走査（W-1 が利用月）。利用月が下限を下回ったら打ち切り。
+      // 引落口座を後から設定しても、記録開始まで確実にさかのぼって発行する（「必ず発行」）。
+      for (int back = 0; back <= 24; back++) {
         final w = DateTime(today.year, today.month - back, 1); // 引落月
         final usage = DateTime(w.year, w.month - 1, 1); // 利用月（前月）
+        if (usage.isBefore(floorUsage)) break;
         final usageYm =
             '${usage.year}-${usage.month.toString().padLeft(2, '0')}';
         // 引落日（月末クランプ）→ 土日祝なら翌営業日。
         final lastDay = DateTime(w.year, w.month + 1, 0).day;
         final due = JpHolidays.nextBusinessDay(
             DateTime(w.year, w.month, day > lastDay ? lastDay : day));
-        if (due.isAfter(todayD) || due.isBefore(windowStart)) continue;
+        // 引落日がまだ来ていないぶんは作らない（未来の引落は予定のまま）。
+        if (due.isAfter(todayD)) continue;
 
         final id = 'cardsettle_${card.id}_$usageYm';
         if (existingIds.contains(id)) continue;
@@ -117,8 +121,10 @@ class CardSettlementService {
             t.date.year == year &&
             t.date.month == month)
         .fold<int>(0, (s, t) => s + t.amount);
+    // 既に実明細化された固定費は txSum に含まれるので二重に数えない。
     final subSum = subs
         .where((s) => (s.paymentMethod ?? '') == name)
+        .where((s) => !txns.any((t) => t.id == 'fixedcost_${s.id}_$ym'))
         .fold<int>(0, (s, sub) => s + sub.plAmountForMonth(ym, curYm));
     return txSum + subSum;
   }
