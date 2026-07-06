@@ -1,1 +1,1 @@
-{"version":"1.0.444","buildNumber":"445","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.444/futa-finance-v1.0.444.apk","releaseNotes":"集計タブに「支出の内訳」円グラフを追加。カードの自動引落を過去分までさかのぼって確実に発行するようにしました。"}
+{"version":"1.0.445","buildNumber":"446","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.445/futa-finance-v1.0.445.apk","releaseNotes":"場所は場所マスタから選ぶ形に（マスタ外は確認して追加）。HOMEの月表示を他タブと統一。明細検索の各行に場所を表示。"}
