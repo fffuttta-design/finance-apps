@@ -9,6 +9,7 @@ import '../../data/monthly_snapshot_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/tax_estimate_repository.dart';
 import '../../data/transaction_repository.dart';
+import '../../screens/transaction_search_screen.dart';
 import '../../utils/formatters.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
@@ -379,6 +380,27 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     MonthCursor.instance.month = _selMonth; // タブ横断で共有
   }
 
+  /// 「明細を検索・一括編集」への入口（集計タブ上部）。
+  Widget _searchEntry() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: V2Spacing.md),
+      child: SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) => const TransactionSearchScreen()),
+          ),
+          icon: const Icon(Icons.manage_search, size: 18),
+          label: const Text('明細を検索・一括編集'),
+          style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12)),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -404,6 +426,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _searchEntry(),
           // 期間(当月/1年) + 詳細/簡易 切替 + 月/年ナビ
           Padding(
             padding: const EdgeInsets.only(bottom: V2Spacing.md),
@@ -509,6 +532,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _searchEntry(),
           // 年ナビ（暦年）
           Padding(
             padding: const EdgeInsets.only(bottom: V2Spacing.md),
