@@ -128,6 +128,9 @@ class _V2ReportScreenState extends State<V2ReportScreen>
   /// 既定は簡易（軽くて見やすい）。
   bool _simple = true;
 
+  /// 個人の「支出の内訳」を、カテゴリ別(false)か場所別(true)で見るか。
+  bool _breakdownByStore = false;
+
   /// 決算期の期首月。当社は 10月〜翌9月 が事業年度。
   final int _fyStartMonth = 10;
   late int _fyYear = _calcFyYear();
@@ -542,6 +545,23 @@ class _V2ReportScreenState extends State<V2ReportScreen>
       ..sort((a, b) => b.value.compareTo(a.value));
     final catTotal = byMajor.values.fold<int>(0, (s, v) => s + v);
 
+    // 支出の内訳（場所別・実質コスト）。カテゴリ別と切替表示する。
+    final byStore = <String, int>{};
+    for (final t in _transactions) {
+      if (t.date.year != year) continue;
+      if (t.type != core.TransactionType.expense) continue;
+      final store =
+          (t.store ?? '').trim().isEmpty ? '（場所なし）' : t.store!.trim();
+      byStore[store] = (byStore[store] ?? 0) + t.effectiveAmount;
+    }
+    final storeEntries = byStore.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final storeTotal = byStore.values.fold<int>(0, (s, v) => s + v);
+
+    // 内訳カードで表示する側（カテゴリ or 場所）。
+    final bkEntries = _breakdownByStore ? storeEntries : catEntries;
+    final bkTotal = _breakdownByStore ? storeTotal : catTotal;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(vertical: V2Spacing.xl),
       child: Column(
@@ -581,11 +601,42 @@ class _V2ReportScreenState extends State<V2ReportScreen>
           ),
           const SizedBox(height: V2Spacing.lg),
           _chartCard(
-            title: '支出の内訳',
-            trailing: '年間 ${formatYen(catTotal)}',
-            empty: catTotal <= 0,
+            title: _breakdownByStore ? '支出の内訳（場所別）' : '支出の内訳（カテゴリ別）',
+            trailing: '年間 ${formatYen(bkTotal)}',
+            empty: bkTotal <= 0,
             emptyText: '$year年の支出がまだありません',
-            child: _PieBreakdown(entries: catEntries, total: catTotal),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // カテゴリ別／場所別の切替。
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(
+                          value: false,
+                          label: Text('カテゴリ別'),
+                          icon: Icon(Icons.category_outlined, size: 16)),
+                      ButtonSegment(
+                          value: true,
+                          label: Text('場所別'),
+                          icon: Icon(Icons.place_outlined, size: 16)),
+                    ],
+                    selected: {_breakdownByStore},
+                    showSelectedIcon: false,
+                    style: ButtonStyle(
+                      visualDensity: VisualDensity.compact,
+                      textStyle: WidgetStatePropertyAll(
+                          V2Typography.caption),
+                    ),
+                    onSelectionChanged: (s) =>
+                        setState(() => _breakdownByStore = s.first),
+                  ),
+                ),
+                const SizedBox(height: V2Spacing.md),
+                _PieBreakdown(entries: bkEntries, total: bkTotal),
+              ],
+            ),
           ),
           const SizedBox(height: V2Spacing.lg),
           _chartCard(

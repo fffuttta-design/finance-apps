@@ -171,10 +171,10 @@ class _V2RootState extends State<V2Root>
           id: 'income',
           label: isBusiness ? '売上' : '収入',
           icon: Icons.savings_outlined),
-      // 事業＝業績（PL重視）/ 個人＝集計（家計の集計）。
+      // 事業も個人も「業績」に統一（個人＝資産を増やす業績）。
       'report': V2NavItem(
           id: 'report',
-          label: isBusiness ? '業績' : '集計',
+          label: '業績',
           icon: Icons.bar_chart_outlined),
       'assets': const V2NavItem(
           id: 'assets',

@@ -52,9 +52,9 @@ class _SidebarOrderScreenState extends State<SidebarOrderScreen> {
       hint: 'クレジットカードタブ'
     ),
     'report': (
-      label: '集計',
+      label: '業績',
       icon: Icons.bar_chart,
-      hint: '集計タブ（統計・テーブル・月末締め）'
+      hint: '業績タブ（統計・テーブル・月末締め）'
     ),
     'settings': (
       label: '設定',
