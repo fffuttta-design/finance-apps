@@ -1,1 +1,1 @@
-{"version":"1.0.435","buildNumber":"436","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.435/futa-finance-v1.0.435.apk","releaseNotes":"月末残高を手で正しい額に直すと「差額調整」を入れてピタッと合わせられるようにしました（アプリ導入前のズレ合わせ用）。明細検索で未登録の支払方法も選べます。"}
+{"version":"1.0.436","buildNumber":"437","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.436/futa-finance-v1.0.436.apk","releaseNotes":"明細検索に「未登録のみ」フィルタを追加（未登録の支払方法だけを一覧表示→付け替え）。締め処理済みの月は支出タブがグレーアウトします。"}
