@@ -55,6 +55,23 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   bool get _isMonthClosed =>
       _closing.forMonth(_month.year, _month.month)?.isClosed ?? false;
 
+  /// この月に「締め済み」のウォレット名（口座 `w:` / カード `card:` 複合キーから抽出）。
+  Set<String> get _closedWalletNames {
+    final suffix = ':$_ymKey';
+    final names = <String>{};
+    for (final c in _closing.closings) {
+      if (!c.isClosed) continue;
+      final k = c.yearMonth;
+      if (!k.endsWith(suffix)) continue;
+      if (k.startsWith('w:')) {
+        names.add(k.substring(2, k.length - suffix.length));
+      } else if (k.startsWith('card:')) {
+        names.add(k.substring(5, k.length - suffix.length));
+      }
+    }
+    return names;
+  }
+
   /// 支出合計カードの内訳を展開しているか。
   bool _summaryOpen = false;
 
@@ -947,6 +964,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                   subscriptions: _subs,
                   ym: _ymKey,
                   onOpenReconcile: _openCardReconcile,
+                  closedWalletNames: _closedWalletNames,
                 ),
                 const SizedBox(height: V2Spacing.xl),
               ],
