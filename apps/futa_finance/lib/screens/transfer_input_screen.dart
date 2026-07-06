@@ -161,6 +161,10 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
         memo: _memoCtrl.text.trim().isEmpty ? null : _memoCtrl.text.trim(),
         transferFromAccount: _fromAccount,
         transferToAccount: _toAccount,
+        // 編集時に既存メタを引き継ぐ（reviewed=検収チェックが外れないように）。
+        reviewed: editing?.reviewed ?? false,
+        sortOrder: editing?.sortOrder,
+        createdAt: editing?.createdAt,
       );
       if (editing != null) {
         await TransactionRepository.instance.update(tx);

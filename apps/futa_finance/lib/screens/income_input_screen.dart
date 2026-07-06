@@ -231,6 +231,13 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       memo: _memoCtrl.text.trim().isEmpty ? null : _memoCtrl.text.trim(),
       incomeSourceId: _selectedSource!.id,
       isPending: _isPending,
+      // 編集時に既存メタを引き継ぐ（reviewed=検収チェックが外れないように）。
+      reviewed: editing?.reviewed ?? false,
+      sortOrder: editing?.sortOrder,
+      receiptType: editing?.receiptType,
+      receiptSaved: editing?.receiptSaved ?? false,
+      receiptUrl: editing?.receiptUrl,
+      createdAt: editing?.createdAt,
     );
     if (editing != null) {
       // 編集：記録を更新するだけ（残高は二重加算を避けるため触らない）。

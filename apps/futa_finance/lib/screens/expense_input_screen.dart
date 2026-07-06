@@ -977,6 +977,12 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       originalCurrency: _currency == 'USD' ? 'USD' : null,
       originalAmount: usdAmount,
       isPending: editing?.isPending ?? false,
+      // 編集時に既存のメタ情報を引き継ぐ（消さない）。
+      // 特に reviewed（検収チェック）は編集で外れないように保持する。
+      reviewed: editing?.reviewed ?? false,
+      sortOrder: editing?.sortOrder,
+      receiptType: editing?.receiptType,
+      createdAt: editing?.createdAt,
     );
     if (editing != null) {
       // 編集：記録を更新するだけ（総資産等は取引から自動再計算される。
