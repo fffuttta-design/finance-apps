@@ -226,11 +226,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     //   月末だけを明示的に上書きしたときのみ、その値を使う）
     final dispEnd = _pendingMonthEndBalance ??
         (dispStart != null ? dispStart + netDelta : autoMonthEndBalance);
-    // 途中残高の表示オフセット（月初を手入力で変えたぶん、各行の残高もずらす）。
-    final balanceOffset =
-        (dispStart != null && autoMonthStartBalance != null)
-            ? dispStart - autoMonthStartBalance
-            : 0;
+    // ※ 各行の残高は _ledgerTable 側で「表示順に積み上げ（月初残高が起点）」に統一。
+    //   月初を手入力で変えても dispStart 起点で自動追従するのでオフセットは不要。
 
     return PopScope(
       canPop: !_hasPendingEdit,
@@ -398,10 +395,11 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                               ? _reorderLedger(_customSorted(displayRows),
                                   dispStart ?? (_account.startingBalance ?? 0))
                               : _ledgerTable(
-                                  displayRows: displayRows,
+                                  // カスタム順（保存した並び順）で表示。並びが未設定なら
+                                  // 日付順にフォールバックするので、通常の口座は今まで通り。
+                                  displayRows: _customSorted(displayRows),
                                   monthStartBalance: dispStart,
                                   monthEndBalance: dispEnd,
-                                  balanceOffset: balanceOffset,
                                 ),
                         ),
                       ],
@@ -941,7 +939,6 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     required List<_LedgerRow> displayRows,
     int? monthStartBalance,
     int? monthEndBalance,
-    int balanceOffset = 0,
   }) {
     if (displayRows.isEmpty &&
         monthStartBalance == null &&
@@ -950,6 +947,15 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         child: Text('この期間の取引はありません',
             style: TextStyle(color: Color(0xFF9CA3AF))),
       );
+    }
+    // 残高は「表示されている順番」に沿って積み上げる（下＝古い側から月初残高に足す）。
+    // これでカスタム順に並べても、その並び順どおりに残高が再計算される。
+    final seed = monthStartBalance ?? (_account.startingBalance ?? 0);
+    final balances = List<int>.filled(displayRows.length, seed);
+    int running = seed;
+    for (int i = displayRows.length - 1; i >= 0; i--) {
+      running += displayRows[i].signedAmount;
+      balances[i] = running;
     }
     // 列幅を固定した Table で揃える（DataTableの不揃いを解消）。
     return SingleChildScrollView(
@@ -989,7 +995,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                 isMonthStart: false,
                 isEdited: _pendingMonthEndBalance != null,
               ),
-            for (final row in displayRows) _txnRow(row, balanceOffset),
+            for (int i = 0; i < displayRows.length; i++)
+              _txnRow(displayRows[i], balances[i]),
             if (monthStartBalance != null && _selectedMonth != null)
               _virtualBalanceRow(
                 label: '月初残高',
@@ -1326,9 +1333,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     await TransactionRepository.instance.add(tx);
   }
 
-  TableRow _txnRow(_LedgerRow row, [int balanceOffset = 0]) {
+  TableRow _txnRow(_LedgerRow row, int shownBalance) {
     final t = row.txn;
-    final shownBalance = row.balanceAfter + balanceOffset;
     final isOut = row.signedAmount < 0;
     final isTransfer = t.type == core.TransactionType.transfer;
     // 差額調整（強制変更）は赤字で目立たせ、摘要は説明文をそのまま出す。
