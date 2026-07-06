@@ -1,1 +1,1 @@
-{"version":"1.0.470","buildNumber":"471","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.470/futa-finance-v1.0.470.apk","releaseNotes":"締め済みの月を薄い青のトーンで表示し、背景と区別しやすくしました（支出タブ・通帳・カード詳細）。"}
+{"version":"1.0.471","buildNumber":"472","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.471/futa-finance-v1.0.471.apk","releaseNotes":"まだ締めていないウォレットがある状態では、月の全体締めができないようにしました（先に各ウォレットを締めるよう案内）。"}
