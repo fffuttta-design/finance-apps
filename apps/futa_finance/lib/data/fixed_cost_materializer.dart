@@ -142,6 +142,48 @@ class FixedCostMaterializer {
     return created;
   }
 
+  /// 固定費（サブスク）を編集したら、既に明細化済みの取引
+  /// （id が `fixedcost_{subId}_YYYY-MM`）を最新の設定に合わせて更新する。
+  /// 反映：大/小カテゴリ・支払方法・名前（取引内容）・固定費フラグ・領収書の受け取り方。
+  /// ※金額は月ごとの実績なので触らない（過去の金額を書き換えない）。
+  static Future<void> syncMaterialized(core.Subscription sub) async {
+    List<core.Transaction> txns;
+    try {
+      txns = await TransactionRepository.instance.loadAll();
+    } catch (_) {
+      return;
+    }
+    final prefix = 'fixedcost_${sub.id}_';
+    final hasNormalCat =
+        sub.categoryMajor != null && sub.categoryMajor!.trim().isNotEmpty;
+    final core.Category? newCat = hasNormalCat
+        ? core.Category(
+            major: sub.categoryMajor!.trim(),
+            sub: (sub.categorySub?.trim().isNotEmpty ?? false)
+                ? sub.categorySub!.trim()
+                : '',
+          )
+        : null; // 普通カテゴリ未設定なら取引のカテゴリはそのまま
+    final rk = sub.receiptKind; // 'paper' / 'drive' / null
+    final updates = <core.Transaction>[];
+    for (final t in txns) {
+      if (!t.id.startsWith(prefix)) continue;
+      updates.add(t.copyWith(
+        category: newCat, // null なら copyWith は既存カテゴリを維持
+        paymentMethod: (sub.paymentMethod?.trim().isNotEmpty ?? false)
+            ? sub.paymentMethod!.trim()
+            : t.paymentMethod,
+        description: sub.name,
+        isFixed: true,
+        receiptType: rk,
+        receiptSaved: rk == 'paper' ? true : t.receiptSaved,
+      ));
+    }
+    if (updates.isNotEmpty) {
+      await TransactionRepository.instance.updateMany(updates);
+    }
+  }
+
   /// その月に、同じ固定費の実取引（同名 or 同額の固定費費目）が既にあるか。
   static bool _isSameFixed(
       core.Transaction t, int y, int m, int amt, String nn) {

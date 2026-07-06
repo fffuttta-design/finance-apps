@@ -293,8 +293,10 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       final e = widget.editing;
       if (e != null) {
         // 編集モード：取引のカテゴリ・支払方法をそのまま復元。
-        _majorCategory = e.category.major;
-        _subCategory = e.category.sub;
+        // 保存済みの大カテゴリは、番号ズレ/素名でもドロップダウンの項目に解決する
+        // （そのままだと項目に一致せず「選択してください」になってしまうため）。
+        _majorCategory = _resolveMajorName(c, e.category.major);
+        _subCategory = e.category.sub.isEmpty ? null : e.category.sub;
         _categoryTouched = true; // 既存値は予測で上書きしない
         _paymentMethod = e.paymentMethod;
         _payCategory = _categoryOf(e.paymentMethod) ?? _PayCategory.card;
@@ -343,6 +345,19 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       _storeCounts = storeCounts;
       _descToStores = descToStores;
     });
+  }
+
+  /// 保存済みの大カテゴリ名を、現在のカテゴリ設定の「表示名（番号付き）」に解決する。
+  /// 番号がズレていても素の名前が一致すればその項目を返す。見つからなければそのまま。
+  String _resolveMajorName(core.CategoryConfig cfg, String stored) {
+    if (stored.trim().isEmpty) return stored;
+    String bare(String s) => s.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
+    final target = bare(stored);
+    for (var i = 0; i < cfg.majors.length; i++) {
+      final dn = cfg.majors[i].displayName(i);
+      if (dn == stored || bare(dn) == target) return dn;
+    }
+    return stored;
   }
 
   /// カテゴリ予測。戻り値＝カテゴリを提案できたか。
@@ -1225,6 +1240,15 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 key: ValueKey('major-$_majorDropdownNonce'),
                 initialValue: _majorCategory,
                 items: [
+                  // 保存済みだが一覧に無い値（削除/未登録カテゴリ）も選択肢に残す。
+                  if (_majorCategory != null &&
+                      _majorCategory!.trim().isNotEmpty &&
+                      !majorNames.contains(_majorCategory))
+                    DropdownMenuItem(
+                      value: _majorCategory,
+                      child: Text(_majorCategory!,
+                          overflow: TextOverflow.ellipsis),
+                    ),
                   for (int i = 0; i < majorNames.length; i++)
                     // 休眠カテゴリは候補から隠す（選択中の値だけは残す）。
                     if (!categories.majors[i].inactive ||

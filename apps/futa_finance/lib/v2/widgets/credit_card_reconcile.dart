@@ -91,8 +91,12 @@ class CreditCardBillingSection extends StatelessWidget {
         .fold(0, (s, t) => s + t.amount);
     final now = DateTime.now();
     final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    // 既に「実明細化」された固定費は txSum に含まれるので、サブスク側では数えない
+    // （二重計上の防止：例 新生銀行が固定費ぶんを二重に出ていた不具合）。
     final subSum = subscriptions
         .where((s) => (s.paymentMethod ?? '') == name)
+        .where((s) =>
+            !transactions.any((t) => t.id == 'fixedcost_${s.id}_$ym'))
         .fold(0, (s, sub) => s + sub.plAmountForMonth(ym, curYm));
     return txSum + subSum;
   }

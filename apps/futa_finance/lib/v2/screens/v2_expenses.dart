@@ -7,6 +7,7 @@ import 'package:finance_core/finance_core.dart' as core;
 
 import '../../data/app_mode.dart';
 import '../../data/settings_repository.dart';
+import '../../data/fixed_cost_materializer.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
 import '../../screens/account_detail_screen.dart';
@@ -255,6 +256,8 @@ class _V2ExpensesScreenState extends State<V2ExpensesScreen>
     newList[idx] = edited;
     await _subscriptionRepo
         .save(_subscriptions.copyWith(subscriptions: newList));
+    // 明細化済みの取引にも編集内容（カテゴリ/支払方法/名前）を反映する。
+    await FixedCostMaterializer.syncMaterialized(edited);
     if (mounted) await _load();
   }
 

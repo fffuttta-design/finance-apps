@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../widgets/memo_field.dart';
 import 'package:finance_core/finance_core.dart';
 
+import '../data/fixed_cost_materializer.dart';
 import '../data/settings_repository.dart';
 import '../data/subscription_repository.dart';
 import '../utils/formatters.dart';
@@ -842,6 +843,9 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     final list = [..._config!.subscriptions];
     list[i] = r;
     _update(list);
+    // 明細化済みの取引にも編集内容（カテゴリ/支払方法/名前）を反映する。
+    await FixedCostMaterializer.syncMaterialized(r);
+    if (mounted) await _load();
   }
 
   Future<void> _delete(int i) async {
