@@ -558,18 +558,27 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                                 style: TextStyle(
                                     fontSize: 11, color: Color(0xFF9CA3AF))),
                             const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
+                            // 会計科目は「支出を記録」と同じくプルダウンで選ぶ。
+                            DropdownButtonFormField<String>(
+                              initialValue: plMajor,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                isDense: true,
+                                border: OutlineInputBorder(),
+                                hintText: '選択してください（任意）',
+                              ),
+                              items: [
+                                const DropdownMenuItem<String>(
+                                    value: null, child: Text('指定なし')),
+                                if (plMajor != null &&
+                                    plMajor!.trim().isNotEmpty &&
+                                    !accountingMajors.contains(plMajor))
+                                  DropdownMenuItem(
+                                      value: plMajor, child: Text(plMajor!)),
                                 for (final m in accountingMajors)
-                                  ChoiceChip(
-                                    label: Text(m),
-                                    selected: plMajor == m,
-                                    onSelected: (sel) => setLocal(
-                                        () => plMajor = sel ? m : null),
-                                  ),
+                                  DropdownMenuItem(value: m, child: Text(m)),
                               ],
+                              onChanged: (v) => setLocal(() => plMajor = v),
                             ),
                           ],
                           // 領収書の受け取り方（実明細化した取引に反映）。

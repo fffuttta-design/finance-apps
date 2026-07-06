@@ -470,18 +470,28 @@ Future<Subscription?> showSubscriptionEditSheet(
                               style: TextStyle(
                                   fontSize: 11, color: Color(0xFF9CA3AF))),
                           const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
+                          // 会計科目は「支出を記録」と同じくプルダウンで選ぶ。
+                          DropdownButtonFormField<String>(
+                            initialValue: plMajor,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              border: OutlineInputBorder(),
+                              hintText: '選択してください（任意）',
+                            ),
+                            items: [
+                              const DropdownMenuItem<String>(
+                                  value: null, child: Text('指定なし')),
+                              // 一覧に無い値（旧データ等）も選択肢として保持。
+                              if (plMajor != null &&
+                                  plMajor!.trim().isNotEmpty &&
+                                  !accountingMajors.contains(plMajor))
+                                DropdownMenuItem(
+                                    value: plMajor, child: Text(plMajor!)),
                               for (final m in accountingMajors)
-                                ChoiceChip(
-                                  label: Text(m),
-                                  selected: plMajor == m,
-                                  onSelected: (sel) => setLocal(
-                                      () => plMajor = sel ? m : null),
-                                ),
+                                DropdownMenuItem(value: m, child: Text(m)),
                             ],
+                            onChanged: (v) => setLocal(() => plMajor = v),
                           ),
                           if (plMajor != null) ...[
                             const SizedBox(height: 10),

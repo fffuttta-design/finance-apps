@@ -280,40 +280,15 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   }
 
   Future<void> _load() async {
+    // ① まずカテゴリ/支払方法だけ読み、フォームを即描画する（開くのを速く）。
+    //    過去の全取引(loadAll)は「サジェスト/カテゴリ提案」専用で、表示を止めない
+    //    よう②で裏読みする（従来は全取引を待ってから描画＝もっさりの原因）。
     final c = await _settings.loadCategories();
     final p = await _settings.loadPayments();
-    // カテゴリ予測（履歴学習）用に過去取引を読み込む。
-    List<core.Transaction> history = const [];
-    try {
-      history = await TransactionRepository.instance.loadAll();
-    } catch (_) {}
     if (!mounted) return;
-    // 取引内容サジェスト用に、過去の支出の内容を頻度集計しておく。
-    // あわせて「場所」も、全体頻度＆件名ごとの使用場所を集計（表記ゆれ防止）。
-    final descCounts = <String, int>{};
-    final storeCounts = <String, int>{};
-    final descToStores = <String, Map<String, int>>{};
-    for (final t in history) {
-      if (t.type != core.TransactionType.expense) continue;
-      final d = t.description.trim();
-      if (d.isNotEmpty) descCounts[d] = (descCounts[d] ?? 0) + 1;
-      final st = (t.store ?? '').trim();
-      if (st.isNotEmpty) {
-        storeCounts[st] = (storeCounts[st] ?? 0) + 1;
-        final dk = d.toLowerCase();
-        if (dk.isNotEmpty) {
-          final m = descToStores[dk] ??= <String, int>{};
-          m[st] = (m[st] ?? 0) + 1;
-        }
-      }
-    }
     setState(() {
       _categories = c;
       _payments = p;
-      _history = history;
-      _descCounts = descCounts;
-      _storeCounts = storeCounts;
-      _descToStores = descToStores;
       final e = widget.editing;
       if (e != null) {
         // 編集モード：取引のカテゴリ・支払方法をそのまま復元。
@@ -333,19 +308,47 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         // プリセットなし → 現カテゴリ（デフォルト: クレカ）の最上位項目を選択。
         _applyCategoryDefault();
       }
-      // 新規時のカテゴリ自動予測：①OCR科目候補 → ②履歴(店舗/内容)。
-      if (e == null && !_categoryTouched) {
-        _autoPredictCategory(initial: true);
+    });
+
+    // ② 過去取引はフォーム表示後に裏で読み込む（サジェスト/カテゴリ提案用）。
+    List<core.Transaction> history = const [];
+    try {
+      history = await TransactionRepository.instance.loadAll();
+    } catch (_) {}
+    if (!mounted) return;
+    final descCounts = <String, int>{};
+    final storeCounts = <String, int>{};
+    final descToStores = <String, Map<String, int>>{};
+    for (final t in history) {
+      if (t.type != core.TransactionType.expense) continue;
+      final d = t.description.trim();
+      if (d.isNotEmpty) descCounts[d] = (descCounts[d] ?? 0) + 1;
+      final st = (t.store ?? '').trim();
+      if (st.isNotEmpty) {
+        storeCounts[st] = (storeCounts[st] ?? 0) + 1;
+        final dk = d.toLowerCase();
+        if (dk.isNotEmpty) {
+          final m = descToStores[dk] ??= <String, int>{};
+          m[st] = (m[st] ?? 0) + 1;
+        }
       }
+    }
+    if (!mounted) return;
+    setState(() {
+      _history = history;
+      _descCounts = descCounts;
+      _storeCounts = storeCounts;
+      _descToStores = descToStores;
     });
   }
 
-  /// カテゴリ自動予測。手動選択済みなら何もしない。
+  /// カテゴリ予測。戻り値＝カテゴリを提案できたか。
+  /// manual=true（「カテゴリを提案」ボタン）のときは、手動選択済み/編集中でも実行する。
   /// 優先: OCR科目候補 → 店舗一致の履歴 → 取引内容一致の履歴。
-  void _autoPredictCategory({bool initial = false}) {
-    if (_categoryTouched || widget.editing != null) return;
+  bool _autoPredictCategory({bool initial = false, bool manual = false}) {
+    if (!manual && (_categoryTouched || widget.editing != null)) return false;
     final cfg = _categories;
-    if (cfg == null) return;
+    if (cfg == null) return false;
 
     String norm(String s) =>
         s.replaceFirst(RegExp(r'^\d+\.'), '').trim();
@@ -366,7 +369,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               _subCategory = subs.isNotEmpty ? subs.first : null;
             }
             _categoryPredicted = true;
-            return;
+            return true;
           }
         }
       }
@@ -375,7 +378,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     // ② 履歴学習：店舗 or 取引内容が一致する過去の支出から最頻カテゴリ。
     final store = _storeCtrl.text.trim().toLowerCase();
     final desc = _descCtrl.text.trim().toLowerCase();
-    if (store.isEmpty && desc.isEmpty) return;
+    if (store.isEmpty && desc.isEmpty) return false;
 
     final tally = <String, int>{}; // "majorsub" -> count
     for (final t in _history) {
@@ -395,7 +398,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       final key = '${t.category.major}${t.category.sub}';
       tally[key] = (tally[key] ?? 0) + weight;
     }
-    if (tally.isEmpty) return;
+    if (tally.isEmpty) return false;
     final best =
         tally.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
     final parts = best.split('');
@@ -413,7 +416,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         break;
       }
     }
-    if (matchedMajor == null) return;
+    if (matchedMajor == null) return false;
     _majorCategory = matchedMajor;
     // 予測した小カテゴリは、その大カテゴリの小カテゴリ一覧に在る場合のみ採用
     // （無い値を入れるとドロップダウンが壊れるため）。
@@ -421,6 +424,20 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         matchedIdx >= 0 ? cfg.majors[matchedIdx].subs : const <String>[];
     _subCategory = (sub.isNotEmpty && subsOfMajor.contains(sub)) ? sub : null;
     _categoryPredicted = true;
+    return true;
+  }
+
+  /// 「カテゴリを提案」ボタン：店舗/取引内容の履歴から手動で予測する。
+  /// 見つからなければトーストで知らせる（勝手に変えないので安心）。
+  void _suggestCategory() {
+    final ok = _autoPredictCategory(manual: true);
+    setState(() {}); // 予測結果（大/小カテゴリ）を反映
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('似た履歴が見つかりませんでした（店舗名か取引内容を入れて再度お試しください）')),
+      );
+    }
   }
 
   /// 取引内容のサジェスト候補（過去の入力から・頻度順に最大6件）。
@@ -1093,12 +1110,12 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 onChanged: (_) {
                   // 変換中（IME composing中）は setState で再描画しない。
                   // Windowsデスクトップで「変換しようとスペースを押すとカーソルが
-                  // 先頭へ飛ぶ」フレームワーク不具合を誘発しないため、予測と
-                  // サジェスト更新は変換が確定してから走らせる。
+                  // 先頭へ飛ぶ」フレームワーク不具合を誘発しないため、サジェスト
+                  // 更新は変換が確定してから走らせる。
+                  // ※カテゴリの自動予測は入力途中で走らせない（重さ・誤爆の元）。
+                  //   代わりにカテゴリ欄の「カテゴリを提案」ボタンで手動実行する。
                   if (_descCtrl.value.composing.isValid) return;
-                  setState(() {
-                    if (!_categoryTouched) _autoPredictCategory();
-                  });
+                  setState(() {});
                 },
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? '入力してください' : null,
@@ -1183,6 +1200,29 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               Row(
                 children: [
                   Expanded(child: _label('大カテゴリ')),
+                  // 手動でカテゴリを提案（店舗/取引内容の履歴から）。
+                  InkWell(
+                    onTap: _suggestCategory,
+                    borderRadius: BorderRadius.circular(6),
+                    child: const Padding(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.auto_awesome,
+                              size: 14, color: Color(0xFF7C3AED)),
+                          SizedBox(width: 3),
+                          Text('カテゴリを提案',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF7C3AED))),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
                   InkWell(
                     onTap: _openCategoryEditor,
                     borderRadius: BorderRadius.circular(6),
