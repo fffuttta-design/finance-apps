@@ -1092,6 +1092,25 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 onReorderDay: _saveReorder,
               ),
             ];
+    // 幅広（PC/Windows＝サイドバー版シェル、画面幅≥700）だけ ListView にして、
+    // 画面外の行（Webの<img>プラットフォームビュー）を描画対象から外し、スクロールを
+    // 軽くする。狭い幅（スマホ＝下タブ版シェル）は本文へ渡る制約の都合で ListView が
+    // 真っ白になるため、従来どおり SingleChildScrollView（＝現行の確実な方式）にする。
+    // 判定はシェル選択と同じ MediaQuery 幅<700 を使うので、スマホ側は現状と完全に同一。
+    final wide = MediaQuery.sizeOf(context).width >= 700;
+    if (wide) {
+      return Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: ListView(
+            padding: const EdgeInsets.symmetric(
+                vertical: V2Spacing.lg, horizontal: V2Spacing.md),
+            children: children,
+          ),
+        ),
+      );
+    }
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(
           vertical: V2Spacing.lg, horizontal: V2Spacing.md),
