@@ -1047,20 +1047,29 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
               ),
             ],
           ),
+          actionsOverflowDirection: VerticalDirection.down,
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx, 'cancel'),
                 child: const Text('修正に戻る')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'force'),
+              child: const Text('月初優先で保存'),
+            ),
             FilledButton(
               style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFEA580C)),
-              onPressed: () => Navigator.pop(ctx, 'force'),
-              child: const Text('月初優先で強制保存'),
+                  backgroundColor: const Color(0xFFDC2626)),
+              onPressed: () => Navigator.pop(ctx, 'adjust'),
+              child: const Text('差額調整を追加して合わせる'),
             ),
           ],
         ),
       );
-      if (action != 'force') return;
+      if (action == 'cancel' || action == null) return;
+      // 差額調整を選んだら、この月の末日に「差額調整（強制変更）」を1件作る。
+      if (action == 'adjust') {
+        await _addBalanceAdjustment(diff);
+      }
     }
 
     // 月初残高 → startingBalance を逆算
@@ -1123,14 +1132,42 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     }
   }
 
+  /// 月末残高の強制変更にあわせて、差額ぶんの「差額調整（強制変更）」を作る。
+  /// 収支・PLには載せないため振替扱い（相手は擬似口座「差額調整」）。
+  /// 口座台帳（このウォレットの残高）だけを diff ぶん動かして帳尻を合わせる。
+  Future<void> _addBalanceAdjustment(int diff) async {
+    final m = _selectedMonth;
+    if (m == null || diff == 0) return;
+    final lastDay = DateTime(m.year, m.month + 1, 0);
+    final up = diff > 0; // 残高を増やす方向か
+    final tx = core.Transaction(
+      id: '${DateTime.now().microsecondsSinceEpoch}adj',
+      date: lastDay,
+      type: core.TransactionType.transfer,
+      category: const core.Category(major: '差額調整', sub: ''),
+      paymentMethod: '',
+      description: '差額調整（強制変更）',
+      amount: diff.abs(),
+      transferFromAccount: up ? '差額調整' : _account.name,
+      transferToAccount: up ? _account.name : '差額調整',
+      reviewed: true,
+      memo: 'アプリ導入前などのズレを、入力した月末残高に合わせて調整',
+    );
+    await TransactionRepository.instance.add(tx);
+  }
+
   TableRow _txnRow(_LedgerRow row, [int balanceOffset = 0]) {
     final t = row.txn;
     final shownBalance = row.balanceAfter + balanceOffset;
     final isOut = row.signedAmount < 0;
     final isTransfer = t.type == core.TransactionType.transfer;
-    final desc = isTransfer
-        ? '振替 ${t.transferFromAccount ?? '?'} → ${t.transferToAccount ?? '?'}'
-        : t.description;
+    // 差額調整（強制変更）は赤字で目立たせ、摘要は説明文をそのまま出す。
+    final isAdjust = t.category.major == '差額調整';
+    final desc = isAdjust
+        ? t.description
+        : isTransfer
+            ? '振替 ${t.transferFromAccount ?? '?'} → ${t.transferToAccount ?? '?'}'
+            : t.description;
     Widget money(String s, Color c) => Padding(
           padding: _cellPad,
           child: Text(s,
@@ -1163,7 +1200,13 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         child: Text(desc,
             overflow: TextOverflow.ellipsis,
             maxLines: 1,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF111827))),
+            style: TextStyle(
+                fontSize: 12,
+                // 差額調整（強制変更）は赤字＋太字で目立たせる。
+                fontWeight: isAdjust ? FontWeight.w700 : FontWeight.w400,
+                color: isAdjust
+                    ? const Color(0xFFDC2626)
+                    : const Color(0xFF111827))),
       ),
       money(isOut ? formatYen(-row.signedAmount) : '',
           const Color(0xFFDC2626)),

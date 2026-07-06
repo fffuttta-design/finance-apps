@@ -72,10 +72,22 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
     });
   }
 
-  List<String> get _paymentNames => [
-        ...?_payments?.bankAccounts.map((b) => b.name),
-        ...?_payments?.creditCards.map((c) => c.name),
-      ];
+  List<String> get _paymentNames {
+    final reg = <String>{
+      ...?_payments?.bankAccounts.map((b) => b.name),
+      ...?_payments?.creditCards.map((c) => c.name),
+    };
+    final ordered = <String>[...reg];
+    // 取引に出てくる「未登録の支払方法」（例:クレカ）も候補に含める。
+    // これで検索→選択→支払方法を一括変更、で正しいカードに付け替えて掃除できる。
+    for (final t in _all) {
+      final pm = t.paymentMethod.trim();
+      if (pm.isNotEmpty && !reg.contains(pm) && !ordered.contains(pm)) {
+        ordered.add(pm);
+      }
+    }
+    return ordered;
+  }
 
   List<core.Transaction> get _filtered {
     final kw = _kwCtrl.text.trim().toLowerCase();
