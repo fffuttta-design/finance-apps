@@ -708,12 +708,12 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
         detailLabel: '支出明細'));
   }
 
-  /// 締め処理済みの月は本文に「薄い青のトーン」を重ねて「もう確定」を示す。
-  /// （以前は不透明度を下げるだけで背景の灰色と紛らわしかったので色味を付けた）
+  /// 締め処理済みの月は本文に「薄い暖色（セピア）のトーン」を重ねて「もう確定」を示す。
+  /// 青は読みにくかったので、読みやすさ優先で不透明度を上げ、色味も落ち着いた暖色に。
   Widget _grey(Widget child) => _isMonthClosed
       ? ColoredBox(
-          color: const Color(0xFFB4CCEC),
-          child: Opacity(opacity: 0.5, child: child),
+          color: const Color(0xFFF6E7C9),
+          child: Opacity(opacity: 0.72, child: child),
         )
       : child;
 

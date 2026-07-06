@@ -412,10 +412,10 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                   // 締め済みは薄い青のトーンを重ねて背景と区別（灰色だと紛らわしい）。
                   child: ColoredBox(
                     color: closed
-                        ? const Color(0xFFB4CCEC)
+                        ? const Color(0xFFF6E7C9)
                         : Colors.transparent,
                     child: Opacity(
-                    opacity: closed ? 0.5 : 1.0,
+                    opacity: closed ? 0.72 : 1.0,
                     child: Column(
                       children: [
                         _summaryCard(

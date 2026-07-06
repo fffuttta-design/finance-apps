@@ -612,10 +612,10 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                           // 締め済みは薄い青のトーンを重ねて背景と区別。
                           child: ColoredBox(
                             color: _isCardMonthClosed
-                                ? const Color(0xFFB4CCEC)
+                                ? const Color(0xFFF6E7C9)
                                 : Colors.transparent,
                             child: Opacity(
-                            opacity: _isCardMonthClosed ? 0.5 : 1.0,
+                            opacity: _isCardMonthClosed ? 0.72 : 1.0,
                           // PC幅は支出明細と同じ表（検索・並び替え・列幅）。
                           // スマホ幅は従来のカード型リスト。
                           child: constraints.maxWidth >= 900

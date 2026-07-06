@@ -344,7 +344,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
               if (_sortCol == _SortCol.custom)
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: Text('▲▼ボタンで並び替え',
+                  child: Text('ハンドルをドラッグで並び替え',
                       style: V2Typography.micro
                           .copyWith(color: V2Colors.textMuted)),
                 ),
@@ -577,33 +577,56 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
   /// 動かして並び替える（長押しドラッグは扱いづらいのでボタン式に変更）。
   /// 行はコンパクト表示（ナロー行を再利用）で、幅崩れの心配がない。
   Widget _customReorderList(List<_Row> rows) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (int i = 0; i < rows.length; i++) ...[
-          if (i > 0)
-            const Divider(height: 1, color: V2Colors.divider),
-          Row(
+    // 他のウォレット（通帳）と同じく、ハンドル（⋮⋮）をドラッグで並び替え。
+    // 行本体タップは従来どおり編集フォームを開く（＝カスタム順でも編集/削除できる）。
+    return ReorderableListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      buildDefaultDragHandles: false,
+      itemCount: rows.length,
+      onReorder: (oldIndex, newIndex) {
+        if (newIndex > oldIndex) newIndex -= 1;
+        final list = [...rows];
+        final item = list.removeAt(oldIndex);
+        list.insert(newIndex, item);
+        widget.onReorderDay?.call([
+          for (final r in list)
+            r.isFixed
+                ? ReorderedItem.fixed(r.fx!.id)
+                : ReorderedItem.txn(r.txn!),
+        ]);
+      },
+      itemBuilder: (context, i) {
+        final r = rows[i];
+        return DecoratedBox(
+          key: ValueKey(r.isFixed ? 'fx_${r.fx!.id}' : 'tx_${r.txn!.id}'),
+          decoration: const BoxDecoration(
+            border:
+                Border(bottom: BorderSide(color: V2Colors.divider)),
+          ),
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _MoveButtons(
-                accent: widget.accent,
-                onUp: i > 0 ? () => _moveRow(i, i - 1, rows) : null,
-                onDown:
-                    i < rows.length - 1 ? () => _moveRow(i, i + 1, rows) : null,
+              ReorderableDragStartListener(
+                index: i,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+                  child: Icon(Icons.drag_indicator,
+                      size: 20, color: Color(0xFF9CA3AF)),
+                ),
               ),
               Expanded(
-                child: rows[i].isFixed
+                child: r.isFixed
                     ? _NarrowFixedRow(
-                        f: rows[i].fx!,
-                        onTap: () => widget.onEditFixed?.call(rows[i].fx!),
+                        f: r.fx!,
+                        onTap: () => widget.onEditFixed?.call(r.fx!),
                         showReceipt: widget.showReceiptCheck,
                         showReview: widget.onToggleReviewedFixed != null,
                         onToggleReviewed: widget.onToggleReviewedFixed,
                       )
                     : _NarrowRow(
-                        t: rows[i].txn!,
-                        onTap: () => widget.onEditTxn(rows[i].txn!),
+                        t: r.txn!,
+                        onTap: () => widget.onEditTxn(r.txn!),
                         showReceipt: widget.showReceiptCheck,
                         onToggleReceipt: widget.onToggleReceipt,
                         showReview: widget.onToggleReviewed != null,
@@ -612,22 +635,10 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
               ),
             ],
           ),
-        ],
-      ],
+        );
+      },
     );
   }
-
-  /// 行を1つ上/下へ動かし、新しい並び順を sortOrder として保存する。
-  void _moveRow(int from, int to, List<_Row> rows) {
-    final list = [...rows];
-    final item = list.removeAt(from);
-    list.insert(to, item);
-    widget.onReorderDay?.call([
-      for (final r in list)
-        r.isFixed ? ReorderedItem.fixed(r.fx!.id) : ReorderedItem.txn(r.txn!),
-    ]);
-  }
-
 }
 
 /// 「カスタム順」モードの切替チップ。ON のとき行を長押しドラッグで並び替えられ、
@@ -647,8 +658,8 @@ class _CustomOrderToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: active
-          ? 'カスタム順：ON（▲▼ボタンで並び替え・自動保存）'
-          : 'カスタム順に切り替え（▲▼で並び替えて保存）',
+          ? 'カスタム順：ON（⋮⋮ハンドルをドラッグで並び替え・自動保存）'
+          : 'カスタム順に切り替え（ハンドルで並び替えて保存）',
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),
@@ -727,42 +738,6 @@ IconData _paymentIcon(String method) {
     return Icons.contactless_outlined;
   }
   return Icons.payment_outlined;
-}
-
-/// カスタム順モードで行の左に置く ▲▼ ボタン（1行ずつ上下へ動かす）。
-/// 端の行では該当方向を無効化（薄いグレー）する。
-class _MoveButtons extends StatelessWidget {
-  const _MoveButtons({
-    required this.accent,
-    required this.onUp,
-    required this.onDown,
-  });
-
-  final Color accent;
-  final VoidCallback? onUp;
-  final VoidCallback? onDown;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget btn(IconData icon, VoidCallback? onTap) => InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(6),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            child: Icon(icon,
-                size: 20,
-                color: onTap == null ? const Color(0xFFD1D5DB) : accent),
-          ),
-        );
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        btn(Icons.keyboard_arrow_up, onUp),
-        btn(Icons.keyboard_arrow_down, onDown),
-      ],
-    );
-  }
 }
 
 /// 並び替えの対象列。`custom` は列ではなく「ユーザーが手で並べた順（カスタム順）」
@@ -1583,65 +1558,76 @@ class _NarrowRow extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 5),
-            // 2行目：カテゴリ + 支払方法
+            // 2行目：カテゴリ+場所（左）… 支払方法（常に右端に揃える）。
             Row(
               children: [
-                Flexible(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: accent.withValues(alpha: 0.13),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
+                // 左側（カテゴリ＋場所）は余白を埋めて、支払方法を右端へ押し出す。
+                Expanded(
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                              color: accent,
-                              borderRadius: BorderRadius.circular(2)),
+                            color: accent.withValues(alpha: 0.13),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                    color: accent,
+                                    borderRadius: BorderRadius.circular(2)),
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(catLabel,
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: HSLColor.fromColor(accent)
+                                            .withLightness(0.30)
+                                            .toColor())),
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(width: 6),
+                      ),
+                      if ((t.store ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(width: 8),
                         Flexible(
-                          child: Text(catLabel,
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: HSLColor.fromColor(accent)
-                                      .withLightness(0.30)
-                                      .toColor())),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.place_outlined,
+                                  size: 12, color: Color(0xFF64748B)),
+                              const SizedBox(width: 2),
+                              Flexible(
+                                child: Text(t.store!.trim(),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF64748B))),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
-                if ((t.store ?? '').trim().isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Row(
-                      children: [
-                        const Icon(Icons.place_outlined,
-                            size: 12, color: Color(0xFF64748B)),
-                        const SizedBox(width: 2),
-                        Flexible(
-                          child: Text(t.store!.trim(),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                              style: const TextStyle(
-                                  fontSize: 12, color: Color(0xFF64748B))),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
                 const SizedBox(width: 10),
-                Flexible(
+                // 支払方法：常に右端・幅上限で省略（行ごとに位置がバラつかない）。
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 160),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(_paymentIcon(pay),
                           size: 12, color: const Color(0xFF64748B)),
