@@ -58,8 +58,6 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
   final _settings = SettingsRepository();
   core.PaymentMethodsConfig? _payments;
   List<TransferTemplate> _templates = const [];
-  // 「前月に有効だったか」を判定するために取引も読む（休眠カードの表示可否用）。
-  List<core.Transaction> _txns = const [];
 
   DateTime _date = DateTime.now();
   String? _fromAccount;
@@ -100,15 +98,10 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
   Future<void> _load() async {
     final p = await _settings.loadPayments();
     final t = await _settings.loadTransferTemplates();
-    List<core.Transaction> txns = const [];
-    try {
-      txns = await TransactionRepository.instance.loadAll();
-    } catch (_) {}
     if (!mounted) return;
     setState(() {
       _payments = p;
       _templates = t.templates;
-      _txns = txns;
       if (_fromAccount == null && widget.initialFromAccount != null) {
         _fromAccount = widget.initialFromAccount;
       }
@@ -116,15 +109,15 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
   }
 
   /// 移動元/先の候補（value=口座名 / label=[種別]口座名）。
-  /// 銀行/現金/電子マネー + 固定の「現金」。休眠中(inactive)は除外。
-  /// [includeCards]=true のとき、クレジットカードも候補に加える（カード引落の移動先用）。
-  /// カードは有効なものは常に、休眠中でも「前月に利用があったカード」は表示する。
+  /// 銀行/現金/電子マネー + 固定の「現金」。休眠中(inactive)の口座は除外。
+  /// [includeCards]=true のとき、登録済みのクレジットカードを**全部**加える
+  /// （カード引落の移動先用）。休眠カードも隠さない＝必要なカードが選べなくなる事故を防ぐ。
   List<({String value, String label})> _accountChoices({bool includeCards = false}) {
     final p = _payments;
     final list = <({String value, String label})>[];
     if (p != null) {
       for (final b in p.bankAccounts) {
-        if (b.inactive) continue; // 休眠中は候補に出さない
+        if (b.inactive) continue; // 休眠中の口座は候補に出さない
         list.add((
           value: b.name,
           label: '[${b.accountType.shortLabel}]${b.name}',
@@ -133,14 +126,7 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
     }
     list.add((value: '現金', label: '[現金]現金'));
     if (includeCards && p != null) {
-      // 「前月」の範囲（前月初日〜今日）。この間に利用があれば休眠でも出す。
-      final now = DateTime.now();
-      final prevMonthStart = DateTime(now.year, now.month - 1, 1);
-      bool usedRecently(String cardName) => _txns.any((t) =>
-          t.paymentMethod == cardName && !t.date.isBefore(prevMonthStart));
       for (final c in p.creditCards) {
-        // 有効なカードは常に、休眠中は前月に利用があったものだけ。
-        if (c.inactive && !usedRecently(c.name)) continue;
         list.add((value: c.name, label: '[カード]${c.name}'));
       }
     }
