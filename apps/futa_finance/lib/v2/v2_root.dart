@@ -19,6 +19,7 @@ import '../screens/receipt_split_screen.dart';
 import '../screens/transfer_input_screen.dart';
 import 'layout/rich_sidebar_shell.dart';
 import 'layout/topnav_shell.dart';
+import 'widgets/global_month_nav.dart';
 import 'screens/rich_expenses.dart';
 import 'screens/rich_home.dart';
 import 'screens/rich_income.dart';
@@ -115,6 +116,11 @@ class _V2RootState extends State<V2Root>
       duration: const Duration(seconds: 4),
     ));
   }
+
+  /// 月（YYYY年M月）を使うタブか。ホーム/支出/収入だけ共有月ナビを出す。
+  /// 業績(report)は月/年の切替＋独自ナビを持つので対象外（タブ内のナビを使う）。
+  static bool _isMonthTab(String id) =>
+      id == 'home' || id == 'expenses' || id == 'income';
 
   @override
   void dispose() {
@@ -341,6 +347,8 @@ class _V2RootState extends State<V2Root>
         personal: mode == AppMode.personal,
         title: cur.label,
         modeSwitcher: V2ModeSwitcher(onDark: false),
+        // 月を使うタブ（ホーム/支出/収入/業績）だけトップバーに共有月ナビを出す。
+        monthNav: _isMonthTab(_currentId) ? const GlobalMonthNav() : null,
         recordButton: _RecordMenuButton(
           accent: accent,
           mode: mode,
@@ -355,6 +363,7 @@ class _V2RootState extends State<V2Root>
     }
     return V2TopNavShell(
       navAtBottom: isNarrow,
+      monthNav: _isMonthTab(_currentId) ? const GlobalMonthNav() : null,
       bottomNav: isNarrow
           ? V2BottomNav(
               items: _navItems,

@@ -12,7 +12,6 @@ import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
 import '../widgets/month_closing_bar.dart';
-import '../widgets/month_nav_bar.dart';
 
 /// 新デザイン（リッチUI）の売上／収入タブ。
 /// サマリーカード（合計＋確定/見込み）＋明細リスト。既存 V2IncomeScreen は温存。
@@ -74,11 +73,6 @@ class _RichIncomeScreenState extends State<RichIncomeScreen>
     });
   }
 
-  void _shiftMonth(int delta) {
-    setState(() => _month = DateTime(_month.year, _month.month + delta));
-    MonthCursor.instance.month = _month; // タブ横断で共有
-  }
-
   List<core.Transaction> get _monthIncome => _transactions
       .where((t) =>
           t.type == core.TransactionType.income &&
@@ -120,22 +114,13 @@ class _RichIncomeScreenState extends State<RichIncomeScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // タブ上部：タイトル＋中央に月セレクタ（資産タブと同じ見た目）
-              // ＋右上に締め処理チップ。
+              // 月の切替はトップバーの共有月ナビに集約。ここは締めボタンだけ右に。
               Row(
                 children: [
                   Text(isBusiness ? '売上' : '収入',
                       style: V2Typography.h1
                           .copyWith(color: V2Colors.textPrimary)),
-                  Expanded(
-                    child: Center(
-                      child: MonthNavBar(
-                        label: '${_month.year}年${_month.month}月',
-                        onPrev: () => _shiftMonth(-1),
-                        onNext: () => _shiftMonth(1),
-                      ),
-                    ),
-                  ),
+                  const Spacer(),
                   MonthClosingBar(
                       month: _month, snapshotIncome: total, dense: true),
                 ],

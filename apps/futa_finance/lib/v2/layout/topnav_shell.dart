@@ -33,6 +33,9 @@ class V2TopNavShell extends StatefulWidget {
   /// true のとき、タブを上ではなく下（[bottomNav]）に配置する（たくはる風）。
   final bool navAtBottom;
 
+  /// ヘッダー直下に置く共有の月ナビ（月を使わないタブでは null）。
+  final Widget? monthNav;
+
   const V2TopNavShell({
     super.key,
     required this.header,
@@ -41,6 +44,7 @@ class V2TopNavShell extends StatefulWidget {
     this.maxContentWidth = 1040,
     this.bottomNav,
     this.navAtBottom = false,
+    this.monthNav,
   });
 
   @override
@@ -92,6 +96,14 @@ class _V2TopNavShellState extends State<V2TopNavShell> {
             widget.header,
             // 上配置のときだけ上タブを出す。
             if (!widget.navAtBottom) widget.topNav,
+            // 共有の月ナビ（ヘッダー直下・月を使うタブのみ）。
+            if (widget.monthNav != null)
+              Container(
+                width: double.infinity,
+                color: V2Colors.topbar,
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Center(child: widget.monthNav),
+              ),
             // スクロールは各画面側に任せる（v2.1 ネイティブ画面は内部で
             // SingleChildScrollView を持つ）。それらを下の PrimaryScrollController に
             // 共有させ、左右余白でもホイールスクロールできるようにする。

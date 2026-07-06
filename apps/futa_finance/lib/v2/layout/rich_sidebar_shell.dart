@@ -25,6 +25,9 @@ class RichSidebarShell extends StatefulWidget {
   /// トップバー右に置くモード切替ウィジェット。
   final Widget modeSwitcher;
 
+  /// トップバー中央に置く共有の月ナビ（月を使わないタブでは null）。
+  final Widget? monthNav;
+
   /// サイドバー下部に置く「記録」ボタン。
   final Widget recordButton;
 
@@ -40,6 +43,7 @@ class RichSidebarShell extends StatefulWidget {
     this.personal = false,
     required this.title,
     required this.modeSwitcher,
+    this.monthNav,
     required this.recordButton,
     required this.content,
   });
@@ -166,7 +170,12 @@ class _RichSidebarShellState extends State<RichSidebarShell> {
                         Text(widget.title,
                             style: V2Typography.h1
                                 .copyWith(color: V2Colors.textPrimary)),
-                        const Spacer(),
+                        // 共有の月ナビを中央に。月を使わないタブでは出さない。
+                        Expanded(
+                          child: Center(
+                            child: widget.monthNav ?? const SizedBox.shrink(),
+                          ),
+                        ),
                         // モード切替（事業/個人）→ 記録ボタンの順で右上に並べる。
                         // セグメントが潰れないよう十分な幅を確保する。
                         SizedBox(width: 168, child: widget.modeSwitcher),

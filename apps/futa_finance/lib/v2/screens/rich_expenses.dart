@@ -25,7 +25,6 @@ import '../theme/typography.dart';
 import '../widgets/credit_card_reconcile.dart';
 import '../widgets/expense_detail_table.dart';
 import '../widgets/month_closing_bar.dart';
-import '../widgets/month_nav_bar.dart';
 
 /// 新デザイン（リッチUI）の経費／支出タブ。
 /// 月サマリー → カテゴリ内訳 → 明細リスト。既存 V2ExpensesScreen は温存。
@@ -151,10 +150,6 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     });
   }
 
-  void _shiftMonth(int delta) {
-    setState(() => _month = DateTime(_month.year, _month.month + delta));
-    MonthCursor.instance.month = _month; // タブ横断で共有
-  }
 
   /// 名前の正規化（実取引との照合用）。
   String _normName(String s) =>
@@ -628,20 +623,12 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                     style:
                         V2Typography.h1.copyWith(color: V2Colors.textPrimary)),
               ),
-              // 月セレクタ＋締めは、諸経費/制作原価タブより「上」に配置する。
+              // 月の切替はトップバーの共有月ナビに集約。ここは締めボタンだけ右に。
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: V2Spacing.md),
                 child: Row(
                   children: [
-                    Expanded(
-                      child: Center(
-                        child: MonthNavBar(
-                          label: '${_month.year}年${_month.month}月',
-                          onPrev: () => _shiftMonth(-1),
-                          onNext: () => _shiftMonth(1),
-                        ),
-                      ),
-                    ),
+                    const Spacer(),
                     MonthClosingBar(
                         month: _month,
                         snapshotExpense: keihiTotal + gaichuTotal,
@@ -776,22 +763,11 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
               // タブ上部：タイトル（個人モードのみ）＋ 中央に月セレクタ（資産タブと
               // 同じシンプルな見た目）＋ 右上に締め処理チップ。
               // 事業モードでは月セレクタをタブより上に出すため、ここは省略する。
+              // 月の切替はトップバーの共有月ナビに集約。ここは締めボタンだけ右に。
               if (showTopHeader) ...[
                 Row(
                   children: [
-                    if (title != null)
-                      Text(title,
-                          style: V2Typography.h1
-                              .copyWith(color: V2Colors.textPrimary)),
-                    Expanded(
-                      child: Center(
-                        child: MonthNavBar(
-                          label: '${_month.year}年${_month.month}月',
-                          onPrev: () => _shiftMonth(-1),
-                          onNext: () => _shiftMonth(1),
-                        ),
-                      ),
-                    ),
+                    const Spacer(),
                     MonthClosingBar(
                         month: _month,
                         snapshotExpense: total,

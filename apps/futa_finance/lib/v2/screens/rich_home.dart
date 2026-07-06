@@ -109,11 +109,6 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
     }
   }
 
-  void _shiftMonth(int delta) {
-    setState(() => _month = DateTime(_month.year, _month.month + delta));
-    MonthCursor.instance.month = _month; // タブ横断で共有
-  }
-
   int _subsTotalForMonth(DateTime m) {
     final now = DateTime.now();
     final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
@@ -252,8 +247,6 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
       incomePending: incomePending,
       expense: expense,
       isBusiness: isBusiness,
-      onPrev: () => _shiftMonth(-1),
-      onNext: () => _shiftMonth(1),
     );
 
     final balanceCard = _BalanceCard(
@@ -363,8 +356,6 @@ class _HeroCard extends StatelessWidget {
   final int incomePending;
   final int expense;
   final bool isBusiness;
-  final VoidCallback onPrev;
-  final VoidCallback onNext;
   const _HeroCard({
     required this.accent,
     required this.monthLabel,
@@ -373,8 +364,6 @@ class _HeroCard extends StatelessWidget {
     required this.incomePending,
     required this.expense,
     required this.isBusiness,
-    required this.onPrev,
-    required this.onNext,
   });
 
   @override
@@ -424,18 +413,12 @@ class _HeroCard extends StatelessWidget {
                         color: onAccent)),
               ),
               const Spacer(),
-              _RoundIconButton(
-                  icon: Icons.chevron_left, onTap: onPrev, color: onAccent),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Text(monthLabel,
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: onAccentSoft)),
-              ),
-              _RoundIconButton(
-                  icon: Icons.chevron_right, onTap: onNext, color: onAccent),
+              // 月の切替はトップバーの共有月ナビへ集約。ここは表示のみ。
+              Text(monthLabel,
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: onAccentSoft)),
             ],
           ),
           const SizedBox(height: 2),
@@ -531,26 +514,6 @@ class _HeroSubTile extends StatelessWidget {
                   color: valueColor,
                   fontFeatures: V2Typography.tabularNums)),
         ],
-      ),
-    );
-  }
-}
-
-class _RoundIconButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  final Color color;
-  const _RoundIconButton(
-      {required this.icon, required this.onTap, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Padding(
-        padding: const EdgeInsets.all(2),
-        child: Icon(icon, size: 20, color: color),
       ),
     );
   }
