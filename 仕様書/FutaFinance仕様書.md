@@ -465,6 +465,10 @@ class MonthlySnapshot {
 - **支出明細テーブルの「金額」列も可変列化**（中央5列＝大/小/内容/支払方法/金額）。支払方法↔金額の境界にリサイズハンドル追加。保存キー `..._v3`。
 - **「毎月の固定費」ヘッダーの右合計のはみ出しを修正**（右パディング32で下の各行金額に揃える）。
 
+### 自動引落明細のカテゴリを選択可能に（v1.0.448〜）
+- カード編集（`card_editor_screen`）に **「引落明細のカテゴリ」**（大カテゴリ）ドロップダウンを追加。`RegisteredCreditCard.settlementCategoryMajor`/`settlementCategorySub` を新設。自動生成される引落明細（`CardSettlementService`）が、設定があればそのカテゴリ名で表示される（未設定は「振替」）。
+- **引落は振替扱いのまま（収支/PL非計上・二重計上しない）**。カテゴリは明細の表示ラベル。カード保存後に既存の引落明細へ `CardSettlementService.syncCategory` で一括反映。
+
 ### 振替フォームのデザインを他フォームと統一（v1.0.447〜）
 - 振替を記録（`transfer_input_screen`）を、支出/収入フォームと同じデザインに統一。**floating labelの `InputDecorator`/`labelText` → 見出し（`_label`）＋素の入力欄（`_inputDecoration`）** に変更（プレースホルダーで項目名を表さない）。AppBarを **✕ 閉じる**、保存を**下部バー→末尾の「記録する/更新する」ボタン**に、金額を**一番上**に移動。旧 `_bottomActions` は削除。
 

@@ -88,11 +88,18 @@ class CardSettlementService {
             _planned(card.name, usageYm, txns, subs, curYm);
         if (amount <= 0) continue;
 
+        // 引落明細のカテゴリ。カード側で設定があればそれ、無ければ「振替」。
+        // （引落は振替扱いで収支/PL非計上。カテゴリは明細の表示ラベル。）
+        final catMajor =
+            (card.settlementCategoryMajor?.trim().isNotEmpty ?? false)
+                ? card.settlementCategoryMajor!.trim()
+                : '振替';
+        final catSub = card.settlementCategorySub?.trim() ?? '';
         final tx = core.Transaction(
           id: id,
           date: due,
           type: core.TransactionType.transfer,
-          category: const core.Category(major: '振替', sub: ''),
+          category: core.Category(major: catMajor, sub: catSub),
           paymentMethod: '',
           description: '${card.name} 引落（${usage.month}月利用分）',
           amount: amount,
@@ -106,6 +113,31 @@ class CardSettlementService {
       }
     }
     return created;
+  }
+
+  /// カードの引落カテゴリを変更したら、既存の引落明細（cardsettle_{cardId}_*）にも反映する。
+  static Future<void> syncCategory(core.RegisteredCreditCard card) async {
+    List<core.Transaction> txns;
+    try {
+      txns = await TransactionRepository.instance.loadAll();
+    } catch (_) {
+      return;
+    }
+    final prefix = 'cardsettle_${card.id}_';
+    final major = (card.settlementCategoryMajor?.trim().isNotEmpty ?? false)
+        ? card.settlementCategoryMajor!.trim()
+        : '振替';
+    final sub = card.settlementCategorySub?.trim() ?? '';
+    final updates = <core.Transaction>[];
+    for (final t in txns) {
+      if (!t.id.startsWith(prefix)) continue;
+      if (t.category.major == major && t.category.sub == sub) continue;
+      updates
+          .add(t.copyWith(category: core.Category(major: major, sub: sub)));
+    }
+    if (updates.isNotEmpty) {
+      await TransactionRepository.instance.updateMany(updates);
+    }
   }
 
   /// 予定額（＝ウォレット照合の「予定」と同じ計算）: 当月の対象カード払い取引＋固定費。

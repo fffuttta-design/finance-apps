@@ -190,6 +190,11 @@ class RegisteredCreditCard {
   /// 引落日に、対象月のカード利用額をこの口座から自動で差し引く（自動引落）。
   final String? settlementAccountId;
 
+  /// 自動生成する引落明細のカテゴリ（大/小・任意・表示名）。
+  /// 引落は振替扱い（収支/PL非計上）だが、明細でこのカテゴリ名で見えるようにする。
+  final String? settlementCategoryMajor;
+  final String? settlementCategorySub;
+
   /// 未使用フラグ。true=休眠中。
   /// 当月利用が偶々 0 円のアクティブカードと区別するため明示設定。
   final bool inactive;
@@ -209,6 +214,8 @@ class RegisteredCreditCard {
     this.memo,
     this.paymentDay,
     this.settlementAccountId,
+    this.settlementCategoryMajor,
+    this.settlementCategorySub,
     this.inactive = false,
     this.monthlyActualBillings = const {},
   });
@@ -226,6 +233,10 @@ class RegisteredCreditCard {
         'memo': memo,
         'paymentDay': paymentDay,
         'settlementAccountId': settlementAccountId,
+        if (settlementCategoryMajor != null)
+          'settlementCategoryMajor': settlementCategoryMajor,
+        if (settlementCategorySub != null)
+          'settlementCategorySub': settlementCategorySub,
         'inactive': inactive,
         'monthlyActualBillings': monthlyActualBillings,
       };
@@ -241,6 +252,8 @@ class RegisteredCreditCard {
         memo: j['memo'] as String?,
         paymentDay: j['paymentDay'] as int?,
         settlementAccountId: j['settlementAccountId'] as String?,
+        settlementCategoryMajor: j['settlementCategoryMajor'] as String?,
+        settlementCategorySub: j['settlementCategorySub'] as String?,
         inactive: j['inactive'] as bool? ?? false,
         monthlyActualBillings: (j['monthlyActualBillings'] as Map<String, dynamic>?)
                 ?.map((k, v) => MapEntry(k, (v as num).toInt())) ??
@@ -256,6 +269,9 @@ class RegisteredCreditCard {
     String? memo,
     int? paymentDay,
     String? settlementAccountId,
+    String? settlementCategoryMajor,
+    String? settlementCategorySub,
+    bool clearSettlementCategory = false,
     bool? inactive,
     Map<String, int>? monthlyActualBillings,
     bool clearMemo = false,
@@ -275,6 +291,12 @@ class RegisteredCreditCard {
         settlementAccountId: clearSettlementAccount
             ? null
             : (settlementAccountId ?? this.settlementAccountId),
+        settlementCategoryMajor: clearSettlementCategory
+            ? null
+            : (settlementCategoryMajor ?? this.settlementCategoryMajor),
+        settlementCategorySub: clearSettlementCategory
+            ? null
+            : (settlementCategorySub ?? this.settlementCategorySub),
         inactive: inactive ?? this.inactive,
         monthlyActualBillings:
             monthlyActualBillings ?? this.monthlyActualBillings,

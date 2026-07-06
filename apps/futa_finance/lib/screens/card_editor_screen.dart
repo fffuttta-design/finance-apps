@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../widgets/memo_field.dart';
 import 'package:finance_core/finance_core.dart';
 
+import '../data/card_settlement_service.dart';
 import '../data/settings_repository.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/centered_body.dart';
@@ -18,6 +19,8 @@ class CardEditorScreen extends StatefulWidget {
 class _CardEditorScreenState extends State<CardEditorScreen> {
   final _repo = SettingsRepository();
   PaymentMethodsConfig? _config;
+  // 引落明細のカテゴリ選択用（大カテゴリ候補）。
+  CategoryConfig? _categories;
 
   // ブランドカラー選択UIは廃止（ロゴURL指定で代替）。
   // モデル側 brandColorValue は既存データ互換のためフィールドだけ残してある。
@@ -30,8 +33,12 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
 
   Future<void> _load() async {
     final c = await _repo.loadPayments();
+    final cats = await _repo.loadCategories();
     if (!mounted) return;
-    setState(() => _config = c);
+    setState(() {
+      _config = c;
+      _categories = cats;
+    });
   }
 
   Future<void> _save() async {
@@ -56,6 +63,8 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
     int? selectedPaymentDay = initial?.paymentDay;
     // 引き落とし口座（銀行のid）。必須。
     String? selectedSettlementId = initial?.settlementAccountId;
+    // 引落明細のカテゴリ（大カテゴリ・任意。未設定なら「振替」で表示）。
+    String? selectedSettlementCat = initial?.settlementCategoryMajor;
     bool selectedInactive = initial?.inactive ?? false;
     // ロゴURLの入力欄を開いているか（既にロゴがあれば畳んで「ロゴを編集」だけ）。
     bool logoEditing = (initial?.iconUrl ?? '').trim().isEmpty;
@@ -100,6 +109,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                     memo: memo,
                     paymentDay: paymentDay,
                     settlementAccountId: selectedSettlementId,
+                    settlementCategoryMajor: selectedSettlementCat,
                     inactive: selectedInactive,
                   ));
             } else {
@@ -116,6 +126,8 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                     clearPaymentDay: paymentDay == null,
                     settlementAccountId: selectedSettlementId,
                     clearSettlementAccount: selectedSettlementId == null,
+                    settlementCategoryMajor: selectedSettlementCat,
+                    clearSettlementCategory: selectedSettlementCat == null,
                     inactive: selectedInactive,
                   ));
             }
@@ -239,6 +251,48 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                                 fontSize: 11, color: Color(0xFF6B7280)),
                           ),
                           const SizedBox(height: 12),
+                          // 引落明細のカテゴリ（自動生成される引落明細に付く大カテゴリ）。
+                          DropdownButtonFormField<String>(
+                            initialValue: selectedSettlementCat,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: '引落明細のカテゴリ',
+                              hintText: '未設定（振替として表示）',
+                              floatingLabelBehavior:
+                                  FloatingLabelBehavior.always,
+                            ),
+                            items: <DropdownMenuItem<String>>[
+                              const DropdownMenuItem<String>(
+                                  value: null,
+                                  child: Text('— 振替（カテゴリなし）—',
+                                      style: TextStyle(
+                                          color: Color(0xFF9CA3AF)))),
+                              if (selectedSettlementCat != null &&
+                                  !(_categories?.majors.any((m) =>
+                                          m.name == selectedSettlementCat) ??
+                                      false))
+                                DropdownMenuItem<String>(
+                                    value: selectedSettlementCat,
+                                    child: Text(selectedSettlementCat!)),
+                              for (final m
+                                  in (_categories?.majors ?? const []))
+                                DropdownMenuItem<String>(
+                                  value: m.name,
+                                  child: Text(m.name,
+                                      overflow: TextOverflow.ellipsis),
+                                ),
+                            ],
+                            onChanged: (v) =>
+                                setLocal(() => selectedSettlementCat = v),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            '※自動生成される引落明細は、この大カテゴリ名で表示されます'
+                            '（振替扱いなので支出集計・PLには入れず、二重計上しません）。',
+                            style: TextStyle(
+                                fontSize: 11, color: Color(0xFF6B7280)),
+                          ),
+                          const SizedBox(height: 12),
                           _logoUrlField(iconUrlCtrl, '💳', setLocal,
                               editing: logoEditing,
                               onToggleEdit: () =>
@@ -327,6 +381,8 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
     final list = [..._config!.creditCards];
     list[i] = r;
     _update(list);
+    // 引落カテゴリの変更を、既存の引落明細にも反映する。
+    await CardSettlementService.syncCategory(r);
   }
 
   Future<void> _delete(int i) async {
