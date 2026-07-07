@@ -695,7 +695,10 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
         return DecoratedBox(
           key: ValueKey(isFixed ? 'fx_${r.fx!.id}' : 'tx_${r.txn!.id}'),
           decoration: BoxDecoration(
-            color: reviewed ? const Color(0xFFF3F4F6) : Colors.white,
+            // 通常表示と同じく、固定費は淡いアンバー背景で区別（確認済みはグレー優先）。
+            color: reviewed
+                ? _kReviewedBg
+                : (isFixed ? _kFixedBg : Colors.white),
             border:
                 const Border(bottom: BorderSide(color: V2Colors.divider)),
           ),
@@ -720,6 +723,31 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                             ? const Color(0xFF9CA3AF)
                             : const Color(0xFF6B7280))),
               ),
+              if (isFixed)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _kFixedBadgeBg,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.event_repeat,
+                            size: 11, color: _kFixedAccent),
+                        SizedBox(width: 3),
+                        Text('固定費',
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: _kFixedAccent)),
+                      ],
+                    ),
+                  ),
+                ),
               Expanded(
                 child: Text(title,
                     overflow: TextOverflow.ellipsis,
