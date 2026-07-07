@@ -1142,6 +1142,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                       controller: controller,
                       focusNode: focusNode,
                       decoration: _inputDecoration(),
+                      // Enter でハイライト中の候補を確定してテキスト欄に反映する
+                      // （RawAutocomplete は field 側がこれを呼ばないと Enter が効かない）。
+                      onFieldSubmitted: (_) => onFieldSubmitted(),
                       // 変換中（IME composing中）は setState で再描画しない
                       // （カーソルが先頭へ飛ぶFlutter不具合の回避）。
                       onChanged: (_) {
@@ -1206,6 +1209,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                       controller: controller,
                       focusNode: focusNode,
                       decoration: _inputDecoration(),
+                      // Enter でハイライト中の候補を確定してテキスト欄に反映する。
+                      onFieldSubmitted: (_) => onFieldSubmitted(),
                       validator: (v) => (v == null || v.trim().isEmpty)
                           ? '場所を入力してください'
                           : null,
