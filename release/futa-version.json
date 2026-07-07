@@ -1,1 +1,1 @@
-{"version":"1.0.486","buildNumber":"487","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.486/futa-finance-v1.0.486.apk","releaseNotes":"支出入力で、取引内容・場所の欄からTabキーで次の入力欄へ移れなかった不具合を修正しました（Tab=次へ／Shift+Tab=前へ）。"}
+{"version":"1.0.487","buildNumber":"488","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.487/futa-finance-v1.0.487.apk","releaseNotes":"明細を削除したら編集ポップアップが自動で閉じるように（失敗時は理由を表示）。固定費のチェックがタップで即座に入る/外れるように改善しました。"}
