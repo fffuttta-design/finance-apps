@@ -199,6 +199,11 @@ class _ShinseiCsvImportScreenState extends State<ShinseiCsvImportScreen> {
 
   Future<void> _import(
       List<_ParsedRow> rows, List<core.Transaction> all) async {
+    // 非同期処理の後に context 経由で閉じると Windows で不発になり、取り込み画面が
+    // くるくるのまま残る（＝背後の通帳が押せなくなる）。Navigator/Messenger は
+    // await の前にキャプチャして確実に閉じる。
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     setState(() => _busy = true);
     try {
       final name = widget.account.name;
@@ -247,18 +252,16 @@ class _ShinseiCsvImportScreenState extends State<ShinseiCsvImportScreen> {
         }
       }
       await TransactionRepository.instance.replaceAll([...kept, ...imported]);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: Text('${rows.length}件を取り込みました')),
       );
-      Navigator.pop(context, true);
+      // mounted に依存せず、キャプチャした Navigator で確実に閉じる。
+      navigator.pop(true);
     } catch (e) {
-      if (mounted) {
-        setState(() => _busy = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('取り込みに失敗しました: $e')),
-        );
-      }
+      if (mounted) setState(() => _busy = false);
+      messenger.showSnackBar(
+        SnackBar(content: Text('取り込みに失敗しました: $e')),
+      );
     }
   }
 
