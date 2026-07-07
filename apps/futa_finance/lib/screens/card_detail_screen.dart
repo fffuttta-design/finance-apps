@@ -149,6 +149,10 @@ class _CardDetailScreenState extends State<CardDetailScreen>
     final now = DateTime.now();
     final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     final ym = '${month.year}-${month.month.toString().padLeft(2, '0')}';
+    // 過去の月は「実際に発行された明細（実取引）」だけを見る。固定費の予定行は
+    // 当月以降のみ出す。開始月が未設定の固定費が過去に遡って計上され、利用合計を
+    // 膨らませていた問題への対処（固定費はその月の決済日になって発行される想定）。
+    if (ym.compareTo(curYm) < 0) return const [];
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
     final name = _card.name;
     final rows = <FixedCostRow>[];

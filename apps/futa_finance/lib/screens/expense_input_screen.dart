@@ -850,6 +850,10 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   Future<void> _deleteTxn() async {
     final e = widget.editing;
     if (e == null) return;
+    // 非同期処理の後に context 経由で閉じると Windows 等で不発になることがあるため、
+    // Navigator / Messenger は await の前にキャプチャしておく（Flutter の定番対処）。
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -870,25 +874,26 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       ),
     );
     if (ok != true) return;
-    setState(() => _saving = true);
+    if (mounted) setState(() => _saving = true);
     try {
       await TransactionRepository.instance.delete(e.id);
     } catch (err) {
       // 削除に失敗したらポップアップは閉じず、理由を出す（無反応で固まらせない）。
-      if (!mounted) return;
-      setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) setState(() => _saving = false);
+      messenger.showSnackBar(
         SnackBar(content: Text('削除に失敗しました: $err')),
       );
       return;
     }
-    if (!mounted) return;
-    // 削除できたらこの入力ポップアップを自動で閉じる。
-    Navigator.pop(context, true);
+    // 削除できたらこの入力ポップアップを自動で閉じる（mounted に依存しない）。
+    navigator.pop(true);
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    // 非同期処理の後に閉じるため、Navigator は await の前にキャプチャしておく
+    // （Windows 等で「保存しても閉じない」のを防ぐ・Flutter の定番対処）。
+    final navigator = Navigator.of(context);
     if (_majorCategory == null ||
         _subCategory == null ||
         _paymentMethod == null) {
@@ -1015,8 +1020,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       // 編集：記録を更新するだけ（総資産等は取引から自動再計算される。
       // 実測残高=displayBalance は実際には変わらないので触らない）。
       await TransactionRepository.instance.update(tx);
-      if (!mounted) return;
-      Navigator.pop(context, true);
+      navigator.pop(true);
       return;
     }
     // 新規追加：同じ日付・同じ金額の既存データがあれば確認（秘書登録分も検知）。
@@ -1078,8 +1082,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       }
     }
 
-    if (!mounted) return;
-    Navigator.pop(context, true);
+    navigator.pop(true);
   }
 
   @override
