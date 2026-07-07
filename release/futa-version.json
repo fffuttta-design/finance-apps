@@ -1,1 +1,1 @@
-{"version":"1.0.495","buildNumber":"496","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.495/futa-finance-v1.0.495.apk","releaseNotes":"カテゴリ追加や場所・残高の保存も、サーバの返事を待たず即時反映（裏で同期）にして、保存が固まらないようにしました。前回の即時保存とあわせて、記録の保存全体が一瞬で終わります。"}
+{"version":"1.0.496","buildNumber":"497","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.496/futa-finance-v1.0.496.apk","releaseNotes":"場所に新しい名前（例:Amazon）を入れると、確認ダイアログで保存が中断され編集が消えていた不具合を修正。入力した場所はそのまま保存され、新しい場所は自動でマスタに追加されます。"}
