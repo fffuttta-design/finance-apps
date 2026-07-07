@@ -1,1 +1,1 @@
-{"version":"1.0.496","buildNumber":"497","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.496/futa-finance-v1.0.496.apk","releaseNotes":"場所に新しい名前（例:Amazon）を入れると、確認ダイアログで保存が中断され編集が消えていた不具合を修正。入力した場所はそのまま保存され、新しい場所は自動でマスタに追加されます。"}
+{"version":"1.0.497","buildNumber":"498","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.497/futa-finance-v1.0.497.apk","releaseNotes":"GMOあおぞらネット銀行のCSV取り込みに対応。通帳のCSV取込がヘッダーを自動判別する方式になり、新生銀行（UTF-8）とGMOあおぞら（Shift-JIS・入金/出金の列順が逆）のどちらも、銀行を選ばずそのまま取り込めます。"}
