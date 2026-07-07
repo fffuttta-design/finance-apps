@@ -962,37 +962,17 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
             return r > 0 ? r : null;
           })()
         : editing?.reimbursed;
-    // 場所マスタの「固定入力」：マスタに無い場所はそのまま保存せず、
-    // 追加するか確認する（＝表記ゆれをここで弾く）。
+    // 場所は、入力した内容をそのまま保存する。マスタに無い新しい場所は自動で
+    // マスタへ追加（次回から候補に出る）。
+    // ⚠ 以前はここで「新しい場所ですか？」の確認ダイアログを出し、確定しないと
+    //   保存ごと中断していた（＝画面外タップ等で金額・カテゴリの編集まで消える）。
+    //   入力を失わせないため、確認は挟まず自動追加＋保存に変更。
     final storeVal = _storeCtrl.text.trim();
     if (storeVal.isNotEmpty) {
       if (!StoreMasterRepository.instance.isLoaded) {
         await StoreMasterRepository.instance.load();
       }
-      final master = StoreMasterRepository.instance.cached;
-      if (!master.contains(storeVal)) {
-        if (!mounted) return;
-        final ok = await showDialog<bool>(
-          context: context,
-          builder: (dctx) => AlertDialog(
-            title: const Text('新しい場所ですか？'),
-            content: Text('「$storeVal」は場所マスタにありません。\n'
-                '表記ゆれを防ぐため、候補から選ぶか、マスタに追加して保存してください。'),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(dctx, false),
-                  child: const Text('場所を選び直す')),
-              FilledButton(
-                  onPressed: () => Navigator.pop(dctx, true),
-                  child: const Text('マスタに追加して保存')),
-            ],
-          ),
-        );
-        if (ok != true) {
-          if (mounted) setState(() => _saving = false);
-          return;
-        }
-      }
+      // add は既存名なら内部で no-op。裏書き込みなので待たせない。
       await StoreMasterRepository.instance.add(storeVal);
     }
     final tx = core.Transaction(
