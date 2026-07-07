@@ -871,8 +871,19 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     );
     if (ok != true) return;
     setState(() => _saving = true);
-    await TransactionRepository.instance.delete(e.id);
+    try {
+      await TransactionRepository.instance.delete(e.id);
+    } catch (err) {
+      // 削除に失敗したらポップアップは閉じず、理由を出す（無反応で固まらせない）。
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('削除に失敗しました: $err')),
+      );
+      return;
+    }
     if (!mounted) return;
+    // 削除できたらこの入力ポップアップを自動で閉じる。
     Navigator.pop(context, true);
   }
 

@@ -242,12 +242,14 @@ class _CardDetailScreenState extends State<CardDetailScreen>
   }
 
   /// 固定費の確認済み（選択中の月）をトグルして保存する。
+  ///
+  /// チェックは即座に反映（楽観的更新）。以前は保存→_load() の往復を待って
+  /// いたため、反映が遅れて「チェックが入らない」ように見えることがあった。
   Future<void> _toggleFixedReviewed(String subId, bool value) async {
     final m = _selectedMonth;
     if (m == null) return;
     final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
-    final cfg = await SubscriptionRepository.instance.load();
-    final newSubs = cfg.subscriptions.map((s) {
+    core.Subscription apply(core.Subscription s) {
       if (s.id != subId) return s;
       final map = Map<String, bool>.from(s.reviewedMonths);
       if (value) {
@@ -256,10 +258,19 @@ class _CardDetailScreenState extends State<CardDetailScreen>
         map.remove(ym);
       }
       return s.copyWith(reviewedMonths: map);
-    }).toList();
-    await SubscriptionRepository.instance
-        .save(core.SubscriptionConfig(subscriptions: newSubs));
-    if (mounted) await _load();
+    }
+
+    // ① ローカル _subs を即更新（チェックがすぐ入る／外れる）。
+    setState(() => _subs = _subs.map(apply).toList());
+    // ② 永続化は裏で。失敗時のみ再読込して元に戻す。
+    try {
+      final cfg = await SubscriptionRepository.instance.load();
+      final newSubs = cfg.subscriptions.map(apply).toList();
+      await SubscriptionRepository.instance
+          .save(core.SubscriptionConfig(subscriptions: newSubs));
+    } catch (_) {
+      if (mounted) await _load();
+    }
   }
 
   /// カード×月の締めキー（月グローバル・口座の締めと衝突しない接頭辞付き）。
