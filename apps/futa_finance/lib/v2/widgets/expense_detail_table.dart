@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../utils/category_colors.dart';
 import '../../utils/formatters.dart';
+import '../../widgets/find_in_page.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
@@ -188,6 +190,25 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
   final _searchCtrl = TextEditingController();
   String _query = '';
 
+  /// ページ内検索（Ctrl+F／🔍）。既存の絞り込み（_query）とは別。
+  final _find = FindController();
+  final GlobalKey _currentRowKey = GlobalKey();
+  int _curMatchRowIndex = -1; // detailRows のうち「現在の1件」の行index
+  String _lastJumpSig = '';
+
+  void _onFind() {
+    if (mounted) setState(() {});
+  }
+
+  /// ページ内検索でハイライト対象になる（画面に見えている）文字列。
+  List<String> _findFields(_Row r) => [
+        r.contentText,
+        r.placeText,
+        r.subText,
+        r.majorText,
+        r.paymentText,
+      ];
+
   /// 決済手段の絞り込み（null = すべて表示）。
   String? _payFilter;
 
@@ -208,13 +229,28 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
   @override
   void initState() {
     super.initState();
+    _find.addListener(_onFind);
     _loadColFrac();
   }
 
   @override
   void dispose() {
+    _find.removeListener(_onFind);
+    _find.dispose();
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  void _ensureVisibleCurrent() {
+    final ctx = _currentRowKey.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 250),
+        alignment: 0.3,
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   Future<void> _loadColFrac() async {
@@ -362,7 +398,42 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
         !payOptions.any((o) => o.key == _payFilter)) {
       _payFilter = null;
     }
-    return Column(
+    // ページ内検索：見えている列の一致数を数え、「現在の1件」の行を決める。
+    final needle = _find.isOpen ? _find.needleNorm : '';
+    _curMatchRowIndex = -1;
+    if (needle.isNotEmpty) {
+      final isDigits = needleIsAllDigits(needle);
+      final matchRowIdx = <int>[];
+      for (var i = 0; i < detailRows.length; i++) {
+        final r = detailRows[i];
+        var hits = 0;
+        for (final t in _findFields(r)) {
+          hits += findMatchStarts(t, needle).length;
+        }
+        if (isDigits &&
+            amountMatches('-${formatYen(r.amount)}', needle)) {
+          hits += 1;
+        }
+        for (var k = 0; k < hits; k++) {
+          matchRowIdx.add(i);
+        }
+      }
+      _find.total = matchRowIdx.length;
+      if (_find.index >= _find.total) {
+        _find.index = _find.total > 0 ? _find.total - 1 : 0;
+      }
+      if (_find.total > 0) _curMatchRowIndex = matchRowIdx[_find.index];
+    } else {
+      _find.total = 0;
+    }
+    // 現在の1件が変わったらそこへスクロール（入力/前後移動のたび1回だけ）。
+    final jumpSig = '$needle#${_find.index}#${detailRows.length}';
+    if (_curMatchRowIndex >= 0 && jumpSig != _lastJumpSig) {
+      _lastJumpSig = jumpSig;
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _ensureVisibleCurrent());
+    }
+    final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
@@ -373,6 +444,17 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
             Text('${detailRows.length}件',
                 style: V2Typography.caption
                     .copyWith(color: V2Colors.textSecondary)),
+            const SizedBox(width: 4),
+            IconButton(
+              icon: const Icon(Icons.search, size: 18),
+              tooltip: 'ページ内検索（Ctrl+F）',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints:
+                  const BoxConstraints(minWidth: 28, minHeight: 28),
+              color: _find.isOpen ? widget.accent : V2Colors.textSecondary,
+              onPressed: () => _find.toggle(),
+            ),
             const Spacer(),
             if (widget.onReorderDay != null) ...[
               if (_isCustomOrder && widget.customEditable) ...[
@@ -495,6 +577,27 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
         else
           _tableBody(detailRows),
       ],
+    );
+    // 検索語を配下の HiliteText へ配り、開いている時は右上に検索バーを浮かせる。
+    final stack = Stack(
+      children: [
+        FindScope(needleNorm: needle, child: content),
+        if (_find.isOpen)
+          Positioned(
+            top: 0,
+            right: 0,
+            child: FindBar(controller: _find, accent: widget.accent),
+          ),
+      ],
+    );
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyF, control: true):
+            _find.open,
+        const SingleActivator(LogicalKeyboardKey.keyF, meta: true): _find.open,
+        const SingleActivator(LogicalKeyboardKey.escape): _find.close,
+      },
+      child: Focus(autofocus: true, child: stack),
     );
   }
 
@@ -642,11 +745,23 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
   Widget _plainRows(List<_Row> rows, Widget Function(_Row r) build) {
     return Column(
       children: [
-        for (final r in rows) ...[
+        for (var i = 0; i < rows.length; i++) ...[
           const Divider(height: 1, color: V2Colors.divider),
-          build(r),
+          _markCurrent(i, build(rows[i])),
         ],
       ],
+    );
+  }
+
+  /// ページ内検索の「現在の1件」の行をオレンジ枠で囲み、ジャンプ先の目印にする。
+  Widget _markCurrent(int i, Widget child) {
+    if (i != _curMatchRowIndex) return child;
+    return Container(
+      key: _currentRowKey,
+      foregroundDecoration: BoxDecoration(
+        border: Border.all(color: kFindCurrent, width: 2),
+      ),
+      child: child,
     );
   }
 
@@ -749,7 +864,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                   ),
                 ),
               Expanded(
-                child: Text(title,
+                child: HiliteText(title,
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                     style: const TextStyle(
@@ -771,7 +886,8 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                           color: Color(0xFFB45309))),
                 )
               else
-                Text('-${formatYen(amount)}',
+                HiliteText('-${formatYen(amount)}',
+                    amount: true,
                     style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -953,6 +1069,17 @@ class _Row {
   int get majorOrder => txn?.category.majorOrder ?? (1 << 20);
 
   String get subText => txn != null ? txn!.category.sub : fx!.categoryLabel;
+
+  /// 大カテゴリの表示テキスト（固定費は「固定費」）。検索ハイライト対象。
+  String get majorText {
+    if (txn != null) {
+      final m = txn!.category.major.trim();
+      return m.isEmpty
+          ? '未分類'
+          : m.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
+    }
+    return '固定費';
+  }
 
   String get contentText => txn != null
       ? (txn!.description.trim().isNotEmpty
@@ -1230,7 +1357,7 @@ class _ExpenseRow extends StatelessWidget {
                     color: accent.withValues(alpha: 0.13),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: Text(majorDisplay,
+                  child: HiliteText(majorDisplay,
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                       style: TextStyle(
@@ -1246,7 +1373,7 @@ class _ExpenseRow extends StatelessWidget {
             // 小カテゴリ（プレーンテキスト）。
             SizedBox(
               width: w.sub,
-              child: Text(subDisplay,
+              child: HiliteText(subDisplay,
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                   style: TextStyle(
@@ -1259,7 +1386,7 @@ class _ExpenseRow extends StatelessWidget {
             _vGrid(_kHandleW, _kRowH),
             SizedBox(
               width: w.content,
-              child: Text(title,
+              child: HiliteText(title,
                   style: V2Typography.body.copyWith(fontWeight: FontWeight.w600),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1),
@@ -1268,7 +1395,7 @@ class _ExpenseRow extends StatelessWidget {
             // 場所（店舗）。
             SizedBox(
               width: w.place,
-              child: Text(
+              child: HiliteText(
                   (t.store ?? '').trim().isEmpty ? '—' : t.store!.trim(),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
@@ -1287,7 +1414,7 @@ class _ExpenseRow extends StatelessWidget {
                       size: 13, color: const Color(0xFF64748B)),
                   const SizedBox(width: 4),
                   Expanded(
-                    child: Text(pay,
+                    child: HiliteText(pay,
                         overflow: TextOverflow.ellipsis,
                         maxLines: 1,
                         style: const TextStyle(
@@ -1299,7 +1426,8 @@ class _ExpenseRow extends StatelessWidget {
             _vGrid(_kHandleW, _kRowH),
             SizedBox(
               width: w.amount,
-              child: Text('-${formatYen(t.amount)}',
+              child: HiliteText('-${formatYen(t.amount)}',
+                  amount: true,
                   textAlign: TextAlign.right,
                   style: const TextStyle(
                       fontSize: 14,
@@ -1427,7 +1555,7 @@ class _FixedRow extends StatelessWidget {
             // 小カテゴリ列：科目/グループ（あれば）。
             SizedBox(
               width: w.sub,
-              child: Text(cat.isEmpty ? '—' : cat,
+              child: HiliteText(cat.isEmpty ? '—' : cat,
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                   style: TextStyle(
@@ -1439,7 +1567,7 @@ class _FixedRow extends StatelessWidget {
             _vGrid(_kHandleW, _kRowH),
             SizedBox(
               width: w.content,
-              child: Text(f.name,
+              child: HiliteText(f.name,
                   style: V2Typography.body.copyWith(fontWeight: FontWeight.w600),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1),
@@ -1460,7 +1588,7 @@ class _FixedRow extends StatelessWidget {
                       size: 13, color: const Color(0xFF64748B)),
                   const SizedBox(width: 4),
                   Expanded(
-                    child: Text(
+                    child: HiliteText(
                         (f.paymentMethod ?? '').trim().isEmpty
                             ? '—'
                             : f.paymentMethod!.trim(),
@@ -1492,7 +1620,8 @@ class _FixedRow extends StatelessWidget {
                                 color: Color(0xFFB45309))),
                       ),
                     )
-                  : Text('-${formatYen(f.amount)}',
+                  : HiliteText('-${formatYen(f.amount)}',
+                      amount: true,
                       textAlign: TextAlign.right,
                       style: const TextStyle(
                           fontSize: 14,
@@ -1706,14 +1835,15 @@ class _NarrowRow extends StatelessWidget {
                 _DateWithWeekday(date: t.date),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(title,
+                  child: HiliteText(title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: V2Typography.body
                           .copyWith(fontWeight: FontWeight.w600)),
                 ),
                 const SizedBox(width: 8),
-                Text('-${formatYen(t.amount)}',
+                HiliteText('-${formatYen(t.amount)}',
+                    amount: true,
                     style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -1765,7 +1895,7 @@ class _NarrowRow extends StatelessWidget {
                               ),
                               const SizedBox(width: 6),
                               Flexible(
-                                child: Text(catLabel,
+                                child: HiliteText(catLabel,
                                     overflow: TextOverflow.ellipsis,
                                     maxLines: 1,
                                     style: TextStyle(
@@ -1788,7 +1918,7 @@ class _NarrowRow extends StatelessWidget {
                                   size: 12, color: Color(0xFF64748B)),
                               const SizedBox(width: 2),
                               Flexible(
-                                child: Text(t.store!.trim(),
+                                child: HiliteText(t.store!.trim(),
                                     overflow: TextOverflow.ellipsis,
                                     maxLines: 1,
                                     style: const TextStyle(
@@ -1813,7 +1943,7 @@ class _NarrowRow extends StatelessWidget {
                           size: 12, color: const Color(0xFF64748B)),
                       const SizedBox(width: 3),
                       Flexible(
-                        child: Text(pay,
+                        child: HiliteText(pay,
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
                             style: const TextStyle(
@@ -1884,7 +2014,7 @@ class _NarrowFixedRow extends StatelessWidget {
                 _DateWithWeekday(date: f.date),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(f.name,
+                  child: HiliteText(f.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: V2Typography.body
@@ -1906,7 +2036,8 @@ class _NarrowFixedRow extends StatelessWidget {
                             color: Color(0xFFB45309))),
                   )
                 else
-                  Text('-${formatYen(f.amount)}',
+                  HiliteText('-${formatYen(f.amount)}',
+                      amount: true,
                       style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
@@ -1941,7 +2072,7 @@ class _NarrowFixedRow extends StatelessWidget {
                 if (cat.isNotEmpty) ...[
                   const SizedBox(width: 8),
                   Flexible(
-                    child: Text(cat,
+                    child: HiliteText(cat,
                         overflow: TextOverflow.ellipsis,
                         maxLines: 1,
                         style: const TextStyle(
@@ -1957,7 +2088,7 @@ class _NarrowFixedRow extends StatelessWidget {
                             size: 12, color: const Color(0xFF64748B)),
                         const SizedBox(width: 3),
                         Flexible(
-                          child: Text(pay,
+                          child: HiliteText(pay,
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
                               style: const TextStyle(

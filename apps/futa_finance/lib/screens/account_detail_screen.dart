@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
+import '../widgets/find_in_page.dart';
 import '../data/month_closing_repository.dart';
 import '../data/month_cursor.dart';
 import '../data/payments_change_notifier.dart';
@@ -79,11 +81,22 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     _pendingMonthEndBalance = null;
   }
 
+  /// ページ内検索（Ctrl+F／🔍）。
+  final _find = FindController();
+  final GlobalKey _currentRowKey = GlobalKey();
+  int _curMatchLedgerIndex = -1; // 表示中の明細のうち「現在の1件」
+  String _lastJumpSig = '';
+
+  void _onFind() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
     // タブで選択中の月で開く（6月を見ていたら口座詳細も6月から）。
     _selectedMonth = MonthCursor.instance.month;
+    _find.addListener(_onFind);
     _load();
     _sub = TransactionRepository.instance.stream.listen((list) {
       if (!mounted) return;
@@ -93,8 +106,32 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
 
   @override
   void dispose() {
+    _find.removeListener(_onFind);
+    _find.dispose();
     _sub?.cancel();
     super.dispose();
+  }
+
+  void _ensureVisibleCurrent() {
+    final ctx = _currentRowKey.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 250),
+        alignment: 0.3,
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  /// 明細の摘要テキスト（検索・表示で共通に使う）。
+  String _ledgerDescOf(_LedgerRow row) {
+    final t = row.txn;
+    if (t.category.major == '差額調整') return t.description;
+    if (t.type == core.TransactionType.transfer) {
+      return '振替 ${t.transferFromAccount ?? '?'} → ${t.transferToAccount ?? '?'}';
+    }
+    return t.description;
   }
 
   Future<void> _load() async {
@@ -264,6 +301,39 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     // ※ 各行の残高は _ledgerTable 側で「表示順に積み上げ（月初残高が起点）」に統一。
     //   月初を手入力で変えても dispStart 起点で自動追従するのでオフセットは不要。
 
+    // 表示する明細（並び順込み）を一度だけ確定させ、ページ内検索の照合にも使う。
+    final shownRows = _customSorted(displayRows);
+    final needle = _find.isOpen ? _find.needleNorm : '';
+    _curMatchLedgerIndex = -1;
+    if (needle.isNotEmpty) {
+      final isDigits = needleIsAllDigits(needle);
+      final matchRowIdx = <int>[];
+      for (var i = 0; i < shownRows.length; i++) {
+        final r = shownRows[i];
+        var hits = findMatchStarts(_ledgerDescOf(r), needle).length;
+        if (isDigits &&
+            amountMatches(formatYen(r.signedAmount.abs()), needle)) {
+          hits += 1;
+        }
+        for (var k = 0; k < hits; k++) {
+          matchRowIdx.add(i);
+        }
+      }
+      _find.total = matchRowIdx.length;
+      if (_find.index >= _find.total) {
+        _find.index = _find.total > 0 ? _find.total - 1 : 0;
+      }
+      if (_find.total > 0) _curMatchLedgerIndex = matchRowIdx[_find.index];
+    } else {
+      _find.total = 0;
+    }
+    final jumpSig = '$needle#${_find.index}#${shownRows.length}';
+    if (_curMatchLedgerIndex >= 0 && jumpSig != _lastJumpSig) {
+      _lastJumpSig = jumpSig;
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _ensureVisibleCurrent());
+    }
+
     return PopScope(
       canPop: !_hasPendingEdit,
       onPopInvokedWithResult: (didPop, result) async {
@@ -330,6 +400,15 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                   ),
                 ),
               ),
+            // ページ内検索（Ctrl+F でも開く）。
+            IconButton(
+              tooltip: 'ページ内検索（Ctrl+F）',
+              icon: Icon(Icons.search,
+                  color: _find.isOpen
+                      ? const Color(0xFF1A237E)
+                      : const Color(0xFF6B7280)),
+              onPressed: () => _find.toggle(),
+            ),
             // 新生銀行などの入出金明細CSVを、表示中の月ぶんだけ取り込む。
             IconButton(
               tooltip: 'CSV取り込み（明細を月ごとに置き換え）',
@@ -407,7 +486,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
           ],
         ),
         // メインカラムレイアウト: 広い画面では中央寄せ + 最大幅
-        body: LayoutBuilder(
+        body: _wrapFind(LayoutBuilder(
           builder: (ctx, constraints) {
             // 締め済みの月は本文（残高カード＋明細）を薄く（グレーアウト）。
             final closed = _isMonthClosed;
@@ -438,12 +517,12 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                         const Divider(height: 1),
                         Expanded(
                           child: _customOrder
-                              ? _reorderLedger(_customSorted(displayRows),
+                              ? _reorderLedger(shownRows,
                                   dispStart ?? (_account.startingBalance ?? 0))
                               : _ledgerTable(
                                   // カスタム順（保存した並び順）で表示。並びが未設定なら
                                   // 日付順にフォールバックするので、通常の口座は今まで通り。
-                                  displayRows: _customSorted(displayRows),
+                                  displayRows: shownRows,
                                   monthStartBalance: dispStart,
                                   monthEndBalance: dispEnd,
                                 ),
@@ -472,6 +551,38 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
             }
             return content;
           },
+        )),
+      ),
+    );
+  }
+
+  /// 本文をページ内検索（Ctrl+F／🔍）で包む。検索語を配下の HiliteText へ配り、
+  /// 開いている間は右上に検索バーを浮かせる。
+  Widget _wrapFind(Widget body) {
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyF, control: true):
+            _find.open,
+        const SingleActivator(LogicalKeyboardKey.keyF, meta: true): _find.open,
+        const SingleActivator(LogicalKeyboardKey.escape): _find.close,
+      },
+      child: Focus(
+        autofocus: true,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: FindScope(
+                needleNorm: _find.isOpen ? _find.needleNorm : '',
+                child: body,
+              ),
+            ),
+            if (_find.isOpen)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: FindBar(controller: _find),
+              ),
+          ],
         ),
       ),
     );
@@ -710,10 +821,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   Widget _reorderRow(_LedgerRow row, int balanceAfter) {
     final t = row.txn;
     final isOut = row.signedAmount < 0;
-    final isTransfer = t.type == core.TransactionType.transfer;
-    final desc = isTransfer
-        ? '振替 ${t.transferFromAccount ?? '?'} → ${t.transferToAccount ?? '?'}'
-        : t.description;
+    final desc = _ledgerDescOf(row);
     final reviewed = t.reviewed;
     return Container(
       color: reviewed ? const Color(0xFFF3F4F6) : Colors.white,
@@ -731,16 +839,17 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                         : const Color(0xFF6B7280))),
           ),
           Expanded(
-            child: Text(desc,
+            child: HiliteText(desc,
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
                 style: const TextStyle(fontSize: 12, color: Color(0xFF111827))),
           ),
           const SizedBox(width: 8),
-          Text(
+          HiliteText(
               isOut
                   ? '-${formatYen(-row.signedAmount)}'
                   : '+${formatYen(row.signedAmount)}',
+              amount: true,
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -1043,7 +1152,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                 isEdited: _pendingMonthEndBalance != null,
               ),
             for (int i = 0; i < displayRows.length; i++)
-              _txnRow(displayRows[i], balances[i]),
+              _txnRow(displayRows[i], balances[i],
+                  current: i == _curMatchLedgerIndex),
             if (monthStartBalance != null && _selectedMonth != null)
               _virtualBalanceRow(
                 label: '月初残高',
@@ -1380,20 +1490,17 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     await TransactionRepository.instance.add(tx);
   }
 
-  TableRow _txnRow(_LedgerRow row, int shownBalance) {
+  TableRow _txnRow(_LedgerRow row, int shownBalance, {bool current = false}) {
     final t = row.txn;
     final isOut = row.signedAmount < 0;
     final isTransfer = t.type == core.TransactionType.transfer;
     // 差額調整（強制変更）は赤字で目立たせ、摘要は説明文をそのまま出す。
     final isAdjust = t.category.major == '差額調整';
-    final desc = isAdjust
-        ? t.description
-        : isTransfer
-            ? '振替 ${t.transferFromAccount ?? '?'} → ${t.transferToAccount ?? '?'}'
-            : t.description;
+    final desc = _ledgerDescOf(row);
     Widget money(String s, Color c) => Padding(
           padding: _cellPad,
-          child: Text(s,
+          child: HiliteText(s,
+              amount: true,
               textAlign: TextAlign.right,
               style: TextStyle(
                   fontSize: 12,
@@ -1403,10 +1510,12 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         );
     final reviewed = t.reviewed;
     return TableRow(
-      // 確認済みは薄いグレー背景。
-      decoration: reviewed
-          ? const BoxDecoration(color: Color(0xFFF3F4F6))
-          : null,
+      // ページ内検索の「現在の1件」は琥珀色で強調（確認済みグレーより優先）。
+      decoration: current
+          ? const BoxDecoration(color: Color(0xFFFFECB3))
+          : reviewed
+              ? const BoxDecoration(color: Color(0xFFF3F4F6))
+              : null,
       children: [
       Padding(
         padding: _cellPad,
@@ -1422,16 +1531,20 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       _typeCell(t),
       Padding(
         padding: _cellPad,
-        child: Text(desc,
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-            style: TextStyle(
-                fontSize: 12,
-                // 差額調整（強制変更）は赤字＋太字で目立たせる。
-                fontWeight: isAdjust ? FontWeight.w700 : FontWeight.w400,
-                color: isAdjust
-                    ? const Color(0xFFDC2626)
-                    : const Color(0xFF111827))),
+        child: KeyedSubtree(
+          // 「現在の1件」へジャンプ（Scrollable.ensureVisible）するための目印。
+          key: current ? _currentRowKey : null,
+          child: HiliteText(desc,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              style: TextStyle(
+                  fontSize: 12,
+                  // 差額調整（強制変更）は赤字＋太字で目立たせる。
+                  fontWeight: isAdjust ? FontWeight.w700 : FontWeight.w400,
+                  color: isAdjust
+                      ? const Color(0xFFDC2626)
+                      : const Color(0xFF111827))),
+        ),
       ),
       // 支出列：振替以外の出金だけ（赤）。
       money(!isTransfer && isOut ? formatYen(-row.signedAmount) : '',
