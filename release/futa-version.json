@@ -1,1 +1,1 @@
-{"version":"1.0.489","buildNumber":"490","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.489/futa-finance-v1.0.489.apk","releaseNotes":"新生銀行CSV取り込みで、摘要の半角カナ（濁点が□に化ける）を全角カナに直して文字化けを解消しました。"}
+{"version":"1.0.490","buildNumber":"491","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.490/futa-finance-v1.0.490.apk","releaseNotes":"新生CSVの取り込みが「くるくる」で終わらない不具合を修正しました（取り込み後に画面が確実に閉じ、通帳の保存ボタン等も押せるようになります）。"}
