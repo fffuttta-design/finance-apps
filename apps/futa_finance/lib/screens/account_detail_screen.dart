@@ -15,7 +15,7 @@ import '../v2/widgets/month_nav_bar.dart';
 import '../widgets/brand_logo.dart';
 import 'expense_input_screen.dart';
 import 'income_input_screen.dart';
-import 'shinsei_csv_import_screen.dart';
+import 'bank_csv_import_screen.dart';
 import 'transfer_input_screen.dart';
 
 /// 口座詳細（通帳）画面。
@@ -1722,7 +1722,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     final target = _selectedMonth ?? DateTime(now.year, now.month);
     final done = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => ShinseiCsvImportScreen(
+        builder: (_) => BankCsvImportScreen(
           account: _account,
           initialMonth: target,
         ),

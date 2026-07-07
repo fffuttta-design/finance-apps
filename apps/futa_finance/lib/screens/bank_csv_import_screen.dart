@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:charset/charset.dart';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
@@ -10,17 +11,23 @@ import '../utils/formatters.dart';
 import '../utils/kana.dart';
 import '../v2/widgets/month_nav_bar.dart';
 
-/// 新生銀行（SBI新生）の入出金明細CSVを、指定した月ぶんだけ取り込む画面。
+/// 銀行の入出金明細CSVを、指定した月ぶんだけ取り込む画面。
 ///
 /// 仕様（ユーザー要件）:
 /// - 対象の月を選び、その月の行だけを取り込む。
 /// - 取り込み時は「その口座・その月」の既存明細を一度クリアして置き換える。
-/// - 各行が「振替」かどうかを選べる。摘要に本人名（ﾌﾀﾑﾗ ﾀｸﾐ）が入る振込は、
+/// - 各行が「振替」かどうかを選べる。摘要に本人名（ﾌﾀﾑﾗ ﾀｸﾐ 等）が入る振込は、
 ///   自分の口座間移動なので既定で「振替」として判定しておく。
 ///
-/// CSV形式: "取引日","摘要","出金金額","入金金額","残高","メモ"（UTF-8 BOM付き）。
-class ShinseiCsvImportScreen extends StatefulWidget {
-  const ShinseiCsvImportScreen({
+/// 対応銀行（ヘッダー行から列と文字コードを自動判別するので、銀行を選ぶ必要はない）:
+/// - 新生銀行（SBI新生）: UTF-8(BOM) / "取引日","摘要","出金金額","入金金額","残高","メモ"
+/// - GMOあおぞらネット銀行: Shift-JIS / "日付","摘要","入金金額","出金金額","残高","メモ"
+///   （入金・出金の列順が新生と逆、かつ日付が YYYYMMDD 区切りなし）
+///
+/// ＝ 入金/出金は列の**位置**ではなく**ヘッダー名**で特定するため、どちらの銀行でも
+///   正しく振り分けられる。
+class BankCsvImportScreen extends StatefulWidget {
+  const BankCsvImportScreen({
     super.key,
     required this.account,
     required this.initialMonth,
@@ -30,14 +37,15 @@ class ShinseiCsvImportScreen extends StatefulWidget {
   final DateTime initialMonth;
 
   @override
-  State<ShinseiCsvImportScreen> createState() => _ShinseiCsvImportScreenState();
+  State<BankCsvImportScreen> createState() => _BankCsvImportScreenState();
 }
 
-class _ShinseiCsvImportScreenState extends State<ShinseiCsvImportScreen> {
+class _BankCsvImportScreenState extends State<BankCsvImportScreen> {
   late DateTime _month =
       DateTime(widget.initialMonth.year, widget.initialMonth.month);
   final List<_ParsedRow> _all = [];
   String? _fileName;
+  String? _bankLabel; // 判別できた銀行名（バナー表示用）
   bool _busy = false;
 
   /// 現在の対象月の行だけ。
@@ -49,12 +57,13 @@ class _ShinseiCsvImportScreenState extends State<ShinseiCsvImportScreen> {
     final picked = await pickCsvFile();
     if (picked == null || !mounted) return;
     try {
-      final rows = _parseCsv(picked.bytes);
+      final result = _parseCsv(picked.bytes);
       setState(() {
         _all
           ..clear()
-          ..addAll(rows);
+          ..addAll(result.rows);
         _fileName = picked.name;
+        _bankLabel = result.bankLabel;
       });
       if (_rows.isEmpty && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -72,30 +81,81 @@ class _ShinseiCsvImportScreenState extends State<ShinseiCsvImportScreen> {
     }
   }
 
-  /// UTF-8(BOM可)でデコードして新生形式の行を取り出す。
-  List<_ParsedRow> _parseCsv(Uint8List bytes) {
-    var text = utf8.decode(bytes, allowMalformed: true);
-    if (text.isNotEmpty && text.codeUnitAt(0) == 0xFEFF) {
-      text = text.substring(1); // BOM 除去
-    }
+  /// CSVバイト列を文字列にデコード。UTF-8(BOM可) を優先し、文字化けする（U+FFFD を含む）
+  /// なら Shift-JIS(cp932)、最後の保険で Latin-1 を試す。
+  /// → 新生(UTF-8)も GMOあおぞら(Shift-JIS)も同じ入口で読める。
+  String _decodeBytes(Uint8List bytes) {
+    try {
+      final u = utf8.decode(bytes); // 厳密：不正バイトがあれば例外
+      final s = (u.isNotEmpty && u.codeUnitAt(0) == 0xFEFF)
+          ? u.substring(1) // UTF-8 BOM 除去
+          : u;
+      if (!s.contains('�')) return s;
+    } catch (_) {}
+    try {
+      final s = shiftJis.decode(bytes);
+      if (s.trim().isNotEmpty) return s;
+    } catch (_) {}
+    return latin1.decode(bytes, allowInvalid: true);
+  }
+
+  /// ヘッダー行から列位置と文字コードを自動判別して行を取り出す。
+  _ParseResult _parseCsv(Uint8List bytes) {
+    final text = _decodeBytes(bytes);
     final lines = text
         .split(RegExp(r'\r\n|\n|\r'))
         .where((l) => l.trim().isNotEmpty)
         .toList();
+    if (lines.isEmpty) {
+      throw '空のCSVです';
+    }
+
+    // 1行目＝ヘッダー。列名から各データ列の位置を特定する。
+    final header = _splitCsvLine(lines[0]).map((c) => c.trim()).toList();
+    int findCol(bool Function(String) test, {int fallback = -1}) {
+      for (var i = 0; i < header.length; i++) {
+        if (test(header[i])) return i;
+      }
+      return fallback;
+    }
+
+    final dateIdx = findCol(
+        (h) => h == '取引日' || h == '日付' || h.contains('取引日') || h.contains('日付'),
+        fallback: 0);
+    final descIdx = findCol(
+        (h) => h.contains('摘要') || h.contains('適用') || h.contains('内容') || h.contains('お取引内容'),
+        fallback: 1);
+    final inIdx = findCol((h) => h.contains('入金'));
+    final outIdx = findCol((h) => h.contains('出金'));
+    final memoIdx = findCol((h) => h.contains('メモ') || h.contains('備考'));
+
+    if (inIdx < 0 || outIdx < 0) {
+      throw '入金金額／出金金額の列が見つかりません（対応形式：新生銀行 / GMOあおぞら）';
+    }
+
+    // 判別できた銀行名（バナー表示のみ・処理には影響しない）。
+    String? bankLabel;
+    if (header.isNotEmpty && header[0] == '日付') {
+      bankLabel = 'GMOあおぞらネット銀行';
+    } else if (header.isNotEmpty && header[0] == '取引日') {
+      bankLabel = '新生銀行（SBI新生）';
+    }
+
+    String cell(List<String> cols, int idx) =>
+        (idx >= 0 && idx < cols.length) ? cols[idx].trim() : '';
+
     final out = <_ParsedRow>[];
-    for (var i = 0; i < lines.length; i++) {
+    for (var i = 1; i < lines.length; i++) {
       final cols = _splitCsvLine(lines[i]);
       if (cols.isEmpty) continue;
-      // ヘッダー行（1行目 or "取引日"始まり）はスキップ。
-      if (i == 0 && cols.first.trim() == '取引日') continue;
-      final date = _parseDate(cols[0]);
+      final date = _parseDate(cell(cols, dateIdx));
       if (date == null) continue; // 日付でない行は無視
       // 半角カナ→全角カナに正規化（濁点ﾞの字形欠けで□になる文字化けを防ぐ）。
-      final desc = halfToFullKana(cols.length > 1 ? cols[1].trim() : '');
-      final outAmt = cols.length > 2 ? _parseInt(cols[2]) : 0;
-      final inAmt = cols.length > 3 ? _parseInt(cols[3]) : 0;
-      final memo = halfToFullKana(cols.length > 5 ? cols[5].trim() : '');
-      if (outAmt == 0 && inAmt == 0) continue;
+      final desc = halfToFullKana(cell(cols, descIdx));
+      final inAmt = _parseInt(cell(cols, inIdx));
+      final outAmt = _parseInt(cell(cols, outIdx));
+      final memo = halfToFullKana(cell(cols, memoIdx));
+      if (inAmt == 0 && outAmt == 0) continue;
       out.add(_ParsedRow(
         date: date,
         desc: desc,
@@ -105,13 +165,15 @@ class _ShinseiCsvImportScreenState extends State<ShinseiCsvImportScreen> {
         isTransfer: _looksLikeTransfer(desc),
       ));
     }
-    return out;
+    return _ParseResult(rows: out, bankLabel: bankLabel);
   }
 
   /// 本人名義の振込＝自分の口座間移動なので「振替」既定。
   bool _looksLikeTransfer(String desc) {
     final n = desc.replaceAll(' ', '').replaceAll('　', '');
-    return n.contains('ﾌﾀﾑﾗ') || n.contains('二村') || n.contains('フタムラ');
+    return n.contains('ﾌﾀﾑﾗ') ||
+        n.contains('二村') ||
+        n.contains('フタムラ');
   }
 
   List<String> _splitCsvLine(String line) {
@@ -146,12 +208,20 @@ class _ShinseiCsvImportScreenState extends State<ShinseiCsvImportScreen> {
     return out;
   }
 
+  /// YYYY/MM/DD・YYYY-MM-DD（新生）と YYYYMMDD 区切りなし（GMOあおぞら）の両対応。
   DateTime? _parseDate(String s) {
     final t = s.trim();
-    final m = RegExp(r'^(\d{4})[/-](\d{1,2})[/-](\d{1,2})').firstMatch(t);
-    if (m == null) return null;
-    return DateTime(
-        int.parse(m.group(1)!), int.parse(m.group(2)!), int.parse(m.group(3)!));
+    final sep = RegExp(r'^(\d{4})[/-](\d{1,2})[/-](\d{1,2})').firstMatch(t);
+    if (sep != null) {
+      return DateTime(int.parse(sep.group(1)!), int.parse(sep.group(2)!),
+          int.parse(sep.group(3)!));
+    }
+    final packed = RegExp(r'^(\d{4})(\d{2})(\d{2})$').firstMatch(t);
+    if (packed != null) {
+      return DateTime(int.parse(packed.group(1)!), int.parse(packed.group(2)!),
+          int.parse(packed.group(3)!));
+    }
+    return null;
   }
 
   int _parseInt(String s) =>
@@ -163,9 +233,8 @@ class _ShinseiCsvImportScreenState extends State<ShinseiCsvImportScreen> {
     final name = widget.account.name;
     final m = _month;
     final all = await TransactionRepository.instance.loadAll();
-    final removeCount = all
-        .where((t) => _involves(t, name) && _inMonth(t, m))
-        .length;
+    final removeCount =
+        all.where((t) => _involves(t, name) && _inMonth(t, m)).length;
     if (!mounted) return;
     final ok = await showDialog<bool>(
       context: context,
@@ -218,7 +287,7 @@ class _ShinseiCsvImportScreenState extends State<ShinseiCsvImportScreen> {
       final imported = <core.Transaction>[];
       for (var i = 0; i < rows.length; i++) {
         final r = rows[i];
-        final id = 'shinsei_${ym}_${base}_$i';
+        final id = 'bankcsv_${ym}_${base}_$i';
         if (r.isTransfer) {
           final out = r.outAmount > 0; // お金が出る＝振替元がこの口座
           imported.add(core.Transaction(
@@ -286,10 +355,10 @@ class _ShinseiCsvImportScreenState extends State<ShinseiCsvImportScreen> {
                     style: TextStyle(fontSize: 13, color: Color(0xFF6B7280))),
                 MonthNavBar(
                   label: '${_month.year}年${_month.month}月',
-                  onPrev: () => setState(() =>
-                      _month = DateTime(_month.year, _month.month - 1)),
-                  onNext: () => setState(() =>
-                      _month = DateTime(_month.year, _month.month + 1)),
+                  onPrev: () => setState(
+                      () => _month = DateTime(_month.year, _month.month - 1)),
+                  onNext: () => setState(
+                      () => _month = DateTime(_month.year, _month.month + 1)),
                 ),
                 const Spacer(),
                 OutlinedButton.icon(
@@ -309,10 +378,10 @@ class _ShinseiCsvImportScreenState extends State<ShinseiCsvImportScreen> {
             child: Text(
               _fileName == null
                   ? 'CSVを選ぶと、その月の明細だけを取り込みます。'
+                      '（新生銀行・GMOあおぞらネット銀行のCSVに自動対応）'
                   : '取り込むと、この月の「${widget.account.name}」の既存明細は消えて置き換わります。'
                       '「振替」ON の行は収支に入りません（口座間の移動）。',
-              style:
-                  const TextStyle(fontSize: 12, color: Color(0xFF9A3412)),
+              style: const TextStyle(fontSize: 12, color: Color(0xFF9A3412)),
             ),
           ),
           if (_fileName != null)
@@ -324,7 +393,10 @@ class _ShinseiCsvImportScreenState extends State<ShinseiCsvImportScreen> {
                       size: 16, color: Color(0xFF6B7280)),
                   const SizedBox(width: 6),
                   Expanded(
-                    child: Text('$_fileName',
+                    child: Text(
+                        _bankLabel == null
+                            ? '$_fileName'
+                            : '$_fileName（$_bankLabel）',
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                             fontSize: 12, color: Color(0xFF6B7280))),
@@ -402,8 +474,8 @@ class _ShinseiCsvImportScreenState extends State<ShinseiCsvImportScreen> {
             SizedBox(
               width: 46,
               child: Text('${r.date.month}/${r.date.day}',
-                  style: const TextStyle(
-                      fontSize: 12, color: Color(0xFF6B7280))),
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
             ),
             Expanded(
               child: Column(
@@ -426,9 +498,7 @@ class _ShinseiCsvImportScreenState extends State<ShinseiCsvImportScreen> {
             const SizedBox(width: 8),
             Text('$sign${formatYen(r.amount)}',
                 style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: amtColor)),
+                    fontSize: 14, fontWeight: FontWeight.w700, color: amtColor)),
             const SizedBox(width: 10),
             // 振替トグル。
             Column(
@@ -448,6 +518,13 @@ class _ShinseiCsvImportScreenState extends State<ShinseiCsvImportScreen> {
       ),
     );
   }
+}
+
+/// パース結果（行 + 判別できた銀行名）。
+class _ParseResult {
+  _ParseResult({required this.rows, this.bankLabel});
+  final List<_ParsedRow> rows;
+  final String? bankLabel;
 }
 
 /// CSVから読み取った1行（取り込み前のプレビュー用）。
