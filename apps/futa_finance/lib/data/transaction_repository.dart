@@ -7,6 +7,7 @@ import 'package:finance_core/finance_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_mode.dart';
+import 'debug_log.dart';
 
 /// 取引データのリポジトリ抽象。
 ///
@@ -336,13 +337,19 @@ class FirestoreTransactionRepository implements TransactionRepository {
         ? t.copyWith(createdAt: DateTime.now(), forceCreatedAt: true)
         : t;
     _cacheUpsert(toSave);
-    await _coll.doc(toSave.id).set(_txDoc(toSave));
+    // サーバ確定(数秒)を待つと画面が固まる。キャッシュ反映＋通知は済んでおり
+    // loadAll はキャッシュを返すので、サーバ書き込みは待たずに裏で実行する。
+    unawaited(_coll.doc(toSave.id).set(_txDoc(toSave)).catchError((Object e) {
+      DebugLog.add('[txn.add] server write failed ${toSave.id}: $e');
+    }));
   }
 
   @override
   Future<void> update(Transaction t) async {
     _cacheUpsert(t);
-    await _coll.doc(t.id).set(_txDoc(t));
+    unawaited(_coll.doc(t.id).set(_txDoc(t)).catchError((Object e) {
+      DebugLog.add('[txn.update] server write failed ${t.id}: $e');
+    }));
   }
 
   @override
@@ -377,7 +384,9 @@ class FirestoreTransactionRepository implements TransactionRepository {
   @override
   Future<void> delete(String id) async {
     _cacheRemove(id);
-    await _coll.doc(id).delete();
+    unawaited(_coll.doc(id).delete().catchError((Object e) {
+      DebugLog.add('[txn.delete] server delete failed $id: $e');
+    }));
   }
 
   @override
