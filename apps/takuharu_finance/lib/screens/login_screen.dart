@@ -1,3 +1,5 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../data/auth_service.dart';
@@ -25,10 +27,39 @@ class _LoginScreenState extends State<LoginScreen> {
       // 成功すると AuthGate が自動で切り替える。
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = 'サインインに失敗しました');
+      final msg = _messageFor(e);
+      // ユーザーが自分でポップアップを閉じただけならエラー表示しない。
+      setState(() => _error = msg);
     } finally {
       if (mounted) setState(() => _signingIn = false);
     }
+  }
+
+  /// サインイン失敗の原因を、特に Web で分かりやすい日本語にする。
+  /// （原因不明の「失敗しました」だけだと Web の設定ミスが切り分けられないため）
+  String? _messageFor(Object e) {
+    if (e is FirebaseAuthException) {
+      switch (e.code) {
+        case 'popup-closed-by-user':
+        case 'cancelled-popup-request':
+        case 'user-cancelled':
+          // 本人がキャンセルしただけ → エラー表示しない。
+          return null;
+        case 'popup-blocked':
+          return 'ブラウザがログイン用のポップアップをブロックしました。'
+              'ポップアップを許可してもう一度おためしください。';
+        case 'unauthorized-domain':
+          // Web で最頻出。Firebase の承認済みドメイン未登録。
+          return 'このドメインはまだ許可されていません。'
+              'Firebase の「承認済みドメイン」への登録が必要です。';
+        case 'network-request-failed':
+          return 'ネットワークに接続できませんでした。通信環境をご確認ください。';
+        case 'operation-not-supported-in-this-environment':
+          return 'このブラウザ環境ではログインできませんでした。'
+              '別のブラウザでおためしください。';
+      }
+    }
+    return kIsWeb ? 'サインインに失敗しました（$e）' : 'サインインに失敗しました';
   }
 
   @override
