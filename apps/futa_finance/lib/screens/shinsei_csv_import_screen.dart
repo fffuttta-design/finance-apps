@@ -7,6 +7,7 @@ import 'package:finance_core/finance_core.dart' as core;
 import '../data/csv_picker.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
+import '../utils/kana.dart';
 import '../v2/widgets/month_nav_bar.dart';
 
 /// 新生銀行（SBI新生）の入出金明細CSVを、指定した月ぶんだけ取り込む画面。
@@ -89,10 +90,11 @@ class _ShinseiCsvImportScreenState extends State<ShinseiCsvImportScreen> {
       if (i == 0 && cols.first.trim() == '取引日') continue;
       final date = _parseDate(cols[0]);
       if (date == null) continue; // 日付でない行は無視
-      final desc = cols.length > 1 ? cols[1].trim() : '';
+      // 半角カナ→全角カナに正規化（濁点ﾞの字形欠けで□になる文字化けを防ぐ）。
+      final desc = halfToFullKana(cols.length > 1 ? cols[1].trim() : '');
       final outAmt = cols.length > 2 ? _parseInt(cols[2]) : 0;
       final inAmt = cols.length > 3 ? _parseInt(cols[3]) : 0;
-      final memo = cols.length > 5 ? cols[5].trim() : '';
+      final memo = halfToFullKana(cols.length > 5 ? cols[5].trim() : '');
       if (outAmt == 0 && inAmt == 0) continue;
       out.add(_ParsedRow(
         date: date,
