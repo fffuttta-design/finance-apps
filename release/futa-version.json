@@ -1,1 +1,1 @@
-{"version":"1.0.479","buildNumber":"480","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.479/futa-finance-v1.0.479.apk","releaseNotes":"クレカ明細のカスタム順に「この並びで固定」ボタンを追加。日付順に戻さずに、並びを保ったまま固定でき、誤操作で崩れなくなりました。"}
+{"version":"1.0.480","buildNumber":"481","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.480/futa-finance-v1.0.480.apk","releaseNotes":"クレカ明細の並び順を銀行の通帳と同じ操作感に統一。ふだんはカスタム順で固定表示、「カスタム順」ボタンONのときだけハンドルで並び替えできます。"}
