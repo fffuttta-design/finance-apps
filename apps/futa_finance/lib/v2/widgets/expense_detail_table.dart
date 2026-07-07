@@ -139,6 +139,11 @@ class ExpenseDetailTable extends StatefulWidget {
   /// 既定 true（内部トグル運用の制作原価タブ等は従来どおり編集可能）。
   final bool customEditable;
 
+  /// タイトル＋検索ボックス（＋絞り込みチップ）を上部に固定し、明細本体だけを
+  /// スクロールさせる。true のとき、この widget 自身が高さいっぱいに広がるので、
+  /// 呼び出し側は SingleChildScrollView で包まず、Expanded 等で高さを与えること。
+  final bool stickyHeader;
+
   const ExpenseDetailTable({
     super.key,
     required this.rows,
@@ -157,6 +162,7 @@ class ExpenseDetailTable extends StatefulWidget {
     this.onReorderDay,
     this.customOrder,
     this.customEditable = true,
+    this.stickyHeader = false,
   });
 
   @override
@@ -479,8 +485,24 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
           ),
           const SizedBox(height: V2Spacing.sm),
         ],
-        if (detailRows.isEmpty)
-          Container(
+        if (widget.stickyHeader)
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _tableBody(detailRows),
+            ),
+          )
+        else
+          _tableBody(detailRows),
+      ],
+    );
+  }
+
+  /// 明細本体（空表示 or 一覧テーブル）。stickyHeader 時はこの部分だけを
+  /// スクロールさせ、タイトル・検索ボックスは上部に固定する。
+  Widget _tableBody(List<_Row> detailRows) {
+    if (detailRows.isEmpty) {
+      return Container(
             padding: const EdgeInsets.symmetric(vertical: 40),
             decoration: BoxDecoration(
               color: V2Colors.surface,
@@ -502,9 +524,9 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                 ],
               ),
             ),
-          )
-        else
-          Container(
+      );
+    }
+    return Container(
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: V2Colors.surface,
@@ -613,9 +635,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                 ],
               );
             }),
-          ),
-      ],
-    );
+          );
   }
 
   /// 明細行リスト（通常の縦積み）。並び替えはカスタム順モードで別UI（▲▼）に切替。

@@ -710,9 +710,13 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                           // PC幅は支出明細と同じ表（検索・並び替え・列幅）。
                           // スマホ幅は従来のカード型リスト。
                           child: constraints.maxWidth >= 900
-                              ? SingleChildScrollView(
-                                  padding: const EdgeInsets.all(16),
+                              ? Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                      16, 16, 16, 0),
                                   child: ExpenseDetailTable(
+                                    // タイトル＋検索ボックスを上部に固定し、
+                                    // 明細本体だけをスクロールさせる。
+                                    stickyHeader: true,
                                     title: '明細',
                                     rows: monthTxns,
                                     onEditTxn: _editCardTxn,
