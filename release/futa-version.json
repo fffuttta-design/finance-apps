@@ -1,1 +1,1 @@
-{"version":"1.0.484","buildNumber":"485","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.484/futa-finance-v1.0.484.apk","releaseNotes":"クレカ明細のカスタム並び替え中でも、固定費の行に色（淡いアンバー背景＋固定費バッジ）を付けて取引と区別できるようにしました。"}
+{"version":"1.0.485","buildNumber":"486","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.485/futa-finance-v1.0.485.apk","releaseNotes":"支出入力の予測（取引内容・場所）で、↑↓で選んだ候補をEnterで確定できなかった不具合を修正しました。"}
