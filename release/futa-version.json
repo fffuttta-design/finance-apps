@@ -1,1 +1,1 @@
-{"version":"1.0.491","buildNumber":"492","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.491/futa-finance-v1.0.491.apk","releaseNotes":"収入・振替の記録画面でも、保存・削除のあとに画面が確実に閉じるよう予防的に修正しました（Windowsでの閉じ不発対策の横展開）。"}
+{"version":"1.0.492","buildNumber":"493","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.492/futa-finance-v1.0.492.apk","releaseNotes":"支出の保存が「保存中...」で固まる不具合を修正しました。サーバ応答が遅くても8秒で先へ進み（端末には保存済み・同期は自動）、失敗時は理由を表示します。"}
