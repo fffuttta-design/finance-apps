@@ -1,1 +1,1 @@
-{"version":"1.0.492","buildNumber":"493","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.492/futa-finance-v1.0.492.apk","releaseNotes":"支出の保存が「保存中...」で固まる不具合を修正しました。サーバ応答が遅くても8秒で先へ進み（端末には保存済み・同期は自動）、失敗時は理由を表示します。"}
+{"version":"1.0.493","buildNumber":"494","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.493/futa-finance-v1.0.493.apk","releaseNotes":"記録の保存が一瞬で終わるようにしました（これまでサーバ確定を数秒待っていた分を、裏で同期する方式にして即時反映）。"}
