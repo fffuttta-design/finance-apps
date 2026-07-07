@@ -1,1 +1,1 @@
-{"version":"1.0.493","buildNumber":"494","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.493/futa-finance-v1.0.493.apk","releaseNotes":"記録の保存が一瞬で終わるようにしました（これまでサーバ確定を数秒待っていた分を、裏で同期する方式にして即時反映）。"}
+{"version":"1.0.494","buildNumber":"495","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.494/futa-finance-v1.0.494.apk","releaseNotes":"新しいカテゴリ（大/小）を追加したとき、その場ですぐドロップダウンに出て自動選択されるようにしました（これまで画面を変えるまで反映されなかった問題を解消）。"}
