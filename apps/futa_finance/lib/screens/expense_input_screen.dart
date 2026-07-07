@@ -14,6 +14,7 @@ import '../utils/duplicate_check.dart';
 import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
 import '../widgets/drive_receipt_picker.dart';
+import '../widgets/tab_focus_traversal.dart';
 import 'category_editor_screen.dart';
 import 'category_sub_editor_screen.dart';
 import 'receipt_camera_screen.dart';
@@ -1128,7 +1129,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               // 過去の取引内容からサジェスト。RawAutocomplete 方式にして、
               // 候補タップ時にフォーカスが外れて選べない不具合を解消（場所欄と同じ）。
               LayoutBuilder(builder: (ctx, cons) {
-                return RawAutocomplete<String>(
+                return TabFocusTraversal(
+                    child: RawAutocomplete<String>(
                   textEditingController: _descCtrl,
                   focusNode: _descFocus,
                   optionsBuilder: (_) => _descSuggestions(),
@@ -1163,7 +1165,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                     onSelected: onSelected,
                     icon: Icons.history,
                   ),
-                );
+                ));
               }),
               const SizedBox(height: 16),
               // 場所（必須）。店舗名や購入元。明細タブの「場所」列に出る。
@@ -1198,7 +1200,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               // （自前の候補リストは、クリック時にフォーカスが外れて選べない・
               //   キー操作できない問題があったため置き換え）。
               LayoutBuilder(builder: (ctx, cons) {
-                return RawAutocomplete<String>(
+                return TabFocusTraversal(
+                    child: RawAutocomplete<String>(
                   textEditingController: _storeCtrl,
                   focusNode: _storeFocus,
                   optionsBuilder: (_) => _storeSuggestions(),
@@ -1226,7 +1229,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                     options: options.toList(),
                     onSelected: onSelected,
                   ),
-                );
+                ));
               }),
               const SizedBox(height: 16),
               // 金額をヒーローとして大きく表示。
