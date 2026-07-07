@@ -50,10 +50,10 @@ class _CardDetailScreenState extends State<CardDetailScreen>
   bool _monthPicked = false;
   // 月締め処理中フラグ（ボタン多重押し防止）。
   bool _busyCardClose = false;
-  // 明細をカスタム順（手動並び順）で表示するか。締めバーのボタンで切替。
+  // 明細の並び替え「編集」モード（銀行の通帳と同じ挙動）。
+  // ・OFF（既定）：保存したカスタム順で固定表示（未設定は日付順フォールバック・ハンドルなし）。
+  // ・ON：ハンドルでドラッグ並び替え＋「日付順に並べ直す」。
   bool _cardCustom = false;
-  // カスタム順のとき、ハンドルでドラッグ編集できるか（false=並びを固定・誤操作防止）。
-  bool _cardCustomEdit = false;
   // カード×月ごとの「締め済み」状態（明示的にボタンを押したときだけ立つ）。
   core.MonthClosingConfig _closing = core.MonthClosingConfig.empty();
   late final TabController _tabController =
@@ -400,56 +400,36 @@ class _CardDetailScreenState extends State<CardDetailScreen>
             ),
           ),
           // 並び順トグル（締めボタンの隣・固定位置。スクロールで消えない）。
-          // ・日付順  → カスタム順（編集）に入る
-          // ・カスタム順のとき → 「日付順」で戻る／「並び替える⇄固定」で編集ON/OFF
-          if (!_cardCustom)
-            OutlinedButton.icon(
-              onPressed: () => setState(() {
-                _cardCustom = true;
-                _cardCustomEdit = true; // 入った直後は並び替え可能
-              }),
-              icon: const Icon(Icons.swap_vert, size: 16),
-              label: const Text('カスタム順'),
+          // 銀行の通帳と同じ：ふだんは保存したカスタム順で固定表示、ボタンONで
+          // 並び替え編集（ハンドル表示）。ONのまま画面から離れても並びは保存される。
+          Tooltip(
+            message: _cardCustom
+                ? '並び替え中（ハンドルをドラッグ）。もう一度押すとこの並びで固定'
+                : 'カスタム順で並び替える（この並びで固定される）',
+            child: OutlinedButton.icon(
+              onPressed: () => setState(() => _cardCustom = !_cardCustom),
+              icon: Icon(_cardCustom ? Icons.check : Icons.swap_vert,
+                  size: 16,
+                  color: _cardCustom
+                      ? const Color(0xFF059669)
+                      : const Color(0xFF6B7280)),
+              label: Text(_cardCustom ? '並び替え中' : 'カスタム順',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: _cardCustom
+                          ? const Color(0xFF059669)
+                          : const Color(0xFF6B7280))),
               style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF6B7280),
-                side: const BorderSide(color: Color(0xFFD1D5DB)),
-                visualDensity: VisualDensity.compact,
-              ),
-            )
-          else ...[
-            OutlinedButton.icon(
-              onPressed: () => setState(() {
-                _cardCustom = false;
-                _cardCustomEdit = false;
-              }),
-              icon: const Icon(Icons.sort, size: 16),
-              label: const Text('日付順'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF6B7280),
-                side: const BorderSide(color: Color(0xFFD1D5DB)),
+                backgroundColor:
+                    _cardCustom ? const Color(0xFFECFDF5) : null,
+                side: BorderSide(
+                    color: _cardCustom
+                        ? const Color(0xFF059669)
+                        : const Color(0xFFD1D5DB)),
                 visualDensity: VisualDensity.compact,
               ),
             ),
-            const SizedBox(width: 8),
-            // カスタム順の「編集(並び替え)」と「固定」を切り替える。
-            FilledButton.tonalIcon(
-              onPressed: () =>
-                  setState(() => _cardCustomEdit = !_cardCustomEdit),
-              icon: Icon(
-                  _cardCustomEdit ? Icons.lock_outline : Icons.drag_indicator,
-                  size: 16),
-              label: Text(_cardCustomEdit ? 'この並びで固定' : '並び替える'),
-              style: FilledButton.styleFrom(
-                backgroundColor: _cardCustomEdit
-                    ? const Color(0xFFECFDF5)
-                    : const Color(0xFFEFF6FF),
-                foregroundColor: _cardCustomEdit
-                    ? const Color(0xFF059669)
-                    : const Color(0xFF2563EB),
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
-          ],
+          ),
           const SizedBox(width: 8),
           if (closed)
             TextButton(
@@ -721,8 +701,11 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                                     onToggleReviewedFixed: (f, v) =>
                                         _toggleFixedReviewed(f.id, v),
                                     onReorderDay: _saveReorder,
-                                    customOrder: _cardCustom,
-                                    customEditable: _cardCustomEdit,
+                                    // 銀行の通帳と同じく常にカスタム順で表示
+                                    // （未設定は日付順フォールバック）。ボタンONの
+                                    // ときだけハンドルで並び替え可能にする。
+                                    customOrder: true,
+                                    customEditable: _cardCustom,
                                     emptyHint: 'この期間の利用はありません',
                                   ),
                                 )
