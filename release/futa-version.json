@@ -1,1 +1,1 @@
-{"version":"1.0.485","buildNumber":"486","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.485/futa-finance-v1.0.485.apk","releaseNotes":"支出入力の予測（取引内容・場所）で、↑↓で選んだ候補をEnterで確定できなかった不具合を修正しました。"}
+{"version":"1.0.486","buildNumber":"487","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.486/futa-finance-v1.0.486.apk","releaseNotes":"支出入力で、取引内容・場所の欄からTabキーで次の入力欄へ移れなかった不具合を修正しました（Tab=次へ／Shift+Tab=前へ）。"}
