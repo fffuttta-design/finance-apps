@@ -191,6 +191,8 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
   Future<void> _delete() async {
     final e = widget.editing;
     if (e == null) return;
+    // 非同期の後に閉じるため Navigator を await 前にキャプチャ（Windows対策）。
+    final navigator = Navigator.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -211,14 +213,15 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       ),
     );
     if (ok != true) return;
-    setState(() => _saving = true);
+    if (mounted) setState(() => _saving = true);
     await TransactionRepository.instance.delete(e.id);
-    if (!mounted) return;
-    Navigator.pop(context, true);
+    navigator.pop(true);
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    // 非同期の後に閉じるため Navigator を await 前にキャプチャ（Windows対策）。
+    final navigator = Navigator.of(context);
     if (_selectedSource == null || _receiveAccount == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('収入マスタと入金先を選んでください')),
@@ -261,8 +264,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
     if (editing != null) {
       // 編集：記録を更新するだけ（残高は二重加算を避けるため触らない）。
       await TransactionRepository.instance.update(tx);
-      if (!mounted) return;
-      Navigator.pop(context, true);
+      navigator.pop(true);
       return;
     }
     // 新規追加：同じ日付・同じ金額の既存データがあれば確認（秘書登録分も検知）。
@@ -286,8 +288,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
           .savePayments(_payments!.copyWith(bankAccounts: updated));
     }
 
-    if (!mounted) return;
-    Navigator.pop(context, true);
+    navigator.pop(true);
   }
 
   @override

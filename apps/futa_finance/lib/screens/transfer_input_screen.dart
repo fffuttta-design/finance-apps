@@ -149,6 +149,8 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
       );
       return;
     }
+    // 非同期の後に閉じるため Navigator を await 前にキャプチャ（Windows対策）。
+    final navigator = Navigator.of(context);
     setState(() => _saving = true);
     try {
       final editing = widget.editing;
@@ -178,8 +180,7 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
       } else {
         await TransactionRepository.instance.add(tx);
       }
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
+      navigator.pop(true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -193,6 +194,8 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
   Future<void> _delete() async {
     final e = widget.editing;
     if (e == null) return;
+    // 非同期の後に閉じるため Navigator を await 前にキャプチャ（Windows対策）。
+    final navigator = Navigator.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -215,8 +218,7 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
     setState(() => _saving = true);
     try {
       await TransactionRepository.instance.delete(e.id);
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
+      navigator.pop(true);
     } catch (err) {
       if (!mounted) return;
       setState(() => _saving = false);
