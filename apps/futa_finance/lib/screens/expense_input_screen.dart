@@ -642,9 +642,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     final newMajor = core.MajorCategory(name: name, subs: const []);
     final updated =
         cfg.copyWith(majors: [...cfg.majors, newMajor]);
-    await _settings.saveCategories(updated);
-    if (!mounted) return;
     final newIndex = updated.majors.length - 1;
+    // 先にローカルへ反映（ドロップダウンに即出す）。保存(サーバ確定は数秒かかる
+    // ことがある)は裏で行い、UIを待たせない。
     setState(() {
       _categories = updated;
       _majorCategory = newMajor.displayName(newIndex);
@@ -652,6 +652,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       _majorDropdownNonce++;
       _subDropdownNonce++;
     });
+    await _settings.saveCategories(updated);
   }
 
   /// 小カテゴリの新規追加ダイアログ → 保存 → ドロップダウン選択。
@@ -695,13 +696,13 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     updatedMajors[majorIdx] =
         cfg.majors[majorIdx].copyWith(subs: newSubs);
     final updated = cfg.copyWith(majors: updatedMajors);
-    await _settings.saveCategories(updated);
-    if (!mounted) return;
+    // 先にローカルへ反映（ドロップダウンに即出す）。保存は裏で。
     setState(() {
       _categories = updated;
       _subCategory = name;
       _subDropdownNonce++;
     });
+    await _settings.saveCategories(updated);
   }
 
   /// 支出記録の途中でカテゴリを編集したくなるケース向け。
