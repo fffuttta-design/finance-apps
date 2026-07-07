@@ -38,7 +38,11 @@ class PushService {
   );
 
   /// ログイン後に1度呼ぶ。許可取得→トークン保存→更新監視→タップ遷移の設定。
+  ///
+  /// Web では FCM/ローカル通知（flutter_local_notifications）が未対応で、
+  /// 起動直後にブラウザの通知許可ダイアログを出してしまうだけなので何もしない。
   Future<void> register() async {
+    if (kIsWeb) return;
     if (_started) return;
     _started = true;
     try {
