@@ -1,1 +1,1 @@
-{"version":"1.0.488","buildNumber":"489","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.488/futa-finance-v1.0.488.apk","releaseNotes":"記録の保存・削除でポップアップが閉じない不具合を修正しました。また、カード明細の固定費（予定）は当月以降のみ表示するようにし、過去月にさかのぼって利用合計が膨らむ問題を解消しました。"}
+{"version":"1.0.489","buildNumber":"490","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.489/futa-finance-v1.0.489.apk","releaseNotes":"新生銀行CSV取り込みで、摘要の半角カナ（濁点が□に化ける）を全角カナに直して文字化けを解消しました。"}
