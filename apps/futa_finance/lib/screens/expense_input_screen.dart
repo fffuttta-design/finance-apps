@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
@@ -876,7 +878,11 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     if (ok != true) return;
     if (mounted) setState(() => _saving = true);
     try {
-      await TransactionRepository.instance.delete(e.id);
+      await TransactionRepository.instance
+          .delete(e.id)
+          .timeout(const Duration(seconds: 8));
+    } on TimeoutException {
+      // 端末キャッシュからは削除済み。サーバ同期は接続後に自動完了。
     } catch (err) {
       // 削除に失敗したらポップアップは閉じず、理由を出す（無反応で固まらせない）。
       if (mounted) setState(() => _saving = false);
@@ -891,9 +897,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    // 非同期処理の後に閉じるため、Navigator は await の前にキャプチャしておく
-    // （Windows 等で「保存しても閉じない」のを防ぐ・Flutter の定番対処）。
+    // 非同期処理の後に閉じるため、Navigator/Messenger は await の前にキャプチャ。
     final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     if (_majorCategory == null ||
         _subCategory == null ||
         _paymentMethod == null) {
@@ -1019,7 +1025,24 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     if (editing != null) {
       // 編集：記録を更新するだけ（総資産等は取引から自動再計算される。
       // 実測残高=displayBalance は実際には変わらないので触らない）。
-      await TransactionRepository.instance.update(tx);
+      // ⚠ 保存が例外/サーバ応答待ちで固まると「保存中...」のまま止まるため、
+      //    タイムアウト＋try/catch で必ず結果を返す（原因もその場で表示）。
+      try {
+        await TransactionRepository.instance
+            .update(tx)
+            .timeout(const Duration(seconds: 8));
+      } on TimeoutException {
+        // サーバ確定待ちで固まらせない。端末キャッシュには反映済み（表示は正しい）で、
+        // 接続復帰後に自動で書き込みが完了する。閉じて先へ進める。
+        messenger.showSnackBar(const SnackBar(
+            content: Text('保存しました（サーバ同期は接続後に自動完了します）')));
+      } catch (e) {
+        if (mounted) setState(() => _saving = false);
+        messenger.showSnackBar(SnackBar(
+            content: Text('保存できませんでした: $e'),
+            duration: const Duration(seconds: 6)));
+        return;
+      }
       navigator.pop(true);
       return;
     }
@@ -1029,7 +1052,22 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       if (mounted) setState(() => _saving = false);
       return;
     }
-    await TransactionRepository.instance.add(tx);
+    try {
+      await TransactionRepository.instance
+          .add(tx)
+          .timeout(const Duration(seconds: 8));
+    } on TimeoutException {
+      messenger.showSnackBar(const SnackBar(
+          content: Text('保存しました（サーバ同期は接続後に自動完了します）')));
+      navigator.pop(true);
+      return;
+    } catch (e) {
+      if (mounted) setState(() => _saving = false);
+      messenger.showSnackBar(SnackBar(
+          content: Text('保存できませんでした: $e'),
+          duration: const Duration(seconds: 6)));
+      return;
+    }
 
     // 支出元ウォレットの残高を自動で減らす（金額ぶん）。
     // 手で残高を調整する機能は廃止＝厳格管理。残高の調整が要るときは
