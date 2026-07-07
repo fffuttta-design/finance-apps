@@ -81,6 +81,9 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     _pendingMonthEndBalance = null;
   }
 
+  /// 種別を「振替」に変える時の相手口座選び用（支払方法の登録一覧）。
+  core.PaymentMethodsConfig? _payments;
+
   /// ページ内検索（Ctrl+F／🔍）。
   final _find = FindController();
   final GlobalKey _currentRowKey = GlobalKey();
@@ -97,6 +100,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     // タブで選択中の月で開く（6月を見ていたら口座詳細も6月から）。
     _selectedMonth = MonthCursor.instance.month;
     _find.addListener(_onFind);
+    _loadPayments();
     _load();
     _sub = TransactionRepository.instance.stream.listen((list) {
       if (!mounted) return;
@@ -1128,8 +1132,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
             0: FixedColumnWidth(92), // 取引日
             1: FixedColumnWidth(78), // 種別
             2: FlexColumnWidth(), // 摘要
-            3: FixedColumnWidth(88), // 支出
-            4: FixedColumnWidth(88), // 収入
+            3: FixedColumnWidth(88), // 収入
+            4: FixedColumnWidth(88), // 支出
             5: FixedColumnWidth(104), // 振替
             6: FixedColumnWidth(108), // 残高
             7: FixedColumnWidth(44), // 確認チェック
@@ -1188,8 +1192,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         h('取引日'),
         h('種別'),
         h('摘要'),
-        h('支出', right: true),
         h('収入', right: true),
+        h('支出', right: true),
         h('振替', right: true),
         h('残高', right: true),
         Padding(
@@ -1238,8 +1242,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                   fontWeight: FontWeight.w700,
                   color: Color(0xFF374151))),
         ),
-        const SizedBox.shrink(), // 支出
         const SizedBox.shrink(), // 収入
+        const SizedBox.shrink(), // 支出
         const SizedBox.shrink(), // 振替
         // 残高：他の行と同じ右端に揃える（鉛筆は次の編集列へ）。
         Padding(
@@ -1546,12 +1550,12 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                       : const Color(0xFF111827))),
         ),
       ),
+      // 収入列：振替以外の入金だけ（緑）。※列は「収入→支出→振替」の順。
+      money(!isTransfer && !isOut ? formatYen(row.signedAmount) : '',
+          const Color(0xFF16A34A)),
       // 支出列：振替以外の出金だけ（赤）。
       money(!isTransfer && isOut ? formatYen(-row.signedAmount) : '',
           const Color(0xFFDC2626)),
-      // 収入列：振替以外の入金だけ（緑）。
-      money(!isTransfer && !isOut ? formatYen(row.signedAmount) : '',
-          const Color(0xFF16A34A)),
       // 振替列：口座間の移動だけ（青・符号付き）。支出/収入とは別立て。
       money(
           isTransfer
@@ -1598,7 +1602,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     ]);
   }
 
-  /// 種別ラベル（入金/出金/振替）を色付きチップで表示（読み取り専用）。
+  /// 種別ラベル（入金/出金/振替）を色付きチップで表示。
+  /// タップでポップアップから種別を変更できる（収入⇔支出⇔振替）。
   Widget _typeCell(core.Transaction t) {
     final String label;
     final Color fg;
@@ -1620,20 +1625,130 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         bg = const Color(0xFFFEF2F2);
         break;
     }
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(6),
+    return PopupMenuButton<core.TransactionType>(
+      tooltip: '種別を変更',
+      padding: EdgeInsets.zero,
+      position: PopupMenuPosition.under,
+      onSelected: (v) => _changeType(t, v),
+      itemBuilder: (_) => const [
+        PopupMenuItem(
+            value: core.TransactionType.income, child: Text('入金（収入）に変更')),
+        PopupMenuItem(
+            value: core.TransactionType.expense, child: Text('出金（支出）に変更')),
+        PopupMenuItem(
+            value: core.TransactionType.transfer,
+            child: Text('振替（口座間の移動）に変更')),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(8, 3, 4, 3),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(label,
+                    style: TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.w700, color: fg)),
+                Icon(Icons.arrow_drop_down, size: 14, color: fg),
+              ],
+            ),
           ),
-          child: Text(label,
-              style: TextStyle(
-                  fontSize: 11, fontWeight: FontWeight.w700, color: fg)),
         ),
+      ),
+    );
+  }
+
+  /// 支払方法の登録一覧（振替の相手口座選び用）を読み込む。
+  Future<void> _loadPayments() async {
+    try {
+      final p = await SettingsRepository.instance.loadPayments();
+      if (mounted) setState(() => _payments = p);
+    } catch (_) {}
+  }
+
+  void _snack(String msg) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    }
+  }
+
+  /// 明細の種別を変更する（収入⇔支出⇔振替）。締め済み月なら先に確認。
+  /// 収入/支出はこの口座の取引として付け替え、振替は相手口座を選ばせる。
+  Future<void> _changeType(
+      core.Transaction t, core.TransactionType to) async {
+    if (t.type == to) return;
+    if (!await _confirmEditClosed(t)) return;
+    if (!mounted) return;
+    if (to == core.TransactionType.transfer) {
+      final counterpart = await _pickCounterpartAccount();
+      if (counterpart == null || !mounted) return;
+      // お金がこの口座から「出る」向きか。出金→出る／入金→入る／既存振替は現状維持。
+      final isOut = t.type == core.TransactionType.expense
+          ? true
+          : t.type == core.TransactionType.income
+              ? false
+              : (t.transferFromAccount == _account.name);
+      final from = isOut ? _account.name : counterpart;
+      final toAcc = isOut ? counterpart : _account.name;
+      // 書き込みは裏で（サーバ確定待ちで固まらない）。表示は stream で即更新。
+      TransactionRepository.instance.update(t.copyWith(
+        type: core.TransactionType.transfer,
+        transferFromAccount: from,
+        transferToAccount: toAcc,
+      ));
+      _snack('「振替」に変更しました（$from → $toAcc）');
+    } else {
+      TransactionRepository.instance.update(t.copyWith(
+        type: to,
+        paymentMethod: _account.name,
+      ));
+      _snack(to == core.TransactionType.income
+          ? '「入金」に変更しました'
+          : '「出金」に変更しました');
+    }
+  }
+
+  /// 振替の相手口座を選ぶダイアログ（この口座以外の登録口座＋現金＋カード）。
+  Future<String?> _pickCounterpartAccount() async {
+    if (_payments == null) await _loadPayments();
+    final p = _payments;
+    final choices = <({String value, String label})>[];
+    if (p != null) {
+      for (final b in p.bankAccounts) {
+        if (b.inactive) continue;
+        if (b.name == _account.name) continue;
+        choices
+            .add((value: b.name, label: '[${b.accountType.shortLabel}]${b.name}'));
+      }
+      for (final c in p.creditCards) {
+        choices.add((value: c.name, label: '[カード]${c.name}'));
+      }
+    }
+    if (_account.name != '現金') {
+      choices.add((value: '現金', label: '[現金]現金'));
+    }
+    if (!mounted) return null;
+    if (choices.isEmpty) {
+      _snack('振替の相手口座がありません（口座を登録してください）');
+      return null;
+    }
+    return showDialog<String>(
+      context: context,
+      builder: (dctx) => SimpleDialog(
+        title: const Text('振替の相手口座を選ぶ'),
+        children: [
+          for (final c in choices)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(dctx, c.value),
+              child: Text(c.label),
+            ),
+        ],
       ),
     );
   }
@@ -1682,8 +1797,11 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       builder: (dctx) => AlertDialog(
         title: Text('${m.month}月を締めますか？'),
         content: Text(
-            '「${_account.name}」の${m.year}年${m.month}月の取引 ${txns.length}件を、'
-            'すべて「確認済み（金額に間違いなし）」にして締めます。'),
+            txns.isEmpty
+                ? '「${_account.name}」の${m.year}年${m.month}月は明細が1件もありません。\n'
+                    'このまま「明細なし」で締めます。'
+                : '「${_account.name}」の${m.year}年${m.month}月の取引 ${txns.length}件を、'
+                    'すべて「確認済み（金額に間違いなし）」にして締めます。'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(dctx, false),
@@ -1728,7 +1846,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     final m = _selectedMonth;
     if (m == null) return const SizedBox.shrink();
     final txns = _monthRelatedTxns();
-    if (txns.isEmpty) return const SizedBox.shrink();
+    // 明細が1件も無い月でも締められる（例：2月の PayPay で取引ゼロでも締めたい）。
+    final empty = txns.isEmpty;
     final closed = _isMonthClosed;
     final doneCount = txns.where((t) => t.reviewed).length;
     return Container(
@@ -1745,8 +1864,12 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
           Expanded(
             child: Text(
               closed
-                  ? '${m.month}月は締め済み（全${txns.length}件 確認済み）'
-                  : '確認済み $doneCount/${txns.length}件',
+                  ? (empty
+                      ? '${m.month}月は締め済み（明細なし）'
+                      : '${m.month}月は締め済み（全${txns.length}件 確認済み）')
+                  : (empty
+                      ? '${m.month}月は明細がありません'
+                      : '確認済み $doneCount/${txns.length}件'),
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
