@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
+import '../data/app_mode.dart';
 import '../data/month_closing_repository.dart';
 import '../data/month_cursor.dart';
 import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
 import '../data/subscription_repository.dart';
 import '../data/transaction_repository.dart';
+import '../v2/theme/mode_accent.dart';
 import '../utils/formatters.dart';
 import '../utils/modal_input.dart';
 import '../utils/thousands_separator_input_formatter.dart';
@@ -601,10 +603,38 @@ class _CardDetailScreenState extends State<CardDetailScreen>
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.post_add, color: Color(0xFF1A237E)),
-            tooltip: '支出を記録（このカード払い）',
-            onPressed: _addExpenseForCard,
+          // 支出を記録ボタン。HOME画面の「記録」ボタンと同じデザイン
+          // （モードのアクセント色で塗った角丸ピル＋白い「＋記録」）にそろえる。
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: Tooltip(
+              message: '支出を記録（このカード払い）',
+              child: Material(
+                color: V2ModeAccent.of(AppModeManager.instance.current),
+                borderRadius: BorderRadius.circular(6),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(6),
+                  onTap: _addExpenseForCard,
+                  child: Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    alignment: Alignment.center,
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add, size: 14, color: Colors.white),
+                        SizedBox(width: 4),
+                        Text('記録',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.fact_check_outlined,
