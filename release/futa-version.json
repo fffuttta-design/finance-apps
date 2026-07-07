@@ -1,1 +1,1 @@
-{"version":"1.0.483","buildNumber":"484","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.483/futa-finance-v1.0.483.apk","releaseNotes":"新生銀行のCSV取り込み機能を追加。通帳右上のボタンから、表示中の月ぶんだけCSVを取り込めます（既存明細は置き換え・各行の振替も選択可）。"}
+{"version":"1.0.484","buildNumber":"485","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.484/futa-finance-v1.0.484.apk","releaseNotes":"クレカ明細のカスタム並び替え中でも、固定費の行に色（淡いアンバー背景＋固定費バッジ）を付けて取引と区別できるようにしました。"}
