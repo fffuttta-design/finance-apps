@@ -214,10 +214,12 @@ class FirestoreSettingsRepository implements SettingsRepository {
   Future<void> saveCategories(CategoryConfig config) async {
     final mk = _modeKey;
     _categoriesCache[mk] = config;
-    await _categoriesDocFor(mk).set({
+    // サーバ確定(数秒〜)を待つとUIが固まる。ローカルキャッシュは即更新済みなので
+    // サーバ書き込みは待たずに裏で実行する（読み込みはキャッシュを返す）。
+    unawaited(_categoriesDocFor(mk).set({
       'json': config.toJsonString(),
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    }).catchError((Object _) {}));
   }
 
   @override
@@ -252,10 +254,10 @@ class FirestoreSettingsRepository implements SettingsRepository {
   Future<void> savePayments(PaymentMethodsConfig config) async {
     final mk = _modeKey;
     _paymentsCache[mk] = config;
-    await _paymentsDocFor(mk).set({
+    unawaited(_paymentsDocFor(mk).set({
       'json': config.toJsonString(),
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    }).catchError((Object _) {}));
   }
 
   DocumentReference<Map<String, dynamic>> _transferTemplatesDocFor(
@@ -277,9 +279,9 @@ class FirestoreSettingsRepository implements SettingsRepository {
 
   @override
   Future<void> saveTransferTemplates(TransferTemplatesConfig config) async {
-    await _transferTemplatesDocFor(_modeKey).set({
+    unawaited(_transferTemplatesDocFor(_modeKey).set({
       'json': config.toJsonString(),
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    }).catchError((Object _) {}));
   }
 }

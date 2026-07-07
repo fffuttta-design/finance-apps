@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -125,7 +126,10 @@ class StoreMasterRepository {
     });
     final doc = _doc;
     if (doc != null) {
-      await doc.set({'json': json, 'updatedAt': FieldValue.serverTimestamp()});
+      // サーバ確定を待つとUIが固まる。ローカル(_cache)は更新済みなので裏で書き込む。
+      unawaited(doc
+          .set({'json': json, 'updatedAt': FieldValue.serverTimestamp()})
+          .catchError((Object _) {}));
     } else {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_prefsKey, json);
