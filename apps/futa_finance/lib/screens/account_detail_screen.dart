@@ -15,6 +15,7 @@ import '../v2/widgets/month_nav_bar.dart';
 import '../widgets/brand_logo.dart';
 import 'expense_input_screen.dart';
 import 'income_input_screen.dart';
+import 'shinsei_csv_import_screen.dart';
 import 'transfer_input_screen.dart';
 
 /// 口座詳細（通帳）画面。
@@ -329,6 +330,12 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                   ),
                 ),
               ),
+            // 新生銀行などの入出金明細CSVを、表示中の月ぶんだけ取り込む。
+            IconButton(
+              tooltip: 'CSV取り込み（明細を月ごとに置き換え）',
+              icon: const Icon(Icons.upload_file, color: Color(0xFF1A237E)),
+              onPressed: _openCsvImport,
+            ),
             Padding(
               padding:
                   const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -1707,6 +1714,21 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     }
     final saved = await showInputSheet<bool>(context, screen);
     if (saved == true && mounted) await _load();
+  }
+
+  /// CSV取り込み画面を開く。対象月は通帳で表示中の月（全期間なら当月）。
+  Future<void> _openCsvImport() async {
+    final now = DateTime.now();
+    final target = _selectedMonth ?? DateTime(now.year, now.month);
+    final done = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ShinseiCsvImportScreen(
+          account: _account,
+          initialMonth: target,
+        ),
+      ),
+    );
+    if (done == true && mounted) await _load();
   }
 }
 
