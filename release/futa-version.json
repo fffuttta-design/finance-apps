@@ -1,1 +1,1 @@
-{"version":"1.0.503","buildNumber":"504","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.503/futa-finance-v1.0.503.apk","releaseNotes":"立替の明細表記を「(実際支払 ¥9,800)」に変更。編集で登録済みの支出を立替にしたときも、もらう現金を受け取り先ウォレットに自動で加算するようにしました（二重作成を防ぐ冪等処理つき）。"}
+{"version":"1.0.504","buildNumber":"505","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.504/futa-finance-v1.0.504.apk","releaseNotes":"「家賃を除く」が『共同生活費』も対象になるよう判定を拡張。名前・カテゴリ・摘要のいずれかに『家賃／共同生活費』を含む項目を除外します（6月5日の共同生活費が除外されなかった不具合の修正）。"}

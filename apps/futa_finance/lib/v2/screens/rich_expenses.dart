@@ -120,15 +120,25 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   }
 
   // ── 家賃（個人モードのハズレ値）を隠す機能 ──────────────────
-  /// 家賃の取引か（大／小カテゴリに「家賃」を含む）。
-  bool _isRentTx(core.Transaction t) =>
-      t.category.sub.contains('家賃') || t.category.major.contains('家賃');
+  /// 家賃とみなすキーワード。ユーザーは「家賃＝共同生活費」として運用しているため
+  /// 「共同生活費」等も同一視して除外対象にする。
+  static const _rentKeywords = ['家賃', '共同生活費', '共同生活'];
 
-  /// 家賃の固定費（サブスク）か（名称／カテゴリ／会計科目に「家賃」を含む）。
+  /// 文字列がいずれかの家賃キーワードを含むか。
+  bool _matchesRent(String? s) =>
+      s != null && _rentKeywords.any((k) => s.contains(k));
+
+  /// 家賃の取引か（大／小カテゴリ・摘要のいずれかにキーワードを含む）。
+  bool _isRentTx(core.Transaction t) =>
+      _matchesRent(t.category.sub) ||
+      _matchesRent(t.category.major) ||
+      _matchesRent(t.description);
+
+  /// 家賃の固定費（サブスク）か（名称／カテゴリ／会計科目にキーワードを含む）。
   bool _isRentSub(core.Subscription s) =>
-      s.name.contains('家賃') ||
-      (s.category ?? '').contains('家賃') ||
-      (s.plMajor ?? '').contains('家賃');
+      _matchesRent(s.name) ||
+      _matchesRent(s.category) ||
+      _matchesRent(s.plMajor);
 
   /// 家賃を隠す表示が有効か（個人モードのみ・設定 ON のとき）。
   bool get _rentHidden => !_isBusiness && UiPreferences.instance.hideRent;
