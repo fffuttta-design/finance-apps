@@ -1,1 +1,1 @@
-{"version":"1.0.500","buildNumber":"501","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.500/futa-finance-v1.0.500.apk","releaseNotes":"個人モードの支出タブに「家賃を除く」トグルを追加。家賃はハズレ値なので、ワンタップで表示/非表示を切替えて他の支出を冷静に見られます。除外は表示（合計・カテゴリ内訳・支払方法別・固定費・明細）だけに効き、締めの記録額は家賃込みの実額を保持します。"}
+{"version":"1.0.501","buildNumber":"502","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.501/futa-finance-v1.0.501.apk","releaseNotes":"立替精算した支出は、明細の金額を「実質負担額（合計支払額）」の2段表示にしました。例：実質 -¥4,000／（合計 ¥9,800）。合計は満額のままカード明細と一致します。"}

@@ -885,14 +885,16 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                           fontWeight: FontWeight.w700,
                           color: Color(0xFFB45309))),
                 )
-              else
+              else if (isFixed)
                 HiliteText('-${formatYen(amount)}',
                     amount: true,
                     style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: V2Colors.negative,
-                        fontFeatures: V2Typography.tabularNums)),
+                        fontFeatures: V2Typography.tabularNums))
+              else
+                _txAmountCell(r.txn!, fontSize: 13),
               if (showReview) ...[
                 const SizedBox(width: 4),
                 SizedBox(
@@ -1142,6 +1144,37 @@ Widget _vGrid(double boxWidth, double height) => SizedBox(
         child: Container(width: 1, height: height, color: _kGridLine),
       ),
     );
+
+/// 明細の金額セル。立替精算（reimbursed>0）の行は「実質負担額（合計支払額）」の
+/// 2段表示にする。実質＝満額−立替回収額。それ以外は満額を1行で表示（従来どおり）。
+Widget _txAmountCell(core.Transaction t, {double fontSize = 14}) {
+  final base = TextStyle(
+    fontSize: fontSize,
+    fontWeight: FontWeight.w700,
+    color: V2Colors.negative,
+    fontFeatures: V2Typography.tabularNums,
+  );
+  final hasReimb = t.reimbursed != null && t.reimbursed! > 0;
+  if (!hasReimb) {
+    return HiliteText('-${formatYen(t.amount)}',
+        amount: true, textAlign: TextAlign.right, style: base);
+  }
+  // 立替精算：実質負担額（主）＋（合計支払額）（副）。
+  return Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.end,
+    children: [
+      HiliteText('-${formatYen(t.effectiveAmount)}',
+          amount: true, textAlign: TextAlign.right, style: base),
+      Text('（合計 ${formatYen(t.amount)}）',
+          textAlign: TextAlign.right,
+          style: TextStyle(
+              fontSize: (fontSize - 3).clamp(9.0, 12.0),
+              color: V2Colors.textMuted,
+              fontFeatures: V2Typography.tabularNums)),
+    ],
+  );
+}
 
 class _ColW {
   final double date;
@@ -1426,14 +1459,7 @@ class _ExpenseRow extends StatelessWidget {
             _vGrid(_kHandleW, _kRowH),
             SizedBox(
               width: w.amount,
-              child: HiliteText('-${formatYen(t.amount)}',
-                  amount: true,
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: V2Colors.negative,
-                      fontFeatures: V2Typography.tabularNums)),
+              child: _txAmountCell(t, fontSize: 14),
             ),
             if (showReceipt) ...[
               _vGrid(_kColGap, _kRowH),
@@ -1842,13 +1868,7 @@ class _NarrowRow extends StatelessWidget {
                           .copyWith(fontWeight: FontWeight.w600)),
                 ),
                 const SizedBox(width: 8),
-                HiliteText('-${formatYen(t.amount)}',
-                    amount: true,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: V2Colors.negative,
-                        fontFeatures: V2Typography.tabularNums)),
+                _txAmountCell(t, fontSize: 14),
                 if (showReceipt) ...[
                   const SizedBox(width: 4),
                   SizedBox(
