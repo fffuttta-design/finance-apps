@@ -13,6 +13,11 @@ class UiPreferences extends ChangeNotifier {
   /// 新キー（v1.0.65〜）: 未使用フラグ ON のものを隠す
   static const _kHideInactive = 'futa.ui.hide_inactive';
 
+  /// 個人モードの支出タブで「家賃」を除外表示するか。
+  /// 家賃はハズレ値（金額が大きすぎて他の支出が霞む）なので、
+  /// 冷静に他の支出を見たいときに隠せるようにする。デフォルト false（=表示）。
+  static const _kHideRent = 'futa.ui.hide_rent';
+
   /// 旧キー（〜v1.0.64）: 残高 0 のものを隠す。
   /// 起動時に値があれば新キーへ引き継いで削除する。
   static const _kLegacyHideZero = 'futa.ui.hide_zero_balance';
@@ -64,6 +69,7 @@ class UiPreferences extends ChangeNotifier {
   double get homeAssetColumnWidth => _homeAssetWidth;
 
   bool _hideInactive = false;
+  bool _hideRent = false;
   List<String> _sidebarOrder = List.of(defaultSidebarOrder);
   bool? _useV2Ui;
   String _v2Variant = v2VariantTopNav;
@@ -72,6 +78,9 @@ class UiPreferences extends ChangeNotifier {
   /// 「未使用」フラグの立っているウォレット・口座・クレカを表示系画面で隠すか。
   /// デフォルトは false（=表示）。
   bool get hideInactive => _hideInactive;
+
+  /// 個人モードの支出タブで「家賃」を除外表示するか。
+  bool get hideRent => _hideRent;
   bool get loaded => _loaded;
 
   /// 現在のタブ並び順（ユーザー保存値）。
@@ -115,6 +124,8 @@ class UiPreferences extends ChangeNotifier {
     } else {
       _hideInactive = false;
     }
+    // 家賃を隠す表示設定
+    _hideRent = prefs.getBool(_kHideRent) ?? false;
     // サイドバー並び順
     final savedOrder = prefs.getStringList(_kSidebarOrder);
     if (savedOrder != null && savedOrder.isNotEmpty) {
@@ -178,6 +189,15 @@ class UiPreferences extends ChangeNotifier {
     _hideInactive = v;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kHideInactive, v);
+    notifyListeners();
+  }
+
+  /// 家賃を隠す表示設定を更新して永続化。
+  Future<void> setHideRent(bool v) async {
+    if (_hideRent == v) return;
+    _hideRent = v;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kHideRent, v);
     notifyListeners();
   }
 

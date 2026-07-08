@@ -10,6 +10,7 @@ import '../../data/nav_history.dart';
 import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
+import '../../data/ui_preferences.dart';
 import '../../screens/account_detail_screen.dart';
 import '../../screens/card_detail_screen.dart';
 import '../../screens/expense_input_screen.dart';
@@ -118,6 +119,25 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     return m.contains('外注費') || m.contains('売上原価') || m.contains('制作原価');
   }
 
+  // ── 家賃（個人モードのハズレ値）を隠す機能 ──────────────────
+  /// 家賃の取引か（大／小カテゴリに「家賃」を含む）。
+  bool _isRentTx(core.Transaction t) =>
+      t.category.sub.contains('家賃') || t.category.major.contains('家賃');
+
+  /// 家賃の固定費（サブスク）か（名称／カテゴリ／会計科目に「家賃」を含む）。
+  bool _isRentSub(core.Subscription s) =>
+      s.name.contains('家賃') ||
+      (s.category ?? '').contains('家賃') ||
+      (s.plMajor ?? '').contains('家賃');
+
+  /// 家賃を隠す表示が有効か（個人モードのみ・設定 ON のとき）。
+  bool get _rentHidden => !_isBusiness && UiPreferences.instance.hideRent;
+
+  /// 表示に使うサブスク一覧（家賃を隠す時は家賃サブスクを除外）。
+  /// 締めスナップショット等「実額」が要る箇所は _subs（全件）を明示的に使う。
+  List<core.Subscription> get _visibleSubs =>
+      _rentHidden ? _subs.where((s) => !_isRentSub(s)).toList() : _subs;
+
   void _rebuildSubTab() {
     _subTab?.dispose();
     _subTab = _isBusiness ? TabController(length: 2, vsync: this) : null;
@@ -139,6 +159,12 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
       setState(() => _transactions = list);
     });
     MonthCursor.instance.addListener(_onMonthCursor);
+    UiPreferences.instance.addListener(_onUiPrefs);
+  }
+
+  /// UI 表示設定（家賃を隠す等）が変わったら再描画する。
+  void _onUiPrefs() {
+    if (mounted) setState(() {});
   }
 
   /// 他タブで月が変わったら追従（6月を見ていれば別タブでも6月維持）。
@@ -155,6 +181,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     _sub?.cancel();
     _subTab?.dispose();
     MonthCursor.instance.removeListener(_onMonthCursor);
+    UiPreferences.instance.removeListener(_onUiPrefs);
     super.dispose();
   }
 
@@ -183,7 +210,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   /// その月に「実取引が存在する」固定費サブスクのID集合。
   /// 実取引があるサブスクは、予定行を出さず・二重計上もしない（実取引を採用）。
   /// 照合＝同月の支出取引を、①名前一致 ②金額一致 の順で1対1に割り当てる。
-  Set<String> _matchedSubIds(DateTime m) {
+  Set<String> _matchedSubIds(DateTime m,
+      [List<core.Subscription>? subsOverride]) {
+    final subsList = subsOverride ?? _visibleSubs;
     final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
     final txns = _transactions
         .where((t) =>
@@ -193,7 +222,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
         .toList();
     final claimed = <String>{};
     final matched = <String>{};
-    for (final sub in _subs) {
+    for (final sub in subsList) {
       final exp = sub.isVariable ? sub.monthlyActuals[ym] : sub.amount;
       final nname = _normName(sub.name);
       core.Transaction? hit;
@@ -224,12 +253,13 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     return matched;
   }
 
-  int _subsOf(DateTime m) {
+  int _subsOf(DateTime m, [List<core.Subscription>? subsOverride]) {
+    final subsList = subsOverride ?? _visibleSubs;
     final now = DateTime.now();
     final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
-    final matched = _matchedSubIds(m);
-    return _subs.fold<int>(
+    final matched = _matchedSubIds(m, subsList);
+    return subsList.fold<int>(
         0,
         (s, sub) => matched.contains(sub.id)
             ? s
@@ -303,7 +333,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
       bool pending
     })>[];
     final matched = _matchedSubIds(m);
-    for (final sub in _subs) {
+    for (final sub in _visibleSubs) {
       // 実取引がある固定費は予定行を出さない（実取引を採用）。
       if (matched.contains(sub.id)) continue;
       final amt = sub.plAmountForMonth(ym, curYm);
@@ -380,7 +410,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     final daysInMonth = DateTime(m.year, m.month + 1, 0).day;
     final rows = <FixedCostRow>[];
     final matched = _matchedSubIds(m);
-    for (final sub in _subs) {
+    for (final sub in _visibleSubs) {
       // 実取引がある固定費は予定行を出さない（実取引を採用）。
       if (matched.contains(sub.id)) continue;
       final amt = sub.plAmountForMonth(ym, curYm);
@@ -700,16 +730,67 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
         ),
       );
     }
-    // 個人モード（従来レイアウト）
+    // 個人モード（従来レイアウト）。家賃を隠す設定なら明細から家賃を除く。
+    final personalRows = _rentHidden
+        ? _monthExpenses.where((t) => !_isRentTx(t)).toList()
+        : _monthExpenses;
+    // 締めスナップショットは常に家賃込みの実額を記録する（隠していても正しい額を残す）。
+    final snapshotFull = _rentHidden
+        ? _monthExpenses.fold<int>(0, (s, t) => s + t.effectiveAmount) +
+            _subsOf(_month, _subs)
+        : null;
     return _grey(_buildBody(
-        rows: _monthExpenses,
+        rows: personalRows,
         showFixedAndCard: true,
         title: '支出',
-        detailLabel: '支出明細'));
+        detailLabel: '支出明細',
+        snapshotExpenseFull: snapshotFull));
   }
 
   /// 締め処理済みの月は本文に「薄い暖色（セピア）のトーン」を重ねて「もう確定」を示す。
   /// 青は読みにくかったので、読みやすさ優先で不透明度を上げ、色味も落ち着いた暖色に。
+  /// 家賃を除外して見るトグル（個人モードの支出タブ）。
+  /// 家賃はハズレ値で他の支出が霞むため、ワンタップで表示/非表示を切替える。
+  Widget _rentToggleChip() {
+    final hidden = _rentHidden;
+    return InkWell(
+      onTap: () async {
+        await UiPreferences.instance
+            .setHideRent(!UiPreferences.instance.hideRent);
+        if (mounted) setState(() {});
+      },
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: hidden
+              ? widget.accent.withValues(alpha: 0.12)
+              : V2Colors.surface,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+              color: hidden ? widget.accent : V2Colors.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+                hidden
+                    ? Icons.visibility_off_outlined
+                    : Icons.home_outlined,
+                size: 15,
+                color: hidden ? widget.accent : V2Colors.textSecondary),
+            const SizedBox(width: 6),
+            Text(hidden ? '家賃を除外中' : '家賃を除く',
+                style: V2Typography.micro.copyWith(
+                    color:
+                        hidden ? widget.accent : V2Colors.textSecondary,
+                    fontWeight: FontWeight.w700)),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _grey(Widget child) => _isMonthClosed
       ? ColoredBox(
           color: const Color(0xFFF6E7C9),
@@ -730,6 +811,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     bool teamSortDefault = false,
     // 事業モードは月セレクタ＋締めをタブより上に出すため、本文側では隠す。
     bool showTopHeader = true,
+    // 締めスナップショットに記録する実額（家賃を隠していても実額を残すため）。
+    // null なら表示中の合計（total）をそのまま使う。
+    int? snapshotExpenseFull,
   }) {
     final accent = widget.accent;
     final summaryLabel = detailLabel.replaceAll('明細', '');
@@ -774,7 +858,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
       final now = DateTime.now();
       final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
       final ym = '${_month.year}-${_month.month.toString().padLeft(2, '0')}';
-      for (final s in _subs) {
+      for (final s in _visibleSubs) {
         final amt = s.plAmountForMonth(ym, curYm);
         if (amt <= 0) continue;
         final pm = (s.paymentMethod ?? '').trim().isEmpty
@@ -798,10 +882,12 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
               if (showTopHeader) ...[
                 Row(
                   children: [
+                    // 個人モードのみ：家賃を除外して見るトグル。
+                    if (!_isBusiness) _rentToggleChip(),
                     const Spacer(),
                     MonthClosingBar(
                         month: _month,
-                        snapshotExpense: total,
+                        snapshotExpense: snapshotExpenseFull ?? total,
                         dense: true,
                         walletsToClose: _walletsToClose(),
                         onChanged: _load),
