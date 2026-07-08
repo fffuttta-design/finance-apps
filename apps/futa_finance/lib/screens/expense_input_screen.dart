@@ -934,9 +934,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         );
         return;
       }
-      if (myShare < amount &&
-          _splitReceiveWallet == null &&
-          widget.editing == null) {
+      if (myShare < amount && _splitReceiveWallet == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('現金の受け取り先を選んでください')),
         );
@@ -1035,6 +1033,11 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
             duration: const Duration(seconds: 6)));
         return;
       }
+      // 立替精算（現金回収の振替＋受け取りウォレット残高）を冪等に再構成。
+      // 二重作成しないよう、必ず既存の settle を基準に差分反映する。
+      try {
+        await _reconcileSettleForEdit(tx, amount);
+      } catch (_) {}
       navigator.pop(true);
       return;
     }
@@ -1087,7 +1090,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         // transferFromAccount は実口座でないラベルにして、口座台帳で
         // 引かれないようにする（外部からの立替回収のため）。
         final settle = core.Transaction(
-          id: '${DateTime.now().microsecondsSinceEpoch}s',
+          // 決定的IDにして、後で編集したとき同じ振替を追える（二重作成防止）。
+          id: 'settle_${tx.id}',
           date: _date,
           type: core.TransactionType.transfer,
           category: const core.Category(major: '振替', sub: ''),
@@ -1675,6 +1679,92 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     ];
   }
 
+  /// 編集での立替精算：現金回収の振替（settle_<取引ID>）と受け取りウォレットの
+  /// 残高キャッシュを、二重作成しないよう「既存を基準に差分反映」で冪等再構成する。
+  /// - 立替ON かつ もらう現金>0 かつ ウォレット選択済み → 振替を upsert・残高を加算
+  /// - 立替OFF / もらう現金0 → 既存の振替を削除・残高を巻き戻し
+  Future<void> _reconcileSettleForEdit(core.Transaction tx, int amount) async {
+    final sid = 'settle_${tx.id}';
+    final myShare = parseAmount(_myShareCtrl.text) ?? 0;
+    final newReceive = _treatSplit ? (amount - myShare) : 0;
+    final newWallet = _splitReceiveWallet;
+    final wantSettle = _treatSplit && newReceive > 0 && newWallet != null;
+
+    // 既存の振替を特定：まず決定的ID。無ければ旧仕様（タイムスタンプID）を
+    // 「立替精算」From＋メモの支出名で探す（過去に新規作成した立替の編集対応）。
+    final all = await TransactionRepository.instance.loadAll();
+    core.Transaction? oldSettle;
+    for (final t in all) {
+      if (t.id == sid) {
+        oldSettle = t;
+        break;
+      }
+    }
+    if (oldSettle == null) {
+      final origDesc = (widget.editing?.description ?? tx.description).trim();
+      if (origDesc.isNotEmpty) {
+        for (final t in all) {
+          if (t.type == core.TransactionType.transfer &&
+              t.transferFromAccount == '立替精算' &&
+              (t.memo ?? '').contains('「$origDesc」')) {
+            oldSettle = t;
+            break;
+          }
+        }
+      }
+    }
+    final oldSid = oldSettle?.id;
+    final oldReceive = oldSettle?.amount ?? 0;
+    final oldWallet = oldSettle?.transferToAccount;
+
+    // 振替トランザクションの upsert / 削除。
+    if (wantSettle) {
+      final settle = core.Transaction(
+        id: sid,
+        date: tx.date,
+        type: core.TransactionType.transfer,
+        category: const core.Category(major: '振替', sub: ''),
+        paymentMethod: '',
+        description: '立替精算（現金回収）: ${tx.description}',
+        amount: newReceive,
+        transferFromAccount: '立替精算',
+        transferToAccount: newWallet,
+        memo: '立替分の現金受け取り（支出「${tx.description}」に紐づく）',
+        createdAt: oldSettle?.createdAt,
+      );
+      if (oldSid == sid) {
+        await TransactionRepository.instance.update(settle);
+      } else {
+        // 旧仕様IDが残っていれば消してから決定的IDで作り直す。
+        if (oldSid != null) {
+          await TransactionRepository.instance.delete(oldSid);
+        }
+        await TransactionRepository.instance.add(settle);
+      }
+    } else if (oldSid != null) {
+      await TransactionRepository.instance.delete(oldSid);
+    }
+
+    // 受け取りウォレットの残高キャッシュを冪等に：旧を戻す → 新を足す。
+    if (_payments != null && (oldReceive > 0 || wantSettle)) {
+      final banks = [..._payments!.bankAccounts];
+      void addTo(String name, int delta) {
+        for (int i = 0; i < banks.length; i++) {
+          if (banks[i].name == name) {
+            banks[i] = banks[i].copyWith(
+                currentBalance: (banks[i].displayBalance ?? 0) + delta);
+            break;
+          }
+        }
+      }
+
+      if (oldWallet != null && oldReceive > 0) addTo(oldWallet, -oldReceive);
+      if (wantSettle) addTo(newWallet, newReceive);
+      _payments = _payments!.copyWith(bankAccounts: banks);
+      await _settings.savePayments(_payments!);
+    }
+  }
+
   /// 立替精算セクション。
   ///
   /// 「自分が一括で支払い、他人から現金をもらう」ケース。
@@ -1724,25 +1814,24 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 onChanged: (v) {
                   setState(() {
                     _treatSplit = v;
-                    // 編集モードでONにしたら、既定は「全額自己負担（戻り0）」。
-                    // ユーザーが自己負担額を下げると、その差が立替（戻る分）になる。
-                    if (v && editing) {
-                      if (_myShareCtrl.text.trim().isEmpty) {
+                    if (v) {
+                      // 編集でONにしたら既定は「全額自己負担（戻り0）」。
+                      // 自己負担額を下げると、その差が立替（もらう現金）になる。
+                      if (editing && _myShareCtrl.text.trim().isEmpty) {
                         _myShareCtrl.text = formatAmount(amount);
                       }
-                    } else if (v && _splitReceiveWallet == null) {
-                      // 新規：既定の受け取り先＝現金口座 → 無ければ先頭。
-                      final cash = payments.bankAccounts.firstWhere(
-                        (b) =>
-                            !b.inactive &&
-                            b.accountType == core.AccountType.cash,
-                        orElse: () => payments.bankAccounts.firstWhere(
-                          (b) => !b.inactive,
-                          orElse: () => payments.bankAccounts.isNotEmpty
-                              ? payments.bankAccounts.first
-                              : (throw StateError('no wallet'))),
-                      );
-                      _splitReceiveWallet = cash.name;
+                      // 既定の受け取り先＝現金口座 → 無ければ先頭（新規・編集共通）。
+                      if (_splitReceiveWallet == null &&
+                          payments.bankAccounts.any((b) => !b.inactive)) {
+                        final cash = payments.bankAccounts.firstWhere(
+                          (b) =>
+                              !b.inactive &&
+                              b.accountType == core.AccountType.cash,
+                          orElse: () => payments.bankAccounts
+                              .firstWhere((b) => !b.inactive),
+                        );
+                        _splitReceiveWallet = cash.name;
+                      }
                     }
                   });
                 },
@@ -1754,8 +1843,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               padding: const EdgeInsets.only(left: 2, bottom: 8),
               child: Text(
                 editing
-                    ? 'この支出のうち、あとで戻ってくる分を差し引いて「実質の負担」を'
-                        '記録します（明細に実質支払を表示）。合計額はそのまま残します。'
+                    ? '登録済みの支出を立替にします。自分の負担額を入れると、'
+                        '残り（もらう現金）を受け取り先ウォレットに加算します。'
+                        '合計額はそのまま残し、明細に「実際支払」を表示します。'
                     : '一括で支払い、他人から現金をもらうとき。経費は全額のまま、'
                         'もらう現金を財布（指定ウォレット）に加算します。',
                 style:
@@ -1789,8 +1879,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                   const Icon(Icons.payments_outlined,
                       size: 16, color: Color(0xFF059669)),
                   const SizedBox(width: 8),
-                  Text(editing ? 'あとで戻る分（立替）' : 'もらう現金',
-                      style: const TextStyle(
+                  const Text('もらう現金',
+                      style: TextStyle(
                           fontSize: 12, color: Color(0xFF6B7280))),
                   const Spacer(),
                   Text(
@@ -1812,35 +1902,31 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                     style:
                         TextStyle(fontSize: 11, color: Color(0xFFDC2626))),
               ),
-            // 受け取り先ウォレット＆現金回収の振替は「新規入力」時のみ。
-            // 編集（登録済みを後から立替化）では実質の負担を記録するだけ。
-            if (!editing) ...[
-              const SizedBox(height: 10),
-              _label('受け取り先（現金が増えるウォレット）'),
-              if (wallets.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEF3C7),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    '現金/口座が未登録です。設定で登録してください。',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF92400E)),
-                  ),
-                )
-              else
-                DropdownButtonFormField<String>(
-                  initialValue: wallets.contains(_splitReceiveWallet)
-                      ? _splitReceiveWallet
-                      : null,
-                  items: wallets
-                      .map((w) => DropdownMenuItem(value: w, child: Text(w)))
-                      .toList(),
-                  onChanged: (v) => setState(() => _splitReceiveWallet = v),
-                  decoration: _inputDecoration(hint: '選択してください'),
+            const SizedBox(height: 10),
+            _label('受け取り先（現金が増えるウォレット）'),
+            if (wallets.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-            ],
+                child: const Text(
+                  '現金/口座が未登録です。設定で登録してください。',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF92400E)),
+                ),
+              )
+            else
+              DropdownButtonFormField<String>(
+                initialValue: wallets.contains(_splitReceiveWallet)
+                    ? _splitReceiveWallet
+                    : null,
+                items: wallets
+                    .map((w) => DropdownMenuItem(value: w, child: Text(w)))
+                    .toList(),
+                onChanged: (v) => setState(() => _splitReceiveWallet = v),
+                decoration: _inputDecoration(hint: '選択してください'),
+              ),
           ],
         ],
       ),

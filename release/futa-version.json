@@ -1,1 +1,1 @@
-{"version":"1.0.502","buildNumber":"503","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.502/futa-finance-v1.0.502.apk","releaseNotes":"立替の明細表記を「(実質支払 ¥9,800)」＋半角カッコに変更。さらに、登録済みの支出を後から立替精算に変えられるようにしました（編集画面の「立替精算」トグルで自分の負担額を入力）。"}
+{"version":"1.0.503","buildNumber":"504","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.503/futa-finance-v1.0.503.apk","releaseNotes":"立替の明細表記を「(実際支払 ¥9,800)」に変更。編集で登録済みの支出を立替にしたときも、もらう現金を受け取り先ウォレットに自動で加算するようにしました（二重作成を防ぐ冪等処理つき）。"}
