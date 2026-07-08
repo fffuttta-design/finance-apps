@@ -1,1 +1,1 @@
-{"version":"1.0.501","buildNumber":"502","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.501/futa-finance-v1.0.501.apk","releaseNotes":"立替精算した支出は、明細の金額を「実質負担額（合計支払額）」の2段表示にしました。例：実質 -¥4,000／（合計 ¥9,800）。合計は満額のままカード明細と一致します。"}
+{"version":"1.0.502","buildNumber":"503","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.502/futa-finance-v1.0.502.apk","releaseNotes":"立替の明細表記を「(実質支払 ¥9,800)」＋半角カッコに変更。さらに、登録済みの支出を後から立替精算に変えられるようにしました（編集画面の「立替精算」トグルで自分の負担額を入力）。"}

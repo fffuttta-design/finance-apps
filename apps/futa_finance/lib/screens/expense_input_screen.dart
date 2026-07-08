@@ -237,6 +237,14 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
           _usdAmountCtrl.text = e.originalAmount!.toString();
         }
       }
+      // 既存の支出が立替精算（reimbursed>0）なら、立替UIをONで復元し、
+      // 自己負担額（＝実質の負担＝amount−reimbursed）をプリフィルする。
+      if (e.type == core.TransactionType.expense &&
+          e.reimbursed != null &&
+          e.reimbursed! > 0) {
+        _treatSplit = true;
+        _myShareCtrl.text = formatAmount(e.effectiveAmount);
+      }
     } else {
       // レシートOCR等からのプリフィル。
       if (widget.initialDate != null) _date = widget.initialDate!;
@@ -926,7 +934,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         );
         return;
       }
-      if (myShare < amount && _splitReceiveWallet == null) {
+      if (myShare < amount &&
+          _splitReceiveWallet == null &&
+          widget.editing == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('現金の受け取り先を選んでください')),
         );
@@ -955,13 +965,14 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
             : null);
     // 立替精算の「あとで戻る額（立替回収額）」。金額(amount)は満額のまま保持し、
     // 実質コスト = amount - reimbursed を集計に使う（詳細/明細で「実質負担」を表示）。
-    // 新規で立替ONのときだけ算出。編集時は 立替UIが無いので既存値を引き継ぐ。
-    final int? reimbursedVal = (_treatSplit && _splitReceiveWallet != null)
-        ? (() {
-            final r = amount - (parseAmount(_myShareCtrl.text) ?? 0);
-            return r > 0 ? r : null;
-          })()
-        : editing?.reimbursed;
+    // 立替ON＝amount−自己負担額（>0のみ）。OFF＝解除（新規は元々なし／編集も解除）。
+    final int? reimbursedVal;
+    if (_treatSplit) {
+      final r = amount - (parseAmount(_myShareCtrl.text) ?? 0);
+      reimbursedVal = r > 0 ? r : null;
+    } else {
+      reimbursedVal = null;
+    }
     // 場所は、入力した内容をそのまま保存する。マスタに無い新しい場所は自動で
     // マスタへ追加（次回から候補に出る）。
     // ⚠ 以前はここで「新しい場所ですか？」の確認ダイアログを出し、確定しないと
@@ -1482,10 +1493,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               const SizedBox(height: 16),
 
               // 立替精算。一括で払って他人から現金を受け取るケース。
-              if (widget.editing == null) ...[
-                _treatSplitSection(payments),
-                const SizedBox(height: 16),
-              ],
+              // 編集時も表示し、登録済みの支出を後から立替に変えられるようにする。
+              _treatSplitSection(payments),
+              const SizedBox(height: 16),
 
               // 備考はデフォルト表示。
               _label('備考（任意）'),
@@ -1671,6 +1681,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   /// 支出は全額を計上したまま（経費・カード請求はそのまま）、もらう現金を
   /// 指定ウォレットに加算する。受け取りは振替扱い（PL非計上）。
   Widget _treatSplitSection(core.PaymentMethodsConfig payments) {
+    // 編集モード（登録済みの支出を後から立替に変える）では、現金の受け取り先や
+    // 振替は作らず、「実質の負担」を記録するだけのシンプルUIにする。
+    final editing = widget.editing != null;
     // 受け取り先候補＝非カードの有効ウォレット（現金/口座/電子マネー）。
     final wallets = payments.bankAccounts
         .where((b) => !b.inactive)
@@ -1711,8 +1724,14 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 onChanged: (v) {
                   setState(() {
                     _treatSplit = v;
-                    if (v && _splitReceiveWallet == null) {
-                      // 既定の受け取り先：現金口座 → 無ければ先頭。
+                    // 編集モードでONにしたら、既定は「全額自己負担（戻り0）」。
+                    // ユーザーが自己負担額を下げると、その差が立替（戻る分）になる。
+                    if (v && editing) {
+                      if (_myShareCtrl.text.trim().isEmpty) {
+                        _myShareCtrl.text = formatAmount(amount);
+                      }
+                    } else if (v && _splitReceiveWallet == null) {
+                      // 新規：既定の受け取り先＝現金口座 → 無ければ先頭。
                       final cash = payments.bankAccounts.firstWhere(
                         (b) =>
                             !b.inactive &&
@@ -1731,12 +1750,16 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
             ],
           ),
           if (_treatSplit) ...[
-            const Padding(
-              padding: EdgeInsets.only(left: 2, bottom: 8),
+            Padding(
+              padding: const EdgeInsets.only(left: 2, bottom: 8),
               child: Text(
-                '一括で支払い、他人から現金をもらうとき。経費は全額のまま、'
-                'もらう現金を財布（指定ウォレット）に加算します。',
-                style: TextStyle(fontSize: 11, color: Color(0xFF4B5563)),
+                editing
+                    ? 'この支出のうち、あとで戻ってくる分を差し引いて「実質の負担」を'
+                        '記録します（明細に実質支払を表示）。合計額はそのまま残します。'
+                    : '一括で支払い、他人から現金をもらうとき。経費は全額のまま、'
+                        'もらう現金を財布（指定ウォレット）に加算します。',
+                style:
+                    const TextStyle(fontSize: 11, color: Color(0xFF4B5563)),
               ),
             ),
             _label('自分の負担額（円）'),
@@ -1766,8 +1789,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                   const Icon(Icons.payments_outlined,
                       size: 16, color: Color(0xFF059669)),
                   const SizedBox(width: 8),
-                  const Text('もらう現金',
-                      style: TextStyle(
+                  Text(editing ? 'あとで戻る分（立替）' : 'もらう現金',
+                      style: const TextStyle(
                           fontSize: 12, color: Color(0xFF6B7280))),
                   const Spacer(),
                   Text(
@@ -1789,31 +1812,35 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                     style:
                         TextStyle(fontSize: 11, color: Color(0xFFDC2626))),
               ),
-            const SizedBox(height: 10),
-            _label('受け取り先（現金が増えるウォレット）'),
-            if (wallets.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEF3C7),
-                  borderRadius: BorderRadius.circular(8),
+            // 受け取り先ウォレット＆現金回収の振替は「新規入力」時のみ。
+            // 編集（登録済みを後から立替化）では実質の負担を記録するだけ。
+            if (!editing) ...[
+              const SizedBox(height: 10),
+              _label('受け取り先（現金が増えるウォレット）'),
+              if (wallets.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    '現金/口座が未登録です。設定で登録してください。',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF92400E)),
+                  ),
+                )
+              else
+                DropdownButtonFormField<String>(
+                  initialValue: wallets.contains(_splitReceiveWallet)
+                      ? _splitReceiveWallet
+                      : null,
+                  items: wallets
+                      .map((w) => DropdownMenuItem(value: w, child: Text(w)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _splitReceiveWallet = v),
+                  decoration: _inputDecoration(hint: '選択してください'),
                 ),
-                child: const Text(
-                  '現金/口座が未登録です。設定で登録してください。',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF92400E)),
-                ),
-              )
-            else
-              DropdownButtonFormField<String>(
-                initialValue: wallets.contains(_splitReceiveWallet)
-                    ? _splitReceiveWallet
-                    : null,
-                items: wallets
-                    .map((w) => DropdownMenuItem(value: w, child: Text(w)))
-                    .toList(),
-                onChanged: (v) => setState(() => _splitReceiveWallet = v),
-                decoration: _inputDecoration(hint: '選択してください'),
-              ),
+            ],
           ],
         ],
       ),

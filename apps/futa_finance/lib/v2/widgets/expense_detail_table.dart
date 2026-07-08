@@ -1166,7 +1166,7 @@ Widget _txAmountCell(core.Transaction t, {double fontSize = 14}) {
     children: [
       HiliteText('-${formatYen(t.effectiveAmount)}',
           amount: true, textAlign: TextAlign.right, style: base),
-      Text('（合計 ${formatYen(t.amount)}）',
+      Text('(実質支払 ${formatYen(t.amount)})',
           textAlign: TextAlign.right,
           style: TextStyle(
               fontSize: (fontSize - 3).clamp(9.0, 12.0),
