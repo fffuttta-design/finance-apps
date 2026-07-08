@@ -1,1 +1,1 @@
-{"version":"1.0.504","buildNumber":"505","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.504/futa-finance-v1.0.504.apk","releaseNotes":"「家賃を除く」が『共同生活費』も対象になるよう判定を拡張。名前・カテゴリ・摘要のいずれかに『家賃／共同生活費』を含む項目を除外します（6月5日の共同生活費が除外されなかった不具合の修正）。"}
+{"version":"1.0.505","buildNumber":"506","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.505/futa-finance-v1.0.505.apk","releaseNotes":"共同生活費（家賃）の銀行振込「振込 ナカネ ハルカ」も『家賃を除く』で隠せるように、判定に振込先名義「ナカネ」を追加しました。"}

@@ -122,7 +122,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   // ── 家賃（個人モードのハズレ値）を隠す機能 ──────────────────
   /// 家賃とみなすキーワード。ユーザーは「家賃＝共同生活費」として運用しているため
   /// 「共同生活費」等も同一視して除外対象にする。
-  static const _rentKeywords = ['家賃', '共同生活費', '共同生活'];
+  /// 「ナカネ」は共同生活費（家賃）の振込先名義（摘要「振込 ナカネ ハルカ」）。
+  /// 銀行CSV取込の家賃振込を"家賃を除く"で拾うために含める。
+  static const _rentKeywords = ['家賃', '共同生活費', '共同生活', 'ナカネ'];
 
   /// 文字列がいずれかの家賃キーワードを含むか。
   bool _matchesRent(String? s) =>
