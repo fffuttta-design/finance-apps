@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/auth_service.dart';
 import '../data/drive_receipt_service.dart';
 import '../data/household_service.dart';
+import '../data/push_service.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
@@ -31,6 +32,13 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
   bool _changed = false;
 
   String get _myUid => AuthService.instance.currentUser?.uid ?? '';
+
+  @override
+  void initState() {
+    super.initState();
+    // この取引を開いた＝その部屋の通知はもう用済みなので消す（LINE的）。
+    PushService.instance.clearForTx(_t.id);
+  }
 
   Future<void> _editTx() async {
     final changed = await Navigator.push<bool>(

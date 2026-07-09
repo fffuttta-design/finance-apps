@@ -85,8 +85,14 @@ class PushService {
     final title = n?.title ?? (m.data['title']?.toString() ?? '');
     final body = n?.body ?? (m.data['body']?.toString() ?? '');
     if (title.isEmpty && body.isEmpty) return;
+    // data.tag があれば「同じ部屋（取引/プラン）」の通知を1枠に上書きする。
+    // 同じ tag は同じ id にして端末側で差し替えられるようにする。
+    final tag = m.data['tag']?.toString();
+    final id = (tag != null && tag.isNotEmpty)
+        ? (tag.hashCode & 0x7fffffff)
+        : DateTime.now().millisecondsSinceEpoch ~/ 1000;
     _local.show(
-      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      id: id,
       title: title,
       body: body,
       notificationDetails: NotificationDetails(
@@ -97,10 +103,38 @@ class PushService {
           importance: Importance.high,
           priority: Priority.high,
           icon: '@mipmap/ic_launcher',
+          tag: (tag != null && tag.isNotEmpty) ? tag : null,
         ),
       ),
       payload: jsonEncode(m.data),
     );
+  }
+
+  /// 取引を開いたら、その取引に紐づく通知（記録/修正・コメント）を消す。
+  Future<void> clearForTx(String txId) =>
+      _clearByTags({'tx:$txId', 'txcomment:$txId'});
+
+  /// プラン項目を開いたら、その項目に紐づく通知（追加/更新/完了・コメント）を消す。
+  Future<void> clearForPlan(String planId) =>
+      _clearByTags({'plan:$planId', 'plancomment:$planId'});
+
+  /// 指定 tag の配信済み通知を消す（Android のみ）。tag/id は端末の実値で照合。
+  Future<void> _clearByTags(Set<String> tags) async {
+    try {
+      final android = _local.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      if (android == null) return;
+      final active = await android.getActiveNotifications();
+      for (final a in active) {
+        final tag = a.tag;
+        final id = a.id;
+        if (tag != null && id != null && tags.contains(tag)) {
+          await _local.cancel(id: id, tag: tag);
+        }
+      }
+    } catch (_) {
+      // 非対応/取得失敗は無視
+    }
   }
 
   /// 通知タップ時の遷移を設定。

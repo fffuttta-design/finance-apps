@@ -9,6 +9,7 @@ import '../data/household_service.dart';
 import '../data/plan_comment_repository.dart';
 import '../data/plan_item.dart';
 import '../data/plan_repository.dart';
+import '../data/push_service.dart';
 import '../theme/app_theme.dart';
 import 'receipt_image_screen.dart';
 
@@ -34,6 +35,13 @@ class _PlanDetailScreenState extends State<PlanDetailScreen> {
 
   String get _myUid => AuthService.instance.currentUser?.uid ?? '';
   String? get _hid => HouseholdService.instance.householdId;
+
+  @override
+  void initState() {
+    super.initState();
+    // このプラン項目を開いた＝その部屋の通知はもう用済みなので消す（LINE的）。
+    PushService.instance.clearForPlan(_item.id);
+  }
 
   @override
   void dispose() {
