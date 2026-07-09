@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.92",
-    "buildNumber":  "97",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.92/takuharu-finance-v0.2.92.apk",
-    "releaseNotes":  "レシート詳細画面のボタン表記を「編集（まとめて）」→「編集」に短くしました。"
+    "version":  "0.2.93",
+    "buildNumber":  "98",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.93/takuharu-finance-v0.2.93.apk",
+    "releaseNotes":  "通知をチャット的に改善：同じ取引/プランの通知は1枠にまとまって上書きされ、その取引/プランを開くと通知が自動で消えます。"
 }
