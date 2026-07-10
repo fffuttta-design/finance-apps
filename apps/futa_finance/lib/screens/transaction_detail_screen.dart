@@ -370,6 +370,61 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
               ),
             ),
           ],
+          // 個人モード：税務用の保管トグルは不要だが、Amazon等でDriveに
+          // 領収書が紐づいている場合は「見る」ボタンだけ出す（閲覧はできて良い）。
+          if (!isBusiness && hasReceipt) ...[
+            const SizedBox(height: 16),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+                    child: Row(
+                      children: [
+                        Text(receiptWord,
+                            style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF374151))),
+                        const Spacer(),
+                        const Text('📄 ドライブに保管',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF059669))),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final url = t.receiptUrl;
+                        if (url == null || url.trim().isEmpty) return;
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ReceiptViewerScreen(
+                              driveUrl: url.trim(),
+                              title: receiptWord,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.receipt_long, size: 18),
+                      label: Text('$receiptWordを見る'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 28),
           // アクション（編集は支出/収入/振替すべてで可能）
           Row(
