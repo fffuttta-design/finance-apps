@@ -52,33 +52,66 @@ class DriveReceiptService {
 
   /// 自分の権限トークンでDriveから画像バイトを取得（アプリ内表示用）。
   /// ブラウザ/再ログイン不要で開ける（drive.file=アプリ作成ファイルに有効）。
+  ///
+  /// ⚠️ 二村秘書BOT(contact@)が作った証憑（Amazon/GO領収書等）は「アプリが作った
+  /// ファイル」ではないため、drive.file 権限だと `alt=media` が 404 になる
+  /// （ログインが drive.readonly 付与前だと readonly も効かない）。
+  /// これらの証憑は BOT が anyone/reader で公開しているので、認証で取れなかったら
+  /// 公開ダウンロード(認証なし)にフォールバックする＝再ログイン不要で確実に表示できる。
   Future<Uint8List?> downloadFile(String fileId) async {
     lastError = null;
     try {
       final token = await _accessToken();
-      if (token == null) {
-        lastError = 'アクセストークンを取得できませんでした';
-        return null;
-      }
-      final uri = Uri.parse(
-          'https://www.googleapis.com/drive/v3/files/$fileId?alt=media');
-      var res = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
-      // 401(トークン期限切れ)は一度だけ強制リフレッシュして再試行。
-      if (res.statusCode == 401) {
-        final fresh = await _accessToken(forceRefresh: true);
-        if (fresh != null) {
-          res = await http.get(uri, headers: {'Authorization': 'Bearer $fresh'});
+      if (token != null) {
+        final uri = Uri.parse(
+            'https://www.googleapis.com/drive/v3/files/$fileId?alt=media');
+        var res =
+            await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+        // 401(トークン期限切れ)は一度だけ強制リフレッシュして再試行。
+        if (res.statusCode == 401) {
+          final fresh = await _accessToken(forceRefresh: true);
+          if (fresh != null) {
+            res =
+                await http.get(uri, headers: {'Authorization': 'Bearer $fresh'});
+          }
         }
-      }
-      if (res.statusCode != 200) {
+        if (res.statusCode == 200) return res.bodyBytes;
+        // 認証で取れない（BOT作成の公開証憑＝404/403等）→ 公開DLへフォールバック。
+        final pub = await _downloadPublic(fileId);
+        if (pub != null) return pub;
         lastError = '取得失敗 (${res.statusCode})';
         return null;
       }
-      return res.bodyBytes;
+      // トークンが取れなくても、公開ファイルなら匿名で取得できる。
+      final pub = await _downloadPublic(fileId);
+      if (pub != null) return pub;
+      lastError = 'アクセストークンを取得できませんでした';
+      return null;
     } catch (e) {
       lastError = e.toString();
       return null;
     }
+  }
+
+  /// 公開(anyone/reader)ファイルを認証なしで取得するフォールバック。
+  /// 取れなければ null（HTMLの確認ページが返った場合も null 扱い）。
+  Future<Uint8List?> _downloadPublic(String fileId) async {
+    for (final url in [
+      'https://drive.usercontent.google.com/download?id=$fileId&export=download',
+      'https://drive.google.com/uc?export=download&id=$fileId',
+    ]) {
+      try {
+        final res = await http.get(Uri.parse(url));
+        if (res.statusCode == 200) {
+          final b = res.bodyBytes;
+          // 先頭が '<'(0x3C)＝HTML確認ページ等は失敗扱い。実ファイル(PDF/画像)だけ返す。
+          if (b.isNotEmpty && b[0] != 0x3C) return b;
+        }
+      } catch (_) {
+        // 次のURLへ
+      }
+    }
+    return null;
   }
 
   /// フォルダIDのメモリキャッシュ。毎回の探索/作成API往復を省いて高速化。
