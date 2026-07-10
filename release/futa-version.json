@@ -1,1 +1,1 @@
-{"version":"1.0.506","buildNumber":"507","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.506/futa-finance-v1.0.506.apk","releaseNotes":"領収書がアプリ内で表示できなかった不具合を修正しました（BOTが保存したAmazon/GO領収書の証憑を、認証で取れない時は公開リンクから取り直すようにして確実に表示）。"}
+{"version":"1.0.507","buildNumber":"508","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.507/futa-finance-v1.0.507.apk","releaseNotes":"領収書がアプリ内で表示できなかった不具合を修正しました（BOTが保存したAmazon/GO/Claude等の証憑を確実に表示）。"}
