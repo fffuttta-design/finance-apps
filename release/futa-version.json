@@ -1,1 +1,1 @@
-{"version":"1.0.505","buildNumber":"506","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.505/futa-finance-v1.0.505.apk","releaseNotes":"共同生活費（家賃）の銀行振込「振込 ナカネ ハルカ」も『家賃を除く』で隠せるように、判定に振込先名義「ナカネ」を追加しました。"}
+{"version":"1.0.506","buildNumber":"507","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.506/futa-finance-v1.0.506.apk","releaseNotes":"領収書がアプリ内で表示できなかった不具合を修正しました（BOTが保存したAmazon/GO領収書の証憑を、認証で取れない時は公開リンクから取り直すようにして確実に表示）。"}
