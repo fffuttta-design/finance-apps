@@ -57,6 +57,17 @@ Future<void> desktopCheckUpdate() async {
   await _bridge!.callMethod<JSPromise<JSAny?>>('checkUpdate'.toJS).toDart;
 }
 
+/// 公開Driveファイル(証憑)をメインプロセス(Node)で取得しbase64で返す。無ければ null。
+/// レンダラのfetch/CORSに依存せず、BOT保存の証憑を確実に取得するため。
+Future<String?> desktopDownloadFile(String fileId) async {
+  final b = _bridge;
+  if (b == null || !b.has('downloadFile')) return null;
+  final res = await b
+      .callMethod<JSPromise<JSString?>>('downloadFile'.toJS, fileId.toJS)
+      .toDart;
+  return res?.toDart;
+}
+
 DesktopTokens _toTokens(JSObject o) {
   final id = (o['idToken'] as JSString?)?.toDart ?? '';
   final ac = (o['accessToken'] as JSString?)?.toDart ?? '';

@@ -628,6 +628,7 @@ class MonthlySnapshot {
 ### 証憑ビューアの「取得失敗(404)」対策＝公開DLフォールバック（v1.0.506〜）
 - **症状**: 二村秘書BOT(contact@)が自動保存した証憑（Amazon/GO領収書等）を「領収書を見る」で開くと **`取得失敗 (404)`**。原因＝`DriveReceiptService.downloadFile` が**認証付き** `files/{id}?alt=media` で取得しており、**BOT作成ファイルは"アプリが作ったファイルではない"ため drive.file 権限では404**（ログインが drive.readonly 付与前だと readonly も効かない）。ファイル自体は正常（contact@/fffuttta/匿名いずれでもDL可・anyone公開済み）。
 - **対策**: `downloadFile` に**認証で取れなければ公開DL(認証なし)にフォールバック**を追加。`drive.usercontent.google.com/download?id=…&export=download`（無ければ `drive.google.com/uc?export=download&id=…`）を叩き、HTML確認ページ(先頭`<`)でなければ実ファイルとして返す。BOTの証憑は anyone/reader 公開なので**再ログイン不要で確実に表示**できる。`_downloadPublic(fileId)` を追加。
+- **⚠️ デスクトップ(Electron)は公開DLもメインプロセスで行う（v1.0.507〜）**: v1.0.506の公開DLフォールバックはレンダラ(Flutter Web)の`http`=ブラウザfetchで叩いていたが、Electron内(`http://127.0.0.1:50873`配信)では**それでも404が続いた**（CORSは`ACAO:*`でOKなのにブラウザ側で取得できない事象）。→ **Electronメインプロセス(Node `https`)で公開DL URLから取得しbase64で返す**経路を追加＝ブラウザのfetch/CORSに一切依存せず確実。実装：main.js `downloadDriveFile`/IPC `futa:downloadFile`、preload `downloadFile`、`desktop_bridge*.desktopDownloadFile`、`_downloadPublic`が**デスクトップ時はまずメインプロセス経由**を試す。Web/Androidは従来の公開DL（そちらはfetchで問題なく取れる）。
 
 ### パレット24色化（v1.0.375〜）
 - **`CategoryColors.palette` を16→24色に拡張**（暖色/寒色交互・かぶりさらに低減）。色ピッカーも24色。

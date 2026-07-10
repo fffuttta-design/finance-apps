@@ -96,6 +96,19 @@ class DriveReceiptService {
   /// 公開(anyone/reader)ファイルを認証なしで取得するフォールバック。
   /// 取れなければ null（HTMLの確認ページが返った場合も null 扱い）。
   Future<Uint8List?> _downloadPublic(String fileId) async {
+    // デスクトップ(Electron)はメインプロセス(Node)で取得＝ブラウザのfetch/CORSに一切
+    // 依存せず確実。BOT保存の証憑(公開)をここで先に取りに行く。
+    if (desktop.isDesktopShell) {
+      try {
+        final b64 = await desktop.desktopDownloadFile(fileId);
+        if (b64 != null && b64.isNotEmpty) {
+          final bytes = base64Decode(b64);
+          if (bytes.isNotEmpty && bytes[0] != 0x3C) return bytes;
+        }
+      } catch (_) {
+        // ブラウザfetchのフォールバックへ
+      }
+    }
     for (final url in [
       'https://drive.usercontent.google.com/download?id=$fileId&export=download',
       'https://drive.google.com/uc?export=download&id=$fileId',

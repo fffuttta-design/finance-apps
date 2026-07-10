@@ -19,3 +19,5 @@ Future<String?> desktopDriveToken({bool forceRefresh = false}) async => null;
 Future<void> desktopSignOut() async {}
 
 Future<void> desktopCheckUpdate() async {}
+
+Future<String?> desktopDownloadFile(String fileId) async => null;

@@ -416,10 +416,49 @@ function setupAutoUpdater() {
   autoUpdater.on('error', (err) => console.warn('[update]', err.message));
 }
 
+// ─────────── 証憑(公開Driveファイル)のDL（メインプロセス＝CORS/ブラウザ制約なし）───────────
+// BOT(contact@)が保存した証憑は drive.file 権限だとレンダラの認証取得が404になる。
+// これら証憑は anyone/reader 公開なので、メインプロセス(Node https)で公開DL URLから取り、
+// base64 で返す。レンダラ(Flutter)はこれを使えばブラウザのfetch/CORSに一切依存しない。
+function httpsGetBuffer(url, depth = 0) {
+  return new Promise((resolve, reject) => {
+    if (depth > 5) return reject(new Error('too many redirects'));
+    https.get(url, { headers: { 'User-Agent': 'FutaFinance' } }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume();
+        return resolve(httpsGetBuffer(res.headers.location, depth + 1));
+      }
+      if (res.statusCode !== 200) { res.resume(); return reject(new Error('status ' + res.statusCode)); }
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve(Buffer.concat(chunks)));
+      res.on('error', reject);
+    }).on('error', reject);
+  });
+}
+
+async function downloadDriveFile(fileId) {
+  const id = String(fileId || '').trim();
+  if (!id) return null;
+  const urls = [
+    `https://drive.usercontent.google.com/download?id=${id}&export=download`,
+    `https://drive.google.com/uc?export=download&id=${id}`,
+  ];
+  for (const u of urls) {
+    try {
+      const buf = await httpsGetBuffer(u);
+      // 先頭 '<'(0x3C)＝HTML確認ページ等は失敗扱い。実ファイルだけ返す。
+      if (buf && buf.length > 0 && buf[0] !== 0x3C) return buf.toString('base64');
+    } catch (_) { /* 次のURLへ */ }
+  }
+  return null;
+}
+
 // ─────────────────── IPC ───────────────────
 ipcMain.handle('futa:signIn', () => interactiveSignIn());
 ipcMain.handle('futa:silent', () => silentTokens());
 ipcMain.handle('futa:driveToken', (_e, force) => driveToken(force));
+ipcMain.handle('futa:downloadFile', (_e, fileId) => downloadDriveFile(fileId));
 ipcMain.handle('futa:signOut', () => {
   const cfg = readAuthCfg();
   delete cfg.refresh_token;

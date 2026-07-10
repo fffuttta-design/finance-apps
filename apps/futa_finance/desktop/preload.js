@@ -16,4 +16,6 @@ contextBridge.exposeInMainWorld('futaDesktop', {
   signOut: () => ipcRenderer.invoke('futa:signOut'),
   // 手動アップデート確認（Driveのversion.txtと照合・ネイティブダイアログ表示）
   checkUpdate: () => ipcRenderer.invoke('futa:checkUpdate'),
+  // 公開Driveファイル(証憑)をメインプロセスで取得 → base64 | null（CORS/ブラウザ非依存）
+  downloadFile: (fileId) => ipcRenderer.invoke('futa:downloadFile', fileId),
 });
