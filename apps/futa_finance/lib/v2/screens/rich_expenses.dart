@@ -147,7 +147,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
 
   // ── 税務顧問料（事業モードのハズレ値）を隠す機能 ──────────────
   /// 税務顧問料とみなすキーワード（大/小カテゴリ・摘要のいずれかに含めば対象）。
-  static const _advisoryKeywords = ['税務顧問料', '顧問料', '税理士'];
+  /// ⚠️ 実データの摘要は「VS税務顧問」（"料"なし）なので "税務顧問" で拾う
+  /// （"税務顧問料" だと一致しない）。"顧問料"/"税理士" も念のため残す。
+  static const _advisoryKeywords = ['税務顧問', '顧問料', '税理士'];
 
   bool _matchesAdvisory(String? s) =>
       s != null && _advisoryKeywords.any((k) => s.contains(k));
