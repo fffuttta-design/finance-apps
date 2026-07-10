@@ -1,1 +1,1 @@
-{"version":"1.0.508","buildNumber":"509","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.508/futa-finance-v1.0.508.apk","releaseNotes":"事業モードの経費タブに「税務顧問料を除く」トグルを追加しました（個人モードの「家賃を除く」と同じ使い勝手）。"}
+{"version":"1.0.509","buildNumber":"510","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.509/futa-finance-v1.0.509.apk","releaseNotes":"事業モードの「税務顧問料を除く」トグルが効くように修正しました（VS税務顧問などを正しく除外）。"}
