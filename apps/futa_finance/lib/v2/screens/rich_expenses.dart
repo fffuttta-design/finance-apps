@@ -145,10 +145,39 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   /// 家賃を隠す表示が有効か（個人モードのみ・設定 ON のとき）。
   bool get _rentHidden => !_isBusiness && UiPreferences.instance.hideRent;
 
+  // ── 税務顧問料（事業モードのハズレ値）を隠す機能 ──────────────
+  /// 税務顧問料とみなすキーワード（大/小カテゴリ・摘要のいずれかに含めば対象）。
+  static const _advisoryKeywords = ['税務顧問料', '顧問料', '税理士'];
+
+  bool _matchesAdvisory(String? s) =>
+      s != null && _advisoryKeywords.any((k) => s.contains(k));
+
+  /// 税務顧問料の取引か。
+  bool _isAdvisoryTx(core.Transaction t) =>
+      _matchesAdvisory(t.category.sub) ||
+      _matchesAdvisory(t.category.major) ||
+      _matchesAdvisory(t.description);
+
+  /// 税務顧問料の固定費（サブスク）か（顧問料を固定費登録している場合に対応）。
+  bool _isAdvisorySub(core.Subscription s) =>
+      _matchesAdvisory(s.name) ||
+      _matchesAdvisory(s.category) ||
+      _matchesAdvisory(s.plMajor);
+
+  /// 税務顧問料を隠す表示が有効か（事業モードのみ・設定 ON のとき）。
+  bool get _advisoryHidden =>
+      _isBusiness && UiPreferences.instance.hideAdvisory;
+
   /// 表示に使うサブスク一覧（家賃を隠す時は家賃サブスクを除外）。
   /// 締めスナップショット等「実額」が要る箇所は _subs（全件）を明示的に使う。
-  List<core.Subscription> get _visibleSubs =>
-      _rentHidden ? _subs.where((s) => !_isRentSub(s)).toList() : _subs;
+  List<core.Subscription> get _visibleSubs {
+    var list = _subs;
+    if (_rentHidden) list = list.where((s) => !_isRentSub(s)).toList();
+    if (_advisoryHidden) {
+      list = list.where((s) => !_isAdvisorySub(s)).toList();
+    }
+    return list;
+  }
 
   void _rebuildSubTab() {
     _subTab?.dispose();
@@ -673,9 +702,18 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     if (_isBusiness && _subTab != null) {
       final all = _monthExpenses;
       final gaichu = all.where(_isGaichu).toList();
-      final keihi = all.where((t) => !_isGaichu(t)).toList();
+      final keihiAll = all.where((t) => !_isGaichu(t)).toList();
+      // 税務顧問料を隠す設定なら諸経費の「表示」から除く。
+      // 締めスナップショットには実額（顧問料込み）を記録する。
+      final keihi = _advisoryHidden
+          ? keihiAll.where((t) => !_isAdvisoryTx(t)).toList()
+          : keihiAll;
+      final subTotal = _subsOf(_month);           // 表示（隠す設定を反映）
+      final subTotalFull = _subsOf(_month, _subs); // 締め用（実額・全件）
       final keihiTotal =
-          keihi.fold<int>(0, (s, t) => s + t.effectiveAmount) + _subsOf(_month);
+          keihi.fold<int>(0, (s, t) => s + t.effectiveAmount) + subTotal;
+      final keihiFullTotal =
+          keihiAll.fold<int>(0, (s, t) => s + t.effectiveAmount) + subTotalFull;
       final gaichuTotal = gaichu.fold<int>(0, (s, t) => s + t.effectiveAmount);
       return Center(
         child: ConstrainedBox(
@@ -695,10 +733,12 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 padding: const EdgeInsets.symmetric(horizontal: V2Spacing.md),
                 child: Row(
                   children: [
+                    // 事業モード：税務顧問料を除外して見るトグル。
+                    _advisoryToggleChip(),
                     const Spacer(),
                     MonthClosingBar(
                         month: _month,
-                        snapshotExpense: keihiTotal + gaichuTotal,
+                        snapshotExpense: keihiFullTotal + gaichuTotal,
                         dense: true,
                         walletsToClose: _walletsToClose(),
                         onChanged: _load),
@@ -793,6 +833,48 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 color: hidden ? widget.accent : V2Colors.textSecondary),
             const SizedBox(width: 6),
             Text(hidden ? '家賃を除外中' : '家賃を除く',
+                style: V2Typography.micro.copyWith(
+                    color:
+                        hidden ? widget.accent : V2Colors.textSecondary,
+                    fontWeight: FontWeight.w700)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 税務顧問料を除外して見るトグル（事業モードの経費タブ）。
+  /// 顧問料は毎月ほぼ固定の大きめ費用で、他の経費の増減が霞むため隠せるようにする。
+  Widget _advisoryToggleChip() {
+    final hidden = _advisoryHidden;
+    return InkWell(
+      onTap: () async {
+        await UiPreferences.instance
+            .setHideAdvisory(!UiPreferences.instance.hideAdvisory);
+        if (mounted) setState(() {});
+      },
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: hidden
+              ? widget.accent.withValues(alpha: 0.12)
+              : V2Colors.surface,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+              color: hidden ? widget.accent : V2Colors.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+                hidden
+                    ? Icons.visibility_off_outlined
+                    : Icons.account_balance_outlined,
+                size: 15,
+                color: hidden ? widget.accent : V2Colors.textSecondary),
+            const SizedBox(width: 6),
+            Text(hidden ? '税務顧問料を除外中' : '税務顧問料を除く',
                 style: V2Typography.micro.copyWith(
                     color:
                         hidden ? widget.accent : V2Colors.textSecondary,

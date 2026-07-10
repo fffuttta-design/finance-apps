@@ -18,6 +18,11 @@ class UiPreferences extends ChangeNotifier {
   /// 冷静に他の支出を見たいときに隠せるようにする。デフォルト false（=表示）。
   static const _kHideRent = 'futa.ui.hide_rent';
 
+  /// 事業モードの経費タブで「税務顧問料」を除外表示するか。
+  /// 顧問料は毎月ほぼ固定の大きめ費用で、他の経費の増減を見たいとき霞むため、
+  /// 家賃(個人)と同じくワンタップで隠せるようにする。デフォルト false（=表示）。
+  static const _kHideAdvisory = 'futa.ui.hide_advisory';
+
   /// 旧キー（〜v1.0.64）: 残高 0 のものを隠す。
   /// 起動時に値があれば新キーへ引き継いで削除する。
   static const _kLegacyHideZero = 'futa.ui.hide_zero_balance';
@@ -70,6 +75,7 @@ class UiPreferences extends ChangeNotifier {
 
   bool _hideInactive = false;
   bool _hideRent = false;
+  bool _hideAdvisory = false;
   List<String> _sidebarOrder = List.of(defaultSidebarOrder);
   bool? _useV2Ui;
   String _v2Variant = v2VariantTopNav;
@@ -81,6 +87,9 @@ class UiPreferences extends ChangeNotifier {
 
   /// 個人モードの支出タブで「家賃」を除外表示するか。
   bool get hideRent => _hideRent;
+
+  /// 事業モードの経費タブで「税務顧問料」を除外表示するか。
+  bool get hideAdvisory => _hideAdvisory;
   bool get loaded => _loaded;
 
   /// 現在のタブ並び順（ユーザー保存値）。
@@ -126,6 +135,8 @@ class UiPreferences extends ChangeNotifier {
     }
     // 家賃を隠す表示設定
     _hideRent = prefs.getBool(_kHideRent) ?? false;
+    // 税務顧問料を隠す表示設定（事業モード）
+    _hideAdvisory = prefs.getBool(_kHideAdvisory) ?? false;
     // サイドバー並び順
     final savedOrder = prefs.getStringList(_kSidebarOrder);
     if (savedOrder != null && savedOrder.isNotEmpty) {
@@ -198,6 +209,15 @@ class UiPreferences extends ChangeNotifier {
     _hideRent = v;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kHideRent, v);
+    notifyListeners();
+  }
+
+  /// 税務顧問料を隠す表示設定を更新して永続化（事業モード）。
+  Future<void> setHideAdvisory(bool v) async {
+    if (_hideAdvisory == v) return;
+    _hideAdvisory = v;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kHideAdvisory, v);
     notifyListeners();
   }
 
