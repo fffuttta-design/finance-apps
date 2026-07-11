@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/app_mode.dart';
+import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 import '../utils/modal_input.dart';
 import '../widgets/centered_body.dart';
+import 'account_detail_screen.dart';
 import 'expense_input_screen.dart';
 import 'income_input_screen.dart';
 import 'receipt_viewer_screen.dart';
@@ -31,6 +33,71 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
   // 画面内で領収書の保管状態を更新できるよう、可変で保持する。
   late core.Transaction _cur = widget.transaction;
   core.Transaction get _t => _cur;
+
+  // 登録済み銀行口座（起動時に読み込み）。銀行取引なら通帳スタイルの
+  // 「銀行明細」レイアウトに切り替えるための突合に使う。
+  List<core.RegisteredBankAccount> _banks = const [];
+  bool _banksLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBanks();
+  }
+
+  Future<void> _loadBanks() async {
+    try {
+      final cfg = await SettingsRepository.instance.loadPayments();
+      if (!mounted) return;
+      setState(() {
+        _banks = cfg.bankAccounts;
+        _banksLoaded = true;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _banksLoaded = true);
+    }
+  }
+
+  /// 名前が「登録済みの銀行口座」に一致すればその口座を返す（現金/電子は除外）。
+  core.RegisteredBankAccount? _bankByName(String? n) {
+    if (n == null || n.trim().isEmpty) return null;
+    for (final b in _banks) {
+      if (b.accountType == core.AccountType.bank && b.name == n) return b;
+    }
+    return null;
+  }
+
+  /// この取引が「開くべき通帳」の銀行口座。null＝銀行明細でない（汎用画面）。
+  /// 振替は from を優先（無ければ to）で通帳を開く。
+  core.RegisteredBankAccount? get _bankAccount {
+    final t = _t;
+    if (t.type == core.TransactionType.transfer) {
+      return _bankByName(t.transferFromAccount) ??
+          _bankByName(t.transferToAccount);
+    }
+    return _bankByName(t.paymentMethod);
+  }
+
+  /// 種別バッジの文言（入金/出金/振替）。手数料も「出金」に含める。
+  String get _typeLabel {
+    switch (_t.type) {
+      case core.TransactionType.income:
+        return '入金';
+      case core.TransactionType.transfer:
+        return '振替';
+      case core.TransactionType.expense:
+        return '出金';
+    }
+  }
+
+  /// 口座名（登録があれば下4桁を併記）。
+  String _acctLabel(String? name) {
+    final nm = (name ?? '').trim();
+    if (nm.isEmpty) return '—';
+    final b = _bankByName(nm);
+    final l4 = b?.last4;
+    return (l4 != null && l4.trim().isNotEmpty) ? '$nm（••••$l4）' : nm;
+  }
 
   /// 紙のレシートで保管済み（現物を税理士へ）フラグの切替。
   /// receiptSaved（対応済みチェック）＝紙でもドライブでも共通、種類は receiptType に記録。
@@ -125,6 +192,18 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 口座一覧の読み込み前は判定できないので、ちらつき防止でローディング表示。
+    if (!_banksLoaded) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF7F8FA),
+        appBar: AppBar(title: const Text('明細')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    // 登録銀行口座に紐づく取引は「銀行明細」専用レイアウト（通帳スタイル）。
+    final bankAcc = _bankAccount;
+    if (bankAcc != null) return _buildBankScaffold(bankAcc);
+
     final t = _t;
     // 領収書・請求書の保管は「事業」だけ必要（税務のため）。
     // 個人モードでは領収書セクションを丸ごと出さない。
@@ -459,6 +538,211 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
           ),
         ],
       ),
+      ),
+    );
+  }
+
+  /// 銀行明細（通帳の1行）専用レイアウト。
+  /// 口座＋入金/出金/振替と摘要・日付だけを見せ、経費の型
+  /// （カテゴリ／領収書保管／立替）は隠す。残高の逆算はしない。
+  Widget _buildBankScaffold(core.RegisteredBankAccount bankAcc) {
+    final t = _t;
+    final wd = _wd[(t.date.weekday - 1) % 7];
+    final isTransfer = t.type == core.TransactionType.transfer;
+    // 売上入金など「収入で請求書(Drive)が紐づく」ときだけ請求書リンクを残す。
+    final hasReceipt = t.receiptUrl != null && t.receiptUrl!.trim().isNotEmpty;
+    final showInvoice = t.type == core.TransactionType.income && hasReceipt;
+    // 口座行の値：振替は「元 → 先」、それ以外は単一口座。
+    final acctValue = isTransfer
+        ? '${_acctLabel(t.transferFromAccount)} → ${_acctLabel(t.transferToAccount)}'
+        : _acctLabel(t.paymentMethod);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F8FA),
+      appBar: AppBar(title: const Text('銀行明細')),
+      body: CenteredBody(
+        maxWidth: 560,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          children: [
+            // 金額カード（摘要＋符号つき金額＋種別バッジ）
+            Container(
+              width: double.infinity,
+              padding:
+                  const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    t.description.isEmpty ? _typeLabel : t.description,
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w600),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    _signedAmount,
+                    style: TextStyle(
+                        fontSize: 34,
+                        fontWeight: FontWeight.w800,
+                        color: _accent),
+                  ),
+                  const SizedBox(height: 12),
+                  // 種別バッジ（入金＝緑／出金＝赤／振替＝グレー）
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _accent.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      _typeLabel,
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: _accent),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            // 明細項目（口座／日付／メモ）。カテゴリは出さない。
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Column(
+                children: [
+                  _row(isTransfer ? '口座（振替）' : '口座', acctValue),
+                  _div(),
+                  _row('日付',
+                      '${t.date.year}/${t.date.month}/${t.date.day}（$wd）'),
+                  if (t.memo != null && t.memo!.trim().isNotEmpty) ...[
+                    _div(),
+                    _row('メモ', t.memo!.trim()),
+                  ],
+                ],
+              ),
+            ),
+            // 売上入金だけ：請求書（Drive）を見るリンクを残す。
+            if (showInvoice) ...[
+              const SizedBox(height: 16),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 14, 16, 4),
+                      child: Row(
+                        children: [
+                          Text('請求書',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF374151))),
+                          Spacer(),
+                          Text('📄 ドライブに保管',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF059669))),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final url = t.receiptUrl;
+                          if (url == null || url.trim().isEmpty) return;
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ReceiptViewerScreen(
+                                driveUrl: url.trim(),
+                                title: '請求書',
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.receipt_long, size: 18),
+                        label: const Text('請求書を見る'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            // 通帳を開く（この取引が属する口座の明細一覧へ）
+            OutlinedButton.icon(
+              onPressed: _busy
+                  ? null
+                  : () async {
+                      final changed = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              AccountDetailScreen(account: bankAcc),
+                        ),
+                      );
+                      // 通帳側で編集/削除された可能性があるので一覧を再読込させる。
+                      if (changed == true && mounted) {
+                        Navigator.pop(context, true);
+                      }
+                    },
+              icon: const Icon(Icons.account_balance, size: 18),
+              label: Text('${bankAcc.name} の通帳を開く'),
+              style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14)),
+            ),
+            const SizedBox(height: 12),
+            // 編集 / 削除（汎用画面と同じ挙動。振替は専用エディタ）
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _busy ? null : _edit,
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('編集'),
+                    style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _busy ? null : _delete,
+                    icon: _busy
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.delete_outline, size: 18),
+                    label: const Text('削除'),
+                    style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFDC2626),
+                        padding: const EdgeInsets.symmetric(vertical: 14)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

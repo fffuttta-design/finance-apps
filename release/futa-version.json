@@ -1,1 +1,1 @@
-{"version":"1.0.511","buildNumber":"512","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.511/futa-finance-v1.0.511.apk","releaseNotes":"固定費やクレカ引落を自動で記録したとき、「何を・いくら」記録したのか内訳をポップアップで表示するようにしました。"}
+{"version":"1.0.512","buildNumber":"513","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.512/futa-finance-v1.0.512.apk","releaseNotes":"銀行口座の取引（振込手数料・引落・入金・振替など）を、通帳のように口座と入金/出金だけを見せる「銀行明細」専用の詳細画面にしました。「通帳を開く」ボタンも追加。"}
