@@ -1,7 +1,10 @@
+import 'package:finance_core/finance_core.dart' as core;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../utils/formatters.dart';
 
 import '../data/app_mode.dart';
 import '../data/card_settlement_service.dart';
@@ -96,13 +99,17 @@ class _V2RootState extends State<V2Root>
     final fresh =
         await _unnotifiedIds('futa.fixedcost.notified', created.map((t) => t.id));
     if (!mounted || fresh.isEmpty) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('🧾 固定費を${fresh.length}件、実明細として記録しました'),
-      duration: const Duration(seconds: 4),
-    ));
+    // 「何を・いくら」実明細化したのかポップアップで一覧表示する（要望）。
+    final items = created.where((t) => fresh.contains(t.id)).toList();
+    await _showMaterializedDialog(
+      emoji: '🧾',
+      title: '固定費を実明細として記録しました',
+      subtitle: '請求日を過ぎた固定費（サブスク）を、明細に自動で追加しました。',
+      items: items,
+    );
   }
 
-  /// クレカの自動引き落としを生成し、初回だけスナックバーで知らせる。
+  /// クレカの自動引き落としを生成し、初回だけポップアップで知らせる。
   /// モードごとに1セッション1回（frequentな _onChange で呼んでも短絡する）。
   Future<void> _runCardSettlement() async {
     final created = await CardSettlementService.runOncePerMode(
@@ -111,10 +118,102 @@ class _V2RootState extends State<V2Root>
     final fresh = await _unnotifiedIds(
         'futa.cardsettle.notified', created.map((t) => t.id));
     if (!mounted || fresh.isEmpty) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('💳 クレカ引落を${fresh.length}件、自動で記録しました'),
-      duration: const Duration(seconds: 4),
-    ));
+    final items = created.where((t) => fresh.contains(t.id)).toList();
+    await _showMaterializedDialog(
+      emoji: '💳',
+      title: 'クレカ引落を自動で記録しました',
+      subtitle: '引落日を過ぎたクレジットカードの請求を、明細に自動で追加しました。',
+      items: items,
+    );
+  }
+
+  /// 「何を・いくら」自動記録したのかを一覧表示するポップアップ。
+  /// 固定費／クレカ引落の自動記録で共通利用する。
+  Future<void> _showMaterializedDialog({
+    required String emoji,
+    required String title,
+    required String subtitle,
+    required List<core.Transaction> items,
+  }) async {
+    if (!mounted || items.isEmpty) return;
+    final total = items.fold<int>(0, (s, t) => s + t.amount);
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(children: [
+          Text(emoji, style: const TextStyle(fontSize: 22)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text('$title（${items.length}件）',
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+          ),
+        ]),
+        content: SizedBox(
+          width: 380,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(subtitle,
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+              const SizedBox(height: 12),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: items.length,
+                  separatorBuilder: (_, _) => Divider(
+                      height: 1, color: Colors.grey.shade200),
+                  itemBuilder: (_, i) {
+                    final t = items[i];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(children: [
+                        // 日付（M/D）
+                        SizedBox(
+                          width: 48,
+                          child: Text(monthDayOnly(t.date),
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey.shade500)),
+                        ),
+                        // 名前（取引内容）
+                        Expanded(
+                          child: Text(
+                            t.description.isEmpty ? '（無題）' : t.description,
+                            style: const TextStyle(fontSize: 14),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // 金額
+                        Text('-${formatYen(t.amount)}',
+                            style: const TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w600)),
+                      ]),
+                    );
+                  },
+                ),
+              ),
+              const Divider(height: 20),
+              Row(children: [
+                const Text('合計',
+                    style:
+                        TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                Text('-${formatYen(total)}',
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold)),
+              ]),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// 月（YYYY年M月）を使うタブか。ホーム/支出/収入だけ共有月ナビを出す。
