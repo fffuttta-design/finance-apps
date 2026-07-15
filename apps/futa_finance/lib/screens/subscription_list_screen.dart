@@ -376,14 +376,18 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
       ),
       builder: (sheetCtx) => StatefulBuilder(
         builder: (ctx, setLocal) {
-          // フォーム入力可否（バリデーション）
+          // フォーム入力可否（バリデーション）。場所は必須。
           final isValid = nameCtrl.text.trim().isNotEmpty &&
-              (parseAmount(amountCtrl.text) ?? 0) > 0;
+              (parseAmount(amountCtrl.text) ?? 0) > 0 &&
+              storeCtrl.text.trim().isNotEmpty;
 
           void onSave() {
             final name = nameCtrl.text.trim();
             final amount = parseAmount(amountCtrl.text);
-            if (name.isEmpty || amount == null || amount <= 0) {
+            if (name.isEmpty ||
+                amount == null ||
+                amount <= 0 ||
+                storeCtrl.text.trim().isEmpty) {
               Navigator.pop(ctx, null);
               return;
             }
@@ -424,8 +428,7 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
               plMajor: pl,
               categoryMajor: cm,
               categorySub: cs,
-              store:
-                  storeCtrl.text.trim().isEmpty ? null : storeCtrl.text.trim(),
+              store: storeCtrl.text.trim(), // 必須（上のバリデーションで空は弾く）
               receiptKind: receiptKind,
               startYearMonth:
                   (startYm == null || startYm!.trim().isEmpty)
@@ -701,9 +704,9 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                               ],
                               onChanged: (v) => setLocal(() {
                                 categoryMajor = v;
-                                final subs = subsOfMajor(v);
-                                categorySub =
-                                    subs.isNotEmpty ? subs.first : null;
+                                // 小カテゴリは自分で選ぶ。先頭を勝手に入れない
+                                // （意図しない小カテゴリのまま保存されるため）。
+                                categorySub = null;
                               }),
                             ),
                             // 大カテゴリを選んでいれば小カテゴリの編集リンクを出す。
@@ -750,14 +753,16 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                               ),
                             ],
                           ],
-                          // 場所（明細化したとき取引の「場所」に入る）。
+                          // 場所（明細化したとき取引の「場所」に入る）。必須。
                           const SizedBox(height: 12),
                           TextField(
                             controller: storeCtrl,
+                            // 入力に応じて保存ボタンの活性を切り替える。
+                            onChanged: (_) => setLocal(() {}),
                             decoration: const InputDecoration(
                               isDense: true,
                               border: OutlineInputBorder(),
-                              labelText: '場所（任意）',
+                              labelText: '場所',
                               hintText: '例: Amazon・コミュファ光',
                               helperText: '明細に付く「場所」。場所別の集計に出ます',
                             ),
