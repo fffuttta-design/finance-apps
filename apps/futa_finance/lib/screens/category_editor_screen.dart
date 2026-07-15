@@ -119,6 +119,9 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
           controller: controller,
           autofocus: true,
           decoration: InputDecoration(labelText: label),
+          // Enter で OK（入力してすぐ確定できるように）。
+          textInputAction: TextInputAction.done,
+          onSubmitted: (v) => Navigator.pop(context, v),
         ),
         actions: [
           TextButton(

@@ -1,7 +1,22 @@
 # FutaFinance 仕様書
 
-> **最終更新: 2026-07-15 / v1.0.518+519**
+> **最終更新: 2026-07-15 / v1.0.519+520**
 > 変更があるたびにこのファイルを編集してバージョンを更新すること。
+>
+> **v1.0.519 の主な変更（2026-07-15）**（固定費まわりの使い勝手）
+>
+> - **固定費の編集シートからカテゴリ自体を編集できるようにした**（`subscription_edit_sheet.dart`）。
+>   支出フォームと同じ「カテゴリ編集」「小カテゴリ編集」リンクを追加し、
+>   `CategoryEditorScreen` / `CategorySubEditorScreen` を開く。戻ったら `reloadCategories` で
+>   候補を読み直し、消えたカテゴリを選んでいたら選択を外す（Dropdown が値を見つけられず落ちるため）。
+>   - ⚠ `categoryOptions` は引数で固定なので、書き換え可能なコピー `options` を持つように変更。
+>   - **小カテゴリ編集リンクは小カテゴリが0件でも出す**（ここから追加したいので）。
+>   - 小カテゴリ編集に渡す `majorIndex` は `majorIndexOf()` で表示名（"1.通信費"）から素の名前で突き合わせて引く。
+> - **小さい入力ポップアップを Enter で確定できるようにした**（`textInputAction: done` ＋ `onSubmitted`）。
+>   対象＝大カテゴリ追加/改名・小カテゴリ追加/改名（`category_editor_screen.dart` /
+>   `category_sub_editor_screen.dart`）、変動費の「今月の金額を入力」（`rich_expenses.dart`）。
+> - **固定費・サブスク一覧の各行にカテゴリを表示**（`subscription_list_screen.dart` `_categoryLabel`）。
+>   「大 › 小」表記（大カテゴリの自動番号は外す）。未設定なら行ごと出さない。
 >
 > **v1.0.518 の主な変更（2026-07-15）**（マウスの戻るボタンが効かない不具合を修正）
 >

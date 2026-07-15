@@ -81,6 +81,19 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
 
   String _genId() => DateTime.now().microsecondsSinceEpoch.toString();
 
+  /// 一覧に出すカテゴリ表記。「大 › 小」（小が無ければ大だけ）。
+  /// 大カテゴリの先頭の自動番号（"1." など）は外して見せる。
+  /// 両方とも未設定なら null（＝行を出さない）。
+  String? _categoryLabel(Subscription s) {
+    final major =
+        (s.categoryMajor ?? '').replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
+    final sub = (s.categorySub ?? '').trim();
+    if (major.isEmpty && sub.isEmpty) return null;
+    if (major.isEmpty) return sub;
+    if (sub.isEmpty) return major;
+    return '$major › $sub';
+  }
+
   List<String> get _paymentMethods {
     final p = _payments;
     if (p == null) return const [];
@@ -1632,6 +1645,25 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                         const SizedBox(width: 3),
                         Expanded(
                           child: Text(s.paymentMethod!,
+                              style: const TextStyle(
+                                  fontSize: 10,
+                                  color: Color(0xFF9CA3AF)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                    ),
+                  ],
+                  // カテゴリ（明細に付く大/小カテゴリ）。付いている時だけ出す。
+                  if (_categoryLabel(s) != null) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        const Icon(Icons.local_offer_outlined,
+                            size: 10, color: Color(0xFF9CA3AF)),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(_categoryLabel(s)!,
                               style: const TextStyle(
                                   fontSize: 10,
                                   color: Color(0xFF9CA3AF)),

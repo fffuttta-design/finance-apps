@@ -427,6 +427,12 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
           autofocus: true,
           decoration: const InputDecoration(
               prefixText: '¥ ', labelText: '金額（円）'),
+          // Enter で保存（入力してすぐ確定できるように）。
+          textInputAction: TextInputAction.done,
+          onSubmitted: (s) {
+            final n = int.tryParse(s.replaceAll(RegExp(r'[^0-9]'), ''));
+            if (n != null) Navigator.pop(dctx, n);
+          },
         ),
         actions: [
           TextButton(

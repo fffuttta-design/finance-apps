@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'memo_field.dart';
 import 'package:finance_core/finance_core.dart';
 
+import '../data/settings_repository.dart';
+import '../screens/category_editor_screen.dart';
+import '../screens/category_sub_editor_screen.dart';
 import '../utils/thousands_separator_input_formatter.dart';
 import 'brand_logo.dart';
 
@@ -44,15 +47,70 @@ Future<Subscription?> showSubscriptionEditSheet(
   // PL計上の開始年月（"YYYY-MM"）。これより前は業績PLに計上しない。
   String? startYm = initial?.startYearMonth;
 
+  // カテゴリはこのシートからも編集できる（編集画面から戻ったら読み直す）ので、
+  // 引数のリストをそのまま使わず、書き換えられるコピーを持つ。
+  var options = List<({String major, List<String> subs})>.of(categoryOptions);
+
   String bareName(String s) =>
       s.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
   List<String> subsOfMajor(String? m) {
     if (m == null) return const [];
-    for (final o in categoryOptions) {
+    for (final o in options) {
       if (o.major == m) return o.subs;
     }
     return const [];
   }
+
+  /// カテゴリ編集画面から戻ったあと、候補を読み直して選択中の値の整合を取る。
+  Future<void> reloadCategories(StateSetter setLocal) async {
+    final c = await SettingsRepository().loadCategories();
+    final next = <({String major, List<String> subs})>[];
+    for (var i = 0; i < c.majors.length; i++) {
+      final m = c.majors[i];
+      if (m.inactive) continue;
+      next.add((major: m.displayName(i), subs: m.subs));
+    }
+    setLocal(() {
+      options = next;
+      // 選んでいたカテゴリが消えていたら選択を外す（Dropdownが値を見つけられず落ちる）。
+      if (categoryMajor != null &&
+          !options.any((o) => o.major == categoryMajor)) {
+        categoryMajor = null;
+        categorySub = null;
+      } else if (categorySub != null &&
+          !subsOfMajor(categoryMajor).contains(categorySub)) {
+        categorySub = null;
+      }
+    });
+  }
+
+  /// 小カテゴリ編集画面に渡す「大カテゴリの番号」を、表示名から引く。
+  /// 表示名は "1.通信費" のように番号付きなので、素の名前でも突き合わせる。
+  Future<int> majorIndexOf(String displayName) async {
+    final c = await SettingsRepository().loadCategories();
+    String norm(String s) => s.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
+    for (var i = 0; i < c.majors.length; i++) {
+      final dn = c.majors[i].displayName(i);
+      if (dn == displayName || norm(dn) == norm(displayName)) return i;
+    }
+    return -1;
+  }
+
+  /// 「カテゴリ編集」リンク（支出フォームと同じ導線）。
+  Widget categoryEditLink(String label, VoidCallback onTap) => Align(
+        alignment: Alignment.centerRight,
+        child: TextButton.icon(
+          onPressed: onTap,
+          icon: const Icon(Icons.tune, size: 14),
+          label: Text(label, style: const TextStyle(fontSize: 12)),
+          style: TextButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          ),
+        ),
+      );
 
   Future<void> pickAnnualDate(StateSetter setLocal) async {
     DateTime temp = nextDate ?? DateTime.now();
@@ -491,12 +549,28 @@ Future<Subscription?> showSubscriptionEditSheet(
                             onChanged: (v) =>
                                 setLocal(() => paymentMethod = v),
                           ),
-                        if (categoryOptions.isNotEmpty) ...[
+                        if (options.isNotEmpty) ...[
                           const SizedBox(height: 16),
-                          const Text('カテゴリ（明細に付く大/小カテゴリ）',
-                              style: TextStyle(
-                                  fontSize: 12, color: Color(0xFF6B7280))),
-                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Text('カテゴリ（明細に付く大/小カテゴリ）',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF6B7280))),
+                              ),
+                              // 支出フォームと同じく、ここからカテゴリ自体を編集できる。
+                              categoryEditLink('カテゴリ編集', () async {
+                                await Navigator.push<void>(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) =>
+                                          const CategoryEditorScreen()),
+                                );
+                                await reloadCategories(setLocal);
+                              }),
+                            ],
+                          ),
                           const Text(
                               '「固定費」はフラグとして持ち、大/小カテゴリは普通のカテゴリ（食費・自己投資など）を使います',
                               style: TextStyle(
@@ -504,6 +578,7 @@ Future<Subscription?> showSubscriptionEditSheet(
                           const SizedBox(height: 8),
                           // 大カテゴリ（支出を記録と同じ普通のカテゴリ）。
                           DropdownButtonFormField<String>(
+                            key: ValueKey('major_${options.length}_$categoryMajor'),
                             initialValue: categoryMajor,
                             isExpanded: true,
                             decoration: const InputDecoration(
@@ -517,12 +592,12 @@ Future<Subscription?> showSubscriptionEditSheet(
                                   value: null, child: Text('指定なし')),
                               if (categoryMajor != null &&
                                   categoryMajor!.trim().isNotEmpty &&
-                                  !categoryOptions
+                                  !options
                                       .any((o) => o.major == categoryMajor))
                                 DropdownMenuItem(
                                     value: categoryMajor,
                                     child: Text(bareName(categoryMajor!))),
-                              for (final o in categoryOptions)
+                              for (final o in options)
                                 DropdownMenuItem(
                                     value: o.major,
                                     child: Text(bareName(o.major))),
@@ -534,10 +609,27 @@ Future<Subscription?> showSubscriptionEditSheet(
                                   subs.isNotEmpty ? subs.first : null;
                             }),
                           ),
+                          // 大カテゴリを選んでいれば小カテゴリの編集リンクを出す。
+                          // ⚠ 小カテゴリが0件のときも出す（ここから追加したいので）。
+                          if (categoryMajor != null)
+                            categoryEditLink('小カテゴリ編集', () async {
+                              final idx = await majorIndexOf(categoryMajor!);
+                              if (idx < 0) return;
+                              if (!context.mounted) return;
+                              await Navigator.push<void>(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => CategorySubEditorScreen(
+                                        majorIndex: idx)),
+                              );
+                              await reloadCategories(setLocal);
+                            }),
                           if (categoryMajor != null &&
                               subsOfMajor(categoryMajor).isNotEmpty) ...[
                             const SizedBox(height: 8),
                             DropdownButtonFormField<String>(
+                              key: ValueKey(
+                                  'sub_${subsOfMajor(categoryMajor).length}_$categorySub'),
                               initialValue:
                                   subsOfMajor(categoryMajor).contains(categorySub)
                                       ? categorySub
