@@ -11,6 +11,8 @@ import '../utils/thousands_separator_input_formatter.dart';
 
 /// 振替入力モーダルを表示する。保存/削除成功時は true を返す。
 /// [editing] を渡すと「振替を編集」モードで開く（プリフィル＋更新/削除）。
+/// [editing] が支出/収入のときは「振替に変更」モード＝同じIDのまま振替に作り替える
+/// （ExpenseInputScreen の「この取引を振替に変更」から呼ばれる）。
 Future<bool?> showTransferInputModal(BuildContext context,
     {core.Transaction? editing}) {
   return showModalBottomSheet<bool>(
@@ -47,7 +49,8 @@ class TransferInputScreen extends StatefulWidget {
   /// 起動時に移動元口座をプリセット（口座詳細画面から呼ばれた時など）。
   final String? initialFromAccount;
 
-  /// 編集対象の振替取引（null=新規作成）。
+  /// 編集対象の取引（null=新規作成）。
+  /// 振替なら「振替を編集」。支出/収入なら「振替に変更」＝同じIDのまま振替に作り替える。
   final core.Transaction? editing;
 
   @override
@@ -67,6 +70,11 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
   final _nameCtrl = TextEditingController();
   bool _saving = false;
 
+  /// 支出/収入を振替に作り替えるモード（＝「振替に変更」から開いた）。
+  bool get _isConverting =>
+      widget.editing != null &&
+      widget.editing!.type != core.TransactionType.transfer;
+
   @override
   void initState() {
     super.initState();
@@ -76,6 +84,12 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
       _date = e.date;
       _fromAccount = e.transferFromAccount;
       _toAccount = e.transferToAccount;
+      // 支出/収入から来たときは振替の口座がまだ無い。支払方法（例: 住信SBI）を
+      // 移動元の初期値にする（口座候補に無ければ _load が未選択に落とす）。
+      if (_isConverting && _fromAccount == null) {
+        final pm = e.paymentMethod.trim();
+        if (pm.isNotEmpty) _fromAccount = pm;
+      }
       _amountCtrl.text = formatAmount(e.amount);
       _memoCtrl.text = e.memo ?? '';
       // 自動命名（移動元 → 移動先）でなければ、付けた名前として復元。
@@ -104,6 +118,18 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
       _templates = t.templates;
       if (_fromAccount == null && widget.initialFromAccount != null) {
         _fromAccount = widget.initialFromAccount;
+      }
+      // 候補に無い口座名（休眠にした/改名した口座、支払方法がクレカだった支出からの
+      // 変更など）が残っていると Dropdown が値を見つけられず画面が落ちる。
+      // 未選択に落として選び直してもらう。
+      final fromOk = _accountChoices().map((c) => c.value).toSet();
+      final toOk =
+          _accountChoices(includeCards: true).map((c) => c.value).toSet();
+      if (_fromAccount != null && !fromOk.contains(_fromAccount)) {
+        _fromAccount = null;
+      }
+      if (_toAccount != null && !toOk.contains(_toAccount)) {
+        _toAccount = null;
       }
     });
   }
@@ -174,6 +200,13 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
         reviewed: editing?.reviewed ?? false,
         sortOrder: editing?.sortOrder,
         createdAt: editing?.createdAt,
+        // 支出から振替に変えたときに、証憑リンクや場所を落とさない
+        // （振替の画面には出ないが、間違って変えたとき戻せなくなるのを防ぐ）。
+        store: editing?.store,
+        receiptUrl: editing?.receiptUrl,
+        receiptId: editing?.receiptId,
+        receiptSaved: editing?.receiptSaved ?? false,
+        receiptType: editing?.receiptType,
       );
       if (editing != null) {
         await TransactionRepository.instance.update(tx);
@@ -442,7 +475,10 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(isEditing ? '振替を編集' : '振替を記録',
+        title: Text(
+            _isConverting
+                ? '振替に変更'
+                : (isEditing ? '振替を編集' : '振替を記録'),
             style: const TextStyle(fontWeight: FontWeight.w700)),
         actions: [
           if (isEditing)
@@ -465,6 +501,23 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // 「振替に変更」で開いたときは、何が起きるかを先に伝える。
+            if (_isConverting) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFBFDBFE)),
+                ),
+                child: const Text(
+                  'この取引を振替に作り替えます。移動元と移動先を選んで保存してください。\n'
+                  '保存すると支出ではなくなり、収支（PL）から外れて口座残高の移動だけになります。',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF1E3A8A)),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             // よく使う振替（テンプレ）
             _buildTemplateSection(),
             const SizedBox(height: 12),

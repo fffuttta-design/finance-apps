@@ -21,6 +21,7 @@ import 'category_editor_screen.dart';
 import 'category_sub_editor_screen.dart';
 import 'receipt_camera_screen.dart';
 import 'store_master_screen.dart';
+import 'transfer_input_screen.dart';
 
 /// 支払元のカテゴリ。UI 上はまずこれを選択 → 該当の項目プルダウンが切り替わる。
 /// 表示順 = クレカ・電子・現金・銀行（使用頻度の高い順）。
@@ -904,6 +905,36 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     navigator.pop(true);
   }
 
+  /// この支出を振替に作り替える（区分の変更）。
+  /// 振替エディタを同じIDで開き、移動元/先を選んで保存させる＝支出が振替になる。
+  /// 例: ATMの現金出金を、口座→現金の振替に直す（PLの経費から外す）。
+  Future<void> _convertToTransfer() async {
+    final e = widget.editing;
+    if (e == null) return;
+    // 非同期の後に閉じるため Navigator を await 前にキャプチャ（Windows対策）。
+    final navigator = Navigator.of(context);
+    final changed = await showTransferInputModal(context, editing: e);
+    if (changed != true) return; // やめた＝支出のまま
+    // 立替精算の相方（settle_<id> の回収用振替）が残ると二重計上になるので消す。
+    await _deleteSettleCompanion(e.id);
+    navigator.pop(true);
+  }
+
+  /// 立替精算でこの支出に紐づけて作った回収用の振替を消す（あれば）。
+  Future<void> _deleteSettleCompanion(String txId) async {
+    try {
+      final all = await TransactionRepository.instance.loadAll();
+      for (final t in all) {
+        if (t.id == 'settle_$txId') {
+          await TransactionRepository.instance.delete(t.id);
+          break;
+        }
+      }
+    } catch (_) {
+      // 消せなくても振替への変更自体は成立している（残高は取引から再計算される）。
+    }
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     // 非同期処理の後に閉じるため、Navigator/Messenger は await の前にキャプチャ。
@@ -1165,6 +1196,24 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              // 区分の変更（あとから「これは振替だった」と気づいたとき用）。
+              // 振替は入力項目が別なので、専用エディタに同じIDのまま引き継ぐ。
+              if (widget.editing != null) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _saving ? null : _convertToTransfer,
+                    icon: const Icon(Icons.swap_horiz, size: 18),
+                    label: const Text('この取引を振替に変更'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF4F46E5),
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+              ],
               // レシートOCRから来て品目が複数ある時：記録方法トグル。
               if (widget.receiptItems != null &&
                   widget.receiptItems!.length >= 2 &&
