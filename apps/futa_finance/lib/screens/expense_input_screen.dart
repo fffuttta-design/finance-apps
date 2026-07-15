@@ -1198,21 +1198,27 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
             children: [
               // 区分の変更（あとから「これは振替だった」と気づいたとき用）。
               // 振替は入力項目が別なので、専用エディタに同じIDのまま引き継ぐ。
+              // ⚠ めったに使わない操作なので、目立たせない（小さいグレーの文字リンク・右寄せ）。
+              //   色付き＋左寄せだと入力欄より先に目に入ってしまう。
               if (widget.editing != null) ...[
                 Align(
-                  alignment: Alignment.centerLeft,
+                  alignment: Alignment.centerRight,
                   child: TextButton.icon(
                     onPressed: _saving ? null : _convertToTransfer,
-                    icon: const Icon(Icons.swap_horiz, size: 18),
-                    label: const Text('この取引を振替に変更'),
+                    icon: const Icon(Icons.swap_horiz, size: 14),
+                    label: const Text('振替に変更', style: TextStyle(fontSize: 12)),
                     style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF4F46E5),
+                      foregroundColor: const Color(0xFF9CA3AF),
+                      backgroundColor: Colors.transparent,
+                      overlayColor: const Color(0xFF9CA3AF),
                       visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 4),
                     ),
                   ),
                 ),
-                const SizedBox(height: 4),
               ],
               // レシートOCRから来て品目が複数ある時：記録方法トグル。
               if (widget.receiptItems != null &&

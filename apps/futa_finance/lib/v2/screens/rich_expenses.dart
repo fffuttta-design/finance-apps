@@ -27,6 +27,9 @@ import '../widgets/credit_card_reconcile.dart';
 import '../widgets/expense_detail_table.dart';
 import '../widgets/month_closing_bar.dart';
 
+/// サマリーの「高額明細」に出す下限（実質負担がこの額以上の取引を並べる）。
+const int _kBigAmount = 10000;
+
 /// 新デザイン（リッチUI）の経費／支出タブ。
 /// 月サマリー → カテゴリ内訳 → 明細リスト。既存 V2ExpensesScreen は温存。
 class RichExpensesScreen extends StatefulWidget {
@@ -966,6 +969,12 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     final paymentEntries = byPayment.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
+    // 高額明細（1万円以上）。「今月なににお金が飛んだか」をサマリーの展開だけで
+    // つかめるようにする（カテゴリ内訳を1つずつ開かなくて済む）。金額降順。
+    // 実質負担（立替を引いた額）で判定＝立替で戻る分は高額扱いしない。
+    final bigRows = rows.where((t) => t.effectiveAmount >= _kBigAmount).toList()
+      ..sort((a, b) => b.effectiveAmount.compareTo(a.effectiveAmount));
+
     // 支出本文のセクション群。
     // ※ 以前ここを ListView 化して画面外を間引く最適化を入れたが、シェルが本文へ渡す
     //   制約の都合でスマホの明細が真っ白（レイアウト例外）になったため、確実に表示できる
@@ -1064,6 +1073,22 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                             const SizedBox(height: 6),
                             for (final e in paymentEntries)
                               _summaryLine(e.key, e.value),
+                            // ── 高額明細（1万円以上）──
+                            if (bigRows.isNotEmpty) ...[
+                              const SizedBox(height: 14),
+                              const Divider(height: 1, color: V2Colors.divider),
+                              const SizedBox(height: 14),
+                              _breakdownHeader(Icons.priority_high,
+                                  '高額明細（1万円以上・${bigRows.length}件）'),
+                              const SizedBox(height: 6),
+                              for (final t in bigRows)
+                                _summaryLine(
+                                  t.description.trim().isEmpty
+                                      ? formatMonthDay(t.date)
+                                      : '${formatMonthDay(t.date)}  ${t.description.trim()}',
+                                  t.effectiveAmount,
+                                ),
+                            ],
                           ],
                         ),
                       ),
