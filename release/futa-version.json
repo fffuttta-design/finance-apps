@@ -1,1 +1,1 @@
-{"version":"1.0.526","buildNumber":"527","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.526/futa-finance-v1.0.526.apk","releaseNotes":"旧UIの使われていないコード（12ファイル・約5,800行）を削除しました。見た目・機能の変更はありません。"}
+{"version":"1.0.527","buildNumber":"528","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.527/futa-finance-v1.0.527.apk","releaseNotes":"レシートで記録したとき、常に「品目ごと」の入力画面が開くようになりました。「まとめて1件 / 品目ごと」の切り替えトグルは撤去しています。"}
