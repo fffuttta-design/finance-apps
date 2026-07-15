@@ -18,6 +18,7 @@ import '../v2/widgets/credit_card_reconcile.dart';
 import '../v2/widgets/expense_detail_table.dart';
 import '../widgets/brand_logo.dart';
 import 'expense_input_screen.dart';
+import 'transaction_detail_screen.dart';
 import 'subscription_list_screen.dart';
 
 /// クレジットカード詳細（利用明細）画面。
@@ -1202,7 +1203,14 @@ class _CardDetailScreenState extends State<CardDetailScreen>
   Future<void> _editCardTxn(core.Transaction t) async {
     if (!await _confirmEditClosed(t)) return;
     if (!mounted) return;
-    await showInputSheet<bool>(context, ExpenseInputScreen(editing: t));
+    // 支出タブ（rich_expenses の _edit）と同じく、まず明細の詳細画面を出す。
+    // ⚠ ここだけ編集フォームを直接開いていたため、同じ「鉛筆」でも
+    //   クレカ明細だけ挙動が違っていた。詳細画面から編集/削除へ進む。
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+          builder: (_) => TransactionDetailScreen(transaction: t)),
+    );
     if (mounted) await _load();
   }
 
