@@ -18,6 +18,7 @@ import '../v2/widgets/credit_card_reconcile.dart';
 import '../v2/widgets/expense_detail_table.dart';
 import '../widgets/brand_logo.dart';
 import 'expense_input_screen.dart';
+import 'receipt_group_detail_screen.dart';
 import 'transaction_detail_screen.dart';
 import 'subscription_list_screen.dart';
 
@@ -736,6 +737,7 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                                     title: '明細',
                                     rows: monthTxns,
                                     onEditTxn: _editCardTxn,
+                                    onOpenGroup: _openCardGroup,
                                     accent: const Color(0xFFDC2626),
                                     // 固定費は月モードのときだけ混ぜる
                                     // （範囲指定はまたぐ月が曖昧なので出さない）。
@@ -1210,6 +1212,19 @@ class _CardDetailScreenState extends State<CardDetailScreen>
       context,
       MaterialPageRoute(
           builder: (_) => TransactionDetailScreen(transaction: t)),
+    );
+    if (mounted) await _load();
+  }
+
+  /// レシートまとめ（「N品」）行タップ：品目の内訳は「まとめ明細」画面で見せる。
+  /// 表の中で展開すると他の明細が下に押し出されて見づらいため。
+  Future<void> _openCardGroup(List<core.Transaction> members) async {
+    if (!await _confirmEditClosed(members.first)) return;
+    if (!mounted) return;
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+          builder: (_) => ReceiptGroupDetailScreen(members: members)),
     );
     if (mounted) await _load();
   }

@@ -96,6 +96,11 @@ class ExpenseDetailTable extends StatefulWidget {
   /// 行タップ時（編集を開く等）。
   final Future<void> Function(core.Transaction t) onEditTxn;
 
+  /// レシートまとめ行（「N品」の行）タップ時。品目の内訳は表の中で展開せず、
+  /// 「まとめ明細」の詳細画面で見せる（v1.0.531〜）。表が縦に伸びて他の明細が
+  /// 押し出されるのを避けるため。呼び出し側で画面を開き、変更があれば再読込する。
+  final Future<void> Function(List<core.Transaction> members) onOpenGroup;
+
   /// アクセント色（バッジ選択色）。
   final Color accent;
 
@@ -150,6 +155,7 @@ class ExpenseDetailTable extends StatefulWidget {
     super.key,
     required this.rows,
     required this.onEditTxn,
+    required this.onOpenGroup,
     required this.accent,
     this.fixedRows = const [],
     this.onEditFixed,
@@ -211,9 +217,6 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
 
   /// 決済手段の絞り込み（null = すべて表示）。
   String? _payFilter;
-
-  /// 開いているレシートまとめ行（_Row.keyId）。既定は畳んだ状態。
-  final Set<String> _expanded = <String>{};
 
   /// ヘッダークリック：同じ列なら昇順/降順をトグル、別列なら列を切替（既定向き）。
   void _onSort(_SortCol col) {
@@ -675,13 +678,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                                   members: r.members!,
                                   total: r.amount,
                                   title: r.contentText,
-                                  expanded: _expanded.contains(r.keyId),
-                                  onToggleExpand: () => _toggleExpand(r.keyId),
-                                  onEditTxn: widget.onEditTxn,
-                                  showReceipt: widget.showReceiptCheck,
-                                  onToggleReceipt: widget.onToggleReceipt,
-                                  showReview: widget.onToggleReviewed != null,
-                                  onToggleReviewed: widget.onToggleReviewed,
+                                  onTap: () => widget.onOpenGroup(r.members!),
                                 )
                               : _NarrowRow(
                                   t: r.txn!,
@@ -748,9 +745,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                             ? _ExpenseGroupRow(
                                 members: r.members!,
                                 total: r.amount,
-                                expanded: _expanded.contains(r.keyId),
-                                onToggleExpand: () => _toggleExpand(r.keyId),
-                                onEditTxn: widget.onEditTxn,
+                                onTap: () => widget.onOpenGroup(r.members!),
                                 w: w,
                                 showReceipt: widget.showReceiptCheck,
                                 onToggleReceipt: widget.onToggleReceipt,
@@ -783,13 +778,6 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
         ],
       ],
     );
-  }
-
-  /// レシートまとめ行の開閉。
-  void _toggleExpand(String keyId) {
-    setState(() {
-      if (!_expanded.remove(keyId)) _expanded.add(keyId);
-    });
   }
 
   /// ページ内検索の「現在の1件」の行をオレンジ枠で囲み、ジャンプ先の目印にする。
@@ -1318,9 +1306,8 @@ const Color _kFixedAccent = Color(0xFFB45309); // 「固定費」バッジ文字
 
 // レシートまとめ行の見た目（品目の束＝1枚のレシートだと分かる淡いブルー系）。
 const Color _kGroupBg = Color(0xFFF7FAFD); // まとめ行の淡い背景
-const Color _kGroupChildBg = Color(0xFFFBFCFD); // 開いた品目行の背景
 const Color _kGroupBadgeBg = Color(0xFFDDEAF7); // 「N品」バッジ背景
-const Color _kGroupAccent = Color(0xFF1D4ED8); // 「N品」バッジ文字・左の縦線
+const Color _kGroupAccent = Color(0xFF1D4ED8); // 「N品」バッジ文字
 
 const double _kDateW = 64; // 「06/29(月)」が収まる幅。
 const double _kColGap = 8;
@@ -1709,14 +1696,13 @@ class _ExpenseRow extends StatelessWidget {
   }
 }
 
-/// 固定費の1行（PC幅）。取引行と同じ列割りだが、淡いアンバー背景＋
-/// 先頭に「固定費」バッジを付けて、ひと目で区別できるようにする。
+/// 同じレシートの品目を束ねた1行（PC幅）。取引行と同じ列割りだが、淡いブルー
+/// 背景＋「N品」バッジでレシート1枚分だと分かるようにし、タップすると品目の
+/// 内訳を「まとめ明細」画面で開く。
 class _ExpenseGroupRow extends StatelessWidget {
   final List<core.Transaction> members;
   final int total;
-  final bool expanded;
-  final VoidCallback onToggleExpand;
-  final Future<void> Function(core.Transaction t) onEditTxn;
+  final VoidCallback onTap;
   final _ColW w;
   final bool showReceipt;
   final Future<void> Function(core.Transaction t, bool value)? onToggleReceipt;
@@ -1725,9 +1711,7 @@ class _ExpenseGroupRow extends StatelessWidget {
   const _ExpenseGroupRow({
     required this.members,
     required this.total,
-    required this.expanded,
-    required this.onToggleExpand,
-    required this.onEditTxn,
+    required this.onTap,
     required this.w,
     this.showReceipt = false,
     this.onToggleReceipt,
@@ -1771,215 +1755,187 @@ class _ExpenseGroupRow extends StatelessWidget {
             : _head.description.trim());
     final pay = _common((t) => t.paymentMethod) ?? '複数';
     final reviewed = _allReviewed;
-    return Column(
-      children: [
-        InkWell(
-          onTap: onToggleExpand,
-          child: Container(
-            height: _kRowH,
-            color: reviewed ? _kReviewedBg : _kGroupBg,
-            child: Opacity(
-              opacity: reviewed ? 0.5 : 1,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                        width: w.date,
-                        child: _DateWithWeekday(date: _head.date)),
-                    _vGrid(_kColGap, _kRowH),
-                    SizedBox(
-                      width: w.major,
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: accent.withValues(alpha: 0.13),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: HiliteText(majorDisplay,
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: HSLColor.fromColor(accent)
-                                      .withLightness(0.30)
-                                      .toColor())),
-                        ),
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        height: _kRowH,
+        color: reviewed ? _kReviewedBg : _kGroupBg,
+        child: Opacity(
+          opacity: reviewed ? 0.5 : 1,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                SizedBox(
+                    width: w.date, child: _DateWithWeekday(date: _head.date)),
+                _vGrid(_kColGap, _kRowH),
+                SizedBox(
+                  width: w.major,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.13),
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                    ),
-                    _vGrid(_kHandleW, _kRowH),
-                    SizedBox(
-                      width: w.sub,
-                      child: HiliteText(subDisplay,
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                          style: const TextStyle(
-                              fontSize: 12, color: V2Colors.textSecondary)),
-                    ),
-                    _vGrid(_kHandleW, _kRowH),
-                    // 内容＝店名。左の ▶ と「N品」バッジでレシート束と分かるように。
-                    SizedBox(
-                      width: w.content,
-                      child: Row(
-                        children: [
-                          Icon(
-                              expanded
-                                  ? Icons.keyboard_arrow_down
-                                  : Icons.chevron_right,
-                              size: 16,
-                              color: V2Colors.textMuted),
-                          const SizedBox(width: 2),
-                          Flexible(
-                            child: HiliteText(title,
-                                style: V2Typography.body
-                                    .copyWith(fontWeight: FontWeight.w600),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 5, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: _kGroupBadgeBg,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text('${members.length}品',
-                                style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: _kGroupAccent)),
-                          ),
-                        ],
-                      ),
-                    ),
-                    _vGrid(_kHandleW, _kRowH),
-                    SizedBox(
-                      width: w.place,
-                      child: HiliteText(store.isEmpty ? '—' : store,
+                      child: HiliteText(majorDisplay,
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,
                           style: TextStyle(
                               fontSize: 12,
-                              color: store.isEmpty
-                                  ? V2Colors.textMuted
-                                  : V2Colors.textSecondary)),
+                              fontWeight: FontWeight.w600,
+                              color: HSLColor.fromColor(accent)
+                                  .withLightness(0.30)
+                                  .toColor())),
                     ),
-                    _vGrid(_kHandleW, _kRowH),
-                    SizedBox(
-                      width: w.pay,
-                      child: Row(
-                        children: [
-                          Icon(_paymentIcon(pay),
-                              size: 13, color: const Color(0xFF64748B)),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: HiliteText(pay,
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                                style: const TextStyle(
-                                    fontSize: 12, color: Color(0xFF64748B))),
-                          ),
-                        ],
-                      ),
-                    ),
-                    _vGrid(_kHandleW, _kRowH),
-                    SizedBox(
-                      width: w.amount,
-                      child: HiliteText('-${formatYen(total)}',
-                          amount: true,
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: V2Colors.negative,
-                              fontFeatures: V2Typography.tabularNums)),
-                    ),
-                    if (showReceipt) ...[
-                      _vGrid(_kColGap, _kRowH),
-                      SizedBox(
-                        width: _kReceiptW,
-                        child: Center(
-                          child: SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: Checkbox(
-                              value: _allReceipt,
-                              visualDensity: VisualDensity.compact,
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                              activeColor: const Color(0xFF16A34A),
-                              // 1枚のレシートなので、束のチェックは品目全部に反映する。
-                              onChanged: onToggleReceipt == null
-                                  ? null
-                                  : (v) async {
-                                      for (final t in members) {
-                                        await onToggleReceipt!(t, v ?? false);
-                                      }
-                                    },
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                    if (showReview) ...[
-                      _vGrid(_kColGap, _kRowH),
-                      SizedBox(
-                        width: _kReviewW,
-                        child: Center(
-                          child: SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: Checkbox(
-                              value: reviewed,
-                              visualDensity: VisualDensity.compact,
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                              activeColor: const Color(0xFF6B7280),
-                              onChanged: onToggleReviewed == null
-                                  ? null
-                                  : (v) async {
-                                      for (final t in members) {
-                                        await onToggleReviewed!(t, v ?? false);
-                                      }
-                                    },
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
-              ),
+                _vGrid(_kHandleW, _kRowH),
+                SizedBox(
+                  width: w.sub,
+                  child: HiliteText(subDisplay,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: const TextStyle(
+                          fontSize: 12, color: V2Colors.textSecondary)),
+                ),
+                _vGrid(_kHandleW, _kRowH),
+                // 内容＝店名。「N品」バッジでレシート束と分かるように。
+                // ▶ は「タップするとまとめ明細画面へ進む」の意味（展開はしない）。
+                SizedBox(
+                  width: w.content,
+                  child: Row(
+                    children: [
+                      const Icon(Icons.chevron_right,
+                          size: 16, color: V2Colors.textMuted),
+                      const SizedBox(width: 2),
+                      Flexible(
+                        child: HiliteText(title,
+                            style: V2Typography.body
+                                .copyWith(fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: _kGroupBadgeBg,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text('${members.length}品',
+                            style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: _kGroupAccent)),
+                      ),
+                    ],
+                  ),
+                ),
+                _vGrid(_kHandleW, _kRowH),
+                SizedBox(
+                  width: w.place,
+                  child: HiliteText(store.isEmpty ? '—' : store,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: store.isEmpty
+                              ? V2Colors.textMuted
+                              : V2Colors.textSecondary)),
+                ),
+                _vGrid(_kHandleW, _kRowH),
+                SizedBox(
+                  width: w.pay,
+                  child: Row(
+                    children: [
+                      Icon(_paymentIcon(pay),
+                          size: 13, color: const Color(0xFF64748B)),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: HiliteText(pay,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: const TextStyle(
+                                fontSize: 12, color: Color(0xFF64748B))),
+                      ),
+                    ],
+                  ),
+                ),
+                _vGrid(_kHandleW, _kRowH),
+                SizedBox(
+                  width: w.amount,
+                  child: HiliteText('-${formatYen(total)}',
+                      amount: true,
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: V2Colors.negative,
+                          fontFeatures: V2Typography.tabularNums)),
+                ),
+                if (showReceipt) ...[
+                  _vGrid(_kColGap, _kRowH),
+                  SizedBox(
+                    width: _kReceiptW,
+                    child: Center(
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: Checkbox(
+                          value: _allReceipt,
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          activeColor: const Color(0xFF16A34A),
+                          // 1枚のレシートなので、束のチェックは品目全部に反映する。
+                          onChanged: onToggleReceipt == null
+                              ? null
+                              : (v) async {
+                                  for (final t in members) {
+                                    await onToggleReceipt!(t, v ?? false);
+                                  }
+                                },
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                if (showReview) ...[
+                  _vGrid(_kColGap, _kRowH),
+                  SizedBox(
+                    width: _kReviewW,
+                    child: Center(
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: Checkbox(
+                          value: reviewed,
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          activeColor: const Color(0xFF6B7280),
+                          onChanged: onToggleReviewed == null
+                              ? null
+                              : (v) async {
+                                  for (final t in members) {
+                                    await onToggleReviewed!(t, v ?? false);
+                                  }
+                                },
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ),
-        // 開いたら品目行。列位置は親と揃えたまま、淡い背景で「中身」と分かるように。
-        if (expanded)
-          for (final t in members)
-            DecoratedBox(
-              decoration: const BoxDecoration(
-                color: _kGroupChildBg,
-                border: Border(
-                    top: BorderSide(color: V2Colors.divider),
-                    left: BorderSide(color: _kGroupAccent, width: 2)),
-              ),
-              child: _ExpenseRow(
-                t: t,
-                onTap: () => onEditTxn(t),
-                w: w,
-                showReceipt: showReceipt,
-                onToggleReceipt: onToggleReceipt,
-                showReview: showReview,
-                onToggleReviewed: onToggleReviewed,
-              ),
-            ),
-      ],
+      ),
     );
   }
 }
@@ -2264,122 +2220,85 @@ class _NarrowSortBar extends StatelessWidget {
 /// 狭い幅用の2行スリム行。
 /// 1行目：日付(曜日)＋内容＋金額／2行目：カテゴリ＋支払方法。
 /// レシートまとめの1行（スマホ幅）＋開いたときの品目行。
+/// 同じレシートの品目を束ねた1行（スマホ幅）。タップで「まとめ明細」画面へ。
 class _NarrowGroupRow extends StatelessWidget {
   final List<core.Transaction> members;
   final int total;
   final String title;
-  final bool expanded;
-  final VoidCallback onToggleExpand;
-  final Future<void> Function(core.Transaction t) onEditTxn;
-  final bool showReceipt;
-  final Future<void> Function(core.Transaction t, bool value)? onToggleReceipt;
-  final bool showReview;
-  final Future<void> Function(core.Transaction t, bool value)? onToggleReviewed;
+  final VoidCallback onTap;
   const _NarrowGroupRow({
     required this.members,
     required this.total,
     required this.title,
-    required this.expanded,
-    required this.onToggleExpand,
-    required this.onEditTxn,
-    this.showReceipt = false,
-    this.onToggleReceipt,
-    this.showReview = false,
-    this.onToggleReviewed,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final head = members.first;
     final reviewed = members.every((t) => t.reviewed);
-    return Column(
-      children: [
-        InkWell(
-          onTap: onToggleExpand,
-          child: Container(
-            color: reviewed ? _kReviewedBg : _kGroupBg,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Opacity(
-              opacity: reviewed ? 0.5 : 1,
-              child: Row(
-                children: [
-                  Icon(
-                      expanded
-                          ? Icons.keyboard_arrow_down
-                          : Icons.chevron_right,
-                      size: 18,
-                      color: V2Colors.textMuted),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        color: reviewed ? _kReviewedBg : _kGroupBg,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Opacity(
+          opacity: reviewed ? 0.5 : 1,
+          child: Row(
+            children: [
+              const Icon(Icons.chevron_right,
+                  size: 18, color: V2Colors.textMuted),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: HiliteText(title,
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
-                                  style: V2Typography.body.copyWith(
-                                      fontWeight: FontWeight.w600)),
-                            ),
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 5, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: _kGroupBadgeBg,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text('${members.length}品',
-                                  style: const TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: _kGroupAccent)),
-                            ),
-                          ],
+                        Flexible(
+                          child: HiliteText(title,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: V2Typography.body
+                                  .copyWith(fontWeight: FontWeight.w600)),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                            '${head.date.month}/${head.date.day}・${head.paymentMethod.trim()}',
-                            style: const TextStyle(
-                                fontSize: 11, color: V2Colors.textMuted)),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: _kGroupBadgeBg,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text('${members.length}品',
+                              style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: _kGroupAccent)),
+                        ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  HiliteText('-${formatYen(total)}',
-                      amount: true,
-                      style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: V2Colors.negative,
-                          fontFeatures: V2Typography.tabularNums)),
-                ],
+                    const SizedBox(height: 2),
+                    Text(
+                        '${head.date.month}/${head.date.day}・${head.paymentMethod.trim()}',
+                        style: const TextStyle(
+                            fontSize: 11, color: V2Colors.textMuted)),
+                  ],
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              HiliteText('-${formatYen(total)}',
+                  amount: true,
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: V2Colors.negative,
+                      fontFeatures: V2Typography.tabularNums)),
+            ],
           ),
         ),
-        if (expanded)
-          for (final t in members)
-            DecoratedBox(
-              decoration: const BoxDecoration(
-                color: _kGroupChildBg,
-                border: Border(
-                    top: BorderSide(color: V2Colors.divider),
-                    left: BorderSide(color: _kGroupAccent, width: 2)),
-              ),
-              child: _NarrowRow(
-                t: t,
-                onTap: () => onEditTxn(t),
-                showReceipt: showReceipt,
-                onToggleReceipt: onToggleReceipt,
-                showReview: showReview,
-                onToggleReviewed: onToggleReviewed,
-              ),
-            ),
-      ],
+      ),
     );
   }
 }

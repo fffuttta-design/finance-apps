@@ -14,6 +14,7 @@ import '../../data/ui_preferences.dart';
 import '../../screens/account_detail_screen.dart';
 import '../../screens/card_detail_screen.dart';
 import '../../screens/expense_input_screen.dart';
+import '../../screens/receipt_group_detail_screen.dart';
 import '../../screens/subscription_list_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
 import '../../utils/emoji_palette.dart';
@@ -587,6 +588,17 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
       context,
       MaterialPageRoute(
           builder: (_) => TransactionDetailScreen(transaction: t)),
+    );
+    if (changed == true && mounted) await _load();
+  }
+
+  /// レシートまとめ（「N品」）行タップ：品目の内訳は「まとめ明細」画面で見せる。
+  /// 表の中で展開すると他の明細が下に押し出されて見づらいため。
+  Future<void> _openGroup(List<core.Transaction> members) async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+          builder: (_) => ReceiptGroupDetailScreen(members: members)),
     );
     if (changed == true && mounted) await _load();
   }
@@ -1330,6 +1342,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 title: detailLabel,
                 rows: rows,
                 onEditTxn: _edit,
+                onOpenGroup: _openGroup,
                 accent: accent,
                 receiptLabel: receiptLabel,
                 defaultTeamSort: teamSortDefault,
