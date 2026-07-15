@@ -95,6 +95,10 @@ class Subscription {
   /// 明細化したときに適用する「普通の小カテゴリ」。任意。
   final String? categorySub;
 
+  /// 明細化したときに適用する「場所」（店名・サービス名など）。任意。
+  /// 支出の store と同じ扱い。場所別の集計に固定費も乗せたいとき用。
+  final String? store;
+
   const Subscription({
     required this.id,
     required this.name,
@@ -116,6 +120,7 @@ class Subscription {
     this.receiptKind,
     this.categoryMajor,
     this.categorySub,
+    this.store,
   });
 
   /// 指定月("YYYY-MM")の表示金額。変動費は未入力なら0、固定費は定額。
@@ -184,6 +189,7 @@ class Subscription {
         if (receiptKind != null) 'receiptKind': receiptKind,
         if (categoryMajor != null) 'categoryMajor': categoryMajor,
         if (categorySub != null) 'categorySub': categorySub,
+        if (store != null) 'store': store,
       };
 
   factory Subscription.fromJson(Map<String, dynamic> j) => Subscription(
@@ -220,6 +226,7 @@ class Subscription {
         receiptKind: j['receiptKind'] as String?,
         categoryMajor: j['categoryMajor'] as String?,
         categorySub: j['categorySub'] as String?,
+        store: j['store'] as String?,
       );
 
   Subscription copyWith({
@@ -249,6 +256,8 @@ class Subscription {
     bool clearCategoryMajor = false,
     String? categorySub,
     bool clearCategorySub = false,
+    String? store,
+    bool clearStore = false,
   }) =>
       Subscription(
         id: id,
@@ -279,6 +288,7 @@ class Subscription {
             : (categoryMajor ?? this.categoryMajor),
         categorySub:
             clearCategorySub ? null : (categorySub ?? this.categorySub),
+        store: clearStore ? null : (store ?? this.store),
       );
 }
 

@@ -1,7 +1,23 @@
 # FutaFinance 仕様書
 
-> **最終更新: 2026-07-15 / v1.0.519+520**
+> **最終更新: 2026-07-15 / v1.0.520+521**
 > 変更があるたびにこのファイルを編集してバージョンを更新すること。
+>
+> **v1.0.520 の主な変更（2026-07-15）**（クレカ明細に領収書チェック／固定費に場所）
+>
+> - **クレカ明細（`CardDetailScreen`）に領収書チェック列を追加**（事業モードのみ）。
+>   `ExpenseDetailTable` に `showReceiptCheck` / `onToggleReceipt` を渡していなかったため、
+>   クレカ明細にはそもそも領収書チェックが無かった。
+> - **並び替え（カスタム順）モードの行にも領収書チェックを表示**（`expense_detail_table.dart`
+>   `_customReorderList`）。並び替えながらチェックすることがあるため。固定費の行は対象外
+>   （実明細になってから付ける）。
+> - **固定費（Subscription）に `store`（場所）を追加**（`packages/finance_core` の
+>   `subscription.dart`：フィールド／`toJson`／`fromJson`／`copyWith`＋`clearStore`）。
+>   - 編集シートに**「場所（任意）」**欄（`subscription_edit_sheet.dart`）。
+>   - **明細化するとき取引の `store` に引き継ぐ**（`fixed_cost_materializer.dart`）＝
+>     場所別の集計に固定費も乗る。
+>   - 固定費・サブスク一覧の各行にも**場所**を表示（`subscription_list_screen.dart`）。
+> - 銀行預金の利子割（利息から天引きされる住民税5%）は**現状のまま**とする方針（記録を残す）。
 >
 > **v1.0.519 の主な変更（2026-07-15）**（固定費まわりの使い勝手）
 >

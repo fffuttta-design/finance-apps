@@ -122,6 +122,8 @@ class FixedCostMaterializer {
             paymentMethod: pay,
             description: sub.name,
             amount: amt,
+            // 固定費マスタに場所を設定していれば明細にも引き継ぐ（場所別集計用）。
+            store: (sub.store ?? '').trim().isEmpty ? null : sub.store!.trim(),
             // 固定費（サブスク）由来の明細であることを示すフラグ。
             isFixed: true,
             // 紙で受け取る固定費は最初から「保管済み」として作る。

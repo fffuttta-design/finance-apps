@@ -742,6 +742,16 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                                     onEditFixed: (f) => f.pending
                                         ? _inputCardVariableAmount(f.id)
                                         : _editCardFixed(f.id),
+                                    // 領収書チェック（事業モードのみ・税理士提出用）。
+                                    // 支出タブの明細表と同じ列をクレカ明細にも出す。
+                                    showReceiptCheck:
+                                        AppModeManager.instance.current ==
+                                            AppMode.business,
+                                    onToggleReceipt: (t, v) async {
+                                      await TransactionRepository.instance
+                                          .update(t.copyWith(receiptSaved: v));
+                                      if (mounted) await _load();
+                                    },
                                     onToggleReviewed: (t, v) async {
                                       await TransactionRepository.instance
                                           .update(t.copyWith(reviewed: v));

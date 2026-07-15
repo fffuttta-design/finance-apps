@@ -1654,6 +1654,24 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                       ],
                     ),
                   ],
+                  // 場所（明細に付く store）。設定している時だけ出す。
+                  if ((s.store ?? '').trim().isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        const Icon(Icons.place_outlined,
+                            size: 10, color: Color(0xFF9CA3AF)),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(s.store!.trim(),
+                              style: const TextStyle(
+                                  fontSize: 10, color: Color(0xFF9CA3AF)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                    ),
+                  ],
                   // カテゴリ（明細に付く大/小カテゴリ）。付いている時だけ出す。
                   if (_categoryLabel(s) != null) ...[
                     const SizedBox(height: 2),

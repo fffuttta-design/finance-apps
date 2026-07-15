@@ -30,6 +30,8 @@ Future<Subscription?> showSubscriptionEditSheet(
   // 毎月の請求日（1〜31）。プルダウンで選択。
   int? billingDay = initial?.billingDay;
   final memoCtrl = TextEditingController(text: initial?.memo ?? '');
+  // 場所（明細化したとき取引の store に入る）。
+  final storeCtrl = TextEditingController(text: initial?.store ?? '');
   final iconUrlCtrl = TextEditingController(text: initial?.iconUrl ?? '');
   // ロゴのURL入力欄を開いているか。既にロゴがあるときは閉じておき（＝
   // URLをベタ表示せず「ロゴ編集」ボタンだけ）、押したら開く。
@@ -337,6 +339,9 @@ Future<Subscription?> showSubscriptionEditSheet(
             plMajor: pl,
             categoryMajor: cm,
             categorySub: cs,
+            store: storeCtrl.text.trim().isEmpty
+                ? null
+                : storeCtrl.text.trim(),
             startYearMonth:
                 (startYm == null || startYm!.trim().isEmpty)
                     ? null
@@ -652,6 +657,18 @@ Future<Subscription?> showSubscriptionEditSheet(
                                   setLocal(() => categorySub = v),
                             ),
                           ],
+                          // 場所（店名・サービス名）。明細化したとき取引の「場所」に入る。
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: storeCtrl,
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              border: OutlineInputBorder(),
+                              labelText: '場所（任意）',
+                              hintText: '例: Amazon・コミュファ光',
+                              helperText: '明細に付く「場所」。場所別の集計に出ます',
+                            ),
+                          ),
                           if (categoryMajor != null) ...[
                             const SizedBox(height: 10),
                             InkWell(

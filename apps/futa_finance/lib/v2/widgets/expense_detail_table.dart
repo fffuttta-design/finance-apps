@@ -897,6 +897,32 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                         fontFeatures: V2Typography.tabularNums))
               else
                 _txAmountCell(r.txn!, fontSize: 13),
+              // 領収書チェック（事業モード・税理士提出用）。並び替え中でも打てるように
+              // 通常表と同じ列をここにも出す（並び替えながらチェックすることがあるため）。
+              // 固定費の行は対象外（実明細になってから付ける）。
+              if (widget.showReceiptCheck) ...[
+                const SizedBox(width: 4),
+                SizedBox(
+                  width: 30,
+                  child: Center(
+                    child: isFixed
+                        ? const SizedBox(width: 22, height: 22)
+                        : SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: Checkbox(
+                              value: r.txn!.receiptSaved,
+                              visualDensity: VisualDensity.compact,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              activeColor: widget.accent,
+                              onChanged: (v) => widget.onToggleReceipt
+                                  ?.call(r.txn!, v ?? false),
+                            ),
+                          ),
+                  ),
+                ),
+              ],
               if (showReview) ...[
                 const SizedBox(width: 4),
                 SizedBox(
