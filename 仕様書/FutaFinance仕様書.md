@@ -1,7 +1,23 @@
 # FutaFinance 仕様書
 
-> **最終更新: 2026-07-15 / v1.0.522+523**
+> **最終更新: 2026-07-15 / v1.0.523+524**
 > 変更があるたびにこのファイルを編集してバージョンを更新すること。
+>
+> **v1.0.523 の主な変更（2026-07-15）**（固定費編集の実装が2つあった／正しい方へ反映）
+>
+> - 🐛 **v1.0.519 の「カテゴリ編集リンク」と v1.0.520 の「場所」を、使われていない方の
+>   ファイルに入れてしまっていたのを修正**。**現役のダイアログへ実装し直した。**
+> - ⚠️ **【重要・地雷】固定費の編集シートは2つある**：
+>   | ファイル | 呼び出し元 | 現役？ |
+>   |---|---|---|
+>   | `screens/subscription_list_screen.dart` の `_editDialog` | 設定→固定費・サブスクマスタ、および `rich_expenses._editSubscription`→`SubscriptionListScreen(initialEditId:)` | ✅ **これが現役** |
+>   | `widgets/subscription_edit_sheet.dart` の `showSubscriptionEditSheet` | `v2/screens/v2_expenses.dart` のみ（＝旧UI・`v2_root.dart:307-308` で `RichExpensesScreen` が選ばれるため通常到達しない） | ❌ ほぼ死にコード |
+>   **固定費の編集画面をいじるときは必ず `subscription_list_screen.dart` の `_editDialog` を見ること。**
+> - `_editDialog` に追加したもの（`subscription_edit_sheet.dart` と同じ内容）:
+>   - 「カテゴリ編集」「小カテゴリ編集」リンク（`CategoryEditorScreen`/`CategorySubEditorScreen`）。
+>     戻ったら `reloadCategories` で候補を読み直し、消えたカテゴリを選んでいたら選択を外す。
+>     小カテゴリ編集リンクは**小カテゴリ0件でも出す**。
+>   - **「場所（任意）」欄**（`store`）。保存時に `Subscription.store` へ入り、明細化で取引の `store` に載る。
 >
 > **v1.0.522 の主な変更（2026-07-15）**（領収書カードを3択チップに）
 >

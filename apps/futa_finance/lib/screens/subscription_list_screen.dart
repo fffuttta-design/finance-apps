@@ -10,6 +10,8 @@ import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/centered_body.dart';
+import 'category_editor_screen.dart';
+import 'category_sub_editor_screen.dart';
 
 /// 並び順モード。
 /// - manual: ユーザーがドラッグで並べた順（永続化される配列の順）
@@ -125,6 +127,8 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     String? plMajor = initial?.plMajor;
     String? categoryMajor = initial?.categoryMajor;
     String? categorySub = initial?.categorySub;
+    // 場所（明細化したとき取引の store に入る）。
+    final storeCtrl = TextEditingController(text: initial?.store ?? '');
     String? startYm = initial?.startYearMonth;
     String? endYm = initial?.endYearMonth;
     // 実明細化したときの領収書の受け取り方（'paper'/'drive'/null）。
@@ -133,7 +137,8 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     // カテゴリ設定を読み込む。
     final catConfig = await _settings.loadCategories();
     // 明細に付ける「普通の大/小カテゴリ」候補（大＝表示名／小＝その大の小一覧）。
-    final categoryOptions = [
+    // ⚠ このダイアログからカテゴリ自体を編集できるので、読み直せるよう var にする。
+    var categoryOptions = [
       for (int i = 0; i < catConfig.majors.length; i++)
         (
           major: catConfig.majors[i].displayName(i),
@@ -149,6 +154,55 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
       }
       return const [];
     }
+
+    /// カテゴリ編集画面から戻ったあと、候補を読み直して選択中の値の整合を取る。
+    Future<void> reloadCategories(StateSetter setLocal) async {
+      final c = await _settings.loadCategories();
+      final next = [
+        for (int i = 0; i < c.majors.length; i++)
+          (major: c.majors[i].displayName(i), subs: c.majors[i].subs),
+      ];
+      setLocal(() {
+        categoryOptions = next;
+        // 選んでいたカテゴリが消えていたら選択を外す（Dropdownが値を見つけられず落ちる）。
+        if (categoryMajor != null &&
+            !categoryOptions.any((o) => o.major == categoryMajor)) {
+          categoryMajor = null;
+          categorySub = null;
+        } else if (categorySub != null &&
+            !subsOfMajor(categoryMajor).contains(categorySub)) {
+          categorySub = null;
+        }
+      });
+    }
+
+    /// 小カテゴリ編集に渡す「大カテゴリの番号」を表示名から引く（素の名前でも突き合わせる）。
+    Future<int> majorIndexOf(String displayName) async {
+      final c = await _settings.loadCategories();
+      for (var i = 0; i < c.majors.length; i++) {
+        final dn = c.majors[i].displayName(i);
+        if (dn == displayName || bareName(dn) == bareName(displayName)) {
+          return i;
+        }
+      }
+      return -1;
+    }
+
+    /// 「カテゴリ編集」リンク（支出フォームと同じ導線）。
+    Widget categoryEditLink(String label, VoidCallback onTap) => Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: onTap,
+            icon: const Icon(Icons.tune, size: 14),
+            label: Text(label, style: const TextStyle(fontSize: 12)),
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            ),
+          ),
+        );
 
     if (!context.mounted) return null;
 
@@ -370,6 +424,8 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
               plMajor: pl,
               categoryMajor: cm,
               categorySub: cs,
+              store:
+                  storeCtrl.text.trim().isEmpty ? null : storeCtrl.text.trim(),
               receiptKind: receiptKind,
               startYearMonth:
                   (startYm == null || startYm!.trim().isEmpty)
@@ -592,16 +648,34 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                             ),
                           if (categoryOptions.isNotEmpty) ...[
                             const SizedBox(height: 16),
-                            const Text('カテゴリ（明細に付く大/小カテゴリ）',
-                                style: TextStyle(
-                                    fontSize: 12, color: Color(0xFF6B7280))),
-                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                const Expanded(
+                                  child: Text('カテゴリ（明細に付く大/小カテゴリ）',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFF6B7280))),
+                                ),
+                                // 支出を記録する画面と同じく、ここからカテゴリ自体を編集できる。
+                                categoryEditLink('カテゴリ編集', () async {
+                                  await Navigator.push<void>(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) =>
+                                            const CategoryEditorScreen()),
+                                  );
+                                  await reloadCategories(setLocal);
+                                }),
+                              ],
+                            ),
                             const Text(
                                 '「固定費」はフラグとして持ち、大/小カテゴリは普通のカテゴリ（食費・自己投資など）を使います',
                                 style: TextStyle(
                                     fontSize: 11, color: Color(0xFF9CA3AF))),
                             const SizedBox(height: 8),
                             DropdownButtonFormField<String>(
+                              key: ValueKey(
+                                  'major_${categoryOptions.length}_$categoryMajor'),
                               initialValue: categoryMajor,
                               isExpanded: true,
                               decoration: const InputDecoration(
@@ -632,10 +706,27 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                                     subs.isNotEmpty ? subs.first : null;
                               }),
                             ),
+                            // 大カテゴリを選んでいれば小カテゴリの編集リンクを出す。
+                            // ⚠ 小カテゴリが0件のときも出す（ここから追加したいので）。
+                            if (categoryMajor != null)
+                              categoryEditLink('小カテゴリ編集', () async {
+                                final idx = await majorIndexOf(categoryMajor!);
+                                if (idx < 0) return;
+                                if (!context.mounted) return;
+                                await Navigator.push<void>(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) => CategorySubEditorScreen(
+                                          majorIndex: idx)),
+                                );
+                                await reloadCategories(setLocal);
+                              }),
                             if (categoryMajor != null &&
                                 subsOfMajor(categoryMajor).isNotEmpty) ...[
                               const SizedBox(height: 8),
                               DropdownButtonFormField<String>(
+                                key: ValueKey(
+                                    'sub_${subsOfMajor(categoryMajor).length}_$categorySub'),
                                 initialValue: subsOfMajor(categoryMajor)
                                         .contains(categorySub)
                                     ? categorySub
@@ -659,6 +750,18 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                               ),
                             ],
                           ],
+                          // 場所（明細化したとき取引の「場所」に入る）。
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: storeCtrl,
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              border: OutlineInputBorder(),
+                              labelText: '場所（任意）',
+                              hintText: '例: Amazon・コミュファ光',
+                              helperText: '明細に付く「場所」。場所別の集計に出ます',
+                            ),
+                          ),
                           // 領収書の受け取り方（実明細化した取引に反映）。
                           const SizedBox(height: 16),
                           const Text('領収書の受け取り方（実明細化時に反映）',
