@@ -7,7 +7,7 @@
 //     preload 経由で Flutter に渡す（埋め込み画面は Google に弾かれるため）
 //  3. electron-updater で GitHub Releases から完全自動更新（NSIS）
 const {
-  app, BrowserWindow, ipcMain, shell, dialog, session,
+  app, BrowserWindow, ipcMain, shell, dialog, session, Menu,
 } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
@@ -320,6 +320,10 @@ function saveWindowState(win) {
 
 // ─────────────────── ウィンドウ ───────────────────
 async function createWindow() {
+  // Electron標準メニュー（File/Edit/View…）を丸ごと無くす。
+  // ⚠ autoHideMenuBar だけだと Alt/Ctrl 操作でメニューバーが顔を出す。
+  //   このアプリに標準メニューは不要なので、メニュー自体を作らない。
+  Menu.setApplicationMenu(null);
   const port = await startServer();
   const st = readWindowState();
   mainWindow = new BrowserWindow({

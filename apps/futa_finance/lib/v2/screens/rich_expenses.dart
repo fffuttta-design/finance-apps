@@ -325,25 +325,34 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
         ],
       );
 
-  Widget _summaryLine(String label, int amount) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(label,
-                  style: V2Typography.caption
-                      .copyWith(color: V2Colors.textSecondary),
-                  overflow: TextOverflow.ellipsis),
-            ),
-            const SizedBox(width: 8),
-            Text(formatYen(amount),
-                style: V2Typography.caption.copyWith(
-                    color: V2Colors.textPrimary,
-                    fontWeight: FontWeight.w600,
-                    fontFeatures: V2Typography.tabularNums)),
-          ],
-        ),
-      );
+  /// [onTap] を渡すと行全体を押せる（高額明細＝押すとその明細の編集を開く）。
+  Widget _summaryLine(String label, int amount, {VoidCallback? onTap}) {
+    final row = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(label,
+                style: V2Typography.caption
+                    .copyWith(color: V2Colors.textSecondary),
+                overflow: TextOverflow.ellipsis),
+          ),
+          const SizedBox(width: 8),
+          Text(formatYen(amount),
+              style: V2Typography.caption.copyWith(
+                  color: V2Colors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: V2Typography.tabularNums)),
+        ],
+      ),
+    );
+    if (onTap == null) return row;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: row,
+    );
+  }
 
   /// この月が対象の変動費か（月払い・範囲内・当月まで）。未入力でも「入力待ち」で出す判定用。
   bool _variableActiveInMonth(core.Subscription sub, String ym, String curYm) {
@@ -957,7 +966,12 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
       final now = DateTime.now();
       final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
       final ym = '${_month.year}-${_month.month.toString().padLeft(2, '0')}';
+      // ⚠ 実明細としてもう記録済みの固定費は足さない（rows に入っているので二重計上になる）。
+      //   種類別の合計(_subsOf)は同じ _matchedSubIds で除外しているのに、ここだけ
+      //   全件足していたため「支払方法別のオリコだけウォレットより多い」ズレが出ていた。
+      final matched = _matchedSubIds(_month);
       for (final s in _visibleSubs) {
+        if (matched.contains(s.id)) continue;
         final amt = s.plAmountForMonth(ym, curYm);
         if (amt <= 0) continue;
         final pm = (s.paymentMethod ?? '').trim().isEmpty
@@ -1087,6 +1101,8 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                                       ? formatMonthDay(t.date)
                                       : '${formatMonthDay(t.date)}  ${t.description.trim()}',
                                   t.effectiveAmount,
+                                  // 押したらその明細を開く（金額の確認→そのまま直せる）。
+                                  onTap: () => _edit(t),
                                 ),
                             ],
                           ],

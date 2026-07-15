@@ -6,6 +6,7 @@ import '../data/transaction_repository.dart';
 import '../data/transfer_template.dart';
 import '../widgets/memo_field.dart';
 import '../utils/date_pick.dart';
+import '../utils/modal_input.dart';
 import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
 
@@ -15,26 +16,10 @@ import '../utils/thousands_separator_input_formatter.dart';
 /// （ExpenseInputScreen の「この取引を振替に変更」から呼ばれる）。
 Future<bool?> showTransferInputModal(BuildContext context,
     {core.Transaction? editing}) {
-  return showModalBottomSheet<bool>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (sheetCtx) {
-      return Padding(
-        padding: EdgeInsets.only(
-            bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
-        child: Container(
-          height: MediaQuery.of(sheetCtx).size.height * 0.95,
-          decoration: const BoxDecoration(
-            color: Color(0xFFFAFAFA),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: TransferInputScreen(editing: editing),
-        ),
-      );
-    },
-  );
+  // 支出/収入のフォームと同じ出し方（PC=中央のコンパクトなダイアログ／スマホ=下からのシート）。
+  // ⚠ 以前はここだけ独自に「画面の95%の高さのシート」を出していたため、
+  //   「支出を編集」から「振替に変更」を押すと見た目がガラッと変わって不自然だった。
+  return showInputSheet<bool>(context, TransferInputScreen(editing: editing));
 }
 
 /// 振替入力画面（口座間のお金の移動）。
@@ -175,6 +160,14 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
       );
       return;
     }
+    // 名前は必須。「新生銀行 → オリコカード」の自動命名だと明細で何の移動か分からず、
+    // 「オリコ先払い」のように後から見て意味が分かる名前を必ず付けてもらう。
+    if (_nameCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('名前を入力してください（例: オリコ先払い）')),
+      );
+      return;
+    }
     // 非同期の後に閉じるため Navigator を await 前にキャプチャ（Windows対策）。
     final navigator = Navigator.of(context);
     setState(() => _saving = true);
@@ -189,9 +182,7 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
         category: const core.Category(major: '振替', sub: ''),
         // paymentMethod は使わない。互換のため空文字。
         paymentMethod: '',
-        description: _nameCtrl.text.trim().isEmpty
-            ? '${_fromAccount!} → ${_toAccount!}'
-            : _nameCtrl.text.trim(),
+        description: _nameCtrl.text.trim(),
         amount: amount,
         memo: _memoCtrl.text.trim().isEmpty ? null : _memoCtrl.text.trim(),
         transferFromAccount: _fromAccount,
@@ -466,7 +457,8 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
     final canSave = !_saving &&
         _fromAccount != null &&
         _toAccount != null &&
-        _amountCtrl.text.isNotEmpty;
+        _amountCtrl.text.isNotEmpty &&
+        _nameCtrl.text.trim().isNotEmpty; // 名前は必須
     final isEditing = widget.editing != null;
     return Scaffold(
       appBar: AppBar(
@@ -475,18 +467,21 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
         ),
+        // タイトル・削除アイコンとも「支出を編集」と同じ見た目に揃える。
         title: Text(
             _isConverting
                 ? '振替に変更'
                 : (isEditing ? '振替を編集' : '振替を記録'),
-            style: const TextStyle(fontWeight: FontWeight.w700)),
+            style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF111827))),
         actions: [
           if (isEditing)
-            TextButton(
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Color(0xFFDC2626)),
+              tooltip: 'この取引を削除',
               onPressed: _saving ? null : _delete,
-              style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFFDC2626)),
-              child: const Text('削除'),
             ),
         ],
       ),
@@ -521,7 +516,16 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
             // よく使う振替（テンプレ）
             _buildTemplateSection(),
             const SizedBox(height: 12),
-            // 金額（他フォームと同じく一番上に大きく）。
+            // 名前（必須）。支出フォームの「取引内容」と同じく一番上に置く
+            // （後から明細で見たとき、何の移動か分かる名前を必ず付けてもらう）。
+            _label('名前'),
+            TextField(
+              controller: _nameCtrl,
+              decoration: _inputDecoration(hint: '例: オリコ先払い・生活費の移動'),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 16),
+            // 金額
             _label('金額（円）'),
             TextField(
               controller: _amountCtrl,
@@ -594,14 +598,6 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
                       DropdownMenuItem(value: c.value, child: Text(c.label)))
                   .toList(),
               onChanged: (v) => setState(() => _toAccount = v),
-            ),
-            const SizedBox(height: 16),
-            // 名前（任意）。未入力なら「移動元 → 移動先」を自動で名前にする。
-            _label('名前（任意）'),
-            TextField(
-              controller: _nameCtrl,
-              decoration:
-                  _inputDecoration(hint: '例: 生活費の移動・カード引落用'),
             ),
             const SizedBox(height: 16),
             // 備考（見出しは上の _label で出すので、枠内のラベルは空にして重複を消す）

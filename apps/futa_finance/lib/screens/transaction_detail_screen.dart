@@ -668,7 +668,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            // 明細項目（口座／日付／メモ）。カテゴリは出さない。
+            // 明細項目（口座／場所／日付／メモ）。カテゴリは出さない。
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -678,6 +678,11 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
               child: Column(
                 children: [
                   _row(isTransfer ? '口座（振替）' : '口座', acctValue),
+                  // 場所（ATM・店名など）。入っている時だけ出す。
+                  if (t.store != null && t.store!.trim().isNotEmpty) ...[
+                    _div(),
+                    _row('場所', t.store!.trim()),
+                  ],
                   _div(),
                   _row('日付',
                       '${t.date.year}/${t.date.month}/${t.date.day}（$wd）'),
