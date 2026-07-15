@@ -1,1 +1,1 @@
-{"version":"1.0.514","buildNumber":"515","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.514/futa-finance-v1.0.514.apk","releaseNotes":"取引の詳細から「領収書のURLを貼る」ができるようになりました（明細URLか紙フラグのどちらかが立てば、対応済みチェックが自動でONになります）。クレカ明細でスクロールバーが編集ボタンに重なる問題も直しました。"}
+{"version":"1.0.515","buildNumber":"516","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.515/futa-finance-v1.0.515.apk","releaseNotes":"支出タブの「内訳を見る」に「高額明細（1万円以上）」を追加しました。今月なににお金が飛んだかが一目で分かります。「振替に変更」ボタンは目立たないように小さくしました。"}
