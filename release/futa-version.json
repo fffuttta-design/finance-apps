@@ -1,1 +1,1 @@
-{"version":"1.0.529","buildNumber":"530","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.529/futa-finance-v1.0.529.apk","releaseNotes":"支出明細から、まだ請求日が来ていない固定費を出さないようにしました（もう出て行ったお金だけが並びます）。集計金額は変わりません。"}
+{"version":"1.0.530","buildNumber":"531","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.530/futa-finance-v1.0.530.apk","releaseNotes":"レシートのDrive保存先フォルダをマイドライブのどこへ移動しても、アプリが自動で見つけて追従するようにしました。新しい端末で空の同名フォルダを作って保存先が分裂するのを防ぎます。"}
