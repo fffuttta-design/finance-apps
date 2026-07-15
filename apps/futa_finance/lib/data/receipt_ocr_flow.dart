@@ -3,10 +3,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
-import '../screens/expense_input_screen.dart';
 import '../screens/receipt_camera_screen.dart';
 import '../screens/receipt_split_screen.dart';
-import '../utils/formatters.dart';
 import '../utils/modal_input.dart';
 import 'app_mode.dart';
 import 'drive_receipt_service.dart';
@@ -16,7 +14,7 @@ import 'replacement_repository.dart';
 import 'settings_repository.dart';
 import 'transaction_repository.dart';
 
-/// レシートOCRの一連の流れ（撮影/選択 → クラウド解析 → 記録方法選択 → 入力）。
+/// レシートOCRの一連の流れ（撮影/選択 → クラウド解析 → 品目ごとに記録）。
 ///
 /// 「+ 記録」メニューや支出画面から呼び出す正式な導線。
 /// 何か記録できたら true を返す。
@@ -112,24 +110,10 @@ Future<bool> runReceiptOcrFlow(BuildContext context) async {
       receiptId: receiptId, receiptUrl: null);
 }
 
-/// 単発記録時に備考へ入れる明細テキスト（・品名 ¥金額）。
-String? _itemsMemo(ReceiptOcrResult r) {
-  final items = r.items;
-  if (items != null && items.isNotEmpty) {
-    return items.map((it) {
-      final bd = (it.unitPrice != null &&
-              it.quantity != null &&
-              it.quantity! > 1)
-          ? '（¥${it.unitPrice}×${it.quantity}）'
-          : '';
-      return '・${it.name} ${formatYen(it.price)}$bd';
-    }).join('\n');
-  }
-  return r.memo;
-}
-
-/// 読み取り後、確認ダイアログを挟まず直接 入力ポップアップへ。
-/// ポップアップ上部のトグル（まとめて1件 / 品目ごと）でその場で切替できる。
+/// 読み取り後、確認ダイアログを挟まず直接「品目ごと」の入力ポップアップへ。
+///
+/// 以前は「まとめて1件 / 品目ごと」の2通りをトグルで選べたが、実運用では
+/// 品目ごとしか使わないため一本化した（v1.0.527）。
 Future<bool> _showOcrResult(BuildContext context, ReceiptOcrResult r,
     {required String receiptId, String? receiptUrl}) async {
   final nothing = r.amount == null &&
@@ -141,52 +125,31 @@ Future<bool> _showOcrResult(BuildContext context, ReceiptOcrResult r,
     );
   }
 
-  final hasItems = r.items != null && r.items!.length >= 2;
-  // 品目が2件以上あれば既定で「品目ごと」を開く（無ければ単発）。
-  var perItem = hasItems;
-
   // Drive保存（receiptId/receiptUrl）は呼び出し側で OCR と並行実行済み。
+  if (!context.mounted) return false;
+  final res = await showInputSheet<Object>(
+    context,
+    ReceiptSplitScreen(
+      items: _rowsFor(r),
+      date: r.date,
+      storeName: r.storeName,
+      initialCategoryMajor: r.categoryMajor ?? r.categoryGuess,
+      initialCategorySub: r.categorySub,
+      receiptId: receiptId,
+      receiptUrl: receiptUrl,
+    ),
+  );
+  return res == true;
+}
 
-  while (true) {
-    if (!context.mounted) return false;
-    final Object? res;
-    if (perItem) {
-      res = await showInputSheet<Object>(
-        context,
-        ReceiptSplitScreen(
-          items: r.items!,
-          date: r.date,
-          storeName: r.storeName,
-          initialCategoryMajor: r.categoryMajor ?? r.categoryGuess,
-          initialCategorySub: r.categorySub,
-          showModeToggle: true,
-          receiptId: receiptId,
-          receiptUrl: receiptUrl,
-        ),
-      );
-    } else {
-      res = await showInputSheet<Object>(
-        context,
-        ExpenseInputScreen(
-          initialAmount: r.amount,
-          initialDate: r.date,
-          initialDescription: r.storeName,
-          initialStore: r.storeName,
-          initialCategoryMajor: r.categoryMajor ?? r.categoryGuess,
-          initialCategorySub: r.categorySub,
-          initialMemo: _itemsMemo(r),
-          // 品目が2件以上ある時だけトグルを出す。
-          receiptItems: hasItems ? r.items : null,
-          receiptId: receiptId,
-          initialReceiptUrl: receiptUrl,
-        ),
-      );
-    }
-    // トグルで反対モードへ切替 → ループしてもう片方を開く。
-    if (res == kReceiptSwitchMode) {
-      perItem = !perItem;
-      continue;
-    }
-    return res == true;
-  }
+/// 品目ごと画面に渡す初期行。
+///
+/// 品目を取れなかったレシート（合計だけ読めた等）でも、読めた合計と店名で
+/// 1行だけ作って渡す。ここで空を返すと読み取った金額が捨てられてしまう。
+List<ReceiptItem> _rowsFor(ReceiptOcrResult r) {
+  final items = r.items;
+  if (items != null && items.isNotEmpty) return items;
+  final amount = r.amount;
+  if (amount == null) return const [];
+  return [ReceiptItem(name: r.storeName?.trim() ?? '', price: amount)];
 }

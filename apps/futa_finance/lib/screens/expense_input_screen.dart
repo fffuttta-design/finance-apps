@@ -7,7 +7,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../data/app_mode.dart';
 import '../data/drive_receipt_service.dart';
-import '../data/receipt_ocr.dart';
 import '../data/settings_repository.dart';
 import '../data/store_master_repository.dart';
 import '../data/transaction_repository.dart';
@@ -97,7 +96,6 @@ class ExpenseInputScreen extends StatefulWidget {
     this.initialCategoryMajor,
     this.initialCategorySub,
     this.editing,
-    this.receiptItems,
     this.receiptId,
     this.initialReceiptUrl,
   });
@@ -120,10 +118,6 @@ class ExpenseInputScreen extends StatefulWidget {
 
   /// 既存取引の編集（指定すると編集モード：全項目プリフィル＋更新/削除）。
   final core.Transaction? editing;
-
-  /// レシートOCRで読み取った品目（2件以上なら上部に記録方法トグルを表示）。
-  /// トグルで「品目ごと」を選ぶと [kReceiptSwitchMode] を返して閉じる。
-  final List<ReceiptItem>? receiptItems;
 
   /// 親レシートのグループID（OCR保存時に付与・任意）。
   final String? receiptId;
@@ -1220,13 +1214,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                   ),
                 ),
               ],
-              // レシートOCRから来て品目が複数ある時：記録方法トグル。
-              if (widget.receiptItems != null &&
-                  widget.receiptItems!.length >= 2 &&
-                  widget.editing == null) ...[
-                _recordModeToggle(perItem: false),
-                const SizedBox(height: 16),
-              ],
               // 取引内容を一番上に（要望：先に内容を書くのが入力しやすい）。
               _label('取引内容'),
               // 過去の取引内容からサジェスト。RawAutocomplete 方式にして、
@@ -1639,32 +1626,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  /// レシート記録の「まとめて1件 / 品目ごと」トグル。
-  /// 現在と違う側を選ぶと kReceiptSwitchMode を返して閉じ、呼び出し側が
-  /// もう片方の画面を開く。
-  Widget _recordModeToggle({required bool perItem}) {
-    return SegmentedButton<bool>(
-      segments: const [
-        ButtonSegment(
-            value: false,
-            icon: Icon(Icons.receipt_long, size: 16),
-            label: Text('まとめて1件', style: TextStyle(fontSize: 12))),
-        ButtonSegment(
-            value: true,
-            icon: Icon(Icons.list_alt, size: 16),
-            label: Text('品目ごと', style: TextStyle(fontSize: 12))),
-      ],
-      selected: {perItem},
-      showSelectedIcon: false,
-      onSelectionChanged: (s) {
-        if (s.first != perItem) {
-          Navigator.pop(context, kReceiptSwitchMode);
-        }
-      },
-      style: const ButtonStyle(visualDensity: VisualDensity.compact),
     );
   }
 

@@ -756,8 +756,7 @@ class MonthlySnapshot {
   → Gemini gemini-2.5-flash へ base64 送信
   → ReceiptOcrResult を解析
   → Drive へ画像を並行アップロード（裏実行）
-  → 記録方法の選択（まとめて1件 / 品目ごと）
-  → ExpenseInputScreen or ReceiptSplitScreen
+  → ReceiptSplitScreen（品目ごと）
   → 保存
 ```
 
@@ -782,12 +781,17 @@ class MonthlySnapshot {
 - Gemini はその一覧から `categoryMajor` / `categorySub` を選択して返す
 - タイムアウト: 30秒 / 429レート制限: 最大3回リトライ
 
-### 6.4 まとめて1件 vs 品目ごと
+### 6.4 記録方法は「品目ごと」に一本化（v1.0.527〜）
 
-| モード | 動作 |
-|---|---|
-| まとめて1件 | 合計金額で1件の支出。品目一覧を memo に記入 |
-| 品目ごと | 各品目を独立した支出として記録。品目別カテゴリ指定可 |
+レシートOCRの結果は必ず `ReceiptSplitScreen`（品目ごと）で開く。
+各品目を独立した支出として記録し、品目別のカテゴリ指定も可。同じ `receiptId`
+で束ねるので、あとから「まとめ」として編集できる。
+
+- v1.0.526 までは「まとめて1件（合計1件＋品目一覧を memo へ）」との2択を
+  ポップアップ上部のトグルで切り替えられたが、実運用で品目ごとしか使われて
+  いなかったため撤去した（トグル／`kReceiptSwitchMode`／`ExpenseInputScreen.receiptItems` も削除）。
+- 品目を取れなかったレシート（合計だけ読めた等）は、読めた合計と店名で
+  1行だけ作って品目ごと画面へ渡す（`receipt_ocr_flow.dart` の `_rowsFor`）。
 
 ---
 
