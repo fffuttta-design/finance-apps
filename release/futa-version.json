@@ -1,1 +1,1 @@
-{"version":"1.0.521","buildNumber":"522","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.521/futa-finance-v1.0.521.apk","releaseNotes":"クレカ明細も支出タブと同じく、まず明細の詳細画面を経由するようにしました。クレカ明細に領収書チェック（事業モード・並び替え中も打てます）を追加。固定費・サブスクマスタで場所を設定できるようになり、明細にも引き継がれます。"}
+{"version":"1.0.522","buildNumber":"523","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.522/futa-finance-v1.0.522.apk","releaseNotes":"取引詳細の「領収書」を3択チップ（URLを貼る／紙で保管／未保管）にしました。証憑があるときは「URLを直す」で貼り替えられます。"}
