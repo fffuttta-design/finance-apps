@@ -1,7 +1,26 @@
 # FutaFinance 仕様書
 
-> **最終更新: 2026-07-15 / v1.0.524+525**
+> **最終更新: 2026-07-15 / v1.0.525+526**
 > 変更があるたびにこのファイルを編集してバージョンを更新すること。
+>
+> **v1.0.525 の主な変更（2026-07-15）**（大カテゴリ追加でセクション選択／旧UIの死にコード削除）
+>
+> - **大カテゴリの追加でセクションを選べるようにした**（`category_editor_screen.dart`
+>   `_addMajor` / `_promptMajorWithSection`）。事業モードは名前＋**セクション**
+>   （売上原価/人件費/販管費…＝`CategoryConfig.sectionsInOrder` から「その他」を除いたもの）を
+>   1つのダイアログで聞く。
+>   ⚠ 以前は名前だけで `section=null` になり、**「その他」に落ちてPLの並びから外れて**いた。
+>   セクションを使わない構成（個人モード）は従来どおり名前だけ。
+> - 🗑 **旧UIの死にコードを削除**：
+>   - `v2/screens/v2_expenses.dart`（`V2ExpensesScreen`）
+>   - `v2/screens/v2_income.dart`（`V2IncomeScreen`）
+>   - `widgets/subscription_edit_sheet.dart`（`showSubscriptionEditSheet`／v1.0.523 の地雷の元凶）
+>   **理由**＝`UiPreferences.richUi` は `=> true` のハードコードで、`v2_root._bodyFor` の
+>   `rich ? Rich… : V2…` の**偽側には到達しない**。3ファイルとも中身は全部 private で、
+>   外から借りている部品も無し（削除後 `flutter analyze` エラー0）。
+>   - `_bodyFor` の `rich ?` 三項も畳んで rich 側に一本化した。
+>   - ⚠ **`V2HomeTopNavScreen` は残す**（`v2_root.dart` の資産タブ `assetsOnly: true` と
+>     default 分岐で現役）。
 >
 > **v1.0.524 の主な変更（2026-07-15）**（固定費編集：場所を必須／小カテゴリの自動選択をやめる）
 >

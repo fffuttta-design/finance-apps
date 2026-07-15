@@ -157,11 +157,84 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
     return r ?? false;
   }
 
+  /// 大カテゴリの追加。セクション（売上原価/人件費/販管費…）がある構成では、
+  /// どのセクションに入れるかも一緒に選ばせる。
+  /// ⚠ 選ばせないと section=null になり「その他」に落ちて、PLの並びから外れる。
   void _addMajor() async {
-    final name = await _promptText(title: '大カテゴリを追加', label: '名前');
-    if (name == null || name.trim().isEmpty) return;
-    final list = [..._config!.majors, MajorCategory(name: name.trim(), subs: [])];
-    _update(list);
+    // 「その他」は未分類の受け皿（実在のセクションではない）ので候補から外す。
+    final sections =
+        _config!.sectionsInOrder.where((s) => s != 'その他').toList();
+    if (sections.isEmpty) {
+      // 個人モードなどセクションを使わない構成：従来どおり名前だけ。
+      final name = await _promptText(title: '大カテゴリを追加', label: '名前');
+      if (name == null || name.trim().isEmpty) return;
+      _update([
+        ..._config!.majors,
+        MajorCategory(name: name.trim(), subs: []),
+      ]);
+      return;
+    }
+    final r = await _promptMajorWithSection(sections);
+    if (r == null || r.name.trim().isEmpty) return;
+    _update([
+      ..._config!.majors,
+      MajorCategory(name: r.name.trim(), section: r.section, subs: []),
+    ]);
+  }
+
+  /// 名前＋セクションを1つのダイアログで聞く。
+  Future<({String name, String section})?> _promptMajorWithSection(
+      List<String> sections) {
+    final controller = TextEditingController();
+    var section = sections.first;
+    return showDialog<({String name, String section})>(
+      context: context,
+      builder: (dctx) => StatefulBuilder(
+        builder: (dctx, setLocal) {
+          void submit() {
+            if (controller.text.trim().isEmpty) return;
+            Navigator.pop(dctx, (name: controller.text, section: section));
+          }
+
+          return AlertDialog(
+            title: const Text('大カテゴリを追加'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  decoration: const InputDecoration(labelText: '名前'),
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => submit(),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  initialValue: section,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'セクション',
+                    helperText: '業績PL（損益計算書）のどこに並べるか',
+                  ),
+                  items: [
+                    for (final s in sections)
+                      DropdownMenuItem(value: s, child: Text(s)),
+                  ],
+                  onChanged: (v) =>
+                      setLocal(() => section = v ?? sections.first),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(dctx),
+                  child: const Text('キャンセル')),
+              FilledButton(onPressed: submit, child: const Text('OK')),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   void _renameMajor(int index) async {

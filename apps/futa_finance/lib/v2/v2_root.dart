@@ -27,9 +27,7 @@ import 'screens/rich_expenses.dart';
 import 'screens/rich_home.dart';
 import 'screens/rich_income.dart';
 import 'screens/v2_devlab.dart';
-import 'screens/v2_expenses.dart';
 import 'screens/v2_home_topnav.dart';
-import 'screens/v2_income.dart';
 import 'screens/v2_report.dart';
 import 'screens/v2_settings.dart';
 import 'theme/mode_accent.dart';
@@ -293,24 +291,17 @@ class _V2RootState extends State<V2Root>
   }
 
   Widget _bodyFor(String id, {required Color accent}) {
-    // 新デザイン（リッチUI）ONのとき本文を rich 版に差替える（PC/スマホ共通）。
-    // ただし業績タブは詳細PL（V2ReportScreen）を維持する（PLを消さない）。
-    final rich = UiPreferences.instance.richUi;
+    // 本文は rich 版に一本化（`UiPreferences.richUi` は常に true で、
+    // 旧版（V2ExpensesScreen/V2IncomeScreen）は到達不能な死にコードだったので削除した）。
+    // ※業績タブは詳細PL（V2ReportScreen）を維持する（PLを消さない）。
+    // ※V2HomeTopNavScreen は資産一覧（assetsOnly）でまだ現役なので残す。
     switch (id) {
       case 'home':
-        return rich
-            ? RichHomeScreen(accent: accent)
-            : V2HomeTopNavScreen(accent: accent);
-      // 支出: v2.1 ネイティブ実装（マネフォクラウド寄りのテーブル中心）
+        return RichHomeScreen(accent: accent);
       case 'expenses':
-        return rich
-            ? RichExpensesScreen(accent: accent)
-            : V2ExpensesScreen(accent: accent);
-      // 収入: v2.1 ネイティブ実装（見込み/確定の状態バッジ付きテーブル）
+        return RichExpensesScreen(accent: accent);
       case 'income':
-        return rich
-            ? RichIncomeScreen(accent: accent)
-            : V2IncomeScreen(accent: accent);
+        return RichIncomeScreen(accent: accent);
       // 資産タブは廃止。口座/カードはホームの総資産や支出の「ウォレット一覧」から。
       // クレカタブも廃止。カード一覧は支出タブ上部の「ウォレット一覧」ボタンから開く。
       // 集計: v2.1 ネイティブ実装（会計風 PL 月次表 + v1 集計画面へのリンク）
@@ -320,44 +311,38 @@ class _V2RootState extends State<V2Root>
         // リッチ時はサイド見切れ防止に中央寄せ＋左右余白を付ける。
         // リッチ時は他タブと同じ密度に揃える（中央寄せ・最大幅960・上部に
         // ダッシュボード帯を表示）。PL（詳細表）はそのまま下に残す。
-        return rich
-            ? Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 960),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: V2ReportScreen(accent: accent, richBand: true),
-                  ),
-                ),
-              )
-            : V2ReportScreen(accent: accent);
+        return Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 960),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: V2ReportScreen(accent: accent, richBand: true),
+            ),
+          ),
+        );
       // 資産: 総資産（口座/カード/月初残高）。ホームから移動。
       case 'assets':
         // 資産は単一カラムなので、リッチ時は細めに中央寄せ（横伸び防止）。
         final assets =
             V2HomeTopNavScreen(accent: accent, assetsOnly: true);
-        return rich
-            ? Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 720),
-                  child: assets,
-                ),
-              )
-            : assets;
+        return Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: assets,
+          ),
+        );
       // 設定: v2.1 ネイティブ（マスター/ディテール、左メニュー + 右パネル）
       case 'settings':
-        // リッチ時は二重サイドバーを避け、1カラム（カード一覧→パネル）に。
-        return rich
-            ? Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 820),
-                  child: V2SettingsScreen(accent: accent, singlePane: true),
-                ),
-              )
-            : V2SettingsScreen(accent: accent);
+        // 二重サイドバーを避け、1カラム（カード一覧→パネル）に。
+        return Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 820),
+            child: V2SettingsScreen(accent: accent, singlePane: true),
+          ),
+        );
       // 開発中: v2.1 風バナー + v1 DevLab を埋め込み（事業モード専用）
       case 'devLab':
         return V2DevLabScreen(accent: accent);
