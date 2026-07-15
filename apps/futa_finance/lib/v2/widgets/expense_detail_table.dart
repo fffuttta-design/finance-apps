@@ -569,8 +569,10 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
         ],
         if (widget.stickyHeader)
           Expanded(
+            // 右に余白を空けて、スクロールバーの通り道を確保する。
+            // これが無いと行末の編集（鉛筆）ボタンにスクロールバーが重なって押しにくい。
             child: SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(bottom: 8, right: 14),
               child: _tableBody(detailRows),
             ),
           )

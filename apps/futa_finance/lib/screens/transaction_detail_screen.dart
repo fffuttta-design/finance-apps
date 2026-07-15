@@ -116,6 +116,50 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
     }
   }
 
+  /// 明細/領収書のURLをあとから貼る（携帯の利用明細ページ・Driveのリンク等）。
+  /// 貼れたら receiptSaved（対応済みチェック）も自動でON＝紙フラグと同じ扱いにする。
+  Future<void> _attachReceiptUrl() async {
+    final ctrl = TextEditingController(text: _cur.receiptUrl ?? '');
+    final word = _cur.type == core.TransactionType.income ? '請求書' : '領収書';
+    final url = await showDialog<String>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: Text('$wordのURLを貼る'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          keyboardType: TextInputType.url,
+          decoration: const InputDecoration(
+            hintText: 'https://…（利用明細ページ・Drive のリンク等）',
+          ),
+          onSubmitted: (v) => Navigator.pop(dctx, v.trim()),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx), child: const Text('キャンセル')),
+          FilledButton(
+            onPressed: () => Navigator.pop(dctx, ctrl.text.trim()),
+            child: const Text('貼る'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (url == null || url.isEmpty) return;
+    // URLが付いた＝証憑あり。チェックもONにする（紙フラグと同じ「対応済み」）。
+    final updated =
+        _cur.copyWith(receiptUrl: url, receiptSaved: true, receiptType: 'drive');
+    setState(() => _cur = updated);
+    try {
+      await TransactionRepository.instance.update(updated);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('保存に失敗しました: $e')));
+      }
+    }
+  }
+
   Color get _accent {
     switch (_t.type) {
       case core.TransactionType.income:
@@ -431,7 +475,18 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                         label: Text('$receiptWordを見る'),
                       ),
                     )
-                  else
+                  else ...[
+                    // 証憑がまだ無いとき：明細のURLを貼る／紙で保管、どちらでも対応済みにできる。
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                      child: OutlinedButton.icon(
+                        onPressed: _busy ? null : _attachReceiptUrl,
+                        icon: const Icon(Icons.link, size: 18),
+                        label: Text('$receiptWordのURLを貼る'),
+                        style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12)),
+                      ),
+                    ),
                     CheckboxListTile(
                       value: t.receiptSaved,
                       onChanged:
@@ -445,6 +500,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                       subtitle: const Text('現物を保管して税理士へ渡す分（写真は不要）',
                           style: TextStyle(fontSize: 12)),
                     ),
+                  ],
                 ],
               ),
             ),
