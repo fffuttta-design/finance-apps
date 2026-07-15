@@ -13,8 +13,11 @@ import 'windows_google_auth.dart';
 ///
 /// フォルダ構成: [ルート]/(事業用|個人用)/YYYY年/MM月/ にアップロードし、
 /// 閲覧リンク(webViewLink)を返す。
-/// ルートフォルダIDは prefs に保存し、ユーザーがフォルダを別の場所へ
-/// 移動しても ID で追従する（option B）。
+///
+/// ルートフォルダはマイドライブのどこに置いてもよい。**場所は決め打ちしない**：
+/// 一度使った端末は prefs のIDで追従し、IDが無い端末は名前でドライブ全体を探す
+/// （`_findRootAnywhere`）。直下に無いだけで作り直すと2箇所に分裂するため。
+/// 現在地（2026-07-15〜）: `マイドライブ/④個人事業/FutaFinanceレシート`
 class DriveReceiptService {
   DriveReceiptService._();
   static final DriveReceiptService instance = DriveReceiptService._();
@@ -223,7 +226,9 @@ class DriveReceiptService {
     if (cached != null) return cached;
     final prefs = await SharedPreferences.getInstance();
     var rootId = prefs.getString(_rootIdKey);
-    rootId ??= await _findFolder(token, _rootName, 'root');
+    // 一覧は「探すだけ」なので作成はしないが、探し方は _ensureRoot と揃える
+    // （直下決め打ちだと移動後に見つからず「保存実績なし」と誤判定する）。
+    rootId ??= await _findRootAnywhere(token);
     if (rootId == null) return null;
     final modeId =
         await _findFolder(token, isBusiness ? '事業用' : '個人用', rootId);
@@ -313,11 +318,32 @@ class DriveReceiptService {
     if (saved != null && await _folderExists(token, saved)) {
       return saved;
     }
-    // 初回はマイドライブ直下に作成（ユーザーが後で移動してもIDで追従）。
-    var id = await _findFolder(token, _rootName, 'root');
+    // IDが未保存（新しい端末・再インストール等）のときは名前で探す。
+    // ⚠ 直下だけを探すと、フォルダを移動済みのときに見つけられず空の同名フォルダを
+    // 直下に作ってしまい、レシートが2箇所に分裂する。必ずドライブ全体から探す。
+    var id = await _findRootAnywhere(token);
     id ??= await _createFolder(token, _rootName, 'root');
     await prefs.setString(_rootIdKey, id);
     return id;
+  }
+
+  /// ルートフォルダ（[_rootName]）を親を問わずドライブ全体から探す。無ければ null。
+  ///
+  /// ユーザーがフォルダを好きな場所へ移動できる前提なので、親を固定して探さない。
+  /// （実例: マイドライブ直下 → `④個人事業/FutaFinanceレシート` へ移動）
+  Future<String?> _findRootAnywhere(String token) async {
+    final esc = _rootName.replaceAll("'", r"\'");
+    final q =
+        "name='$esc' and mimeType='application/vnd.google-apps.folder' and trashed=false";
+    final uri = Uri.parse(
+        'https://www.googleapis.com/drive/v3/files?q=${Uri.encodeQueryComponent(q)}'
+        '&fields=files(id)&spaces=drive&pageSize=10');
+    final res =
+        await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+    if (res.statusCode != 200) return null;
+    final files = (jsonDecode(res.body)['files'] as List?) ?? const [];
+    if (files.isEmpty) return null;
+    return files.first['id'] as String?;
   }
 
   Future<String> _findOrCreateFolder(
