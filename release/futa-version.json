@@ -1,1 +1,1 @@
-{"version":"1.0.513","buildNumber":"514","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.513/futa-finance-v1.0.513.apk","releaseNotes":"支出を後から振替に変更できるようにしました。「支出を編集」→「この取引を振替に変更」で、ATMの現金出金など口座間の移動を振替に直せます（収支から外れて残高の移動だけになります）。"}
+{"version":"1.0.514","buildNumber":"515","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.514/futa-finance-v1.0.514.apk","releaseNotes":"取引の詳細から「領収書のURLを貼る」ができるようになりました（明細URLか紙フラグのどちらかが立てば、対応済みチェックが自動でONになります）。クレカ明細でスクロールバーが編集ボタンに重なる問題も直しました。"}
