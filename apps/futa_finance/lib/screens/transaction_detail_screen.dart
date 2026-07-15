@@ -116,6 +116,52 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
     }
   }
 
+  /// 領収書の保管方法を選ぶチップ1つ分（固定費編集の「領収書の受け取り方」と同じ見た目）。
+  Widget _receiptChoiceChip({
+    required IconData icon,
+    required String label,
+    required bool selected,
+    VoidCallback? onTap,
+  }) {
+    const accent = Color(0xFF4F46E5);
+    return Material(
+      color: selected ? accent.withValues(alpha: 0.08) : Colors.white,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+                color: selected ? accent : const Color(0xFFE5E7EB),
+                width: selected ? 1.5 : 1),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(selected ? Icons.check : icon,
+                  size: 15,
+                  color: selected ? accent : const Color(0xFF6B7280)),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(label,
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight:
+                            selected ? FontWeight.w700 : FontWeight.w500,
+                        color:
+                            selected ? accent : const Color(0xFF374151)),
+                    overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// 明細/領収書のURLをあとから貼る（携帯の利用明細ページ・Driveのリンク等）。
   /// 貼れたら receiptSaved（対応済みチェック）も自動でON＝紙フラグと同じ扱いにする。
   Future<void> _attachReceiptUrl() async {
@@ -474,32 +520,72 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                         icon: const Icon(Icons.receipt_long, size: 18),
                         label: Text('$receiptWordを見る'),
                       ),
+                    ),
+                  // 貼ったURLを直す/外す（間違えて貼ったときの逃げ道）。
+                  // 自動取込で付いた証憑もここから貼り替えられる。
+                  if (hasReceipt)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: _busy ? null : _attachReceiptUrl,
+                        icon: const Icon(Icons.link, size: 14),
+                        label: const Text('URLを直す',
+                            style: TextStyle(fontSize: 12)),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF9CA3AF),
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
+                        ),
+                      ),
                     )
                   else ...[
-                    // 証憑がまだ無いとき：明細のURLを貼る／紙で保管、どちらでも対応済みにできる。
+                    // 証憑がまだ無いとき：どう保管したかを3択で選ぶ。
+                    // ⚠ 以前は「URLを貼るボタン」＋「紙のチェックボックス」で、
+                    //   同じ1つの問い（どう保管した？）なのに聞き方が2種類あって不揃いだった。
+                    //   固定費編集の「領収書の受け取り方」と同じチップ形に統一。
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-                      child: OutlinedButton.icon(
-                        onPressed: _busy ? null : _attachReceiptUrl,
-                        icon: const Icon(Icons.link, size: 18),
-                        label: Text('$receiptWordのURLを貼る'),
-                        style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12)),
+                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _receiptChoiceChip(
+                              icon: Icons.link,
+                              label: 'URLを貼る',
+                              selected: false,
+                              onTap: _busy ? null : _attachReceiptUrl,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _receiptChoiceChip(
+                              icon: Icons.receipt,
+                              label: '紙で保管',
+                              selected: t.receiptSaved,
+                              onTap:
+                                  _busy ? null : () => _setPaperKept(true),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _receiptChoiceChip(
+                              icon: Icons.remove_circle_outline,
+                              label: '未保管',
+                              selected: !t.receiptSaved,
+                              onTap:
+                                  _busy ? null : () => _setPaperKept(false),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    CheckboxListTile(
-                      value: t.receiptSaved,
-                      onChanged:
-                          _busy ? null : (v) => _setPaperKept(v ?? false),
-                      controlAffinity: ListTileControlAffinity.leading,
-                      dense: true,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 12),
-                      title: const Text('紙のレシートで保管済み',
-                          style: TextStyle(fontSize: 14)),
-                      subtitle: const Text('現物を保管して税理士へ渡す分（写真は不要）',
-                          style: TextStyle(fontSize: 12)),
-                    ),
+                    if (t.receiptSaved)
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(12, 0, 12, 12),
+                        child: Text('現物を保管して税理士へ渡す分（写真は不要）',
+                            style: TextStyle(
+                                fontSize: 11, color: Color(0xFF9CA3AF))),
+                      ),
                   ],
                 ],
               ),
