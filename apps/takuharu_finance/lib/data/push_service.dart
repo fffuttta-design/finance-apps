@@ -7,6 +7,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../main.dart';
 import '../screens/plan_detail_screen.dart';
+import '../screens/receipt_detail_screen.dart';
 import '../screens/transaction_chat_screen.dart';
 import 'auth_service.dart';
 import 'household_service.dart';
@@ -118,6 +119,10 @@ class PushService {
   Future<void> clearForPlan(String planId) =>
       _clearByTags({'plan:$planId', 'plancomment:$planId'});
 
+  /// レシートを開いたら、そのレシートの「まとめ1件」通知を消す。
+  Future<void> clearForReceipt(String receiptId) =>
+      _clearByTags({'receipt:$receiptId'});
+
   /// 指定 tag の配信済み通知を消す（Android のみ）。tag/id は端末の実値で照合。
   Future<void> _clearByTags(Set<String> tags) async {
     try {
@@ -148,11 +153,30 @@ class PushService {
   }
 
   /// 通知データから、対象画面へ遷移する。
+  /// - レシート（receiptId 付き）: そのレシート1枚の詳細画面。
   /// - 取引（tx / comment）: その取引のチャット画面。
   /// - プランニング（plan / plan_comment）: その項目の詳細画面。
   Future<void> _handleTap(Map<String, dynamic> data) async {
     final hid = HouseholdService.instance.householdId;
     if (hid == null) return;
+
+    // レシートまとめ通知 → レシート画面（品目1件ずつのチャットには飛ばさない）。
+    final receiptId = data['receiptId'];
+    if (receiptId is String && receiptId.isNotEmpty) {
+      // 起動直後はデータ未準備のことがあるので軽くリトライ。
+      for (var i = 0; i < 3; i++) {
+        final members =
+            await TxRepository.instance.listByReceiptId(hid, receiptId);
+        final nav = appNavigatorKey.currentState;
+        if (members.isNotEmpty && nav != null) {
+          nav.push(MaterialPageRoute(
+              builder: (_) => ReceiptDetailScreen(members: members)));
+          return;
+        }
+        await Future.delayed(const Duration(milliseconds: 800));
+      }
+      return;
+    }
 
     final planId = data['planId'];
     if (planId is String && planId.isNotEmpty) {

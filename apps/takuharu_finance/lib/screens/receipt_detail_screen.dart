@@ -7,6 +7,7 @@ import '../data/auth_service.dart';
 import '../data/categories.dart';
 import '../data/drive_receipt_service.dart';
 import '../data/household_service.dart';
+import '../data/push_service.dart';
 import '../data/receipt_comment_repository.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
@@ -46,6 +47,8 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
     final rid = _receiptId;
     if (hid != null && rid != null && rid.isNotEmpty) {
       _source = ReceiptCommentSource(hid, rid);
+      // 開いたら、このレシートのまとめ通知を消す。
+      PushService.instance.clearForReceipt(rid);
       // 旧・品目別コメントをレシートの1スレッドへ統合（初回だけ実行・冪等）。
       // ストリームが拾うので await しない（統合が終わり次第、画面に反映される）。
       ReceiptCommentRepository.instance

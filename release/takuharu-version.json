@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.93",
-    "buildNumber":  "98",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.93/takuharu-finance-v0.2.93.apk",
-    "releaseNotes":  "通知をチャット的に改善：同じ取引/プランの通知は1枠にまとまって上書きされ、その取引/プランを開くと通知が自動で消えます。"
+    "version":  "0.2.94",
+    "buildNumber":  "99",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.94/takuharu-finance-v0.2.94.apk",
+    "releaseNotes":  "レシートを登録したときの相手への通知を「品目ごとに1件ずつ」から「レシート1枚につき1件」にまとめました。通知をタップするとレシート画面が開きます。"
 }
