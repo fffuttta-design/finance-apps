@@ -507,7 +507,6 @@ class _V2ReportScreenState extends State<V2ReportScreen>
   // ── 家庭用：貯金の推移＋月別収支（暦年・棒グラフ）──────────────
   Widget _personalReport() {
     final year = _personalYear;
-    final nets = <int>[];
     final balances = <int?>[];
     final labels = <String>[];
     var yearNet = 0;
@@ -525,7 +524,6 @@ class _V2ReportScreenState extends State<V2ReportScreen>
         }
       }
       final net = inc - exp;
-      nets.add(net);
       yearNet += net;
       yearIncome += inc;
       yearExpense += exp;
@@ -533,6 +531,8 @@ class _V2ReportScreenState extends State<V2ReportScreen>
       labels.add('$m');
     }
     final hasAnyBalance = balances.any((b) => b != null);
+    // 税金・保険料の月次表（対象の記録が無ければ null＝セクションごと出さない）。
+    final taxCard = _taxTableCard(year);
 
     // 前年の収入/支出（前年比の算出用）。
     var prevIncome = 0, prevExpense = 0;
@@ -631,19 +631,16 @@ class _V2ReportScreenState extends State<V2ReportScreen>
             hasAnyTx: hasAnyTx,
           ),
           const SizedBox(height: V2Spacing.lg),
-          _chartCard(
-            title: '月別の収支（収入 − 支出）',
-            trailing: '年間 ${formatYen(yearNet, withSign: true)}',
-            trailingColor:
-                yearNet >= 0 ? V2Colors.positive : V2Colors.negative,
-            empty: !hasAnyTx,
-            emptyText: '$year年の記録がまだありません',
-            child: _MiniBarChart(values: nets, labels: labels, signed: true),
-          ),
-          const SizedBox(height: V2Spacing.lg),
+          // ※「月別の収支（収入 − 支出）」の棒グラフは廃止（2026-07-15）。
+          //   年間の収支・貯蓄率は上の「$year年のサマリー」で見えるので不要。
           // 大きい出費 TOP5。
           _topExpensesCard(top5),
           const SizedBox(height: V2Spacing.lg),
+          // 税金・保険料（税目ごとの月次表）。対象の記録が無い年は出さない。
+          if (taxCard != null) ...[
+            taxCard,
+            const SizedBox(height: V2Spacing.lg),
+          ],
           _chartCard(
             title: _breakdownByStore ? '支出の内訳（場所別）' : '支出の内訳（カテゴリ別）',
             trailing: '年間 ${formatYen(bkTotal)}',
@@ -1238,6 +1235,83 @@ class _V2ReportScreenState extends State<V2ReportScreen>
                   fontWeight: FontWeight.w800,
                   color: color,
                   fontFeatures: V2Typography.tabularNums)),
+        ],
+      ),
+    );
+  }
+
+  // ── 個人：税金・保険料の月次表（税目ごと・横スクロール） ──
+  /// 税金・保険料とみなす大カテゴリのキーワード（大カテゴリ名にこれを含めば対象）。
+  /// ⚠️ 小カテゴリ・摘要は見ない。「健康サプリ」「健康投資」のような
+  ///    税金と無関係の項目まで拾ってしまうため（実データで確認済み）。
+  static const _taxMajorKeywords = [
+    '税金',
+    '租税公課',
+    '保険',
+    '年金',
+    '社会保険',
+    '健康保険',
+    '法定福利費',
+  ];
+
+  bool _isTaxMajor(String major) =>
+      _taxMajorKeywords.any((k) => _bareMajor(major).contains(k));
+
+  /// 税金・保険料の月次表。行＝税目（小カテゴリ／無ければ大カテゴリ）、
+  /// 列＝1〜12月＋年間合計。年間合計の大きい順。対象が無ければ null（＝出さない）。
+  Widget? _taxTableCard(int year) {
+    // 税目 → 月別(0-11)の金額。
+    final byItem = <String, List<int>>{};
+    for (final t in _transactions) {
+      if (t.date.year != year) continue;
+      if (t.type != core.TransactionType.expense) continue;
+      if (!_isTaxMajor(t.category.major)) continue;
+      // 税目名＝小カテゴリ（所得税・住民税など）。無ければ大カテゴリの素名。
+      final name = t.category.sub.trim().isNotEmpty
+          ? t.category.sub.trim()
+          : _bareMajor(t.category.major);
+      final months = byItem.putIfAbsent(name, () => List<int>.filled(12, 0));
+      months[t.date.month - 1] += t.effectiveAmount;
+    }
+    if (byItem.isEmpty) return null;
+
+    final entries = byItem.entries.toList()
+      ..sort((a, b) {
+        final ta = a.value.fold<int>(0, (s, v) => s + v);
+        final tb = b.value.fold<int>(0, (s, v) => s + v);
+        return tb.compareTo(ta);
+      });
+    final total = List<int>.generate(
+        12, (i) => entries.fold<int>(0, (s, e) => s + e.value[i]));
+    final rows = <_PLRow>[
+      for (final e in entries)
+        _PLRow(label: e.key, monthly: e.value, kind: _RowKind.data),
+      _PLRow(label: '合計', monthly: total, kind: _RowKind.emphasize),
+    ];
+    final months =
+        List<DateTime>.generate(12, (i) => DateTime(year, i + 1));
+    return V2Card(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                V2Spacing.lg, V2Spacing.md, V2Spacing.lg, V2Spacing.sm),
+            child: Row(
+              children: [
+                Icon(Icons.account_balance_outlined,
+                    size: 18, color: widget.accent),
+                const SizedBox(width: V2Spacing.sm),
+                Text('税金・保険料', style: V2Typography.h2),
+                const SizedBox(width: V2Spacing.sm),
+                Text('← 横スクロール →',
+                    style:
+                        V2Typography.micro.copyWith(color: V2Colors.textMuted)),
+              ],
+            ),
+          ),
+          _PLTable(months: months, rows: rows, totalLabel: '年間合計'),
         ],
       ),
     );
