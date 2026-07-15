@@ -1,1 +1,1 @@
-{"version":"1.0.527","buildNumber":"528","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.527/futa-finance-v1.0.527.apk","releaseNotes":"レシートで記録したとき、常に「品目ごと」の入力画面が開くようになりました。「まとめて1件 / 品目ごと」の切り替えトグルは撤去しています。"}
+{"version":"1.0.528","buildNumber":"529","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.528/futa-finance-v1.0.528.apk","releaseNotes":"支出タブとクレカ明細で、同じレシートの品目が1行にまとまるようになりました（クリックで品目が開きます）。カード明細1行＝アプリ1行で突き合わせできます。集計金額は変わりません。"}
