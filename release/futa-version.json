@@ -1,1 +1,1 @@
-{"version":"1.0.512","buildNumber":"513","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.512/futa-finance-v1.0.512.apk","releaseNotes":"銀行口座の取引（振込手数料・引落・入金・振替など）を、通帳のように口座と入金/出金だけを見せる「銀行明細」専用の詳細画面にしました。「通帳を開く」ボタンも追加。"}
+{"version":"1.0.513","buildNumber":"514","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.513/futa-finance-v1.0.513.apk","releaseNotes":"支出を後から振替に変更できるようにしました。「支出を編集」→「この取引を振替に変更」で、ATMの現金出金など口座間の移動を振替に直せます（収支から外れて残高の移動だけになります）。"}
