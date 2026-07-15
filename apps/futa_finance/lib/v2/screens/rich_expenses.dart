@@ -464,8 +464,12 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
 
   /// 指定月に計上される固定費を、明細テーブルに混ぜる用の行に変換する。
   /// 日付＝請求日（billingDay／年払いは nextBillingDate）。無ければ月初。
+  ///
+  /// 請求日がまだ来ていない固定費は出さない（v1.0.529〜）。明細は「もう出て行った
+  /// お金」を突き合わせる場所なので、未計上の予定が混ざると照合の邪魔になる。
   List<FixedCostRow> _fixedTableRows(DateTime m) {
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
     final daysInMonth = DateTime(m.year, m.month + 1, 0).day;
@@ -488,6 +492,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
         final day = (sub.billingDay ?? 1).clamp(1, daysInMonth);
         date = DateTime(m.year, m.month, day);
       }
+      // 請求日が未来＝まだ計上されていないので明細には出さない。
+      // （過去月を見ているときは全部過去日なので、この行は効かない）
+      if (date.isAfter(today)) continue;
       // 小カテゴリ列に出す科目／グループ（会計科目を優先、無ければカテゴリ）。
       final label = (sub.plMajor ?? '').trim().isNotEmpty
           ? sub.plMajor!.trim()
