@@ -1,1 +1,1 @@
-{"version":"1.0.530","buildNumber":"531","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.530/futa-finance-v1.0.530.apk","releaseNotes":"レシートのDrive保存先フォルダをマイドライブのどこへ移動しても、アプリが自動で見つけて追従するようにしました。新しい端末で空の同名フォルダを作って保存先が分裂するのを防ぎます。"}
+{"version":"1.0.531","buildNumber":"532","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.531/futa-finance-v1.0.531.apk","releaseNotes":"支出明細の「N品」まとめ行をタップしたとき、リストの中で開くのではなく「まとめ明細」画面を開いて品目を表示するようにしました。明細が下に押し出されなくなります。"}
