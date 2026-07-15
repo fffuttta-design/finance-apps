@@ -21,6 +21,31 @@ class NavHistory {
 
   bool get canGoForward => _forward.isNotEmpty;
 
+  /// 直近に戻る/進むを実行した時刻。Electron ではマウスの戻るボタンで
+  /// 「app-command（メインプロセス）」と「ポインタイベント（Flutter）」の
+  /// 両方が飛んでくることがあり、そのままだと2画面ぶん戻ってしまう。
+  /// 短時間の二重発火は捨てる。
+  DateTime? _lastNav;
+  bool _isDuplicate() {
+    final now = DateTime.now();
+    if (_lastNav != null &&
+        now.difference(_lastNav!).inMilliseconds < 300) {
+      return true;
+    }
+    _lastNav = now;
+    return false;
+  }
+
+  /// マウス「戻る」：1つ前の画面へ。
+  /// ⚠ `MaterialApp.builder` の context は Navigator より**上**なので
+  ///    `Navigator.maybeOf(context)` は null になる（これで戻れなかった）。
+  ///    ルートの [navigatorKey] から辿ること。
+  void goBack() {
+    if (_isDuplicate()) return;
+    final nav = navigatorKey.currentState;
+    if (nav != null && nav.canPop()) nav.pop();
+  }
+
   /// 新しい画面へ進む。ブラウザ同様、ここで「進む履歴」はクリアされる。
   /// [onReturn] は画面が閉じられて戻ってきた時に呼ばれる（再読込などに使う）。
   void push(BuildContext context, WidgetBuilder builder,
@@ -31,6 +56,7 @@ class NavHistory {
 
   /// マウス「進む」：直前に戻った画面を開き直す。
   void goForward() {
+    if (_isDuplicate()) return;
     if (_forward.isEmpty) return;
     final nav = navigatorKey.currentState;
     if (nav == null) return;

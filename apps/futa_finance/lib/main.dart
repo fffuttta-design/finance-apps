@@ -95,8 +95,10 @@ class FutaFinanceApp extends StatelessWidget {
             return Listener(
               onPointerDown: (event) {
                 if (event.buttons == kBackMouseButton) {
-                  final nav = Navigator.maybeOf(context);
-                  if (nav != null && nav.canPop()) nav.pop();
+                  // ⚠ ここの context は Navigator より上（MaterialApp.builder）なので
+                  //    Navigator.maybeOf(context) は必ず null になり、戻れなかった。
+                  //    NavHistory がルートの navigatorKey から辿って pop する。
+                  NavHistory.instance.goBack();
                 } else if (event.buttons == kForwardMouseButton) {
                   // 進むボタン：戻った先の画面を開き直す（NavHistory 経由で開いた画面のみ）。
                   NavHistory.instance.goForward();

@@ -1,7 +1,22 @@
 # FutaFinance 仕様書
 
-> **最終更新: 2026-07-15 / v1.0.517+518**
+> **最終更新: 2026-07-15 / v1.0.518+519**
 > 変更があるたびにこのファイルを編集してバージョンを更新すること。
+>
+> **v1.0.518 の主な変更（2026-07-15）**（マウスの戻るボタンが効かない不具合を修正）
+>
+> - 🐛 **マウスの「戻る」ボタンでどの画面からも戻れなかったのを修正**（`main.dart` / `nav_history.dart`）。
+>   **原因＝`MaterialApp.builder` の `context` は Navigator より“上”**なので、
+>   `Navigator.maybeOf(context)` が**常に null** になっていた（＝pop が一度も呼ばれない）。
+>   → `NavHistory.goBack()` を追加し、ルートの `navigatorKey.currentState` から pop する。
+>   **この罠は builder 内で Navigator を触るとき必ず踏むので注意。**
+> - **Electron の app-command（マウス戻る/進む）を `window.futaGoBack/futaGoForward` 経由に変更**
+>   （`desktop/main.js` / `nav_history_hook_web.dart`）。
+>   ⚠ 以前の `window.history.back()` は**効かない**。Flutter(Navigator 1.0) は画面遷移を
+>   ブラウザ履歴に積まないため、何も起きない（最悪アプリが前のURLへ飛ぶ）。
+> - Electron ではマウス戻るで **app-command とポインタイベントの両方**が飛びうるため、
+>   `NavHistory` に**300msの二重発火ガード**（`_isDuplicate`）を入れた（2画面ぶん戻るのを防ぐ）。
+> - 設定のメニュー名を **「固定費・サブスク」→「固定費・サブスクマスタ」**（他のマスタ項目と表記を統一）。
 >
 > **v1.0.517 の主な変更（2026-07-15）**（支払方法別の二重計上バグ修正・入力まわりの統一）
 >

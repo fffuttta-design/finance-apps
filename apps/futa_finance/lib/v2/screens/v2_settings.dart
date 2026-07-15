@@ -88,7 +88,7 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
           desc: 'ウォレット残高を実際に合わせる（差は営業外に記録）'),
       _MenuItem('incomeMaster', '収入マスタ', Icons.savings_outlined,
           desc: '収入源（売上）を登録'),
-      _MenuItem('subscription', '固定費・サブスク', Icons.event_repeat,
+      _MenuItem('subscription', '固定費・サブスクマスタ', Icons.event_repeat,
           desc: '毎月・毎年の固定支払を管理'),
       _MenuItem('budget', '税金・保険', Icons.account_balance_outlined,
           desc: '法人税・消費税・社保などの予定（資金繰りに反映）'),
@@ -230,7 +230,7 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
         return const V2IncomeMasterPanel();
       case 'subscription':
         return _embedV1(const SubscriptionListScreen(),
-            title: '固定費・サブスク',
+            title: '固定費・サブスクマスタ',
             note: '毎月・毎年の固定支払（家賃・サブスク等）を管理します。',
             icon: Icons.event_repeat,
             iconColor: V2Colors.warning);

@@ -366,18 +366,20 @@ async function createWindow() {
   mainWindow.on('close', () => saveWindowState(mainWindow));
   mainWindow.on('closed', () => { mainWindow = null; });
 
-  // マウスの「戻る/進む」ボタン（Windowsの app-command）をブラウザ履歴に流す。
-  // Flutter Web は Navigator.push でブラウザ履歴に積むため、history.back/forward で
-  // 直前の画面（設定の各マスタ等）に戻れる。
+  // マウスの「戻る/進む」ボタン（Windowsの app-command）を Flutter の画面遷移に流す。
+  // ⚠ 以前は history.back() を呼んでいたが効かない。Flutter(Navigator 1.0)は
+  //   画面遷移をブラウザ履歴に積まないため、何も起きない（最悪アプリが前のURLへ飛ぶ）。
+  //   Flutter 側が生やす window.futaGoBack / futaGoForward を呼ぶ。
+  //   ※ Flutter 側もポインタイベントで戻るを拾うので二重に飛びうる。
+  //     NavHistory 側で短時間の二重発火は捨てている。
   mainWindow.on('app-command', (e, cmd) => {
     if (cmd === 'browser-backward') {
-      mainWindow.webContents.executeJavaScript('window.history.back()').catch(() => {});
-    } else if (cmd === 'browser-forward') {
-      // 進むは Flutter 側の簡易フォワードスタック（window.futaGoForward）を呼ぶ。
-      // 無い場合はブラウザ履歴の forward にフォールバック。
       mainWindow.webContents
-          .executeJavaScript(
-              'window.futaGoForward ? window.futaGoForward() : window.history.forward()')
+          .executeJavaScript('window.futaGoBack && window.futaGoBack()')
+          .catch(() => {});
+    } else if (cmd === 'browser-forward') {
+      mainWindow.webContents
+          .executeJavaScript('window.futaGoForward && window.futaGoForward()')
           .catch(() => {});
     }
   });
