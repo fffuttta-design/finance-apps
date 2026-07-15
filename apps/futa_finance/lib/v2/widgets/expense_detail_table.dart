@@ -1803,15 +1803,12 @@ class _ExpenseGroupRow extends StatelessWidget {
                           fontSize: 12, color: V2Colors.textSecondary)),
                 ),
                 _vGrid(_kHandleW, _kRowH),
-                // 内容＝店名。「N品」バッジでレシート束と分かるように。
-                // ▶ は「タップするとまとめ明細画面へ進む」の意味（展開はしない）。
+                // 内容＝店名＋「N品」バッジ（これだけでレシート束だと分かるので
+                // 開閉アイコンは置かない）。タップでまとめ明細画面へ。
                 SizedBox(
                   width: w.content,
                   child: Row(
                     children: [
-                      const Icon(Icons.chevron_right,
-                          size: 16, color: V2Colors.textMuted),
-                      const SizedBox(width: 2),
                       Flexible(
                         child: HiliteText(title,
                             style: V2Typography.body
@@ -2246,9 +2243,6 @@ class _NarrowGroupRow extends StatelessWidget {
           opacity: reviewed ? 0.5 : 1,
           child: Row(
             children: [
-              const Icon(Icons.chevron_right,
-                  size: 18, color: V2Colors.textMuted),
-              const SizedBox(width: 4),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

@@ -29,6 +29,10 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
   String? _error;
   bool _loading = true;
 
+  /// PDFの拡大/縮小ボタン用。ホイールはページ送り（スクロール）に使うので、
+  /// ズームはボタン・ピンチ・Ctrl+「＋/−」で行う。
+  final _pdf = PdfViewerController();
+
   @override
   void initState() {
     super.initState();
@@ -81,6 +85,19 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
       appBar: AppBar(
         title: Text('${widget.title}を見る'),
         actions: [
+          // ホイールはページ送りに使うので、ズームはここのボタンで（PDFのみ）。
+          if (_isPdf) ...[
+            IconButton(
+              icon: const Icon(Icons.zoom_out),
+              tooltip: '縮小',
+              onPressed: () => _pdf.zoomDown(),
+            ),
+            IconButton(
+              icon: const Icon(Icons.zoom_in),
+              tooltip: '拡大',
+              onPressed: () => _pdf.zoomUp(),
+            ),
+          ],
           IconButton(
             icon: const Icon(Icons.open_in_new),
             tooltip: '外部（Drive）で開く',
@@ -100,15 +117,19 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
                       ? PdfViewer.data(
                           _bytes!,
                           sourceName: widget.driveUrl,
+                          controller: _pdf,
                           params: PdfViewerParams(
                             // 既定はcover(埋める=拡大しすぎ)なので、ページ全体が
                             // 収まるフィット倍率で開く（見やすさ優先）。
                             calculateInitialZoom: (document, controller,
                                     alternativeFitScale, coverScale) =>
                                 alternativeFitScale,
-                            // マウスホイールだけで拡大率を変更できるようにする
-                            // （null にするとホイール＝スクロールではなくズームになる）。
-                            scrollByMouseWheel: null,
+                            // ⚠ ここを null にするとホイールが「ズーム」になり、
+                            //   複数ページのPDF（例：GUの注文明細5ページ）を
+                            //   ホイールで送れなくなる。ホイール＝スクロールが正。
+                            //   ズームはAppBarの拡大/縮小ボタン・ピンチ・Ctrl+「＋/−」で行う。
+                            //   既定の0.2は動きが小さいので少し大きめにする。
+                            scrollByMouseWheel: 0.5,
                           ),
                         )
                       : InteractiveViewer(

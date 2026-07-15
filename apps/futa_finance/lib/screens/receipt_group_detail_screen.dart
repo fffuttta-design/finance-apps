@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
-import 'package:url_launcher/url_launcher.dart';
 
-import '../data/drive_receipt_service.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 import '../utils/modal_input.dart';
 import '../widgets/centered_body.dart';
-import 'receipt_image_screen.dart';
 import 'receipt_split_screen.dart';
+import 'receipt_viewer_screen.dart';
 import 'transaction_detail_screen.dart';
 
 /// 同じレシート/まとめの複数品目を1画面で見る「まとめ明細」詳細。
@@ -248,19 +246,15 @@ class ReceiptGroupDetailScreen extends StatelessWidget {
     );
   }
 
+  /// 領収書を開く。明細詳細（`transaction_detail_screen`）と同じ `ReceiptViewerScreen`
+  /// を使う。⚠ 以前は `ReceiptImageScreen`（`Image.memory` の画像専用）だったため、
+  /// **PDFの領収書（ネット注文の明細など）はここから開けなかった**。
+  /// `ReceiptViewerScreen` は PDF/画像を判定し、失敗時はDriveで開くところまで面倒を見る。
   Future<void> _openReceipt(BuildContext context, String raw) async {
-    final fileId = DriveReceiptService.fileIdFromUrl(raw);
-    if (fileId != null) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-            builder: (_) => ReceiptImageScreen(fileId: fileId)),
-      );
-      return;
-    }
-    final uri = Uri.tryParse(raw);
-    if (uri != null) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (_) => ReceiptViewerScreen(driveUrl: raw, title: '領収書')),
+    );
   }
 }
