@@ -1,7 +1,26 @@
 # FutaFinance 仕様書
 
-> **最終更新: 2026-07-15 / v1.0.525+526**
+> **最終更新: 2026-07-15 / v1.0.526+527**
 > 変更があるたびにこのファイルを編集してバージョンを更新すること。
+>
+> **v1.0.526 の主な変更（2026-07-15）**（旧UIの死にコードを一掃）
+>
+> - 🗑 **どこからも参照されていない旧UIのファイルを全削除**（12ファイル・約5,800行）。
+>   v1.0.525 の3ファイル（`v2_expenses`/`v2_income`/`subscription_edit_sheet`）を消したことで
+>   芋づる式に孤立したものを、**孤立が出なくなるまで繰り返し**削除した：
+>   - `screens/report_screen.dart`(867) `screens/table_view_screen.dart`(486)
+>     `screens/pending_settlement_screen.dart`(365)
+>   - `widgets/month_closing_view.dart`(977) `widgets/calendar_view.dart`(414)
+>     `widgets/category_heat_grid.dart`(160) `widgets/annual_contracts_card.dart`(95)
+>     `widgets/icon_picker_dialog.dart`(104)
+>   - `v2/screens/v2_placeholder.dart`(66) `v2/widgets/v2_stat_card.dart`(130)
+>     `v2/widgets/v2_section_header.dart`(58) `mock/dashboard_summary.dart`(77)
+> - **死にスイッチ `UiPreferences.richUi`（`=> true` 固定）を削除**し、
+>   `v2_root.dart` の最後の分岐 `if (richUi && !isNarrow)` を `if (!isNarrow)` に畳んだ。
+> - ※`PendingSettlementScreen`（入金締め）は `month_closing_view` からしか開けず**以前から到達不能**
+>   だった。機能は現行UIに存在する（収入タブの行タップ→`IncomeInputScreen` の見込み/確定トグル）。
+> - **判定方法**：`lib/` の各 .dart について「そのファイル名を import している .dart があるか」を
+>   走査し、0件のものを削除 →`flutter analyze` エラー0 を確認 → 再走査、を孤立が消えるまで繰り返す。
 >
 > **v1.0.525 の主な変更（2026-07-15）**（大カテゴリ追加でセクション選択／旧UIの死にコード削除）
 >

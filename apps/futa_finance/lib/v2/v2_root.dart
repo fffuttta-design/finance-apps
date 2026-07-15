@@ -417,9 +417,9 @@ class _V2RootState extends State<V2Root>
             curve: Curves.easeOutCubic);
       }
     }
-    // 新デザイン（リッチUI）かつ広い画面 → 左サイドバーのダッシュボードシェル。
-    // スマホ幅は従来どおり下タブのシェルを使う（本文だけ rich 版に差替え済）。
-    if (UiPreferences.instance.richUi && !isNarrow) {
+    // 広い画面 → 左サイドバーのダッシュボードシェル。
+    // スマホ幅は下タブのシェルを使う。
+    if (!isNarrow) {
       final items = _navItems;
       final cur = items.firstWhere((e) => e.id == _currentId,
           orElse: () => items.first);

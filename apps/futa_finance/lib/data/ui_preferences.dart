@@ -59,10 +59,6 @@ class UiPreferences extends ChangeNotifier {
   static const v2VariantSidebar = 'sidebar';
   static const v2VariantTopNav = 'topnav';
 
-  /// 新デザイン（リッチUI）に固定（v1.0.366〜・旧デザインは廃止）。
-  /// 切替トグルは削除し、常に新デザインを使う。
-  bool get richUi => true;
-
   /// ホーム（広い画面）の総資産カラム幅。ユーザーがドラッグで調整・永続化。
   static const _kHomeAssetWidth = 'futa.ui.home_asset_width';
   static const homeAssetWidthMin = 240.0;
