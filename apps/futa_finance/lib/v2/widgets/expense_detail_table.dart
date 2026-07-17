@@ -2208,7 +2208,15 @@ class _NarrowSortBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        child: Row(children: [for (final c in _SortCol.values) _chip(c)]),
+        // ⚠️ `_SortCol.values` には `custom`（カスタム並び替え）が含まれるが、これは
+        //   タップして選ぶソート列ではなく別ボタンで切り替える内部状態で、`_labels` に
+        //   ラベルが無い。ラベルの有る列だけチップにする。全値を回して `_labels[c]!` を
+        //   引くと `custom` で null になり、スマホのソートバーが毎回クラッシュして
+        //   支出明細が丸ごと灰色(ErrorWidget)になる（v1.0.418で custom を足したとき混入）。
+        child: Row(children: [
+          for (final c in _SortCol.values)
+            if (_labels.containsKey(c)) _chip(c)
+        ]),
       ),
     );
   }

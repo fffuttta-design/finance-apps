@@ -1,1 +1,1 @@
-{"version":"1.0.532","buildNumber":"533","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.532/futa-finance-v1.0.532.apk","releaseNotes":"何ページもあるPDFの領収書がスクロールできるようになりました（拡大・縮小は画面右上のボタンです）。まとめ明細画面からもPDFの領収書が開けます。まとめ行の開閉アイコンは「◯品」バッジがあれば分かるので外しました。"}
+{"version":"1.0.533","buildNumber":"534","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.533/futa-finance-v1.0.533.apk","releaseNotes":"スマホで支出明細が灰色のまま表示されない不具合を修正しました（並び替えバーの不具合が原因で、事業・個人の両方が見えなくなっていました）。"}
