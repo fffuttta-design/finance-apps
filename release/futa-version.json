@@ -1,1 +1,1 @@
-{"version":"1.0.533","buildNumber":"534","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.533/futa-finance-v1.0.533.apk","releaseNotes":"スマホで支出明細が灰色のまま表示されない不具合を修正しました（並び替えバーの不具合が原因で、事業・個人の両方が見えなくなっていました）。"}
+{"version":"1.0.534","buildNumber":"535","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.534/futa-finance-v1.0.534.apk","releaseNotes":"スマホの支出明細から領収書・検収のチェックボックスを外し、内容が見やすくなりました（締め処理はPCで行うため）。"}

@@ -664,14 +664,17 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                     ),
                     _plainRows(
                       detailRows,
+                      // ⚠️ スマホ幅は領収書/検収のチェックボックスを出さない（2026-07-18）。
+                      //   締め処理（検収）は必ずPCで行うので、狭い画面ではチェックが場所を
+                      //   食うだけで使わない。行タップは編集/まとめ明細に使い、チェックは
+                      //   PC（広い幅）とデスクトップに任せる。
                       (r) => r.isFixed
                           ? _NarrowFixedRow(
                               f: r.fx!,
                               onTap: () => widget.onEditFixed?.call(r.fx!),
-                              showReceipt: widget.showReceiptCheck,
-                              showReview:
-                                  widget.onToggleReviewedFixed != null,
-                              onToggleReviewed: widget.onToggleReviewedFixed,
+                              showReceipt: false,
+                              showReview: false,
+                              onToggleReviewed: null,
                             )
                           : r.isGroup
                               ? _NarrowGroupRow(
@@ -683,10 +686,10 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                               : _NarrowRow(
                                   t: r.txn!,
                                   onTap: () => widget.onEditTxn(r.txn!),
-                                  showReceipt: widget.showReceiptCheck,
-                                  onToggleReceipt: widget.onToggleReceipt,
-                                  showReview: widget.onToggleReviewed != null,
-                                  onToggleReviewed: widget.onToggleReviewed,
+                                  showReceipt: false,
+                                  onToggleReceipt: null,
+                                  showReview: false,
+                                  onToggleReviewed: null,
                                 ),
                     ),
                   ],
