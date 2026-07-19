@@ -91,6 +91,11 @@ class CreditCardBillingSection extends StatelessWidget {
         .fold(0, (s, t) => s + t.amount);
     final now = DateTime.now();
     final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    // 過去月は「実際に発行された明細（実取引）」だけで数える。開始月未設定や
+    // 支払カード変更で、その月は実際に課金されていない固定費（サブスク設定の
+    // 支払方法だけ当該カードのもの）を予定計上すると利用合計が膨らみ、
+    // card_detail の利用合計（過去月は実取引のみ）とズレる。ここで揃える。
+    if (ym.compareTo(curYm) < 0) return txSum;
     // 既に「実明細化」された固定費は txSum に含まれるので、サブスク側では数えない
     // （二重計上の防止：例 新生銀行が固定費ぶんを二重に出ていた不具合）。
     final subSum = subscriptions

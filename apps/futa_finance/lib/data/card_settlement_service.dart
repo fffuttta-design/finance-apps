@@ -166,6 +166,9 @@ class CardSettlementService {
             t.date.year == year &&
             t.date.month == month)
         .fold<int>(0, (s, t) => s + t.amount);
+    // 過去月は実取引だけで数える（その月に実際は課金されていない固定費を
+    // サブスク設定の支払方法だけで予定計上して膨らませない。ウォレット/明細と揃える）。
+    if (ym.compareTo(curYm) < 0) return txSum;
     // 既に実明細化された固定費は txSum に含まれるので二重に数えない。
     final subSum = subs
         .where((s) => (s.paymentMethod ?? '') == name)
