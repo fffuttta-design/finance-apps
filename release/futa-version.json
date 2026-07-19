@@ -1,1 +1,1 @@
-{"version":"1.0.535","buildNumber":"536","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.535/futa-finance-v1.0.535.apk","releaseNotes":"支出タブ（ウォレット）の利用合計が、過去月はクレカ明細と一致するよう修正しました（実際に課金されていない固定費が二重計上されていた不具合の解消）。"}
+{"version":"1.0.536","buildNumber":"537","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.536/futa-finance-v1.0.536.apk","releaseNotes":"証憑（請求書・領収書）ビューアに拡大率の%表示を追加しました。ページ全体が収まる状態を100%として、今の拡大率が分かります。%をタップすると元のフィット表示に戻せます。"}
