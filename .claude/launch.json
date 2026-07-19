@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "futafin-web",
+      "runtimeExecutable": "py",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8099",
+        "--directory",
+        "C:/dev/CoreBusinessTools/finance-apps/apps/futa_finance/build/web"
+      ],
+      "port": 8099
+    }
+  ]
+}

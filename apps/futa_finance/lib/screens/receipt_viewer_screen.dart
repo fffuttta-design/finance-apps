@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/drive_receipt_service.dart';
@@ -39,11 +40,26 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
   /// 現在の拡大率（フィット基準の%表示に使う）。1.0=フィット時。
   double _zoomRatio = 1.0;
 
+  /// 証憑を開いたときの既定拡大率（フィット基準）。設定ボタンで変更可・端末に保存。
+  double _defaultZoomRatio = 1.0;
+  static const _prefKey = 'receipt_viewer_default_zoom';
+
   @override
   void initState() {
     super.initState();
     _pdf.addListener(_onPdfChanged);
-    _load();
+    _init();
+  }
+
+  /// 既定拡大率を読み込んでから証憑をロードする（初期ズームに反映するため先に読む）。
+  Future<void> _init() async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      _defaultZoomRatio = sp.getDouble(_prefKey) ?? 1.0;
+    } catch (_) {
+      _defaultZoomRatio = 1.0;
+    }
+    await _load();
   }
 
   @override
@@ -103,8 +119,75 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
     }
   }
 
+  /// 既定の拡大率を選ぶダイアログ。選んだ倍率を端末に保存し、今の証憑にも即反映する。
+  Future<void> _openZoomSettings() async {
+    const presets = <double>[1.0, 1.25, 1.5, 2.0, 3.0];
+    final chosen = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('既定の拡大率'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '証憑を開いたときの拡大率です。\n（ページ全体がちょうど収まる状態＝100%）',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: presets.map((r) {
+                final selected = (r - _defaultZoomRatio).abs() < 0.001;
+                return ChoiceChip(
+                  label: Text('${(r * 100).round()}%'),
+                  selected: selected,
+                  onSelected: (_) => Navigator.pop(ctx, r),
+                );
+              }).toList(),
+            ),
+            if (_pdf.isReady) ...[
+              const Divider(height: 24),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.center_focus_strong),
+                  label: Text('今の倍率（${(_zoomRatio * 100).round()}%）を既定にする'),
+                  onPressed: () => Navigator.pop(ctx, _zoomRatio),
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('閉じる'),
+          ),
+        ],
+      ),
+    );
+    if (chosen == null || chosen <= 0) return;
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setDouble(_prefKey, chosen);
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() => _defaultZoomRatio = chosen);
+    // 今開いている証憑にも即反映する。
+    final fit = _fitScale;
+    if (fit != null && _pdf.isReady) {
+      _pdf.setZoom(_pdf.centerPosition, fit * chosen);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // AppBarのアイコンと同じ前景色を使う（白背景のツールバーで白字になって
+    // 見えなくなる不具合を防ぐ）。テーマ未指定なら onSurface にフォールバック。
+    final appBarFg = Theme.of(context).appBarTheme.foregroundColor ??
+        Theme.of(context).colorScheme.onSurface;
     return Scaffold(
       appBar: AppBar(
         title: Text('${widget.title}を見る'),
@@ -133,8 +216,8 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
                   alignment: Alignment.center,
                   child: Text(
                     '${(_zoomRatio * 100).round()}%',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: appBarFg,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
@@ -146,6 +229,12 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
               icon: const Icon(Icons.zoom_in),
               tooltip: '拡大',
               onPressed: () => _pdf.zoomUp(),
+            ),
+            // 既定の拡大率を設定（次回以降この倍率で開く）。
+            IconButton(
+              icon: const Icon(Icons.settings),
+              tooltip: '既定の拡大率を設定',
+              onPressed: _openZoomSettings,
             ),
           ],
           IconButton(
@@ -175,7 +264,8 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
                                 alternativeFitScale, coverScale) {
                               // フィット倍率を「100%」の基準として覚えておく。
                               _fitScale = alternativeFitScale;
-                              return alternativeFitScale;
+                              // 既定拡大率（設定で変更可）を掛けて開く。
+                              return alternativeFitScale * _defaultZoomRatio;
                             },
                             // ⚠ ここを null にするとホイールが「ズーム」になり、
                             //   複数ページのPDF（例：GUの注文明細5ページ）を

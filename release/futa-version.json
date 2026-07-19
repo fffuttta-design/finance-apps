@@ -1,1 +1,1 @@
-{"version":"1.0.536","buildNumber":"537","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.536/futa-finance-v1.0.536.apk","releaseNotes":"証憑（請求書・領収書）ビューアに拡大率の%表示を追加しました。ページ全体が収まる状態を100%として、今の拡大率が分かります。%をタップすると元のフィット表示に戻せます。"}
+{"version":"1.0.537","buildNumber":"538","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.537/futa-finance-v1.0.537.apk","releaseNotes":"証憑ビューアの拡大率%表示が白背景で見えなかったのを修正しました。また設定（歯車）ボタンから、証憑を開いたときの既定の拡大率（100%〜300%）を選んで保存できるようにしました。"}
