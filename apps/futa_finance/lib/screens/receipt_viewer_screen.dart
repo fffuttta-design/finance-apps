@@ -33,10 +33,34 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
   /// ズームはボタン・ピンチ・Ctrl+「＋/−」で行う。
   final _pdf = PdfViewerController();
 
+  /// 「ページ全体フィット」を100%とする基準倍率（初期ズーム）。
+  double? _fitScale;
+
+  /// 現在の拡大率（フィット基準の%表示に使う）。1.0=フィット時。
+  double _zoomRatio = 1.0;
+
   @override
   void initState() {
     super.initState();
+    _pdf.addListener(_onPdfChanged);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _pdf.removeListener(_onPdfChanged);
+    super.dispose();
+  }
+
+  /// ズーム/スクロール変化のたびに呼ばれる。フィット倍率を基準に現在%を更新。
+  void _onPdfChanged() {
+    if (!mounted || !_pdf.isReady) return;
+    final fit = _fitScale;
+    if (fit == null || fit <= 0) return;
+    final ratio = _pdf.currentZoom / fit;
+    if ((ratio - _zoomRatio).abs() > 0.005) {
+      setState(() => _zoomRatio = ratio);
+    }
   }
 
   /// バイト先頭で PDF / 画像 を判定（Driveリンクは拡張子が無いため）。
@@ -92,6 +116,32 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
               tooltip: '縮小',
               onPressed: () => _pdf.zoomDown(),
             ),
+            // 現在の拡大率（ページ全体フィット＝100%基準）。タップでフィットに戻す。
+            Center(
+              child: InkWell(
+                onTap: () {
+                  final fit = _fitScale;
+                  if (fit != null && _pdf.isReady) {
+                    _pdf.setZoom(_pdf.centerPosition, fit);
+                  }
+                },
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  constraints: const BoxConstraints(minWidth: 52),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '${(_zoomRatio * 100).round()}%',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
             IconButton(
               icon: const Icon(Icons.zoom_in),
               tooltip: '拡大',
@@ -122,8 +172,11 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
                             // 既定はcover(埋める=拡大しすぎ)なので、ページ全体が
                             // 収まるフィット倍率で開く（見やすさ優先）。
                             calculateInitialZoom: (document, controller,
-                                    alternativeFitScale, coverScale) =>
-                                alternativeFitScale,
+                                alternativeFitScale, coverScale) {
+                              // フィット倍率を「100%」の基準として覚えておく。
+                              _fitScale = alternativeFitScale;
+                              return alternativeFitScale;
+                            },
                             // ⚠ ここを null にするとホイールが「ズーム」になり、
                             //   複数ページのPDF（例：GUの注文明細5ページ）を
                             //   ホイールで送れなくなる。ホイール＝スクロールが正。
