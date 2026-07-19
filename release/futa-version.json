@@ -1,1 +1,1 @@
-{"version":"1.0.534","buildNumber":"535","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.534/futa-finance-v1.0.534.apk","releaseNotes":"スマホの支出明細から領収書・検収のチェックボックスを外し、内容が見やすくなりました（締め処理はPCで行うため）。"}
+{"version":"1.0.535","buildNumber":"536","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.535/futa-finance-v1.0.535.apk","releaseNotes":"支出タブ（ウォレット）の利用合計が、過去月はクレカ明細と一致するよう修正しました（実際に課金されていない固定費が二重計上されていた不具合の解消）。"}
