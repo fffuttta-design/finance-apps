@@ -277,7 +277,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (catEntries.isNotEmpty) ...[
           _sectionTitle('支出の内訳'),
           const SizedBox(height: 8),
-          _categoryCard(catEntries, expense, txnsByCat),
+          _categoryCard(catEntries, expense, txnsByCat, month),
           const SizedBox(height: 16),
         ],
         _sectionTitle('最近の入出金'),
@@ -627,7 +627,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _categoryCard(List<MapEntry<String, int>> entries, int total,
-      Map<String, List<core.Transaction>> txnsByCat) {
+      Map<String, List<core.Transaction>> txnsByCat,
+      List<core.Transaction> monthAll) {
     final top = entries.take(6).toList();
     return Card(
       child: Padding(
@@ -638,7 +639,8 @@ class _HomeScreenState extends State<HomeScreen> {
               if (i > 0)
                 const Divider(
                     height: 1, thickness: 1, color: AppColors.pinkSoft),
-              _catRow(top[i], total, txnsByCat[top[i].key] ?? const []),
+              _catRow(
+                  top[i], total, txnsByCat[top[i].key] ?? const [], monthAll),
             ],
           ],
         ),
@@ -647,8 +649,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // カテゴリ1行：タップでその下にぶら下がる取引明細を開閉する。
-  Widget _catRow(
-      MapEntry<String, int> e, int total, List<core.Transaction> txns) {
+  // 明細は「1レシート＝1行」にまとめて出す。
+  Widget _catRow(MapEntry<String, int> e, int total,
+      List<core.Transaction> txns, List<core.Transaction> monthAll) {
     final open = _openCat == e.key;
     return Column(
       children: [
@@ -660,51 +663,15 @@ class _HomeScreenState extends State<HomeScreen> {
         if (open)
           Padding(
             padding: const EdgeInsets.only(left: 40, bottom: 4),
-            child: Column(
-              children: [for (final t in txns) _catTxnRow(t)],
+            child: ReceiptGroupedDetailList(
+              txns: txns,
+              allTxns: monthAll,
+              onChanged: () {
+                if (mounted) setState(() {});
+              },
             ),
           ),
       ],
-    );
-  }
-
-  // 展開時の明細1行（タップで会話/編集画面へ）。
-  Widget _catTxnRow(core.Transaction t) {
-    return InkWell(
-      onTap: () async {
-        final changed = await Navigator.push<bool>(
-          context,
-          MaterialPageRoute(
-              builder: (_) => TransactionChatScreen(transaction: t)),
-        );
-        if (changed == true && mounted) setState(() {});
-      },
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 40,
-              child: Text('${t.date.month}/${t.date.day}',
-                  style: const TextStyle(
-                      fontSize: 11, color: AppColors.textSub)),
-            ),
-            Expanded(
-              child: Text(
-                  t.description.isEmpty ? t.category.major : t.description,
-                  style: const TextStyle(fontSize: 12, color: AppColors.text),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
-            ),
-            Text(formatYen(t.amount),
-                style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.text)),
-          ],
-        ),
-      ),
     );
   }
 

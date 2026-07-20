@@ -38,6 +38,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   final _searchCtrl = TextEditingController();
   String _query = '';
   _Sort _sort = _Sort.dateDesc;
+  // カテゴリ内訳で展開中のカテゴリ名（タップで開閉）。
+  String? _openCat;
 
   @override
   void initState() {
@@ -157,7 +159,16 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
-                children: [for (final e in cats) _catBar(e.key, e.value, total)],
+                children: [
+                  for (final e in cats)
+                    _catRow(
+                        e,
+                        total,
+                        month
+                            .where((t) => t.category.major == e.key)
+                            .toList(),
+                        month),
+                ],
               ),
             ),
           ),
@@ -288,7 +299,33 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         ),
       );
 
-  Widget _catBar(String name, int amount, int total) {
+  // カテゴリ1行：タップで明細を開閉（明細は「1レシート＝1行」にまとめる）。
+  Widget _catRow(MapEntry<String, int> e, int total,
+      List<core.Transaction> txns, List<core.Transaction> monthAll) {
+    final open = _openCat == e.key;
+    return Column(
+      children: [
+        InkWell(
+          onTap: () => setState(() => _openCat = open ? null : e.key),
+          borderRadius: BorderRadius.circular(12),
+          child: _catBar(e.key, e.value, total, expanded: open),
+        ),
+        if (open)
+          Padding(
+            padding: const EdgeInsets.only(left: 40, bottom: 4),
+            child: ReceiptGroupedDetailList(
+              txns: txns,
+              allTxns: monthAll,
+              onChanged: () {
+                if (mounted) setState(() {});
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _catBar(String name, int amount, int total, {bool expanded = false}) {
     final c = categoryFor(name, income: false);
     final ratio = total == 0 ? 0.0 : amount / total;
     return Padding(
@@ -313,6 +350,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               Text(formatYen(amount),
                   style: const TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w700)),
+              const SizedBox(width: 4),
+              Icon(expanded ? Icons.expand_less : Icons.expand_more,
+                  size: 18, color: AppColors.textSub),
             ],
           ),
           const SizedBox(height: 6),
