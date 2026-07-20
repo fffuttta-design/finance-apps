@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.96",
-    "buildNumber":  "101",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.96/takuharu-finance-v0.2.96.apk",
-    "releaseNotes":  "内訳のレシート行から先頭のアイコンを外しました（「◯件」で分かるため）。消費税・差額の行が「その他」に入って邪魔だったのを、そのレシートの主なカテゴリ（食費のレシートなら食費）に入るようにしました。過去の記録は 設定＞データ＞「消費税・差額のカテゴリを直す」でまとめて直せます。"
+    "version":  "0.2.97",
+    "buildNumber":  "102",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.97/takuharu-finance-v0.2.97.apk",
+    "releaseNotes":  "過去に「その他」で記録されていた消費税・差額の行を、アプリを開いたときに自動でそのレシートの主なカテゴリ（食費のレシートなら食費）へ付け替えます。何も操作は要りません。金額・日付・品名は変わりません。"
 }
