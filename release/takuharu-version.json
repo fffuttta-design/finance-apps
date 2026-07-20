@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.95",
-    "buildNumber":  "100",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.95/takuharu-finance-v0.2.95.apk",
-    "releaseNotes":  "「支出の内訳」と支出タブの「カテゴリ内訳」を開いたときの明細を、1レシート＝1行にまとめて表示するようにしました（店名＋件数＋そのカテゴリ分の合計）。行をタップするとレシートの中身が見られます。支出タブのカテゴリ内訳もタップで開けるようになりました。"
+    "version":  "0.2.96",
+    "buildNumber":  "101",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.96/takuharu-finance-v0.2.96.apk",
+    "releaseNotes":  "内訳のレシート行から先頭のアイコンを外しました（「◯件」で分かるため）。消費税・差額の行が「その他」に入って邪魔だったのを、そのレシートの主なカテゴリ（食費のレシートなら食費）に入るようにしました。過去の記録は 設定＞データ＞「消費税・差額のカテゴリを直す」でまとめて直せます。"
 }
