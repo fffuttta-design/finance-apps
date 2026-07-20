@@ -246,11 +246,15 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
     // 1行追加し、記録合計をレシートとピッタリ合わせる（外税レシート対策）。
     final adj = _addAdjustment ? _adjustment : 0;
     if (adj != 0) {
+      // 調整行のカテゴリは「その他」ではなく、そのレシートの主たるカテゴリに寄せる
+      // （食費のレシートなら消費税ぶんも食費として集計される）。
+      final adjCat =
+          dominantCategory(txns.map((t) => (t.category.major, t.amount)));
       txns.add(core.Transaction(
         id: '${DateTime.now().microsecondsSinceEpoch}-adj',
         date: _date,
         type: core.TransactionType.expense,
-        category: core.Category(major: 'その他', sub: ''),
+        category: core.Category(major: adjCat, sub: ''),
         paymentMethod: _payment ?? '',
         description: adj >= 0 ? '消費税・調整' : '値引き・調整',
         amount: adj,

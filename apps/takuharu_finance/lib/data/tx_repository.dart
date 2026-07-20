@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
+import 'categories.dart';
+
 /// 世帯の収支取引（Firestore）。households/{hid}/transactions。
 class TxRepository {
   TxRepository._();
@@ -112,6 +114,42 @@ class TxRepository {
       batch.set(d.reference, {'receiptUrl': url}, SetOptions(merge: true));
     }
     await batch.commit();
+  }
+
+  /// 過去に「その他」で記録された差額調整（消費税・調整／値引き・調整）の行を、
+  /// そのレシートの主たるカテゴリ（品目の金額合計が一番大きいカテゴリ）に付け替える。
+  /// v0.2.96 以降の新規記録は最初からこのカテゴリで入るので、これは一度きりの直し用。
+  /// 戻り値は直した件数。金額・日付・品名は変更しない。
+  Future<int> repairAdjustmentCategories(String hid) async {
+    const adjNames = ['消費税・調整', '値引き・調整'];
+    final snap =
+        await _coll(hid).where('description', whereIn: adjNames).get();
+    var fixed = 0;
+    // レシートごとの品目は使い回すのでキャッシュする。
+    final cache = <String, List<core.Transaction>>{};
+    for (final d in snap.docs) {
+      core.Transaction t;
+      try {
+        t = core.Transaction.fromJson(Map<String, dynamic>.from(d.data()));
+      } catch (_) {
+        continue;
+      }
+      final rid = t.receiptId;
+      if (rid == null || rid.isEmpty) continue;
+      final members = cache[rid] ??= await listByReceiptId(hid, rid);
+      // 主たるカテゴリは「調整行以外の品目」から決める。
+      final cat = dominantCategory(members
+          .where((m) => !adjNames.contains(m.description))
+          .map((m) => (m.category.major, m.amount)));
+      if (cat == t.category.major) continue;
+      await d.reference.set({
+        'categoryMajor': cat,
+        'categorySub': '',
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      fixed++;
+    }
+    return fixed;
   }
 
   /// 指定の receiptId 群のうち、既に存在するものを返す（固定費の二重記録防止）。

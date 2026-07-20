@@ -45,6 +45,29 @@ const personalFoodCategories = <String>{'食費', '日用品'};
 bool isPersonalFoodCategory(String major) =>
     personalFoodCategories.contains(major);
 
+/// レシートの「主たるカテゴリ」＝品目の金額合計が一番大きいカテゴリ。
+/// 消費税・差額調整の行を「その他」にせず、このカテゴリに寄せるために使う
+/// （食費のレシートなら消費税ぶんも食費に入る）。
+/// 品目が無い／判定できないときは [fallback]（既定は「その他」）。
+String dominantCategory(Iterable<(String, int)> items,
+    {String fallback = 'その他'}) {
+  final sums = <String, int>{};
+  for (final (cat, amount) in items) {
+    if (cat.isEmpty) continue;
+    sums[cat] = (sums[cat] ?? 0) + amount;
+  }
+  if (sums.isEmpty) return fallback;
+  var best = fallback;
+  var bestSum = -1;
+  for (final e in sums.entries) {
+    if (e.value > bestSum) {
+      best = e.key;
+      bestSum = e.value;
+    }
+  }
+  return best;
+}
+
 /// カテゴリ名 → 表示用（アイコン/色）。
 /// 既定カテゴリに無い名前（ユーザー追加のカスタム）は、名前から安定したパステル色を付ける。
 TxCategory categoryFor(String name, {required bool income}) {

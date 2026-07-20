@@ -321,6 +321,9 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
     final adj = (_addAdjustment && _receiptTotal != null) ? _adjustment : 0;
     if (hasNormal && adj != 0) {
       final desc = adj >= 0 ? _kAdjPlus : _kAdjMinus;
+      // 調整行のカテゴリは「その他」ではなく、そのレシートの主たるカテゴリに寄せる。
+      final adjCat = dominantCategory([...updates, ...adds]
+          .map((t) => (t.category.major, t.amount)));
       if (_adjTxId != null && _adjSource != null) {
         // 既存の調整行を更新（残すので keepIds に入れて削除対象から外す）。
         keepIds.add(_adjTxId!);
@@ -329,7 +332,7 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
           paymentMethod: _payment,
           paidBy: _payer,
           store: store,
-          category: core.Category(major: 'その他', sub: ''),
+          category: core.Category(major: adjCat, sub: ''),
           description: desc,
           amount: adj,
           personalFor: null,
@@ -340,7 +343,7 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
           id: '${DateTime.now().microsecondsSinceEpoch}-adj',
           date: _date,
           type: core.TransactionType.expense,
-          category: core.Category(major: 'その他', sub: ''),
+          category: core.Category(major: adjCat, sub: ''),
           paymentMethod: _payment ?? '',
           description: desc,
           amount: adj,

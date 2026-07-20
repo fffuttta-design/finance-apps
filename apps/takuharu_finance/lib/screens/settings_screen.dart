@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/auth_service.dart';
 import '../data/household_service.dart';
 import '../data/notify_prefs_service.dart';
+import '../data/tx_repository.dart';
 import '../data/update_flow.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
@@ -587,8 +588,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.auto_fix_high_rounded,
+                  color: AppColors.pinkDark),
+              title: const Text('消費税・差額のカテゴリを直す',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              subtitle: const Text('過去の「その他」をレシートの主なカテゴリに付け替え',
+                  style: TextStyle(fontSize: 11)),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: _repairAdjustments,
+            ),
+          ),
         ],
     );
+  }
+
+  /// 過去の差額調整（消費税・調整／値引き・調整）のカテゴリを、
+  /// そのレシートの主なカテゴリへ付け替える（一度きりの直し・金額は変わらない）。
+  Future<void> _repairAdjustments() async {
+    final hid = HouseholdService.instance.householdId;
+    if (hid == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('消費税・差額のカテゴリを直す'),
+        content: const Text(
+            '過去に「その他」で記録された「消費税・調整」「値引き・調整」を、\n'
+            'そのレシートの主なカテゴリ（食費のレシートなら食費）に付け替えます。\n\n'
+            '金額・日付・品名は変わりません。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx, false),
+              child: const Text('やめる')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dctx, true),
+              child: const Text('直す')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final n = await TxRepository.instance.repairAdjustmentCategories(hid);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(n == 0 ? '直すものはありませんでした' : '$n件のカテゴリを直しました')));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('直せませんでした')));
+    }
   }
 
   /// タブ④「アプリ」：アカウント・更新・サインアウト。

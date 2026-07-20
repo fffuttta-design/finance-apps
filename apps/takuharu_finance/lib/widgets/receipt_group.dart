@@ -113,9 +113,7 @@ class ReceiptGroupedDetailList extends StatelessWidget {
       },
       label: Row(
         children: [
-          const Icon(Icons.receipt_long_rounded,
-              size: 13, color: AppColors.pinkDark),
-          const SizedBox(width: 4),
+          // 「◯件」でレシートまとめ行と分かるので、先頭アイコンは付けない。
           Flexible(
             child: Text(store,
                 style: const TextStyle(
