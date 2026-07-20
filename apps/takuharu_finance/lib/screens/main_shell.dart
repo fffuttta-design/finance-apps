@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../data/household_service.dart';
 import '../data/push_service.dart';
+import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../widgets/startup_update_mixin.dart';
 import 'analysis_screen.dart';
@@ -33,6 +36,23 @@ class _MainShellState extends State<MainShell>
     scheduleStartupUpdateCheck();
     // プッシュ通知（相手の記録/コメント）の登録。許可ダイアログ→トークン保存。
     PushService.instance.register();
+    // 過去の「消費税・調整／値引き・調整」のカテゴリ直し（一度きり・裏で静かに）。
+    _repairAdjustmentCategoriesOnce();
+  }
+
+  /// 差額調整の行が「その他」で入っていた過去分を、そのレシートの主なカテゴリへ
+  /// 付け替える（v0.2.97）。端末ごとに一度だけ実行し、失敗しても黙って諦める
+  /// （次の起動でまた試す）。金額・日付・品名は変えない。
+  Future<void> _repairAdjustmentCategoriesOnce() async {
+    const key = 'takuharu.adjcat_repaired.v1';
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool(key) == true) return;
+      final hid = HouseholdService.instance.householdId;
+      if (hid == null) return;
+      await TxRepository.instance.repairAdjustmentCategories(hid);
+      await prefs.setBool(key, true);
+    } catch (_) {/* 次の起動で再挑戦 */}
   }
 
   @override
