@@ -102,6 +102,9 @@ exports.onCommentCreated = onDocumentCreated(
       const snap = event.data;
       if (!snap) return;
       const c = snap.data() || {};
+      // 変更履歴（アプリが自動で書く kind=log）は会話ではないので送らない。
+      // 「〇〇が記録を直したよ」通知は VPS 常駐の takuharu-notifier が担当する。
+      if (c.kind === "log") return;
       const hid = event.params.hid;
       const author = c.uid || "";
       const {targets, names} = await targetsForOthers(hid, author);

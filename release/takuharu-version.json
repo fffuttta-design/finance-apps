@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.97",
-    "buildNumber":  "102",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.97/takuharu-finance-v0.2.97.apk",
-    "releaseNotes":  "過去に「その他」で記録されていた消費税・差額の行を、アプリを開いたときに自動でそのレシートの主なカテゴリ（食費のレシートなら食費）へ付け替えます。何も操作は要りません。金額・日付・品名は変わりません。"
+    "version":  "0.2.98",
+    "buildNumber":  "103",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.98/takuharu-finance-v0.2.98.apk",
+    "releaseNotes":  "明細やレシートを直すと、その内容（例「個人わく なし → たく」）がチャット欄に変更履歴として残るようになりました。相手にも「◯◯が記録を直したよ」と、何が変わったかまで通知が届きます。"
 }

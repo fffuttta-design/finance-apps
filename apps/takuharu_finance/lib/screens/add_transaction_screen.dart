@@ -10,8 +10,10 @@ import '../data/auth_service.dart';
 import '../data/categories.dart';
 import '../data/account.dart';
 import '../data/account_repository.dart';
+import '../data/comment_repository.dart';
 import '../data/drive_receipt_service.dart';
 import '../data/household_service.dart';
+import '../data/tx_diff.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
@@ -225,6 +227,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     try {
       if (widget.editing != null) {
         await TxRepository.instance.update(hid, tx, uid);
+        // 何を直したかをチャットに変更履歴として残す（相手にも通知が飛ぶ）。
+        await _postChangeLog(hid, uid, widget.editing!, tx);
       } else {
         await TxRepository.instance.add(hid, tx, uid);
       }
@@ -236,6 +240,19 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         _toast('保存に失敗しました');
       }
     }
+  }
+
+  /// 編集内容（金額・カテゴリ・個人わく等）の変更点を、この明細のチャットに
+  /// 変更履歴として1件残す。変更が無ければ何もしない。
+  /// 失敗しても保存自体は成功しているので黙って諦める。
+  Future<void> _postChangeLog(String hid, String uid, core.Transaction before,
+      core.Transaction after) async {
+    try {
+      final changes = txDiff(before, after);
+      final text = txChangeLogText(txActorName(uid), '記録', changes);
+      if (text == null) return;
+      await CommentRepository.instance.addLog(hid, after.id, uid, text);
+    } catch (_) {/* 履歴が残らないだけ。保存は済んでいる */}
   }
 
   /// 保存する personalFor を決める。

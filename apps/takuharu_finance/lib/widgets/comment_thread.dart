@@ -299,7 +299,30 @@ class _CommentThreadState extends State<CommentThread> {
         ),
       );
 
+  /// 変更履歴（kind='log'）。会話の吹き出しではなく、中央のグレー帯で控えめに出す。
+  Widget _logChip(TxComment m) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEFEFF2),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Text(
+            m.text,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                fontSize: 11, height: 1.5, color: AppColors.textSub),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _bubble(TxComment m) {
+    if (m.isLog) return _logChip(m);
     final mine = m.uid == _myUid;
     // 吹き出しの最大幅。長文でも相手側に食い込みすぎないよう画面の約72%で頭打ち。
     final maxBubbleWidth = MediaQuery.sizeOf(context).width * 0.72;

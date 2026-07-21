@@ -119,9 +119,9 @@ class PushService {
   Future<void> clearForPlan(String planId) =>
       _clearByTags({'plan:$planId', 'plancomment:$planId'});
 
-  /// レシートを開いたら、そのレシートの「まとめ1件」通知を消す。
+  /// レシートを開いたら、そのレシートの通知（記録/修正・コメント）を消す。
   Future<void> clearForReceipt(String receiptId) =>
-      _clearByTags({'receipt:$receiptId'});
+      _clearByTags({'receipt:$receiptId', 'receiptcomment:$receiptId'});
 
   /// 指定 tag の配信済み通知を消す（Android のみ）。tag/id は端末の実値で照合。
   Future<void> _clearByTags(Set<String> tags) async {

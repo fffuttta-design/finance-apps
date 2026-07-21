@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'comment_repository.dart' show TxComment;
+import 'comment_repository.dart' show TxComment, txCommentFromMap;
 
 /// レシート単位のチャット（households/{hid}/receipts/{receiptId}/comments）。
 ///
@@ -30,14 +30,7 @@ class ReceiptCommentRepository {
         .map((snap) {
       final list = <TxComment>[];
       for (final d in snap.docs) {
-        final m = d.data();
-        list.add(TxComment(
-          id: d.id,
-          uid: (m['uid'] ?? '') as String,
-          text: (m['text'] ?? '') as String,
-          imageUrl: m['imageUrl'] as String?,
-          createdAt: (m['createdAt'] as Timestamp?)?.toDate(),
-        ));
+        list.add(txCommentFromMap(d.id, d.data()));
       }
       return list;
     });
@@ -67,6 +60,20 @@ class ReceiptCommentRepository {
     batch.set(_receiptDoc(hid, rid),
         {'commentCount': FieldValue.increment(1)}, SetOptions(merge: true));
     await batch.commit();
+  }
+
+  /// 変更履歴（アプリが自動で残す1件）を投稿する。
+  /// 会話ではないので 💬 バッジ（commentCount）は増やさない。
+  Future<void> addLog(String hid, String rid, String uid, String text) async {
+    final t = text.trim();
+    if (t.isEmpty) return;
+    final id = DateTime.now().microsecondsSinceEpoch.toString();
+    await _coll(hid, rid).doc(id).set({
+      'uid': uid,
+      'text': t,
+      'kind': 'log',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
   }
 
   /// 旧「品目ごと」に付いていたコメントを、このレシートの1スレッドへ寄せて統合する。

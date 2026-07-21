@@ -7,6 +7,8 @@ import '../data/account_repository.dart';
 import '../data/auth_service.dart';
 import '../data/categories.dart';
 import '../data/household_service.dart';
+import '../data/receipt_comment_repository.dart';
+import '../data/tx_diff.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
@@ -231,6 +233,52 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
     if (chosen != null) setState(() => _items[index].category = chosen);
   }
 
+  /// レシートを直した内容を、そのレシートのチャットに変更履歴として1件残す。
+  ///
+  /// レシート全体に効く項目（日付・支払い・お店・払った人）は1回だけ、
+  /// 品目ごとの項目（金額・品名・カテゴリ・個人わく）は品目名を頭に付けて並べる。
+  /// 変更が無ければ何もしない。失敗しても保存は済んでいるので黙って諦める。
+  Future<void> _postChangeLog(
+    String hid,
+    String uid, {
+    required List<core.Transaction> updates,
+    required List<core.Transaction> adds,
+    required List<core.Transaction> deletes,
+  }) async {
+    final rid = _receiptId;
+    if (rid == null || rid.isEmpty) return;
+    try {
+      final before = {for (final m in widget.members) m.id: m};
+      final lines = <String>[];
+
+      // レシート共通の変更（既存品目の1つを代表にして1回だけ見る）。
+      for (final u in updates) {
+        final b = before[u.id];
+        if (b == null) continue;
+        lines.addAll(txDiff(b, u, fields: kTxCommonFields));
+        break;
+      }
+      // 品目ごとの変更。
+      for (final u in updates) {
+        final b = before[u.id];
+        if (b == null) continue;
+        for (final c in txDiff(b, u, fields: kTxItemFields)) {
+          lines.add('${txItemLabel(u)}: $c');
+        }
+      }
+      for (final a in adds) {
+        lines.add('追加 ${txItemLabel(a)} ${formatYen(a.amount)}');
+      }
+      for (final d in deletes) {
+        lines.add('削除 ${txItemLabel(d)} ${formatYen(d.amount)}');
+      }
+
+      final text = txChangeLogText(txActorName(uid), 'レシート', lines);
+      if (text == null) return;
+      await ReceiptCommentRepository.instance.addLog(hid, rid, uid, text);
+    } catch (_) {/* 履歴が残らないだけ。保存は済んでいる */}
+  }
+
   Future<void> _save() async {
     final hid = HouseholdService.instance.householdId;
     final uid = AuthService.instance.currentUser?.uid;
@@ -373,6 +421,9 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
       if (adds.isNotEmpty) {
         await TxRepository.instance.addAll(hid, adds, uid);
       }
+      // 何を直したかをレシートのチャットに変更履歴として残す（相手にも通知）。
+      await _postChangeLog(hid, uid,
+          updates: updates, adds: adds, deletes: deletes);
       if (!mounted) return;
       Navigator.pop(context, true);
     } catch (_) {
