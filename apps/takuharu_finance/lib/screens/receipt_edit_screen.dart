@@ -372,6 +372,10 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
       // 調整行のカテゴリは「その他」ではなく、そのレシートの主たるカテゴリに寄せる。
       final adjCat = dominantCategory([...updates, ...adds]
           .map((t) => (t.category.major, t.amount)));
+      // 個人わくも同じ考え方で寄せる（食費わくで買ったぶんの消費税は、その人の
+      // わくから引く）。共用が一番大きければ null＝共用のまま。
+      final adjOwner = adjustmentOwner(
+          [...updates, ...adds].map((t) => (t.personalFor, t.amount)));
       if (_adjTxId != null && _adjSource != null) {
         // 既存の調整行を更新（残すので keepIds に入れて削除対象から外す）。
         keepIds.add(_adjTxId!);
@@ -383,8 +387,8 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
           category: core.Category(major: adjCat, sub: ''),
           description: desc,
           amount: adj,
-          personalFor: null,
-          clearPersonalFor: true,
+          personalFor: adjOwner,
+          clearPersonalFor: adjOwner == null,
         ));
       } else {
         adds.add(core.Transaction(
@@ -399,6 +403,7 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
           receiptId: _receiptId,
           receiptUrl: _receiptUrl,
           paidBy: _payer,
+          personalFor: adjOwner,
         ));
       }
     }

@@ -250,6 +250,10 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
       // （食費のレシートなら消費税ぶんも食費として集計される）。
       final adjCat =
           dominantCategory(txns.map((t) => (t.category.major, t.amount)));
+      // 個人わくも同じ考え方で寄せる（食費わくで買ったぶんの消費税は、その人の
+      // わくから引く）。共用が一番大きければ null＝共用のまま。
+      final adjOwner =
+          adjustmentOwner(txns.map((t) => (t.personalFor, t.amount)));
       txns.add(core.Transaction(
         id: '${DateTime.now().microsecondsSinceEpoch}-adj',
         date: _date,
@@ -263,6 +267,7 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
         receiptUrl: widget.receiptUrl ??
             DriveReceiptService.instance.urlFor(receiptId),
         paidBy: _payer,
+        personalFor: adjOwner,
       ));
     }
     setState(() => _saving = true);

@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.98",
-    "buildNumber":  "103",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.98/takuharu-finance-v0.2.98.apk",
-    "releaseNotes":  "明細やレシートを直すと、その内容（例「個人わく なし → たく」）がチャット欄に変更履歴として残るようになりました。相手にも「◯◯が記録を直したよ」と、何が変わったかまで通知が届きます。"
+    "version":  "0.2.99",
+    "buildNumber":  "104",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.99/takuharu-finance-v0.2.99.apk",
+    "releaseNotes":  "レシートの消費税・差額ぶんも「個人の食費わく」に入るようになりました。これまでは個人わくで買ったものの消費税だけが共用財布から出ていて、使った合計額が少なく出ていました。過去のぶんも直してあります。"
 }

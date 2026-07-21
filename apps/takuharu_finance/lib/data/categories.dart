@@ -68,6 +68,33 @@ String dominantCategory(Iterable<(String, int)> items,
   return best;
 }
 
+/// 差額調整（消費税・値引き）の行を、誰の「個人の食費わく」に入れるか。
+///
+/// [items] は品目の (personalFor, 金額)。personalFor が null の品目＝共用。
+/// 品目の金額が一番大きい持ち主に寄せる（共用が一番大きければ null＝共用のまま）。
+/// 個人わくで買ったものの消費税ぶんだけが共用財布から出てしまう、という
+/// ズレを防ぐため（「相手がいくら使ったか」の合計を正しく出すのが目的）。
+///
+/// ※ 1レシートに共用と個人が混ざる場合、本来は按分すべきだが、行を分けると
+///   相手に「記録したよ」通知が余分に飛ぶので、一番大きい持ち主に寄せている。
+///   差額は数十円レベルなので、合計額の実感を優先する。
+String? adjustmentOwner(Iterable<(String?, int)> items) {
+  final sums = <String?, int>{};
+  for (final (owner, amount) in items) {
+    sums[owner] = (sums[owner] ?? 0) + amount;
+  }
+  if (sums.isEmpty) return null;
+  String? best;
+  var bestSum = -1;
+  for (final e in sums.entries) {
+    if (e.value > bestSum) {
+      best = e.key;
+      bestSum = e.value;
+    }
+  }
+  return best;
+}
+
 /// カテゴリ名 → 表示用（アイコン/色）。
 /// 既定カテゴリに無い名前（ユーザー追加のカスタム）は、名前から安定したパステル色を付ける。
 TxCategory categoryFor(String name, {required bool income}) {
