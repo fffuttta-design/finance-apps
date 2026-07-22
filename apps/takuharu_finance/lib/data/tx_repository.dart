@@ -44,6 +44,8 @@ class TxRepository {
     await _coll(hid).doc(t.id).set({
       ...t.toJson(),
       'recordedBy': uid,
+      // 登録日時（初回保存時のみ。明細に「いつ登録したか」を出すため）。
+      'createdAt': (t.createdAt ?? DateTime.now()).toIso8601String(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
@@ -57,6 +59,8 @@ class TxRepository {
       batch.set(coll.doc(t.id), {
         ...t.toJson(),
         'recordedBy': uid,
+        // 登録日時（初回保存時のみ。レシート品目も個別に「いつ登録したか」を持つ）。
+        'createdAt': (t.createdAt ?? DateTime.now()).toIso8601String(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
     }

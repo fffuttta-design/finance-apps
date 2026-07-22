@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.99",
-    "buildNumber":  "104",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.99/takuharu-finance-v0.2.99.apk",
-    "releaseNotes":  "レシートの消費税・差額ぶんも「個人の食費わく」に入るようになりました。これまでは個人わくで買ったものの消費税だけが共用財布から出ていて、使った合計額が少なく出ていました。過去のぶんも直してあります。"
+    "version":  "0.2.100",
+    "buildNumber":  "105",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.100/takuharu-finance-v0.2.100.apk",
+    "releaseNotes":  "各明細に「登録した日時」を小さく表示するようにしました。手で入れた記録もレシートの品目も、明細をタップした詳細画面に『登録 ○月○日 ○時○分』が出ます。これまでのぶんも表示されます。"
 }

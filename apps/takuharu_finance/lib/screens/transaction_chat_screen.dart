@@ -136,6 +136,9 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
           if (t.paymentMethod.isNotEmpty) _infoRow('支払元', t.paymentMethod),
           if (t.memo != null && t.memo!.trim().isNotEmpty)
             _infoRow('メモ', t.memo!.trim()),
+          // いつ登録したか（小さく添える。既存データは createdAt が無いので出さない）。
+          if (t.createdAt != null)
+            _infoRow('登録', formatRegisteredAt(t.createdAt!)),
           // 個人の食費わく（食費の支出なら、あとから付け外しできる）。
           _personalFoodSection(t),
           if (t.receiptUrl != null && t.receiptUrl!.trim().isNotEmpty) ...[

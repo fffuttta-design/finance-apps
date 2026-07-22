@@ -6,6 +6,15 @@ String formatYen(int amount) {
   return neg ? '-¥$s' : '¥$s';
 }
 
+/// 登録日時などを「2026/7/22 14:30」の形で短く表す。
+/// 明細に「いつ登録したか」を小さく添えるのに使う。
+String formatRegisteredAt(DateTime dt) {
+  final d = dt.toLocal();
+  final hh = d.hour.toString().padLeft(2, '0');
+  final mm = d.minute.toString().padLeft(2, '0');
+  return '${d.year}/${d.month}/${d.day} $hh:$mm';
+}
+
 /// 入力欄のカンマ除去 → int。
 int? parseYen(String text) {
   final cleaned = text.trim().replaceAll(',', '').replaceAll('¥', '');

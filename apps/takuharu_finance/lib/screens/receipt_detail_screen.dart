@@ -180,6 +180,9 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
           if (first.paymentMethod.isNotEmpty)
             _infoRow('支払元', first.paymentMethod),
           if (payer != null) _infoRow('支払った人', payer),
+          // いつ登録したか（小さく添える。既存データは createdAt が無いので出さない）。
+          if (first.createdAt != null)
+            _infoRow('登録', formatRegisteredAt(first.createdAt!)),
           const SizedBox(height: 12),
           // 品目一覧（読み取り専用。直したいときは下の「編集」から）
           const Text('内訳',
