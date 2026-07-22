@@ -1,6 +1,6 @@
 # FutaFinance 仕様書
 
-> **最終更新: 2026-07-18 / v1.0.534+535**
+> **最終更新: 2026-07-22 / v1.0.538+539**
 > 変更があるたびにこのファイルを編集してバージョンを更新すること。
 >
 > **v1.0.532 の主な変更（2026-07-16）**（領収書ビューアのスクロール／まとめ行の見た目）
@@ -584,6 +584,7 @@ class Transaction {
   final String? recordedBy;          // 記録者UID
   final String? paidBy;              // 支払者UID
   final int commentCount;            // チャット件数（読み取り専用）
+  final DateTime? createdAt;          // 登録日時（初回保存時に自動セット。既存データはnull）
 }
 
 enum TransactionType { expense, income, transfer }
@@ -836,6 +837,11 @@ class MonthlySnapshot {
   ]
 }
 ```
+
+### 明細詳細に「登録日時」を表示（v1.0.538〜）
+
+- 取引詳細画面（`transaction_detail_screen`）の「明細項目」欄の最後に、**「登録 YYYY/M/D H:MM」**の控えめな1行（`_metaRow`・小さめ淡色）を追加。レシート／手入力で**いつ保存したか**を確認できる。
+- 表示は `Transaction.createdAt`（初回保存時に自動セット済み）を使う。**既存データ（createdAtがnull）の明細では出さない**。一覧の各行はスッキリのまま（詳細画面だけに出す）。汎用レイアウトと銀行明細レイアウトの両方に対応。
 
 ### 6.3 カテゴリ自動予測
 
@@ -1443,5 +1449,5 @@ class AppModeManager extends ChangeNotifier {
 
 | 種別 | バージョン |
 |---|---|
-| Flutter アプリ（Web/Android） | 1.0.464+465 |
-| Electron Desktop（Windows） | 1.0.464（pubspec版に同期） |
+| Flutter アプリ（Web/Android） | 1.0.538+539 |
+| Electron Desktop（Windows） | 1.0.538（pubspec版に同期） |

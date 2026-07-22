@@ -404,6 +404,11 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                   _div(),
                   _row('メモ', t.memo!.trim()),
                 ],
+                // いつ登録したか（レシート/手入力で保存した日時）。参考情報として控えめに。
+                if (t.createdAt != null) ...[
+                  _div(),
+                  _metaRow('登録', _fmtCreatedAt(t.createdAt!)),
+                ],
               ],
             ),
           ),
@@ -776,6 +781,11 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                     _div(),
                     _row('メモ', t.memo!.trim()),
                   ],
+                  // いつ登録したか（レシート/手入力で保存した日時）。参考情報として控えめに。
+                  if (t.createdAt != null) ...[
+                    _div(),
+                    _metaRow('登録', _fmtCreatedAt(t.createdAt!)),
+                  ],
                 ],
               ),
             ),
@@ -936,5 +946,36 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
         ],
       ),
     );
+  }
+
+  /// 「登録日時」など、参考情報の控えめな1行（本項目より一段小さく・淡く）。
+  Widget _metaRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 84,
+            child: Text(label,
+                style: const TextStyle(
+                    fontSize: 11, color: Color(0xFF9CA3AF))),
+          ),
+          Expanded(
+            child: Text(value,
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF9CA3AF))),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 登録日時を「2026/7/22 14:30」形式に整形。分は2桁ゼロ埋め。
+  static String _fmtCreatedAt(DateTime d) {
+    final m = d.minute.toString().padLeft(2, '0');
+    return '${d.year}/${d.month}/${d.day} ${d.hour}:$m';
   }
 }
