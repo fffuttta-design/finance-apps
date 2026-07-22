@@ -25,6 +25,7 @@ import 'checklist_editor_screen.dart';
 import 'income_master_screen.dart';
 import 'sidebar_order_screen.dart';
 import 'subscription_list_screen.dart';
+import 'ai_usage_screen.dart';
 
 /// 設定のトップ画面。各サブ設定への入り口を並べる。
 class SettingsScreen extends StatefulWidget {
@@ -355,6 +356,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               context,
               MaterialPageRoute(
                   builder: (_) => const ChecklistEditorScreen()),
+            ),
+          ),
+          _tile(
+            icon: Icons.query_stats,
+            title: 'API使用量',
+            subtitle: 'Claude APIをどのツールがいくら使ったか',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AiUsageScreen()),
             ),
           ),
         ];

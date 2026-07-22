@@ -8,6 +8,7 @@ import 'monthly_snapshot_repository.dart';
 import 'settings_repository.dart';
 import 'subscription_repository.dart';
 import 'transaction_repository.dart';
+import 'ai_usage_repository.dart';
 
 /// 全リポジトリの Local/Firestore 切替を一括管理する中央 Provider。
 ///
@@ -36,6 +37,7 @@ class RepositoryProvider {
     ChecklistRepository.useFirestore(uid);
     BudgetItemRepository.instance.useFirestore(uid);
     ComplianceTaskRepository.instance.useFirestore(uid);
+    AiUsageRepository.instance.useFirestore(uid);
     _firestoreActive = true;
     _currentUid = uid;
   }
@@ -51,6 +53,7 @@ class RepositoryProvider {
     ChecklistRepository.useLocal();
     BudgetItemRepository.instance.useLocal();
     ComplianceTaskRepository.instance.useLocal();
+    AiUsageRepository.instance.useLocal();
     _firestoreActive = false;
     _currentUid = null;
   }
