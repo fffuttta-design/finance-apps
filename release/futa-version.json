@@ -1,1 +1,1 @@
-{"version":"1.0.538","buildNumber":"539","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.538/futa-finance-v1.0.538.apk","releaseNotes":"明細をタップして開く詳細画面に「登録日時」を小さく表示するようにしました。レシートや手入力でその明細をいつ登録したかが確認できます。"}
+{"version":"1.0.539","buildNumber":"540","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.539/futa-finance-v1.0.539.apk","releaseNotes":"設定 > データ管理 > API使用量 を追加しました。Claude APIをどのツールがいくら使ったかを、ツール別ランキング・モデル別・日別推移で確認できます。クレジット購入の実額とClaude Max(サブスク)は別枠で表示します。"}
