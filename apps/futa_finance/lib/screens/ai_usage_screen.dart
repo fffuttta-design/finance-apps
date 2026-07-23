@@ -198,31 +198,31 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 主役は「Claudeに実際いくら払ったか」＝APIのチャージ + Maxサブスク。
+          // API利用ぶんの概算は、その内訳として下に添える。
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              const Text('使った額（概算）  ',
+              const Text('Claudeにかかった額  ',
                   style: TextStyle(fontSize: 12, color: Colors.grey)),
-              Text('¥${_fmt(spentJpy)}',
+              Text('¥${_fmt((chargedJpy + subJpy).toDouble())}',
                   style: const TextStyle(
                       fontSize: 28, fontWeight: FontWeight.bold)),
               const SizedBox(width: 8),
-              Text('(\$${spentUsd.toStringAsFixed(2)})',
+              Text('(\$${(chargedUsd + subUsd).toStringAsFixed(2)})',
                   style: const TextStyle(fontSize: 13, color: Colors.grey)),
             ],
           ),
           const SizedBox(height: 12),
-          _kv('APIクレジット購入（実額）', _money(chargedJpy, chargedUsd),
-              note: 'API利用ぶんのチャージ。カードから実際に引き落とされた額'),
-          _kv('Claude Max サブスク（実額）', _money(subJpy, subUsd),
-              note: '月額プラン。API課金ではないので「使った額」には含めない'),
-          _kv('呼び出し回数', '${_fmt((u?.total.calls ?? 0).toDouble())} 回'),
-          _kv('トークン合計', _fmt((u?.total.totalTokens ?? 0).toDouble())),
-          if ((u?.total.cacheRead ?? 0) > 0)
-            _kv('キャッシュ節約率',
-                '${((u!.total.cacheHitRatio) * 100).toStringAsFixed(1)}%',
-                note: '入力のうちキャッシュから読めた割合（高いほど安い）'),
+          _kv('├ APIクレジット購入', _money(chargedJpy, chargedUsd),
+              note: 'API利用ぶんのチャージ（実額）'),
+          _kv('└ Claude Max サブスク', _money(subJpy, subUsd),
+              note: '月額プラン（実額）'),
+          const Divider(height: 20),
+          _kv('うちAPIで実際に使った分（概算）', '¥${_fmt(spentJpy)}'
+              '（\$${spentUsd.toStringAsFixed(2)}）',
+              note: 'チャージした分のうち、実際に消費した額。下のランキングの合計'),
         ],
       ),
     );
