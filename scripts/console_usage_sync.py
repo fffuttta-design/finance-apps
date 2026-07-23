@@ -44,13 +44,28 @@ KEY_FILE = os.environ.get(
     r"C:\dev\_secrets\ai-usage-key.txt" if _WIN else "/opt/apps/claude-usage/ai-usage-key.txt")
 ENDPOINT = os.environ.get("AI_USAGE_ENDPOINT", "https://hisho.run-strategy.jp/ai-usage")
 USAGE_URL = "https://platform.claude.com/usage"
+# 判明済みの組織ID（探索に失敗したときの最後の砦。組織を変えたらここも変える）
+ORG_ID = os.environ.get("CONSOLE_ORG_ID", "ea21edf1-b29b-491a-b13c-5ceb6328e580")
 
 # ページ内で走らせる取得処理。組織IDは画面のHTMLから拾うので決め打ちしない。
 FETCH_JS = r"""
-async (months) => {
-  const uuid = /organizations\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/;
-  const m = document.documentElement.innerHTML.match(uuid);
-  const org = m ? m[1] : null;
+async ([months, KNOWN_ORG]) => {
+  // 組織IDはAPIから取る。HTMLから拾うと headless で描画前に読んで空振りする（実際に踏んだ）。
+  const uuid = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/;
+  let org = null;
+  for (const path of ['/api/organizations', '/api/bootstrap', '/api/auth/current_account']) {
+    const r = await fetch(path, {credentials: 'include'}).catch(() => null);
+    if (!r || !r.ok) continue;   // 401でも諦めない（その口が無いだけのことがある）
+    const t = await r.text();
+    const m = t.match(uuid);
+    if (m) { org = m[1]; break; }
+  }
+  if (!org) {
+    const m2 = document.documentElement.innerHTML.match(
+      /organizations\/([0-9a-f-]{36})/);
+    if (m2) org = m2[1];
+  }
+  if (!org) org = KNOWN_ORG;
   if (!org) return {error: 'org_not_found'};
 
   const out = {org: org, months: {}};
@@ -109,25 +124,66 @@ def _post(payload: dict) -> dict:
         return json.loads(r.read().decode("utf-8"))
 
 
+# ログインできたかを、画面ではなく**実際にAPIが答えるか**で判定する。
+# 🔥 「Enterを押したら保存」だと、別のウィンドウでログインした場合に
+#    未ログインのCookieをそのまま保存してしまう（2026-07-23に実際に踏んだ）。
+_PROBE_JS = r"""
+async (org) => {
+  const r = await fetch(
+    `/api/organizations/${org}/usage_activities`
+    + `?starting_on=2026-07-01&ending_before=2026-07-02&granularity=daily`,
+    {credentials: 'include'}).catch(() => null);
+  return r ? r.status : 0;
+}
+"""
+
+
 def do_login() -> int:
-    """①PCで1回だけ。画面でログインして、Cookieを SESSION_FILE に保存する。"""
+    """①PCで1回だけ。画面でログインして、Cookieを SESSION_FILE に保存する。
+
+    ⚠️ 保存するのは「本当にログインできた」と確認できたときだけ。
+    """
+    import time
     from playwright.sync_api import sync_playwright
 
     os.makedirs(os.path.dirname(SESSION_FILE), exist_ok=True)
-    print("ブラウザを開きます。")
-    print("⚠️ 「Google で続行」は使えません（Googleが自動操作ブラウザを拒否します）。")
-    print("   「メールアドレスで続ける」を選び、メールに届くコードでログインしてください。")
+    print("=" * 56)
+    print(" Anthropic Console にログインしてください")
+    print("=" * 56)
+    print(" ⚠️ 開いた窓の中だけで操作してください（別のChromeでログインしても無効です）")
+    print(" ⚠️ 「Google で続行」は使えません（Googleが自動操作ブラウザを拒否します）")
+    print("    → 「メールアドレスで続ける」を選び、メールのコードでログイン")
+    print()
+    print(" ログインできたか自動で確認します。Enterを押す必要はありません。")
+    print("=" * 56)
+
     with sync_playwright() as pw:
         br = pw.chromium.launch(headless=False, channel="chrome")
         ctx = br.new_context()
         page = ctx.new_page()
         page.goto(USAGE_URL, wait_until="domcontentloaded", timeout=120_000)
-        print()
-        print("使用量ページが表示されたら、この窓で Enter を押してください…")
-        input()
+
+        deadline = time.time() + 600          # 10分待つ
+        ok = False
+        while time.time() < deadline:
+            try:
+                status = page.evaluate(_PROBE_JS, ORG_ID)
+            except Exception:                 # noqa: BLE001  ページ遷移中など
+                status = 0
+            if status == 200:
+                ok = True
+                break
+            time.sleep(3)
+
+        if not ok:
+            print("❌ ログインを確認できませんでした（10分でタイムアウト）。もう一度お試しください。")
+            br.close()
+            return 2
+
         ctx.storage_state(path=SESSION_FILE)
         br.close()
-    print(f"✅ ログイン情報を保存しました: {SESSION_FILE}")
+
+    print(f"✅ ログインを確認して保存しました: {SESSION_FILE}")
     print("   このファイルをVPSへ置けば、以降は毎日VPSが自動で取り込みます。")
     return 0
 
@@ -145,13 +201,13 @@ def do_fetch(months: int) -> int:
         br = pw.chromium.launch(headless=True)
         ctx = br.new_context(storage_state=SESSION_FILE)
         page = ctx.new_page()
-        page.goto(USAGE_URL, wait_until="domcontentloaded", timeout=120_000)
+        page.goto(USAGE_URL, wait_until="networkidle", timeout=120_000)
         if "login" in page.url or "auth" in page.url:
             print("❌ ログインが切れています。PCで --login を実行し直してください。")
             br.close()
             return 2
         try:
-            data = page.evaluate(FETCH_JS, targets)
+            data = page.evaluate(FETCH_JS, [targets, ORG_ID])
         except Exception as e:            # noqa: BLE001
             print("❌ 取得に失敗:", str(e)[:200])
             br.close()
