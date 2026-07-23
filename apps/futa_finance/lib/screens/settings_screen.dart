@@ -360,8 +360,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           _tile(
             icon: Icons.query_stats,
-            title: 'API使用量',
-            subtitle: 'Claude APIをどのツールがいくら使ったか',
+            title: 'Claude使用量',
+            subtitle: 'Claudeをどのツールがいくら使ったか',
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AiUsageScreen()),

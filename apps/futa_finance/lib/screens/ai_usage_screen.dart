@@ -75,7 +75,7 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('API使用量'),
+        title: const Text('Claude使用量'),
         actions: [
           IconButton(
             tooltip: '再読み込み',
@@ -116,8 +116,6 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
               _appRankingCard(),
               const SizedBox(height: 12),
               _modelCard(),
-              const SizedBox(height: 12),
-              _dailyCard(),
               const SizedBox(height: 12),
               _purchaseCard(),
               const SizedBox(height: 12),
@@ -189,6 +187,10 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
     final spentUsd = u?.total.usd ?? 0;
     final chargedJpy = p?.chargeTotal ?? 0;
     final subJpy = p?.subscriptionTotal ?? 0;
+    final chargedUsd =
+        (p?.charges ?? const <AiPurchase>[]).fold<double>(0, (a, b) => a + b.usd);
+    final subUsd = (p?.subscriptions ?? const <AiPurchase>[])
+        .fold<double>(0, (a, b) => a + b.usd);
 
     return _card(
       title: '今月のまとめ',
@@ -211,9 +213,9 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          _kv('APIクレジット購入（実額）', '¥${_fmt(chargedJpy.toDouble())}',
+          _kv('APIクレジット購入（実額）', _money(chargedJpy, chargedUsd),
               note: 'API利用ぶんのチャージ。カードから実際に引き落とされた額'),
-          _kv('Claude Max サブスク（実額）', '¥${_fmt(subJpy.toDouble())}',
+          _kv('Claude Max サブスク（実額）', _money(subJpy, subUsd),
               note: '月額プラン。API課金ではないので「使った額」には含めない'),
           _kv('呼び出し回数', '${_fmt((u?.total.calls ?? 0).toDouble())} 回'),
           _kv('トークン合計', _fmt((u?.total.totalTokens ?? 0).toDouble())),
@@ -309,53 +311,6 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
     );
   }
 
-  Widget _dailyCard() {
-    final daily = _usage?.daily ?? const <AiUsageDay>[];
-    if (daily.isEmpty) {
-      return _card(
-          title: '日別の推移', icon: Icons.show_chart, child: _empty());
-    }
-    final max = daily.fold<double>(0, (a, b) => b.jpy > a ? b.jpy : a);
-    return _card(
-      title: '日別の推移',
-      icon: Icons.show_chart,
-      child: SizedBox(
-        height: 120,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              for (final d in daily)
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Text('¥${d.jpy.toStringAsFixed(0)}',
-                          style: const TextStyle(fontSize: 9)),
-                      const SizedBox(height: 2),
-                      Container(
-                        width: 16,
-                        height: max <= 0 ? 2 : (d.jpy / max * 78).clamp(2, 78),
-                        decoration: BoxDecoration(
-                          color: Colors.indigo.shade300,
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(d.date.length >= 10 ? d.date.substring(8) : d.date,
-                          style: const TextStyle(
-                              fontSize: 9, color: Colors.grey)),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _purchaseCard() {
     final p = _purchases;
@@ -377,7 +332,7 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
                   const SizedBox(height: 4),
                   for (final t in p.charges)
                     _kv('${t.date.month}/${t.date.day}  ${t.label}',
-                        '¥${_fmt(t.amountJpy.toDouble())}'),
+                        _money(t.amountJpy, t.usd)),
                 ],
                 if (p.subscriptions.isNotEmpty) ...[
                   const SizedBox(height: 8),
@@ -387,7 +342,7 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
                   const SizedBox(height: 4),
                   for (final t in p.subscriptions)
                     _kv('${t.date.month}/${t.date.day}  ${t.label}',
-                        '¥${_fmt(t.amountJpy.toDouble())}'),
+                        _money(t.amountJpy, t.usd)),
                 ],
               ],
             ),
@@ -452,6 +407,11 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
       ),
     );
   }
+
+  /// 「¥1,014（\$6.05）」の形。USDが分からないときは円だけ。
+  static String _money(int jpy, double usd) => usd > 0
+      ? '¥${_fmt(jpy.toDouble())}（\$${usd.toStringAsFixed(2)}）'
+      : '¥${_fmt(jpy.toDouble())}';
 
   static String _fmt(double v) {
     final s = v.abs() < 100 && v != v.roundToDouble()

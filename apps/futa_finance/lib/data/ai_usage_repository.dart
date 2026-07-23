@@ -54,6 +54,7 @@ class AiUsageRepository {
       final p = AiPurchase(
         date: DateTime.tryParse((m['date'] ?? '') as String? ?? '') ?? from,
         amountJpy: _i(m['amount']),
+        usd: _usdInMemo((m['memo'] as String?) ?? ''),
         label: ((m['store'] as String?)?.isNotEmpty ?? false)
             ? m['store'] as String
             : ((m['description'] ?? '') as String),
@@ -245,11 +246,21 @@ class AiPurchase {
   final int amountJpy;
   final String label;
 
+  /// 請求時のUSD額（メモから拾えたときだけ。0なら不明）。
+  final double usd;
+
   const AiPurchase({
     required this.date,
     required this.amountJpy,
     required this.label,
+    this.usd = 0,
   });
+}
+
+/// メモに埋まっている "$214.73 USD" のような表記からUSD額を拾う。
+double _usdInMemo(String memo) {
+  final m = RegExp(r'\$\s*([0-9]+(?:\.[0-9]+)?)\s*USD').firstMatch(memo);
+  return double.tryParse(m?.group(1) ?? '') ?? 0;
 }
 
 /// 月内の Anthropic 支払い。API のクレジット購入とサブスクを分けて持つ。
