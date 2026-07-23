@@ -181,10 +181,7 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
   }
 
   Widget _summaryCard() {
-    final u = _usage;
     final p = _purchases;
-    final spentJpy = u?.total.jpy ?? 0;
-    final spentUsd = u?.total.usd ?? 0;
     final chargedJpy = p?.chargeTotal ?? 0;
     final subJpy = p?.subscriptionTotal ?? 0;
     final chargedUsd =
@@ -219,10 +216,6 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
               note: 'API利用ぶんのチャージ（実額）'),
           _kv('└ Claude Max サブスク', _money(subJpy, subUsd),
               note: '月額プラン（実額）'),
-          const Divider(height: 20),
-          _kv('うちAPIで実際に使った分（概算）', '¥${_fmt(spentJpy)}'
-              '（\$${spentUsd.toStringAsFixed(2)}）',
-              note: 'チャージした分のうち、実際に消費した額。下のランキングの合計'),
         ],
       ),
     );
