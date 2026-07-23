@@ -58,16 +58,35 @@ class AiUsageRepository {
             ? m['store'] as String
             : ((m['description'] ?? '') as String),
       );
-      // 「sub」「max」「pro」を含む＝月額サブスク。それ以外は都度のクレジット購入。
-      final isSub = label.contains('sub') ||
-          label.contains('max') ||
-          label.contains('pro') ||
-          (m['isFixed'] == true);
-      (isSub ? subs : charges).add(p);
+      (_isSubscription(m, label) ? subs : charges).add(p);
     }
     charges.sort((a, b) => a.date.compareTo(b.date));
     subs.sort((a, b) => a.date.compareTo(b.date));
     return AiPurchases(charges: charges, subscriptions: subs);
+  }
+
+  /// Anthropicへの支払いが「Claude Max（月額サブスク）」か「APIクレジット購入」かを判定する。
+  ///
+  /// 🔥 実データはどちらも store="Anthropic" / description="Claude API利用料（Anthropic）" で
+  /// **文言では区別できない**。実際に効く手がかりは2つ:
+  ///   1. memo の請求書番号の系列 … `Z8OT9YXC****` = APIクレジットの都度購入
+  ///   2. memo の USD 金額 … サブスクは $100/$200 クラス、クレジット購入は $5〜$20 程度
+  /// 2つとも無いときだけ、店名・摘要のキーワードで拾う。
+  static bool _isSubscription(Map<String, dynamic> m, String label) {
+    if (label.contains('max') || label.contains('サブスク')) return true;
+    final memo = (m['memo'] as String?) ?? '';
+    // ① 請求書番号の系列で判定（APIクレジット購入の系列なら確定でサブスクではない）
+    if (memo.contains('Z8OT9YXC')) return false;
+    // ② memo に埋まっている USD 額（例 "$214.73 USD"）で判定
+    final usd = RegExp(r'\$\s*([0-9]+(?:\.[0-9]+)?)\s*USD').firstMatch(memo);
+    if (usd != null) {
+      final v = double.tryParse(usd.group(1) ?? '') ?? 0;
+      if (v >= 100) return true;   // $100超はサブスク（クレジット購入は毎回$20未満）
+      return false;
+    }
+    // ③ 手がかりが無ければ固定費フラグと金額で最後の判断
+    if (m['isFixed'] == true) return true;
+    return ((m['amount'] as num?)?.toInt() ?? 0) >= 15000;
   }
 
   /// 指定月の使用量サマリを取得する。未計測・未同期なら null。

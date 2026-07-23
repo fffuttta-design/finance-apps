@@ -211,19 +211,16 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          _kv('クレジット購入（実額）', '¥${_fmt(chargedJpy.toDouble())}',
-              note: 'カードから実際に引き落とされた額'),
+          _kv('APIクレジット購入（実額）', '¥${_fmt(chargedJpy.toDouble())}',
+              note: 'API利用ぶんのチャージ。カードから実際に引き落とされた額'),
+          _kv('Claude Max サブスク（実額）', '¥${_fmt(subJpy.toDouble())}',
+              note: '月額プラン。API課金ではないので「使った額」には含めない'),
           _kv('呼び出し回数', '${_fmt((u?.total.calls ?? 0).toDouble())} 回'),
           _kv('トークン合計', _fmt((u?.total.totalTokens ?? 0).toDouble())),
           if ((u?.total.cacheRead ?? 0) > 0)
             _kv('キャッシュ節約率',
                 '${((u!.total.cacheHitRatio) * 100).toStringAsFixed(1)}%',
                 note: '入力のうちキャッシュから読めた割合（高いほど安い）'),
-          if (subJpy > 0) ...[
-            const Divider(height: 24),
-            _kv('Claude サブスク（別枠）', '¥${_fmt(subJpy.toDouble())}',
-                note: '月額プラン。API課金ではないので上の金額には含めていない'),
-          ],
         ],
       ),
     );
@@ -371,10 +368,27 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
           ? const Text('この月の記録はありません。',
               style: TextStyle(fontSize: 12, color: Colors.grey))
           : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final t in all)
-                  _kv('${t.date.month}/${t.date.day}  ${t.label}',
-                      '¥${_fmt(t.amountJpy.toDouble())}'),
+                if (p!.charges.isNotEmpty) ...[
+                  const Text('APIクレジット購入',
+                      style: TextStyle(
+                          fontSize: 11, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  for (final t in p.charges)
+                    _kv('${t.date.month}/${t.date.day}  ${t.label}',
+                        '¥${_fmt(t.amountJpy.toDouble())}'),
+                ],
+                if (p.subscriptions.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  const Text('Claude Max サブスク（API課金ではない）',
+                      style: TextStyle(
+                          fontSize: 11, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  for (final t in p.subscriptions)
+                    _kv('${t.date.month}/${t.date.day}  ${t.label}',
+                        '¥${_fmt(t.amountJpy.toDouble())}'),
+                ],
               ],
             ),
     );
