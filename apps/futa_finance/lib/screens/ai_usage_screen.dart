@@ -21,6 +21,7 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
   AiUsageMonth? _usage;
   AiPurchases? _purchases;
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -31,14 +32,31 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     final repo = AiUsageRepository.instance;
-    final u = await repo.fetch(_month);
-    final p = await repo.fetchPurchases(_month);
+    AiUsageMonth? u;
+    AiPurchases? p;
+    String? err;
+    // ⚠️ 片方が失敗しても画面が「読み込み中」のまま固まらないように、
+    //    それぞれ独立に握って、失敗したことを画面に出す。
+    try {
+      u = await repo.fetch(_month);
+    } catch (e) {
+      err = '使用量の読み取りに失敗しました: $e';
+    }
+    try {
+      p = await repo.fetchPurchases(_month);
+    } catch (e) {
+      err = '${err ?? ''}\n購入履歴の読み取りに失敗しました: $e'.trim();
+    }
     if (!mounted) return;
     setState(() {
       _usage = u;
       _purchases = p;
+      _error = err;
       _loading = false;
     });
   }
@@ -79,6 +97,20 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
                 child: Center(child: CircularProgressIndicator()),
               )
             else ...[
+              if (_error != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Text(_error!,
+                      style: TextStyle(
+                          fontSize: 11, color: Colors.orange.shade900)),
+                ),
+                const SizedBox(height: 12),
+              ],
               _summaryCard(),
               const SizedBox(height: 12),
               _appRankingCard(),

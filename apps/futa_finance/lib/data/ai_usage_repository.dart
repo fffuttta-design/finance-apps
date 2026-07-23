@@ -34,9 +34,11 @@ class AiUsageRepository {
     if (uid == null) return const AiPurchases(charges: [], subscriptions: []);
     final from = DateTime(month.year, month.month, 1);
     final to = DateTime(month.year, month.month + 1, 1);
+    // ⚠️ mode と date の2条件を同時に where すると Firestore の**複合インデックス**が要る。
+    //    未作成だと例外になり、画面が読み込み中のまま止まる（実際に踏んだ）。
+    //    date だけで絞って mode はアプリ側で判定する＝単一フィールドの既定インデックスで済む。
     final snap = await FirebaseFirestore.instance
         .collection('users/$uid/transactions')
-        .where('mode', isEqualTo: 'business')
         .where('date',
             isGreaterThanOrEqualTo: from.toIso8601String(),
             isLessThan: to.toIso8601String())
@@ -46,6 +48,7 @@ class AiUsageRepository {
     final subs = <AiPurchase>[];
     for (final d in snap.docs) {
       final m = d.data();
+      if (m['mode'] != 'business') continue;
       final label = '${m['store'] ?? ''} ${m['description'] ?? ''}'.toLowerCase();
       if (!label.contains('anthropic') && !label.contains('claude')) continue;
       final p = AiPurchase(
