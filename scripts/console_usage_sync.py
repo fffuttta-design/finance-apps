@@ -52,8 +52,10 @@ FETCH_JS = r"""
 async ([months, KNOWN_ORG]) => {
   // 組織IDはAPIから取る。HTMLから拾うと headless で描画前に読んで空振りする（実際に踏んだ）。
   const uuid = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/;
-  let org = null;
-  for (const path of ['/api/organizations', '/api/bootstrap', '/api/auth/current_account']) {
+  // 🔥 判明済みの組織IDを最優先で使う。自動探索を先にすると、/api/organizations が返す
+  //    別のUUID（ワークスペース等）を掴んでしまい 401 になる（2026-07-23に実際に踏んだ）。
+  let org = KNOWN_ORG || null;
+  for (const path of (org ? [] :  ['/api/organizations', '/api/bootstrap', '/api/auth/current_account'])) {
     const r = await fetch(path, {credentials: 'include'}).catch(() => null);
     if (!r || !r.ok) continue;   // 401でも諦めない（その口が無いだけのことがある）
     const t = await r.text();
@@ -65,7 +67,6 @@ async ([months, KNOWN_ORG]) => {
       /organizations\/([0-9a-f-]{36})/);
     if (m2) org = m2[1];
   }
-  if (!org) org = KNOWN_ORG;
   if (!org) return {error: 'org_not_found'};
 
   const out = {org: org, months: {}};
