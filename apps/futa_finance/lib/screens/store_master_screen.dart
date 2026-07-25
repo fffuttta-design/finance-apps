@@ -20,15 +20,23 @@ class StoreMasterScreen extends StatefulWidget {
 
 class _StoreMasterScreenState extends State<StoreMasterScreen> {
   final _repo = StoreMasterRepository.instance;
+  final _searchCtrl = TextEditingController();
   bool _loading = true;
   bool _busy = false;
   List<String> _stores = [];
   List<core.Transaction> _txns = [];
+  String _query = '';
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -263,8 +271,94 @@ class _StoreMasterScreenState extends State<StoreMasterScreen> {
           ? const Center(child: CircularProgressIndicator())
           : CenteredBody(
               maxWidth: 640,
-              child: _stores.isEmpty ? _empty() : _sectionedList(),
+              child: Column(
+                children: [
+                  if (_stores.isNotEmpty) _searchBar(),
+                  Expanded(
+                    child: _stores.isEmpty
+                        ? _empty()
+                        : (_query.trim().isEmpty
+                            ? _sectionedList()
+                            : _filteredList()),
+                  ),
+                ],
+              ),
             ),
+    );
+  }
+
+  Widget _searchBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      child: TextField(
+        controller: _searchCtrl,
+        onChanged: (v) => setState(() => _query = v),
+        decoration: InputDecoration(
+          hintText: '場所を検索（例: ファミマ）',
+          prefixIcon: const Icon(Icons.search, size: 20),
+          suffixIcon: _query.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.clear, size: 18),
+                  tooltip: 'クリア',
+                  onPressed: () {
+                    _searchCtrl.clear();
+                    setState(() => _query = '');
+                  },
+                ),
+          isDense: true,
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 検索中はセクションを無視して、名前が一致する場所を平らに並べる。
+  /// （並び替えは検索中は意味を成さないのでドラッグハンドルは出さない。）
+  Widget _filteredList() {
+    final q = _query.trim().toLowerCase();
+    final hits = _stores.where((s) => s.toLowerCase().contains(q)).toList();
+    if (hits.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.search_off,
+                  size: 36, color: Color(0xFF9CA3AF)),
+              const SizedBox(height: 10),
+              Text('「${_query.trim()}」に一致する場所はありません',
+                  style: const TextStyle(
+                      fontSize: 13, color: Color(0xFF6B7280))),
+            ],
+          ),
+        ),
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+          child: Text('${hits.length} 件',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF9CA3AF))),
+        ),
+        for (final store in hits)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: _row(store, null),
+          ),
+      ],
     );
   }
 
@@ -477,6 +571,144 @@ class _StoreMasterScreenState extends State<StoreMasterScreen> {
     await _load();
   }
 
+  static String _yen(int v) {
+    final s = v.abs().toString();
+    final b = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) b.write(',');
+      b.write(s[i]);
+    }
+    return '${v < 0 ? '-' : ''}¥${b.toString()}';
+  }
+
+  static String _ymd(DateTime d) =>
+      '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
+
+  /// この場所に紐づく明細の一覧をボトムシートで表示する（新しい順）。
+  Future<void> _showTransactions(String store) async {
+    final list = _txns.where((t) => (t.store ?? '').trim() == store).toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+    if (list.isEmpty) {
+      _snack('「$store」を使っている明細はまだありません');
+      return;
+    }
+    final total = list.fold<int>(0, (a, t) {
+      final signed =
+          t.type == core.TransactionType.income ? t.amount : -t.amount;
+      return a + signed;
+    });
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sctx) {
+        final h = MediaQuery.of(sctx).size.height * 0.75;
+        return SafeArea(
+          child: SizedBox(
+            height: h,
+            child: Column(
+              children: [
+                const SizedBox(height: 8),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD1D5DB),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.place_outlined,
+                          size: 20, color: Color(0xFF6B7280)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(store,
+                                style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis),
+                            Text('明細 ${list.length} 件 ・ 合計 ${_yen(total)}',
+                                style: const TextStyle(
+                                    fontSize: 12, color: Color(0xFF6B7280))),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    itemCount: list.length,
+                    separatorBuilder: (_, _) =>
+                        const Divider(height: 1, indent: 16, endIndent: 16),
+                    itemBuilder: (_, i) => _txnTile(list[i]),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _txnTile(core.Transaction t) {
+    final isIncome = t.type == core.TransactionType.income;
+    final signed = isIncome ? t.amount : -t.amount;
+    final title = t.description.trim().isNotEmpty
+        ? t.description.trim()
+        : (t.category.sub.trim().isNotEmpty ? t.category.sub : '(内容なし)');
+    final sub = <String>[
+      _ymd(t.date),
+      if (t.category.sub.trim().isNotEmpty) t.category.sub,
+      if (t.paymentMethod.trim().isNotEmpty) t.paymentMethod,
+    ].join(' ・ ');
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(title,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text(sub,
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF9CA3AF))),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(_yen(signed),
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: isIncome
+                      ? const Color(0xFF059669)
+                      : const Color(0xFF111827))),
+        ],
+      ),
+    );
+  }
+
   Widget _empty() => Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -499,7 +731,7 @@ class _StoreMasterScreenState extends State<StoreMasterScreen> {
         ),
       );
 
-  Widget _row(String store, int index) {
+  Widget _row(String store, int? index) {
     final cnt = _count(store);
     return Container(
       decoration: BoxDecoration(
@@ -510,32 +742,52 @@ class _StoreMasterScreenState extends State<StoreMasterScreen> {
       padding: const EdgeInsets.fromLTRB(4, 8, 6, 8),
       child: Row(
         children: [
-          // ドラッグハンドル（このセクション内で並び替え）。
-          ReorderableDragStartListener(
-            index: index,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 6),
-              child: Icon(Icons.drag_indicator,
-                  size: 18, color: Color(0xFF9CA3AF)),
-            ),
-          ),
+          // ドラッグハンドル（このセクション内で並び替え）。検索中(index==null)は出さない。
+          if (index != null)
+            ReorderableDragStartListener(
+              index: index,
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6),
+                child: Icon(Icons.drag_indicator,
+                    size: 18, color: Color(0xFF9CA3AF)),
+              ),
+            )
+          else
+            const SizedBox(width: 12),
           const Icon(Icons.place_outlined,
               size: 18, color: Color(0xFF6B7280)),
           const SizedBox(width: 8),
+          // 名前部分をタップすると、この場所の明細一覧を出す。
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(store,
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w600),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
-                Text('明細 $cnt 件',
-                    style: const TextStyle(
-                        fontSize: 11, color: Color(0xFF9CA3AF))),
-              ],
+            child: InkWell(
+              borderRadius: BorderRadius.circular(6),
+              onTap: () => _showTransactions(store),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(store,
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                    Row(
+                      children: [
+                        Text('明細 $cnt 件',
+                            style: const TextStyle(
+                                fontSize: 11, color: Color(0xFF9CA3AF))),
+                        if (cnt > 0) ...[
+                          const SizedBox(width: 4),
+                          const Icon(Icons.chevron_right,
+                              size: 13, color: Color(0xFF9CA3AF)),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
           IconButton(
