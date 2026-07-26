@@ -47,6 +47,8 @@ BALANCE_ENDPOINT = os.environ.get("AI_BALANCE_ENDPOINT", ENDPOINT.rstrip("/") + 
 USAGE_URL = "https://platform.claude.com/usage"
 # 判明済みの組織ID（探索に失敗したときの最後の砦。組織を変えたらここも変える）
 ORG_ID = os.environ.get("CONSOLE_ORG_ID", "ea21edf1-b29b-491a-b13c-5ceb6328e580")
+_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+       "(KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36")
 
 # ページ内で走らせる取得処理。組織IDは画面のHTMLから拾うので決め打ちしない。
 FETCH_JS = r"""
@@ -124,6 +126,16 @@ def _months(n: int) -> list[str]:
         if m == 0:
             y, m = y - 1, 12
     return out
+
+
+def _post_balance(bal: dict) -> dict:
+    """Consoleの残高JSONを二村秘書へ送る（段のアラート判定は向こう側）。"""
+    return _post({
+        "amount": bal["amount"],
+        "currency": bal.get("currency", "USD"),
+        "balance_credits": bal.get("balance_credits"),
+        "raw": json.dumps(bal, ensure_ascii=False),
+    }, url=BALANCE_ENDPOINT)
 
 
 def _post(payload: dict, url: str = ENDPOINT) -> dict:
@@ -237,12 +249,7 @@ def do_fetch(months: int) -> int:
     # 取れた残高を二村秘書へ送る（段のアラート判定は向こう側でやる）。
     if isinstance(balance, dict) and isinstance(balance.get("amount"), (int, float)):
         try:
-            _post({
-                "amount": balance["amount"],
-                "currency": balance.get("currency", "USD"),
-                "balance_credits": balance.get("balance_credits"),
-                "raw": json.dumps(balance, ensure_ascii=False),
-            }, url=BALANCE_ENDPOINT)
+            _post_balance(balance)
             print(f"💳 残高を送信: 約 ${balance['amount'] / 100:.2f}")
         except Exception as e:            # noqa: BLE001
             print("（残高の送信に失敗:", str(e)[:120], "）")
@@ -286,9 +293,65 @@ def do_fetch(months: int) -> int:
     return 0
 
 
+def _cookie_header() -> str:
+    """保存済みセッション（Playwrightのstorage_state）から platform.claude.com 用のCookieを組む。"""
+    state = json.load(io.open(SESSION_FILE, encoding="utf-8"))
+    jar = []
+    for c in state.get("cookies", []):
+        dom = c.get("domain", "").lstrip(".")
+        if dom in ("claude.com", "platform.claude.com"):
+            jar.append(f"{c['name']}={c['value']}")
+    return "; ".join(jar)
+
+
+def do_balance_only() -> int:
+    """残高だけを取ってPOSTする（毎時用）。
+
+    🔥 **ブラウザを起動しない**。保存済みCookieでHTTPを1回叩くだけ＝超軽量（VPS負荷ほぼ0）。
+       使用量(usage_activities)の取り込みは重いブラウザ経路のまま毎朝1回（do_fetch）。
+    """
+    if not os.path.exists(SESSION_FILE):
+        print(f"❌ ログイン情報がありません（{SESSION_FILE}）。PCで --login を実行してください。")
+        return 2
+    try:
+        cookie = _cookie_header()
+    except Exception as e:            # noqa: BLE001
+        print("❌ セッションの読み込みに失敗:", str(e)[:200])
+        return 1
+    url = f"https://platform.claude.com/api/organizations/{ORG_ID}/prepaid/credits"
+    req = urllib.request.Request(url, headers={
+        "Cookie": cookie, "User-Agent": _UA,
+        "Accept": "application/json", "Referer": "https://platform.claude.com/usage",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            bal = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            print("❌ ログインが切れています。PCで --login を実行し直してください。")
+            return 2
+        print("❌ 残高の取得に失敗:", e.code)
+        return 1
+    except Exception as e:            # noqa: BLE001
+        print("❌ 残高の取得に失敗:", str(e)[:200])
+        return 1
+    if not isinstance(bal, dict) or not isinstance(bal.get("amount"), (int, float)):
+        print("❌ 残高が読めません:", str(bal)[:200])
+        return 1
+    _post_balance(bal)
+    print(f"💳 残高を送信: 約 ${bal['amount'] / 100:.2f}")
+    return 0
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--months", type=int, default=2, help="さかのぼる月数（既定2）")
     ap.add_argument("--login", action="store_true", help="①PCで1回だけ：ログインしてCookieを保存")
+    ap.add_argument("--balance-only", action="store_true",
+                    help="残高だけをブラウザ無しで取得（毎時用・超軽量）")
     a = ap.parse_args()
-    sys.exit(do_login() if a.login else do_fetch(a.months))
+    if a.login:
+        sys.exit(do_login())
+    if a.balance_only:
+        sys.exit(do_balance_only())
+    sys.exit(do_fetch(a.months))
