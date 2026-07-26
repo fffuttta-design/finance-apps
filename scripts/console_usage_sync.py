@@ -43,6 +43,7 @@ KEY_FILE = os.environ.get(
     "AI_USAGE_KEY_FILE",
     r"C:\dev\_secrets\ai-usage-key.txt" if _WIN else "/opt/apps/claude-usage/ai-usage-key.txt")
 ENDPOINT = os.environ.get("AI_USAGE_ENDPOINT", "https://hisho.run-strategy.jp/ai-usage")
+BALANCE_ENDPOINT = os.environ.get("AI_BALANCE_ENDPOINT", ENDPOINT.rstrip("/") + "/balance")
 USAGE_URL = "https://platform.claude.com/usage"
 # 判明済みの組織ID（探索に失敗したときの最後の砦。組織を変えたらここも変える）
 ORG_ID = os.environ.get("CONSOLE_ORG_ID", "ea21edf1-b29b-491a-b13c-5ceb6328e580")
@@ -97,6 +98,18 @@ async ([months, KNOWN_ORG]) => {
 }
 """
 
+# クレジット残高を取る内部API。使用量(usage_activities)とは別物で、
+# `amount`(残り最小単位＝USDのセント) と `currency` を返す。これを二村秘書へ流して
+# 段（$10/$5/$2）を割ったらDiscordで知らせる。
+BALANCE_JS = r"""
+async (org) => {
+  const r = await fetch(`/api/organizations/${org}/prepaid/credits`,
+                        {credentials: 'include'});
+  if (!r.ok) return {error: r.status};
+  return await r.json();
+}
+"""
+
 # Consoleのキー名 → 集計側のアプリID（自前計測と同じ名前に寄せる）
 ALIAS = {"二村秘書Bot": "futahisho"}
 
@@ -113,10 +126,10 @@ def _months(n: int) -> list[str]:
     return out
 
 
-def _post(payload: dict) -> dict:
+def _post(payload: dict, url: str = ENDPOINT) -> dict:
     key = io.open(KEY_FILE, encoding="utf-8").read().strip()
     req = urllib.request.Request(
-        ENDPOINT,
+        url,
         data=json.dumps(payload).encode("utf-8"),
         headers={"content-type": "application/json", "x-usage-key": key},
         method="POST",
@@ -213,7 +226,28 @@ def do_fetch(months: int) -> int:
             print("❌ 取得に失敗:", str(e)[:200])
             br.close()
             return 1
+        # ついでにクレジット残高も取る（同じログインセッションで叩けるので追加コストほぼ0）。
+        try:
+            balance = page.evaluate(BALANCE_JS, ORG_ID)
+        except Exception as e:            # noqa: BLE001
+            print("（残高の取得に失敗:", str(e)[:120], "）")
+            balance = None
         br.close()
+
+    # 取れた残高を二村秘書へ送る（段のアラート判定は向こう側でやる）。
+    if isinstance(balance, dict) and isinstance(balance.get("amount"), (int, float)):
+        try:
+            _post({
+                "amount": balance["amount"],
+                "currency": balance.get("currency", "USD"),
+                "balance_credits": balance.get("balance_credits"),
+                "raw": json.dumps(balance, ensure_ascii=False),
+            }, url=BALANCE_ENDPOINT)
+            print(f"💳 残高を送信: 約 ${balance['amount'] / 100:.2f}")
+        except Exception as e:            # noqa: BLE001
+            print("（残高の送信に失敗:", str(e)[:120], "）")
+    elif balance is not None:
+        print("（残高が取れませんでした:", str(balance)[:120], "）")
 
     if not isinstance(data, dict) or data.get("error"):
         err = (data or {}).get("error")
