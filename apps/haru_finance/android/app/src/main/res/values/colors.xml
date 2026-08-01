@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- 通知アイコンのアクセント色（はるファイナンスの水色） -->
-    <color name="notification_color">#3AB4D6</color>
+    <color name="notification_color">#4FC4F0</color>
 </resources>

@@ -158,7 +158,7 @@ class _SplashState extends State<_Splash>
     final breathe = Tween<double>(begin: 0.985, end: 1.025)
         .animate(CurvedAnimation(parent: _breathe, curve: Curves.easeInOut));
     return Scaffold(
-      backgroundColor: const Color(0xFFEAF7FC),
+      backgroundColor: const Color(0xFFE8F7FE),
       body: Center(
         child: FadeTransition(
           opacity: introFade,

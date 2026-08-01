@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.0",
-    "buildNumber":  "1",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/haru-v1.0.0/haru-finance-v1.0.0.apk",
-    "releaseNotes":  "はるファイナンス はじめての配信です。はる専用の家計簿として、支出・収入の記録、予算、レシート読み取り、固定費、分析などが使えます。"
+    "version":  "1.0.1",
+    "buildNumber":  "2",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/haru-v1.0.1/haru-finance-v1.0.1.apk",
+    "releaseNotes":  "テーマの色を明るい水色にしました。アプリのアイコンも「コイン（¥）」の新デザインに変わりました。"
 }

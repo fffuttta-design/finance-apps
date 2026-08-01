@@ -7,16 +7,16 @@ import 'package:google_fonts/google_fonts.dart';
 /// いるが、値はすべて水色系に置き換えてある（＝アプリ全体のアクセントは水色）。
 /// 名前は互換のための別名だと思ってよい。
 class AppColors {
-  static const pink = Color(0xFF3AB4D6); // メイン（水色）
-  static const pinkDark = Color(0xFF2790AE); // 濃いめの水色
-  static const pinkSoft = Color(0xFFDBF1F8); // 淡い水色（チップ背景等）
-  static const bg = Color(0xFFF1FAFD); // 画面背景
+  static const pink = Color(0xFF4FC4F0); // メイン（明るい水色）
+  static const pinkDark = Color(0xFF1E9FD9); // 濃いめの水色（アイコン・強調）
+  static const pinkSoft = Color(0xFFDDF3FD); // 淡い水色（チップ背景等）
+  static const bg = Color(0xFFF2FBFF); // 画面背景
   static const card = Colors.white;
   static const text = Color(0xFF34505A); // 見出し（やわらかいスレート）
   static const textSub = Color(0xFF7FA0AB); // サブ
   static const income = Color(0xFF35C2A0); // 収入（ミントグリーン）
   static const expense = Color(0xFFF4796B); // 支出（コーラル）
-  static const divider = Color(0xFFDFEEF3);
+  static const divider = Color(0xFFD6EEF8);
 }
 
 /// アプリ全体のテーマ。フォントは Zen Maru Gothic（丸ゴシック）。
