@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.1",
-    "buildNumber":  "2",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/haru-v1.0.1/haru-finance-v1.0.1.apk",
-    "releaseNotes":  "テーマの色を明るい水色にしました。アプリのアイコンも「コイン（¥）」の新デザインに変わりました。"
+    "version":  "1.0.2",
+    "buildNumber":  "3",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/haru-v1.0.2/haru-finance-v1.0.2.apk",
+    "releaseNotes":  "アイコンの中の白いコインを大きくしました。"
 }
