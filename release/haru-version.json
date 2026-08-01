@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.4",
-    "buildNumber":  "5",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/haru-v1.0.4/haru-finance-v1.0.4.apk",
-    "releaseNotes":  "たくはると被るピンクを水色に統一しました。銀行口座は初期登録をやめ、自分で自由に登録できるようにしました。"
+    "version":  "1.0.5",
+    "buildNumber":  "6",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/haru-v1.0.5/haru-finance-v1.0.5.apk",
+    "releaseNotes":  "支出タブをピンクの配色にしました。"
 }
