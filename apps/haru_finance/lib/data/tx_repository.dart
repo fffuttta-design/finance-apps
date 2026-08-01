@@ -11,7 +11,7 @@ class TxRepository {
   final _db = FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> _coll(String hid) =>
-      _db.collection('users/$hid/transactions');
+      _db.collection('haru/$hid/transactions');
 
   /// 取引のリアルタイム購読（日付の新しい順）。
   Stream<List<core.Transaction>> watch(String hid) {

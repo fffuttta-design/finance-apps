@@ -9,7 +9,7 @@ class BudgetRepository {
   final _db = FirebaseFirestore.instance;
 
   DocumentReference<Map<String, dynamic>> _doc(String hid) =>
-      _db.collection('users').doc(hid);
+      _db.collection('haru').doc(hid);
 
   /// 月の予算（円）の購読。未設定なら null。
   Stream<int?> watch(String hid) => _doc(hid)

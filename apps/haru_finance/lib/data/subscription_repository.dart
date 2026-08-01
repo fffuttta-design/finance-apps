@@ -10,7 +10,7 @@ class SubscriptionRepository {
   final _db = FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> _coll(String hid) =>
-      _db.collection('users/$hid/subscriptions');
+      _db.collection('haru/$hid/subscriptions');
 
   Stream<List<Subscription>> watch(String hid) {
     return _coll(hid).snapshots().map((snap) {

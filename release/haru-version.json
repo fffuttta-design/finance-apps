@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.2",
-    "buildNumber":  "3",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/haru-v1.0.2/haru-finance-v1.0.2.apk",
-    "releaseNotes":  "アイコンの中の白いコインを大きくしました。"
+    "version":  "1.0.3",
+    "buildNumber":  "4",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/haru-v1.0.3/haru-finance-v1.0.3.apk",
+    "releaseNotes":  "ログインできる人を noel と takuharu の2アカウントだけに制限しました。"
 }

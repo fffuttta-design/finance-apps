@@ -5,16 +5,16 @@ import 'package:flutter/foundation.dart';
 /// 本人（はる）1 人ぶんの家計データの持ち主（スコープ）を管理する。
 ///
 /// たくはるファイナンスの「世帯共有」を廃止し、すべて本人だけのデータにした。
-/// データ構造:
-///   users/{uid}                     { name, paymentMethods, replacements,
-///                                      customExpenseCats, customIncomeCats,
-///                                      monthlyBudget }
-///   users/{uid}/transactions/{id}
-///   users/{uid}/subscriptions/{id}
-///   users/{uid}/accounts/{id}
+/// データ構造（たくはるの users/ とは分離し、noel/takuharumika だけに制限）:
+///   haru/{uid}                     { name, paymentMethods, replacements,
+///                                    customExpenseCats, customIncomeCats,
+///                                    monthlyBudget }
+///   haru/{uid}/transactions/{id}
+///   haru/{uid}/subscriptions/{id}
+///   haru/{uid}/accounts/{id}
 ///
 /// 互換のためクラス名・`householdId` ゲッターはそのまま残しているが、
-/// 中身は「ログイン中の uid」を指す（＝各リポジトリの保存先は users/{uid}/…）。
+/// 中身は「ログイン中の uid」を指す（＝各リポジトリの保存先は haru/{uid}/…）。
 class HouseholdService extends ChangeNotifier {
   HouseholdService._();
   static final HouseholdService instance = HouseholdService._();
@@ -93,8 +93,10 @@ class HouseholdService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// はる専用のデータ置き場（たくはるの users/ とは分離し、noel/takuharumika
+  /// だけがアクセスできるよう Firestore ルールで制限している）。
   CollectionReference<Map<String, dynamic>> get _users =>
-      _db.collection('users');
+      _db.collection('haru');
 
   /// ログイン後に呼ぶ。本人のスコープ（uid）を確定し、設定を読み込む。
   Future<void> ensureHousehold(User user) async {

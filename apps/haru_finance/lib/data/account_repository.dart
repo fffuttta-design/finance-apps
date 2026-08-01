@@ -10,7 +10,7 @@ class AccountRepository {
   final _db = FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> _coll(String hid) =>
-      _db.collection('users/$hid/accounts');
+      _db.collection('haru/$hid/accounts');
 
   Stream<List<Account>> watch(String hid) {
     return _coll(hid).snapshots().map((snap) {
