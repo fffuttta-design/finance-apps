@@ -1,0 +1,181 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+
+import 'data/auth_service.dart';
+import 'data/household_service.dart';
+import 'firebase_options.dart';
+import 'screens/login_screen.dart';
+import 'screens/main_shell.dart';
+import 'theme/app_theme.dart';
+import 'widgets/load_error_view.dart';
+
+/// 通知タップからの画面遷移などで使うグローバル Navigator。
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  await AuthService.instance.init();
+  runApp(const HaruFinanceApp());
+}
+
+class HaruFinanceApp extends StatelessWidget {
+  const HaruFinanceApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'はるファイナンス',
+      debugShowCheckedModeBanner: false,
+      navigatorKey: appNavigatorKey,
+      theme: buildHaruTheme(),
+      // 日付ピッカー等を日本語表示にする。
+      locale: const Locale('ja'),
+      supportedLocales: const [Locale('ja'), Locale('en')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      home: const _AuthGate(),
+    );
+  }
+}
+
+/// ログイン状態で画面を出し分ける。
+/// 未ログイン → ログイン画面 / ログイン済 → 本人スコープを確保してホームへ。
+class _AuthGate extends StatelessWidget {
+  const _AuthGate();
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: AuthService.instance.userStream,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const _Splash();
+        }
+        final user = snap.data;
+        if (user == null) return const LoginScreen();
+        return _ScopeGate(user: user);
+      },
+    );
+  }
+}
+
+/// 本人スコープ（uid）を確保してからホームを表示。
+class _ScopeGate extends StatefulWidget {
+  final User user;
+  const _ScopeGate({required this.user});
+
+  @override
+  State<_ScopeGate> createState() => _ScopeGateState();
+}
+
+class _ScopeGateState extends State<_ScopeGate> {
+  late Future<void> _future;
+
+  /// スコープ確保＋スプラッシュの最低表示時間（ロゴアニメを少しだけ見せる）。
+  Future<void> _ensure() async {
+    await Future.wait([
+      HouseholdService.instance.ensureHousehold(widget.user),
+      Future<void>.delayed(const Duration(milliseconds: 1100)),
+    ]);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _ensure();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const _Splash();
+        }
+        if (snap.hasError) {
+          // permission-denied = このアカウントに権限が無い
+          // （＝ログインアカウント違いの可能性が高い）。専用案内＋アカウント切替。
+          final err = snap.error;
+          final perm = err is FirebaseException &&
+              err.code == 'permission-denied';
+          return LoadErrorView(
+            permissionError: perm,
+            message: perm ? null : err.toString(),
+            onRetry: () => setState(() {
+              _future = _ensure();
+            }),
+          );
+        }
+        return const MainShell();
+      },
+    );
+  }
+}
+
+/// 起動スプラッシュ。淡い水色背景＋ブランドロゴが「ふわっと呼吸」する短いアニメ。
+class _Splash extends StatefulWidget {
+  const _Splash();
+
+  @override
+  State<_Splash> createState() => _SplashState();
+}
+
+class _SplashState extends State<_Splash>
+    with SingleTickerProviderStateMixin {
+  // 入場のふわっとフェード＋スケールイン（やわらかめ）。
+  late final AnimationController _intro = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  )..forward();
+  // ゆっくり控えめな呼吸（ゴツくならないよう振れ幅は小さく）。
+  late final AnimationController _breathe = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1900),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _intro.dispose();
+    _breathe.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final introFade =
+        CurvedAnimation(parent: _intro, curve: Curves.easeOut);
+    final introScale = Tween<double>(begin: 0.86, end: 1.0)
+        .animate(CurvedAnimation(parent: _intro, curve: Curves.easeOutCubic));
+    final breathe = Tween<double>(begin: 0.985, end: 1.025)
+        .animate(CurvedAnimation(parent: _breathe, curve: Curves.easeInOut));
+    return Scaffold(
+      backgroundColor: const Color(0xFFEAF7FC),
+      body: Center(
+        child: FadeTransition(
+          opacity: introFade,
+          child: ScaleTransition(
+            scale: introScale,
+            child: ScaleTransition(
+              scale: breathe,
+              child: Image.asset(
+                'assets/brand/logo.png',
+                width: 148,
+                errorBuilder: (_, _, _) => const Icon(Icons.savings_rounded,
+                    size: 72, color: AppColors.pink),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

@@ -10,6 +10,7 @@
 
 - **FutaFinance（事業・個人）** → `仕様書/FutaFinance仕様書.md`
 - **たくはるファイナンス（カップル家計簿）** → `仕様書/たくはるファイナンス仕様書.md`
+- **はるファイナンス（はるの個人家計簿）** → `仕様書/はるファイナンス仕様書.md`
 
 各アプリの仕様（データ構造・API・UI・機能・バージョン管理）が網羅されている。
 
@@ -47,6 +48,7 @@
 | **Web** | `git push origin main` | Claude（push で自動） |
 | **Android (FutaFinance)** | Bash で flutter build → gh release → version.json push | Claude が直接実行 |
 | **Android (たくはる)** | Bash で flutter build → gh release → version.json push | Claude が直接実行 |
+| **Android (はる)** | Bash で flutter build → gh release → version.json push | Claude が直接実行 |
 | **Windows Desktop** | `cd apps/futa_finance/desktop/Scripts && powershell -ExecutionPolicy Bypass -File build_desktop.ps1 -Publish` | Claude が直接実行 |
 
 ---
@@ -240,6 +242,42 @@ git push origin main
 - ユーザーにスクリプト実行を頼まず、Claude が Bash で直接実行する
 
 ---
+
+## はるファイナンス（apps/haru_finance）
+
+たくはるファイナンスを複製し、はる 1 人用に共用機能を削除した個人家計簿アプリ。
+配色は水色ベース。Firebase は `takuharu-finance` を流用し、データは `users/{uid}` 配下に分離。
+仕様は `仕様書/はるファイナンス仕様書.md`。
+
+### バージョン管理
+- `apps/haru_finance/pubspec.yaml` の `version: X.Y.Z+B` を +1
+- コミットメッセージ: `feat(haru): vX.Y.Z - 内容`
+
+### Android 配信手順（Claudeが直接実行する）
+```bash
+# 1. APK ビルド
+cd apps/haru_finance
+flutter build apk --release --dart-define=GEMINI_API_KEY=$(cat gemini.key | tr -d '[:space:]')
+cp build/app/outputs/flutter-apk/app-release.apk build/haru-finance-vX.Y.Z.apk
+
+# 2. GitHub Release 作成（APK アップロード）
+gh release create haru-vX.Y.Z \
+  apps/haru_finance/build/haru-finance-vX.Y.Z.apk \
+  --repo fffuttta-design/finance-apps \
+  --title "haru-finance vX.Y.Z+B" \
+  --notes "リリースノート"
+
+# 3. release/haru-version.json を更新して push
+git add release/haru-version.json
+git commit -m "release(haru): vX.Y.Z+B - リリースノート"
+git push origin main
+```
+- 署名は `android/app/takuharu-release.jks`（alias `takuharu`）を流用。
+  SHA-1 = `3C:53:51:C3:26:1E:B1:96:1D:F1:68:EC:45:8E:5D:86:0C:1A:87:3D`。
+- ⚠️ **要初期作業（takuharumika@gmail.com 権限）**: `com.haru.finance` を takuharu-finance
+  プロジェクトに Android アプリとして登録し上記 SHA-1 を登録するまで、Google ログインは動かない
+  （ビルドは takuharu の android 設定を暫定流用して通している）。登録後に正式な
+  `android/app/google-services.json` と `firebase_options.dart` の android 設定へ差し替える。
 
 ## このドキュメント自体の更新
 

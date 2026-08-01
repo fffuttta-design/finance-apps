@@ -11,6 +11,7 @@ workspace:
   - packages/finance_core
   - apps/futa_finance
   - apps/takuharu_finance
+  - apps/haru_finance
 
 melos:
   command:
@@ -32,6 +33,9 @@ melos:
     run-takuharu:
       description: たくはるファイナンスを実機で起動
       run: melos exec --scope="takuharu_finance" -- "flutter run"
+    run-haru:
+      description: はるファイナンスを実機で起動
+      run: melos exec --scope="haru_finance" -- "flutter run"
     clean:
       description: 全パッケージのbuild成果物を削除
       run: melos exec -- "flutter clean"

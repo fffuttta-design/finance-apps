@@ -31,9 +31,16 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid in allowedUsers();
     }
 
-    // 自分のユーザードキュメント
+    // 自分のユーザードキュメント＋その配下すべて（本人のみ）。
+    // はるファイナンス（個人アプリ）の家計データ users/{uid}/transactions 等は
+    // ここに入る。許可リスト(allowedUsers)は不要＝ログイン中の本人が自分の
+    // データにだけアクセスできる。共有データ households/** は従来どおり
+    // allowedUsers で保護したまま（下の match を参照）。
     match /users/{uid} {
-      allow read, write: if isAllowed() && request.auth.uid == uid;
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+      match /{document=**} {
+        allow read, write: if isSignedIn() && request.auth.uid == uid;
+      }
     }
 
     // 世帯ドキュメント
