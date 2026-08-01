@@ -1,1 +1,1 @@
-{"version":"1.0.545","buildNumber":"546","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.545/futa-finance-v1.0.545.apk","releaseNotes":"場所マスタに検索バーを追加しました。件数が多くても名前で絞り込めます。さらに各場所をタップすると、その場所に紐づく明細の一覧（新しい順・件数と合計つき）を確認できます。"}
+{"version":"1.0.546","buildNumber":"547","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.546/futa-finance-v1.0.546.apk","releaseNotes":"経費明細一覧を見やすくしました。日付が折り返さず1行で表示され、支払方法は登録済みのカードロゴだけをすっきり表示します（三井住友カードなど）。"}
