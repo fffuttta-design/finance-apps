@@ -31,24 +31,30 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid in allowedUsers();
     }
 
-    // 自分のユーザードキュメント（たくはる用・従来どおり allowedUsers 限定）。
-    match /users/{uid} {
-      allow read, write: if isAllowed() && request.auth.uid == uid;
+    // はるファイナンスを使えるアカウント（メールで判定＝uid のズレに強い）。
+    function isHaruAccount() {
+      return isSignedIn() && request.auth.token.email in [
+        'noel.31128@gmail.com',
+        'takuharumika@gmail.com'
+      ];
     }
 
-    // はるファイナンス専用データ。noel と takuharumika の 2 人だけ。
-    // たくはるの users/ とは分離し、本人が自分の haru/{uid} 配下にだけ
-    // アクセスできる（他の Google アカウントでログインしても権限なし）。
-    match /haru/{uid} {
-      function isHaruUser() {
-        return isSignedIn() && request.auth.uid in [
-          'TdIx6DB8PpVdPH7wo3QhavmP1ia2',  // noel.31128@gmail.com
-          'vnoNjaHvhvew2HYhfSY7DlqLyC72'   // takuharumika@gmail.com
-        ];
-      }
-      allow read, write: if isHaruUser() && request.auth.uid == uid;
+    // 自分のユーザードキュメント。
+    //  - ドキュメント本体: たくはる用（従来どおり allowedUsers 限定）。
+    //  - 配下すべて: はるファイナンス旧版(v1.0.2)互換。noel/takuharumika が
+    //    自分の users/{uid}/… にアクセスできる（他人は不可）。
+    match /users/{uid} {
+      allow read, write: if isAllowed() && request.auth.uid == uid;
       match /{document=**} {
-        allow read, write: if isHaruUser() && request.auth.uid == uid;
+        allow read, write: if isHaruAccount() && request.auth.uid == uid;
+      }
+    }
+
+    // はるファイナンス専用データ（v1.0.3〜）。noel と takuharumika の 2 人だけ。
+    match /haru/{uid} {
+      allow read, write: if isHaruAccount() && request.auth.uid == uid;
+      match /{document=**} {
+        allow read, write: if isHaruAccount() && request.auth.uid == uid;
       }
     }
 
