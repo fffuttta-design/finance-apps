@@ -266,26 +266,54 @@ function webDir() {
 
 function startServer() {
   const root = webDir();
+  // 検証子付きで静的ファイルを返す。ヘッダを付けることで Chromium が本文を
+  // ディスクキャッシュし、さらに **V8(JS)/WASM のコンパイル結果まで再利用** する。
+  // → 起動のたびに main.dart.js(5.7MB)/canvaskit.wasm(7.2MB) を再取得・再コンパイル
+  //   していたのを止め、2 回目以降の起動を大幅に速くする。
+  // `no-cache` は「キャッシュはするが毎回検証する」意味。ファイル更新（＝アプリ更新）
+  //   時は mtime/size が変わり ETag が変わるので、必ず新しい本文が配られる（古い画面が
+  //   出る事故は起きない）。未更新なら 304 を返すだけ＝本文もコンパイル結果も使い回す。
+  const sendFile = (file, res, req) => {
+    fs.stat(file, (err, st) => {
+      if (err || !st.isFile()) {
+        // 未知パスは index.html へフォールバック（SPA ルーティング）。
+        // index.html 自身が来て失敗したら 404。
+        if (path.basename(file) === 'index.html') {
+          res.writeHead(404); res.end('not found'); return;
+        }
+        sendFile(path.join(root, 'index.html'), res, req);
+        return;
+      }
+      const etag = `W/"${st.size}-${Math.floor(st.mtimeMs)}"`;
+      const lastMod = st.mtime.toUTCString();
+      const ext = path.extname(file).toLowerCase();
+      const headers = {
+        'Content-Type': MIME[ext] || 'application/octet-stream',
+        'Cache-Control': 'no-cache',
+        'ETag': etag,
+        'Last-Modified': lastMod,
+      };
+      // 変更が無ければ 304（本文を送らない＝キャッシュ本文とコンパイル結果を再利用）。
+      const inm = req.headers['if-none-match'];
+      const ims = req.headers['if-modified-since'];
+      if ((inm && inm === etag) ||
+          (ims && new Date(ims).getTime() >= st.mtime.getTime() - 1000)) {
+        res.writeHead(304, headers); res.end(); return;
+      }
+      fs.readFile(file, (e2, data) => {
+        if (e2) { res.writeHead(500); res.end(); return; }
+        res.writeHead(200, headers);
+        res.end(data);
+      });
+    });
+  };
   const handler = (req, res) => {
     let urlPath;
     try { urlPath = decodeURIComponent(req.url.split('?')[0]); } catch (_) { urlPath = '/'; }
     if (urlPath === '/' || urlPath === '') urlPath = '/index.html';
     const file = path.join(root, path.normalize(urlPath).replace(/^([/\\])+/, ''));
     if (!file.startsWith(root)) { res.writeHead(403); res.end(); return; }
-    fs.readFile(file, (err, data) => {
-      if (err) {
-        // 未知パスは index.html へフォールバック（SPA ルーティング）。
-        fs.readFile(path.join(root, 'index.html'), (e2, idx) => {
-          if (e2) { res.writeHead(404); res.end('not found'); return; }
-          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-          res.end(idx);
-        });
-        return;
-      }
-      const ext = path.extname(file).toLowerCase();
-      res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
-      res.end(data);
-    });
+    sendFile(file, res, req);
   };
   return new Promise((resolve) => {
     const srv = http.createServer(handler);
@@ -383,6 +411,34 @@ async function createWindow() {
           .catch(() => {});
     }
   });
+
+  // ── 起動時間の計測（FUTA_TIMING=1 のときだけ）───────────────
+  if (process.env.FUTA_TIMING) {
+    const t0 = Number(process.env.FUTA_T0) || Date.now();
+    const tf = path.join(os.tmpdir(), 'futa_timing.txt');
+    const log = (label) => {
+      try { fs.appendFileSync(tf, `[timing] +${Date.now() - t0}ms ${label}\n`); } catch (_) {}
+    };
+    const wc = mainWindow.webContents;
+    wc.on('did-start-loading', () => log('did-start-loading'));
+    wc.on('dom-ready', () => log('dom-ready'));
+    wc.on('did-finish-load', () => {
+      log('did-finish-load');
+      wc.executeJavaScript(
+        "new Promise(r=>{" +
+        "function done(){" +
+        " var ff=performance.now()|0;" +
+        " var rs=performance.getEntriesByType('resource').map(function(e){" +
+        "  return {n:e.name.split('/').pop(),dur:e.duration|0,xfer:e.transferSize,enc:e.encodedBodySize,start:e.startTime|0,end:e.responseEnd|0};" +
+        " }).filter(function(e){return e.enc>50000||/dart|canvaskit|skwasm|wasm/.test(e.n);})" +
+        "  .sort(function(a,b){return b.enc-a.enc;});" +
+        " r(JSON.stringify({firstFrame:ff,res:rs},null,0));" +
+        "}" +
+        "if(window.__ffDone)return done();" +
+        "window.addEventListener('flutter-first-frame',done,{once:true});})"
+      ).then((s) => log('DUMP ' + s)).catch((e) => log('dump-err ' + e));
+    });
+  }
 
   mainWindow.loadURL(`http://127.0.0.1:${port}/`);
 }
