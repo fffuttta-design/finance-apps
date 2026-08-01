@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.3",
-    "buildNumber":  "4",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/haru-v1.0.3/haru-finance-v1.0.3.apk",
-    "releaseNotes":  "ログインできる人を noel と takuharu の2アカウントだけに制限しました。"
+    "version":  "1.0.4",
+    "buildNumber":  "5",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/haru-v1.0.4/haru-finance-v1.0.4.apk",
+    "releaseNotes":  "たくはると被るピンクを水色に統一しました。銀行口座は初期登録をやめ、自分で自由に登録できるようにしました。"
 }

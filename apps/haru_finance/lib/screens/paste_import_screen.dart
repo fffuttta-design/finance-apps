@@ -236,7 +236,7 @@ class _PasteImportScreenState extends State<PasteImportScreen> {
       );
     }
     return Card(
-      color: const Color(0xFFFFF0F3),
+      color: const Color(0xFFEFF9FE),
       margin: const EdgeInsets.only(bottom: 6),
       child: ListTile(
         dense: true,

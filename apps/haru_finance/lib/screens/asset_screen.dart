@@ -11,8 +11,9 @@ import '../utils/format.dart';
 import '../widgets/settings_button.dart';
 import 'accounts_screen.dart';
 
-/// 資産タブ：ワンバンク・UFJ銀行など各口座の「今の残高」と、
+/// 資産タブ：登録した各口座の「今の残高」と、
 /// 選択中の月（全タブ共通）の入出金の動きを表示する。
+/// 口座は初期登録せず、本人が「口座・残高を編集」から自由に追加する。
 class AssetScreen extends StatefulWidget {
   const AssetScreen({super.key});
 
@@ -21,13 +22,8 @@ class AssetScreen extends StatefulWidget {
 }
 
 class _AssetScreenState extends State<AssetScreen> {
-  /// 初期設置しておく口座名（無ければ自動で用意する）。
-  static const _seedNames = ['ワンバンク', 'UFJ銀行'];
-
   // 表示中の月は全タブ共通（MonthScope）。
   DateTime get _month => MonthScope.instance.month;
-
-  bool _seeding = false;
 
   @override
   void initState() {
@@ -49,27 +45,6 @@ class _AssetScreenState extends State<AssetScreen> {
 
   bool _inMonth(core.Transaction t) =>
       t.date.year == _month.year && t.date.month == _month.month;
-
-  /// ワンバンク・UFJ銀行が未登録なら、初期残高0の銀行口座として自動で用意する。
-  Future<void> _ensureSeeds(String hid, List<Account> accounts) async {
-    if (_seeding) return;
-    final existing = accounts.map((a) => a.name).toSet();
-    final missing = _seedNames.where((n) => !existing.contains(n)).toList();
-    if (missing.isEmpty) return;
-    _seeding = true;
-    for (final name in missing) {
-      await AccountRepository.instance.save(
-        hid,
-        Account(
-          id: 'seed_${_seedNames.indexOf(name)}',
-          name: name,
-          type: AccountType.bank,
-          initialBalance: 0,
-        ),
-      );
-    }
-    // 保存後は accounts stream が更新を流すので、追加の setState は不要。
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,8 +78,6 @@ class _AssetScreenState extends State<AssetScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 final accounts = accSnap.data ?? const <Account>[];
-                // 初回：ワンバンク/UFJが無ければ用意する。
-                if (accSnap.hasData) _ensureSeeds(hid, accounts);
                 return StreamBuilder<List<core.Transaction>>(
                   stream: TxRepository.instance.watch(hid),
                   builder: (context, txSnap) {
@@ -163,7 +136,7 @@ class _AssetScreenState extends State<AssetScreen> {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFFFF8FA8), Color(0xFFFF6B8A)],
+            colors: [Color(0xFF6FD0F5), Color(0xFF1E9FD9)],
           ),
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
@@ -337,7 +310,7 @@ class _AssetScreenState extends State<AssetScreen> {
         child: Column(
           children: [
             const Icon(Icons.account_balance_wallet_rounded,
-                size: 48, color: Color(0xFFF3C6D2)),
+                size: 48, color: Color(0xFFB6E1F5)),
             const SizedBox(height: 10),
             const Text('資産口座がまだないよ',
                 style: TextStyle(color: AppColors.textSub, fontSize: 13)),

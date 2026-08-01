@@ -39,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFFFFE4EC), Color(0xFFFFF5F7)],
+            colors: [Color(0xFFDDF3FD), Color(0xFFF2FBFF)],
           ),
         ),
         child: SafeArea(
@@ -69,7 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFE0E6),
+                          color: const Color(0xFFDDF3FD),
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: Text(_error!,

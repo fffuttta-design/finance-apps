@@ -76,9 +76,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
   bool get _isIncome => _type == core.TransactionType.income;
 
-  /// 新規記録の既定の支払元。
-  static const _defaultPayment = 'ワンバンク';
-
   /// レシートの品目メモ（まとめて1件にぶら下がる内訳）。新規=initialMemo、編集=既存メモ。
   String? get _receiptMemo => widget.initialMemo ?? widget.editing?.memo;
 
@@ -108,8 +105,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           widget.initialDescription!.isNotEmpty) {
         _memoCtrl.text = widget.initialDescription!;
       }
-      // 新規記録の支払元は「ワンバンク」を既定にする。
-      _payment = _defaultPayment;
+      // 支払元は既定を持たず、本人が登録した口座から選んでもらう。
+      _payment = null;
       _receiptId = widget.initialReceiptId;
       _receiptUrl = widget.initialReceiptUrl ??
           (widget.initialReceiptId != null

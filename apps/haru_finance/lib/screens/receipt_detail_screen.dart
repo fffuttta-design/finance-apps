@@ -141,7 +141,7 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
                   fontWeight: FontWeight.w900,
                   color: AppColors.expense)),
           const SizedBox(height: 14),
-          Container(height: 1, color: const Color(0xFFF3E1E7)),
+          Container(height: 1, color: const Color(0xFFD6EEF8)),
           const SizedBox(height: 8),
           _infoRow('日付',
               '${first.date.year}/${first.date.month}/${first.date.day}（$wd）'),

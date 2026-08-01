@@ -49,7 +49,7 @@ class _Item {
 class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
   late DateTime _date;
   String? _payer;
-  String? _payment = _defaultPayment; // 支払元（既定はワンバンク）
+  String? _payment; // 支払元（本人が登録した口座から選ぶ・既定なし）
   List<Account> _accounts = []; // 登録済みの口座/クレカ
   final _items = <_Item>[];
   late final TextEditingController _storeCtrl; // 店名（読み取り結果を編集できる）
@@ -58,9 +58,6 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
   late final TextEditingController _receiptTotalCtrl;
   bool _addAdjustment = true; // 差額を「消費税・調整」として自動追加するか
   bool _saving = false;
-
-  /// レシート記録の既定の支払元。手入力画面と揃える。
-  static const _defaultPayment = 'ワンバンク';
 
   Map<String, String> get _members => HouseholdService.instance.memberNames;
 
@@ -350,7 +347,7 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                       ),
                     ],
                     const SizedBox(height: 10),
-                    // 支払元（既定ワンバンク・未選択では登録できない）
+                    // 支払元（既定なし・未選択では登録できない）
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Column(

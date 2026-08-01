@@ -45,7 +45,7 @@ class SimplePieChart extends StatelessWidget {
                 if (centerTop != null)
                   Text(centerTop!,
                       style: const TextStyle(
-                          fontSize: 11, color: Color(0xFF9E8A92))),
+                          fontSize: 11, color: Color(0xFF7FA0AB))),
                 if (centerBottom != null)
                   Text(centerBottom!,
                       style: const TextStyle(
@@ -73,7 +73,7 @@ class _DonutPainter extends CustomPainter {
 
     if (total <= 0) {
       final paint = Paint()
-        ..color = const Color(0xFFF3E1E7)
+        ..color = const Color(0xFFD6EEF8)
         ..style = PaintingStyle.stroke
         ..strokeWidth = stroke;
       canvas.drawCircle(center, r, paint);

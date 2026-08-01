@@ -285,7 +285,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFFFF8FA8), Color(0xFFFF6B8A)],
+            colors: [Color(0xFF6FD0F5), Color(0xFF1E9FD9)],
           ),
           borderRadius: BorderRadius.circular(24),
         ),
@@ -395,7 +395,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
         child: Column(
           children: [
             const Icon(Icons.event_repeat_rounded,
-                size: 48, color: Color(0xFFF3C6D2)),
+                size: 48, color: Color(0xFFB6E1F5)),
             const SizedBox(height: 10),
             const Text('家賃・光熱費・サブスクなどを登録しよう',
                 style: TextStyle(color: AppColors.textSub, fontSize: 13)),

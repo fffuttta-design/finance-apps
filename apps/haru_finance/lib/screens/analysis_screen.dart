@@ -231,7 +231,7 @@ class AnalysisScreen extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFFFE2EA), Color(0xFFFFF1F4)],
+          colors: [Color(0xFFDDF3FD), Color(0xFFEFF9FE)],
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.pinkSoft, width: 1.2),

@@ -272,7 +272,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFFFF9AA2), Color(0xFFFF6B6B)],
+            colors: [Color(0xFFF9A08F), Color(0xFFF4796B)],
           ),
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
@@ -413,7 +413,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         child: Column(
           children: [
             const Icon(Icons.shopping_bag_outlined,
-                size: 48, color: Color(0xFFF3C6D2)),
+                size: 48, color: Color(0xFFB6E1F5)),
             const SizedBox(height: 10),
             Text('${_month.month}月の支出はまだないよ',
                 style: const TextStyle(color: AppColors.textSub, fontSize: 13)),
