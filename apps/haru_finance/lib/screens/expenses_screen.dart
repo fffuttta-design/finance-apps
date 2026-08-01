@@ -101,7 +101,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         title: const Text('支出'),
         leading: const Padding(
           padding: EdgeInsets.only(left: 12),
-          child: Icon(Icons.shopping_bag_rounded, color: AppColors.expense),
+          child: Icon(Icons.shopping_bag_rounded, color: AppColors.expensePink),
         ),
         actions: const [SettingsButton()],
       ),
@@ -110,7 +110,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           final changed = await showRecordMenu(context);
           if (changed && mounted) setState(() {});
         },
-        backgroundColor: AppColors.expense,
+        backgroundColor: AppColors.expensePink,
         icon: const Icon(Icons.add_rounded),
         label: const Text('きろく',
             style: TextStyle(fontWeight: FontWeight.w700)),
@@ -272,12 +272,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFFF9A08F), Color(0xFFF4796B)],
+            colors: [AppColors.expensePinkLight, AppColors.expensePinkDeep],
           ),
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-                color: AppColors.expense.withValues(alpha: 0.3),
+                color: AppColors.expensePink.withValues(alpha: 0.3),
                 blurRadius: 18,
                 offset: const Offset(0, 8)),
           ],
@@ -361,7 +361,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             child: LinearProgressIndicator(
               value: ratio,
               minHeight: 7,
-              backgroundColor: AppColors.pinkSoft,
+              backgroundColor: AppColors.expensePinkSoft,
               valueColor: AlwaysStoppedAnimation(c.color),
             ),
           ),
@@ -403,7 +403,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             style: const TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 15,
-                color: AppColors.expense)),
+                color: AppColors.expensePink)),
       ),
     );
   }
@@ -413,7 +413,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         child: Column(
           children: [
             const Icon(Icons.shopping_bag_outlined,
-                size: 48, color: Color(0xFFB6E1F5)),
+                size: 48, color: Color(0xFFFFB6C9)),
             const SizedBox(height: 10),
             Text('${_month.month}月の支出はまだないよ',
                 style: const TextStyle(color: AppColors.textSub, fontSize: 13)),

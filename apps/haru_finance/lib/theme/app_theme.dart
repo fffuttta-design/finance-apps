@@ -16,6 +16,11 @@ class AppColors {
   static const textSub = Color(0xFF7FA0AB); // サブ
   static const income = Color(0xFF35C2A0); // 収入（ミントグリーン）
   static const expense = Color(0xFFF4796B); // 支出（コーラル）
+  // 支出タブ専用のピンク（はるの希望で支出タブだけピンクにする）。
+  static const expensePink = Color(0xFFFF6B8A); // メイン
+  static const expensePinkLight = Color(0xFFFF8FA8); // グラデ開始
+  static const expensePinkDeep = Color(0xFFF2547B); // グラデ終了
+  static const expensePinkSoft = Color(0xFFFFE4EC); // 淡いピンク（バー背景等）
   static const divider = Color(0xFFD6EEF8);
 }
 
