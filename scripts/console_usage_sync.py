@@ -244,6 +244,14 @@ def do_fetch(months: int) -> int:
         except Exception as e:            # noqa: BLE001
             print("（残高の取得に失敗:", str(e)[:120], "）")
             balance = None
+        # 🔥 恒久対応（2026-08-01）：取得に成功したら**更新後のCookieを毎回保存し直す**。
+        #    platform.claude.com はアクセスのたびにセッションを更新する（ローリング）ので、
+        #    毎日走っている限りログインが延命され、--login の再ログインがほぼ要らなくなる。
+        #    ⚠️ ここに来ている＝FETCH_JS が通った＝セッションは有効。有効なときだけ上書き保存する。
+        try:
+            ctx.storage_state(path=SESSION_FILE)
+        except Exception as e:            # noqa: BLE001
+            print("（セッションの再保存に失敗:", str(e)[:120], "）")
         br.close()
 
     # 取れた残高を二村秘書へ送る（段のアラート判定は向こう側でやる）。
