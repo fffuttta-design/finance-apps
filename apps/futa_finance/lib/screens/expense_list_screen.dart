@@ -3,9 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
+import '../data/payments_change_notifier.dart';
+import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/category_colors.dart';
 import '../utils/formatters.dart';
+import '../widgets/brand_logo.dart';
 import '../widgets/date_weekday_text.dart';
 import 'receipt_group_detail_screen.dart';
 import 'transaction_detail_screen.dart';
@@ -71,6 +74,9 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   List<core.Transaction> _transactions = [];
   bool _loading = true;
 
+  /// 支払方法名→登録済みロゴを引くための支払方法マスタ（カード/口座）。
+  core.PaymentMethodsConfig _payments = core.PaymentMethodsConfig.empty();
+
   _Sort _sort = _Sort.dateDesc;
   final _searchCtrl = TextEditingController();
   String _query = '';
@@ -117,15 +123,19 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   void initState() {
     super.initState();
     _load();
+    _loadPayments();
     _sub = _txRepo.stream.listen((list) {
       if (!mounted) return;
       setState(() => _transactions = list);
     });
+    // カード/口座のロゴ変更に追従（設定でロゴを付け替えたら即反映）。
+    PaymentsChangeNotifier.instance.addListener(_loadPayments);
   }
 
   @override
   void dispose() {
     _sub?.cancel();
+    PaymentsChangeNotifier.instance.removeListener(_loadPayments);
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -137,6 +147,32 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
       _transactions = txns;
       _loading = false;
     });
+  }
+
+  Future<void> _loadPayments() async {
+    final p = await SettingsRepository.instance.loadPayments();
+    if (!mounted) return;
+    setState(() => _payments = p);
+  }
+
+  /// 支払方法名に一致する登録済みカード/口座のロゴURLを返す（無ければ null）。
+  /// カード優先で照合（同名口座より三井住友カード等のブランドロゴを優先）。
+  String? _paymentIconUrl(String method) {
+    final m = method.trim();
+    if (m.isEmpty) return null;
+    for (final c in _payments.creditCards) {
+      if (c.name.trim() == m) {
+        final u = c.iconUrl?.trim();
+        if (u != null && u.isNotEmpty) return u;
+      }
+    }
+    for (final b in _payments.bankAccounts) {
+      if (b.name.trim() == m) {
+        final u = b.iconUrl?.trim();
+        if (u != null && u.isNotEmpty) return u;
+      }
+    }
+    return null;
   }
 
   List<core.Transaction> get _filtered {
@@ -513,10 +549,19 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     return Icons.payment_outlined;
   }
 
-  /// 支払方法チップ（アイコン＋名称）。空なら何も出さない。
+  /// 支払方法チップ。空なら何も出さない。
+  /// 登録済みのカード/口座ロゴがあれば **ロゴだけ** を表示（三井住友カード等）。
+  /// ロゴ未登録なら従来どおりアイコン＋名称のチップにフォールバックする。
   Widget _paymentChip(String method) {
     final m = method.trim();
     if (m.isEmpty) return const SizedBox.shrink();
+    final logoUrl = _paymentIconUrl(m);
+    if (logoUrl != null) {
+      return Tooltip(
+        message: m,
+        child: BrandLogo(iconUrl: logoUrl, size: 20, borderRadius: 5),
+      );
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
@@ -540,7 +585,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
 
   /// 日付（曜日付き）。行の左側に縦並びで表示。
   Widget _dateCol(DateTime d) => SizedBox(
-        width: 52,
+        width: 58,
         child: dateWeekdayText(d,
             baseStyle: const TextStyle(
                 fontSize: 12,

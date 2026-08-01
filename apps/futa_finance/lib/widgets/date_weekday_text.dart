@@ -18,5 +18,9 @@ Widget dateWeekdayText(DateTime d, {required TextStyle baseStyle}) {
       ],
     ),
     style: baseStyle,
+    // 日付は 1 行固定。狭い列でも「(火)」の閉じ括弧が次行に落ちないようにする。
+    maxLines: 1,
+    softWrap: false,
+    overflow: TextOverflow.visible,
   );
 }
