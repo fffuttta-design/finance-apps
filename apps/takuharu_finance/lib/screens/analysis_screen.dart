@@ -3,6 +3,7 @@ import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/categories.dart';
 import '../data/household_service.dart';
+import '../data/month_scope.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
@@ -10,9 +11,39 @@ import '../widgets/settings_button.dart';
 import '../widgets/simple_pie_chart.dart';
 import 'category_trend_screen.dart';
 
-/// 分析：月別の収支推移（6ヶ月）と今月のカテゴリ内訳（自前描画・依存なし）。
-class AnalysisScreen extends StatelessWidget {
+/// 分析：月別の収支推移（6ヶ月）と選択中の月のカテゴリ内訳（自前描画・依存なし）。
+/// 月は全タブ共通の MonthScope を使うので、前月以前もさかのぼって見られる。
+class AnalysisScreen extends StatefulWidget {
   const AnalysisScreen({super.key});
+
+  @override
+  State<AnalysisScreen> createState() => _AnalysisScreenState();
+}
+
+class _AnalysisScreenState extends State<AnalysisScreen> {
+  // 表示中の月は全タブ共通（MonthScope）。切替は他タブにも反映される。
+  DateTime get _month => MonthScope.instance.month;
+
+  @override
+  void initState() {
+    super.initState();
+    MonthScope.instance.notifier.addListener(_onMonthChanged);
+  }
+
+  @override
+  void dispose() {
+    MonthScope.instance.notifier.removeListener(_onMonthChanged);
+    super.dispose();
+  }
+
+  void _onMonthChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _shift(int d) => MonthScope.instance.shift(d);
+
+  bool _inMonth(core.Transaction t) =>
+      t.date.year == _month.year && t.date.month == _month.month;
 
   @override
   Widget build(BuildContext context) {
@@ -26,14 +57,17 @@ class AnalysisScreen extends StatelessWidget {
               stream: TxRepository.instance.watch(hid),
               builder: (context, snap) {
                 final all = snap.data ?? const <core.Transaction>[];
+                final m = _month.month;
                 return ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                   children: [
+                    _monthBar(),
+                    const SizedBox(height: 12),
                     _sectionTitle('月別の収支（6ヶ月）'),
                     const SizedBox(height: 8),
                     _trendCard(all),
                     const SizedBox(height: 20),
-                    _sectionTitle('今月の支出内訳'),
+                    _sectionTitle('$m月の支出内訳'),
                     const SizedBox(height: 8),
                     _pieCard(all),
                     const SizedBox(height: 12),
@@ -49,10 +83,27 @@ class AnalysisScreen extends StatelessWidget {
     );
   }
 
+  Widget _monthBar() => Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+              icon: const Icon(Icons.chevron_left_rounded),
+              onPressed: () => _shift(-1)),
+          Text('${_month.year}年 ${_month.month}月',
+              style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.text)),
+          IconButton(
+              icon: const Icon(Icons.chevron_right_rounded),
+              onPressed: () => _shift(1)),
+        ],
+      );
+
+  /// 選択中の月を末尾（右端）とした直近6ヶ月の収支推移。
   Widget _trendCard(List<core.Transaction> all) {
-    final now = DateTime.now();
     final months =
-        List.generate(6, (i) => DateTime(now.year, now.month - (5 - i)));
+        List.generate(6, (i) => DateTime(_month.year, _month.month - (5 - i)));
     final exp = <int>[];
     final inc = <int>[];
     for (final m in months) {
@@ -109,6 +160,8 @@ class AnalysisScreen extends StatelessWidget {
   Widget _monthColumn(DateTime m, int income, int expense, int maxV) {
     const barArea = 96.0;
     double h(int v) => maxV == 0 ? 0 : (v / maxV) * barArea;
+    // 選択中の月を強調（月ラベルを濃く・太く）。
+    final isSel = m.year == _month.year && m.month == _month.month;
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
@@ -123,7 +176,10 @@ class AnalysisScreen extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text('${m.month}月',
-            style: const TextStyle(fontSize: 10, color: AppColors.textSub)),
+            style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSel ? FontWeight.w800 : FontWeight.w400,
+                color: isSel ? AppColors.pinkDark : AppColors.textSub)),
       ],
     );
   }
@@ -154,22 +210,12 @@ class AnalysisScreen extends StatelessWidget {
     );
   }
 
-  /// 今月の支出カテゴリ内訳（円グラフ）。
+  /// 選択中の月の支出カテゴリ内訳（円グラフ）。
   Widget _pieCard(List<core.Transaction> all) {
-    final entries = _thisMonthByCat(all);
+    final entries = _monthByCat(all);
     final total = entries.fold<int>(0, (s, e) => s + e.value);
     if (entries.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.symmetric(vertical: 28),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.pinkSoft, width: 1.2),
-        ),
-        child: const Text('今月の支出はまだないよ',
-            style: TextStyle(color: AppColors.textSub, fontSize: 12)),
-      );
+      return _emptyCard('${_month.month}月の支出はまだないよ');
     }
     // 上位6カテゴリ＋残りを「その他」にまとめてスライス化。
     final top = entries.take(6).toList();
@@ -214,11 +260,10 @@ class AnalysisScreen extends StatelessWidget {
   /// エンゲル係数カード（食料費 ÷ 支出合計）。
   /// 食料費＝「食費」＋「外食」。
   Widget _engelCard(List<core.Transaction> all) {
-    final now = DateTime.now();
     var food = 0, total = 0;
     for (final t in all) {
       if (t.type != core.TransactionType.expense) continue;
-      if (t.date.year != now.year || t.date.month != now.month) continue;
+      if (!_inMonth(t)) continue;
       total += t.amount;
       if (t.category.major == '食費' || t.category.major == '外食') {
         food += t.amount;
@@ -245,8 +290,8 @@ class AnalysisScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('エンゲル係数（今月）',
-                    style: TextStyle(
+                Text('エンゲル係数（${_month.month}月）',
+                    style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: AppColors.text)),
@@ -266,13 +311,12 @@ class AnalysisScreen extends StatelessWidget {
     );
   }
 
-  /// 今月のカテゴリ別支出を金額の多い順で返す。
-  List<MapEntry<String, int>> _thisMonthByCat(List<core.Transaction> all) {
-    final now = DateTime.now();
+  /// 選択中の月のカテゴリ別支出を金額の多い順で返す。
+  List<MapEntry<String, int>> _monthByCat(List<core.Transaction> all) {
     final byCat = <String, int>{};
     for (final t in all) {
       if (t.type != core.TransactionType.expense) continue;
-      if (t.date.year != now.year || t.date.month != now.month) continue;
+      if (!_inMonth(t)) continue;
       byCat[t.category.major] = (byCat[t.category.major] ?? 0) + t.amount;
     }
     return byCat.entries.toList()
@@ -280,14 +324,14 @@ class AnalysisScreen extends StatelessWidget {
   }
 
   Widget _categoryCard(BuildContext context, List<core.Transaction> all) {
-    final entries = _thisMonthByCat(all);
+    final entries = _monthByCat(all);
     final total = entries.fold<int>(0, (s, e) => s + e.value);
     if (entries.isEmpty) {
       return Container(
         padding: const EdgeInsets.symmetric(vertical: 28),
         alignment: Alignment.center,
-        child: const Text('今月の支出はまだないよ',
-            style: TextStyle(color: AppColors.textSub, fontSize: 12)),
+        child: Text('${_month.month}月の支出はまだないよ',
+            style: const TextStyle(color: AppColors.textSub, fontSize: 12)),
       );
     }
     return Container(
@@ -304,6 +348,18 @@ class AnalysisScreen extends StatelessWidget {
       ),
     );
   }
+
+  Widget _emptyCard(String text) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 28),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.pinkSoft, width: 1.2),
+        ),
+        child: Text(text,
+            style: const TextStyle(color: AppColors.textSub, fontSize: 12)),
+      );
 
   Widget _catRow(
       BuildContext context, String name, int amount, int total) {

@@ -25,6 +25,18 @@ class SubscriptionRepository {
     });
   }
 
+  /// 固定費を一度だけ取得する（自動記帳など、購読ではなく単発で読む用）。
+  Future<List<Subscription>> fetch(String hid) async {
+    final snap = await _coll(hid).get();
+    final list = <Subscription>[];
+    for (final d in snap.docs) {
+      try {
+        list.add(Subscription.fromJson(Map<String, dynamic>.from(d.data())));
+      } catch (_) {}
+    }
+    return list;
+  }
+
   /// 固定費を保存する。更新した本人 [uid] を記録し、通知サービスが
   /// 「変更した人を除いた相手」へ通知できるようにする。
   Future<void> save(String hid, Subscription s, String uid) async {

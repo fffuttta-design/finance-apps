@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.100",
-    "buildNumber":  "105",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.100/takuharu-finance-v0.2.100.apk",
-    "releaseNotes":  "各明細に「登録した日時」を小さく表示するようにしました。手で入れた記録もレシートの品目も、明細をタップした詳細画面に『登録 ○月○日 ○時○分』が出ます。これまでのぶんも表示されます。"
+    "version":  "0.2.101",
+    "buildNumber":  "106",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.101/takuharu-finance-v0.2.101.apk",
+    "releaseNotes":  "・分析タブで前の月もさかのぼって見られるようにしました（◀▶で月を切替。円グラフ・カテゴリ内訳・エンゲル係数がその月の内容になります）。\n・固定費が支払日になると、自動で支出に記録されるようになりました（毎月ボタンを押さなくてOK。二重には記録されません）。"
 }

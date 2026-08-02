@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/household_service.dart';
 import '../data/push_service.dart';
+import '../data/subscription_auto_record.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../widgets/startup_update_mixin.dart';
@@ -38,6 +39,16 @@ class _MainShellState extends State<MainShell>
     PushService.instance.register();
     // 過去の「消費税・調整／値引き・調整」のカテゴリ直し（一度きり・裏で静かに）。
     _repairAdjustmentCategoriesOnce();
+    // 支払日が来た固定費を自動で支出に記帳（裏で静かに・二重計上なし）。
+    _autoRecordSubscriptions();
+  }
+
+  /// 支払日を過ぎた固定費を今月分として自動記帳する（起動時・復帰時）。
+  /// 失敗しても黙って諦める（サービス側で二重計上を防止・連打を間引く）。
+  Future<void> _autoRecordSubscriptions() async {
+    try {
+      await SubscriptionAutoRecord.instance.run();
+    } catch (_) {/* 次の起動/復帰で再挑戦 */}
   }
 
   /// 差額調整の行が「その他」で入っていた過去分を、そのレシートの主なカテゴリへ
@@ -75,6 +86,8 @@ class _MainShellState extends State<MainShell>
     // アプリ復帰時にも更新を確認（スロットルで連打抑制）。
     if (state == AppLifecycleState.resumed) {
       runUpdateCheck();
+      // 復帰時にも固定費の自動記帳を確認（サービス側で10分間引き）。
+      _autoRecordSubscriptions();
     }
   }
 
