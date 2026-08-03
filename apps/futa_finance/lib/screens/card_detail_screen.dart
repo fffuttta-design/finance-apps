@@ -16,6 +16,7 @@ import '../utils/modal_input.dart';
 import '../utils/thousands_separator_input_formatter.dart';
 import '../v2/widgets/credit_card_reconcile.dart';
 import '../v2/widgets/expense_detail_table.dart';
+import '../v2/widgets/month_nav_bar.dart';
 import '../widgets/brand_logo.dart';
 import 'expense_input_screen.dart';
 import 'receipt_group_detail_screen.dart';
@@ -557,21 +558,6 @@ class _CardDetailScreenState extends State<CardDetailScreen>
       ..sort((a, b) => b.date.compareTo(a.date));
   }
 
-  /// 月選択肢: 当月 + 取引月（降順）+ 全期間。
-  List<DateTime?> _availableMonths() {
-    final name = _card.name;
-    final set = <DateTime>{};
-    final now = DateTime.now();
-    set.add(DateTime(now.year, now.month));
-    for (final t in _all) {
-      if (t.type != core.TransactionType.expense) continue;
-      if (t.paymentMethod != name) continue;
-      set.add(DateTime(t.date.year, t.date.month));
-    }
-    final list = set.toList()..sort((a, b) => b.compareTo(a));
-    return [null, ...list];
-  }
-
   @override
   Widget build(BuildContext context) {
     final allTxns = _cardTransactions();
@@ -708,6 +694,9 @@ class _CardDetailScreenState extends State<CardDetailScreen>
               Expanded(
                 child: TabBarView(
                   controller: _tabController,
+                  // タブ横スワイプを無効化（明細タブの左右スワイプを「月の切替」に
+                  // 使うため）。タブはタブバーのタップで切り替える。
+                  physics: const NeverScrollableScrollPhysics(),
                   children: [
                     // ── タブ1: その月の明細 ──
                     Column(
@@ -771,7 +760,18 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                                     emptyHint: 'この期間の利用はありません',
                                   ),
                                 )
-                              : _historyList(monthTxns),
+                              // スマホ幅：カード型リスト。左右スワイプで月を切替。
+                              : GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onHorizontalDragEnd: (details) {
+                                    if (_range != null) return;
+                                    final v = details.primaryVelocity ?? 0;
+                                    if (v == 0) return;
+                                    // 左スワイプ＝次の月／右スワイプ＝前の月。
+                                    _shiftCardMonth(v < 0 ? 1 : -1);
+                                  },
+                                  child: _historyList(monthTxns),
+                                ),
                           ),
                           ),
                         ),
@@ -800,8 +800,18 @@ class _CardDetailScreenState extends State<CardDetailScreen>
     );
   }
 
+  /// 月を前後に切り替える（横矢印・スワイプ共通）。全期間(null)なら当月起点。
+  void _shiftCardMonth(int delta) {
+    if (_range != null) return;
+    final now = DateTime.now();
+    final base = _selectedMonth ?? DateTime(now.year, now.month);
+    final next = DateTime(base.year, base.month + delta);
+    setState(() => _selectedMonth = next);
+    // 詳細で月を変えたら共有カーソルにも反映（戻っても揃う）。
+    MonthCursor.instance.month = next;
+  }
+
   Widget _monthSelector() {
-    final months = _availableMonths();
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
@@ -809,26 +819,7 @@ class _CardDetailScreenState extends State<CardDetailScreen>
         children: [
           const Text('期間: ',
               style: TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
-          if (_range == null)
-            // 月モード：月プルダウン。
-            DropdownButton<DateTime?>(
-              value: _selectedMonth,
-              isDense: true,
-              underline: const SizedBox.shrink(),
-              style: const TextStyle(
-                  fontSize: 13, color: Color(0xFF111827)),
-              items: months.map((m) {
-                final label = m == null ? '全期間' : '${m.year}年${m.month}月';
-                return DropdownMenuItem<DateTime?>(
-                    value: m, child: Text(label));
-              }).toList(),
-              onChanged: (v) => setState(() {
-                _selectedMonth = v;
-                // 詳細で月を変えたら共有カーソルにも反映（戻っても揃う）。
-                if (v != null) MonthCursor.instance.month = v;
-              }),
-            )
-          else
+          if (_range != null)
             // 範囲モード：選択中の期間をチップ表示（✕で月モードに戻る）。
             InputChip(
               label: Text(
@@ -839,8 +830,46 @@ class _CardDetailScreenState extends State<CardDetailScreen>
               avatar: const Icon(Icons.date_range, size: 16),
               onDeleted: () => setState(() => _range = null),
               visualDensity: VisualDensity.compact,
+            )
+          else if (_selectedMonth != null)
+            // 月モード：プルダウンをやめ、横矢印（‹ 2026年5月 ›）で前後に切替。
+            // スマホは左右スワイプでも切り替えられる（明細リスト側で処理）。
+            MonthNavBar(
+              label: '${_selectedMonth!.year}年${_selectedMonth!.month}月',
+              onPrev: () => _shiftCardMonth(-1),
+              onNext: () => _shiftCardMonth(1),
+            )
+          else
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text('全期間',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF111827))),
             ),
           const Spacer(),
+          // 全期間 ⇄ 月別 切替（コンパクトなアイコンボタン）。
+          if (_range == null)
+            IconButton(
+              tooltip: _selectedMonth == null ? '月別で見る' : '全期間で見る',
+              visualDensity: VisualDensity.compact,
+              icon: Icon(
+                  _selectedMonth == null
+                      ? Icons.calendar_view_month
+                      : Icons.all_inclusive,
+                  size: 20,
+                  color: const Color(0xFF6B7280)),
+              onPressed: () => setState(() {
+                if (_selectedMonth == null) {
+                  final m = _defaultMonth();
+                  _selectedMonth = m;
+                  MonthCursor.instance.month = m;
+                } else {
+                  _selectedMonth = null;
+                }
+              }),
+            ),
           // 期間指定（◯月◯日〜◯月◯日）ボタン。
           TextButton.icon(
             onPressed: _pickRange,

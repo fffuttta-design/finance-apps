@@ -523,13 +523,22 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                           child: _customOrder
                               ? _reorderLedger(shownRows,
                                   dispStart ?? (_account.startingBalance ?? 0))
-                              : _ledgerTable(
-                                  // カスタム順（保存した並び順）で表示。並びが未設定なら
-                                  // 日付順にフォールバックするので、通常の口座は今まで通り。
-                                  displayRows: shownRows,
-                                  monthStartBalance: dispStart,
-                                  monthEndBalance: dispEnd,
-                                ),
+                              // PC幅は列そろえの表、スマホ幅は崩れない1行リスト。
+                              // 幅広の固定列 Table を狭い画面に押し込むと「摘要」や
+                              // 残高が1文字ずつ縦に折れて崩れるため、幅で出し分ける。
+                              : (constraints.maxWidth >= 900
+                                  ? _ledgerTable(
+                                      // カスタム順（保存した並び順）で表示。並びが未設定なら
+                                      // 日付順にフォールバックするので、通常の口座は今まで通り。
+                                      displayRows: shownRows,
+                                      monthStartBalance: dispStart,
+                                      monthEndBalance: dispEnd,
+                                    )
+                                  : _ledgerMobileList(
+                                      displayRows: shownRows,
+                                      monthStartBalance: dispStart,
+                                      monthEndBalance: dispEnd,
+                                    )),
                         ),
                       ],
                     ),
@@ -1170,6 +1179,231 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ── スマホ幅（<900）用の通帳リスト ──────────────────────────
+  // 幅広の Table を狭い画面に押し込むと列が潰れて崩れる。スマホでは
+  // 「1行1明細」のコンパクト表示にして、摘要はellipsis・残高は下段の
+  // サブ行に逃がすことで、狭い画面でも崩れないようにする。
+  Widget _ledgerMobileList({
+    required List<_LedgerRow> displayRows,
+    int? monthStartBalance,
+    int? monthEndBalance,
+  }) {
+    if (displayRows.isEmpty &&
+        monthStartBalance == null &&
+        monthEndBalance == null) {
+      return const Center(
+        child: Text('この期間の取引はありません',
+            style: TextStyle(color: Color(0xFF9CA3AF))),
+      );
+    }
+    // 残高は「表示順（上＝新しい／下＝古い）」に沿って積み上げる。
+    final seed = monthStartBalance ?? (_account.startingBalance ?? 0);
+    final balances = List<int>.filled(displayRows.length, seed);
+    int running = seed;
+    for (int i = displayRows.length - 1; i >= 0; i--) {
+      running += displayRows[i].signedAmount;
+      balances[i] = running;
+    }
+    final list = ListView(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 24),
+      children: [
+        if (monthEndBalance != null && _selectedMonth != null)
+          _mobileBalanceBanner(
+            label: '月末残高',
+            balance: monthEndBalance,
+            bg: const Color(0xFFE0F2FE),
+            isMonthStart: false,
+            isEdited: _pendingMonthEndBalance != null,
+          ),
+        for (int i = 0; i < displayRows.length; i++)
+          _mobileLedgerRow(displayRows[i], balances[i],
+              current: i == _curMatchLedgerIndex),
+        if (monthStartBalance != null && _selectedMonth != null)
+          _mobileBalanceBanner(
+            label: '月初残高',
+            balance: monthStartBalance,
+            bg: const Color(0xFFFEF3C7),
+            isMonthStart: true,
+            isEdited: _pendingMonthStartBalance != null,
+          ),
+      ],
+    );
+    // スマホは左右スワイプでも月を切り替えられるようにする（月選択時のみ）。
+    // 左スワイプ＝次の月、右スワイプ＝前の月（カレンダー系の一般的な向き）。
+    return GestureDetector(
+      onHorizontalDragEnd: (details) {
+        if (_selectedMonth == null) return;
+        final v = details.primaryVelocity ?? 0;
+        if (v == 0) return;
+        _shiftMonth(v < 0 ? 1 : -1);
+      },
+      child: list,
+    );
+  }
+
+  /// スマホ用: 月初/月末残高のバナー行（タップの鉛筆で手入力編集）。
+  Widget _mobileBalanceBanner({
+    required String label,
+    required int balance,
+    required Color bg,
+    required bool isMonthStart,
+    required bool isEdited,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF374151))),
+          const Spacer(),
+          Text(formatYen(balance),
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'monospace',
+                  color: isEdited
+                      ? const Color(0xFFEA580C)
+                      : const Color(0xFF111827))),
+          IconButton(
+            icon: Icon(Icons.edit,
+                size: 15,
+                color: isEdited
+                    ? const Color(0xFFEA580C)
+                    : const Color(0xFF9CA3AF)),
+            padding: const EdgeInsets.only(left: 6),
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints(),
+            tooltip: isMonthStart ? '月初残高を修正' : '月末残高を修正',
+            onPressed: () => _editVirtualBalance(isMonthStart, balance),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// スマホ用: 1明細=1行のコンパクト行（日付／種別／摘要＋残高／金額／確認／編集）。
+  Widget _mobileLedgerRow(_LedgerRow row, int balanceAfter,
+      {bool current = false}) {
+    final t = row.txn;
+    final isOut = row.signedAmount < 0;
+    final isTransfer = t.type == core.TransactionType.transfer;
+    final isAdjust = t.category.major == '差額調整';
+    final desc = _ledgerDescOf(row);
+    final reviewed = t.reviewed;
+    final amountColor = isTransfer ? _cTransfer : (isOut ? _cRed : _cGreen);
+    final amountStr = isOut
+        ? '−${formatYen(-row.signedAmount)}'
+        : '+${formatYen(row.signedAmount)}';
+    return Container(
+      key: current ? _currentRowKey : null,
+      decoration: BoxDecoration(
+        color: current
+            ? const Color(0xFFFFECB3)
+            : reviewed
+                ? const Color(0xFFF3F4F6)
+                : Colors.white,
+        border:
+            const Border(bottom: BorderSide(color: Color(0xFFF1F2F4))),
+      ),
+      padding: const EdgeInsets.fromLTRB(6, 6, 2, 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // 日付（MM/DD＋年）
+          SizedBox(
+            width: 42,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                    '${t.date.month.toString().padLeft(2, '0')}/${t.date.day.toString().padLeft(2, '0')}',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'monospace',
+                        color: reviewed
+                            ? const Color(0xFF9CA3AF)
+                            : const Color(0xFF374151))),
+                Text('${t.date.year}',
+                    style: const TextStyle(
+                        fontSize: 9, color: Color(0xFF9CA3AF))),
+              ],
+            ),
+          ),
+          const SizedBox(width: 2),
+          // 種別チップ（タップで入金/出金/振替を変更）
+          _typeCell(t),
+          const SizedBox(width: 2),
+          // 摘要＋残高（2段）
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                HiliteText(desc,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight:
+                            isAdjust ? FontWeight.w700 : FontWeight.w500,
+                        color: isAdjust
+                            ? const Color(0xFFDC2626)
+                            : const Color(0xFF111827))),
+                const SizedBox(height: 1),
+                Text('残高 ${formatYen(balanceAfter)}',
+                    style: TextStyle(
+                        fontSize: 10.5,
+                        fontFamily: 'monospace',
+                        color: balanceAfter >= 0
+                            ? const Color(0xFF9CA3AF)
+                            : const Color(0xFFDC2626))),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          // 金額（振替は青／入金は緑／出金は赤）
+          HiliteText(amountStr,
+              amount: true,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'monospace',
+                  color: amountColor)),
+          // 確認済みチェック
+          SizedBox(
+            width: 30,
+            child: Checkbox(
+              value: reviewed,
+              visualDensity: VisualDensity.compact,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              activeColor: const Color(0xFF6B7280),
+              onChanged: (v) => _toggleReviewed(t, v ?? false),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit_outlined,
+                size: 16, color: Color(0xFF6B7280)),
+            padding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints(),
+            tooltip: '編集',
+            onPressed: () => _showEditDialog(t),
+          ),
+        ],
       ),
     );
   }
