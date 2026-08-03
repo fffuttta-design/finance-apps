@@ -517,6 +517,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                           transferNet: transferNet,
                           startBalance: dispStart,
                           endBalance: dispEnd,
+                          wide: constraints.maxWidth >= 900,
                         ),
                         const Divider(height: 1),
                         Expanded(
@@ -942,14 +943,18 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     required int transferNet,
     int? startBalance,
     int? endBalance,
+    bool wide = true,
   }) {
     final hasMonth = startBalance != null && endBalance != null;
     return Container(
       color: const Color(0xFFFAFAFA),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      padding: EdgeInsets.fromLTRB(wide ? 16 : 10, 12, wide ? 16 : 10, 12),
       child: hasMonth
-          ? _balanceFlowStrip(
-              startBalance, endBalance, realIn, realOut, transferNet, netDelta)
+          ? (wide
+              ? _balanceFlowStrip(startBalance, endBalance, realIn, realOut,
+                  transferNet, netDelta)
+              : _balanceFlowStripMobile(startBalance, endBalance, realIn,
+                  realOut, transferNet, netDelta))
           // 全期間は月初/月末が無いので、実収入/実支出/振替/差引を並べる。
           : Row(
               children: [
@@ -1048,6 +1053,130 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// スマホ幅用の残高フロー帯。月初→月末を上段に大きく（数字は FittedBox で
+  /// 縮小して1文字ずつ縦に折れないようにする）、実収入/実支出/振替を下段に3枚並べる。
+  Widget _balanceFlowStripMobile(int start, int end, int realIn, int realOut,
+      int transferNet, int net) {
+    Widget bigNum(String label, int value, Color color,
+        {double size = 18, bool alignEnd = false}) {
+      return Column(
+        crossAxisAlignment:
+            alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: alignEnd ? _cSky : const Color(0xFF9CA3AF))),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment:
+                alignEnd ? Alignment.centerRight : Alignment.centerLeft,
+            child: Text(formatYen(value),
+                maxLines: 1,
+                style: TextStyle(
+                    fontSize: size,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'monospace',
+                    color: color)),
+          ),
+        ],
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                  child: bigNum('月初残高', start, const Color(0xFF111827),
+                      size: 17)),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6),
+                child: Icon(Icons.arrow_forward,
+                    size: 16, color: Color(0xFF9CA3AF)),
+              ),
+              Expanded(
+                  child:
+                      bigNum('月末残高', end, _cSky, size: 22, alignEnd: true)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                  child: _flowChipMobile('実収入', '+${formatYen(realIn)}',
+                      _cGreen, const Color(0xFFF0FDF4))),
+              const SizedBox(width: 6),
+              Expanded(
+                  child: _flowChipMobile('実支出', '−${formatYen(realOut)}',
+                      _cRed, const Color(0xFFFEF2F2))),
+              const SizedBox(width: 6),
+              Expanded(
+                  child: _flowChipMobile(
+                      '振替',
+                      formatYen(transferNet, withSign: true),
+                      _cTransfer,
+                      const Color(0xFFEFF6FF))),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+            decoration: BoxDecoration(
+              color: net >= 0
+                  ? const Color(0xFFF0FDF4)
+                  : const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text('差引 ${formatYen(net, withSign: true)}',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: net >= 0 ? _cGreen : _cRed)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _flowChipMobile(String label, String value, Color color, Color bg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label,
+              style: const TextStyle(fontSize: 10, color: Color(0xFF6B7280))),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(value,
+                maxLines: 1,
+                style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'monospace',
+                    color: color)),
           ),
         ],
       ),
@@ -1354,10 +1483,11 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 HiliteText(desc,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                         fontSize: 12.5,
+                        height: 1.25,
                         fontWeight:
                             isAdjust ? FontWeight.w700 : FontWeight.w500,
                         color: isAdjust

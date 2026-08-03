@@ -11,6 +11,7 @@ import '../data/settings_repository.dart';
 import '../data/subscription_repository.dart';
 import '../data/transaction_repository.dart';
 import '../v2/theme/mode_accent.dart';
+import '../utils/category_colors.dart';
 import '../utils/formatters.dart';
 import '../utils/modal_input.dart';
 import '../utils/thousands_separator_input_formatter.dart';
@@ -1056,16 +1057,10 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF111827)),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 2),
-                Text(
-                  '${t.category.major}${t.category.sub.isNotEmpty ? ' · ${t.category.sub}' : ''}',
-                  style: const TextStyle(
-                      fontSize: 10, color: Color(0xFF9CA3AF)),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                const SizedBox(height: 4),
+                _categoryBadge(t.category),
               ],
             ),
           ),
@@ -1078,6 +1073,45 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                 fontWeight: FontWeight.w700,
                 fontFamily: 'monospace',
                 color: Color(0xFFDC2626)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// カテゴリを色付きバッジで表示（大カテゴリの色に連動）。小カテゴリがあれば併記。
+  Widget _categoryBadge(core.Category cat) {
+    final major = CategoryColors.bareMajor(cat.major);
+    if (major.isEmpty && cat.sub.isEmpty) return const SizedBox.shrink();
+    final accent = CategoryColors.effective(cat.major);
+    final label =
+        major + (cat.sub.isNotEmpty ? ' · ${cat.sub}' : '');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.13),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            margin: const EdgeInsets.only(right: 5),
+            decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+          ),
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  color: Color.alphaBlend(
+                      accent.withValues(alpha: 0.85), const Color(0xFF374151))),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
