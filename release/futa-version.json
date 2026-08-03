@@ -1,1 +1,1 @@
-{"version":"1.0.552","buildNumber":"553","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.552/futa-finance-v1.0.552.apk","releaseNotes":"レシート読み取り後の入力画面を品目数で振り分け。1品目（医療領収証など単票）は手入力と同じ「支出を記録」フォームに統一し、2品目以上のときだけ「品目ごとに記録」を使うようにしました。"}
+{"version":"1.0.553","buildNumber":"554","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.553/futa-finance-v1.0.553.apk","releaseNotes":"「カテゴリを提案」を強化。履歴が無くても、店舗名・取引内容の文言からAIがカテゴリを推定します（例: アレルギー内科クリニック → 病院・薬 › 内科）。"}
