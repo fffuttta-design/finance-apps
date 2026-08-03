@@ -1,1 +1,1 @@
-{"version":"1.0.548","buildNumber":"549","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.548/futa-finance-v1.0.548.apk","releaseNotes":"口座の通帳（入出金履歴）がスマホで文字が縦に崩れていたのを直し、1明細1行で見やすくしました。クレジットカードの月切り替えを「‹ 6月 ›」の横スライドに変更（左右スワイプでも切替可）。"}
+{"version":"1.0.549","buildNumber":"550","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.549/futa-finance-v1.0.549.apk","releaseNotes":"通帳の上部サマリー（月初/月末残高）がスマホで数字が縦に潰れていたのを修正。明細タイトルを2行表示で読めるように。クレジットカードのカテゴリを色付きバッジ表示にして見やすくしました。"}
