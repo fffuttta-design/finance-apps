@@ -1,1 +1,1 @@
-{"version":"1.0.546","buildNumber":"547","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.546/futa-finance-v1.0.546.apk","releaseNotes":"経費明細一覧を見やすくしました。日付が折り返さず1行で表示され、支払方法は登録済みのカードロゴだけをすっきり表示します（三井住友カードなど）。"}
+{"version":"1.0.548","buildNumber":"549","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.548/futa-finance-v1.0.548.apk","releaseNotes":"口座の通帳（入出金履歴）がスマホで文字が縦に崩れていたのを直し、1明細1行で見やすくしました。クレジットカードの月切り替えを「‹ 6月 ›」の横スライドに変更（左右スワイプでも切替可）。"}
