@@ -13,6 +13,7 @@ import '../../data/transaction_repository.dart';
 import '../../screens/account_detail_screen.dart';
 import '../../screens/card_detail_screen.dart';
 import '../../screens/expense_list_screen.dart';
+import '../../screens/subscription_list_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/brand_logo.dart';
@@ -126,6 +127,15 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
   /// 支払方法名 → 対応するウォレットの詳細画面へ。クレカ＝CardDetailScreen、
   /// 銀行/現金/電子マネー＝AccountDetailScreen（通帳）。未登録の支払方法は何もしない。
   Future<void> _openWalletDetail(String name) async {
+    // 「固定費・サブスク」は実際のウォレットではないので固定費一覧を開く。
+    if (name == '固定費・サブスク') {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const SubscriptionListScreen()),
+      );
+      if (mounted) await _load();
+      return;
+    }
     for (final c in _payments.creditCards) {
       if (c.name == name) {
         await Navigator.push(
@@ -349,6 +359,7 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
                     tappable: {
                       for (final c in _payments.creditCards) c.name,
                       for (final b in _payments.bankAccounts) b.name,
+                      '固定費・サブスク',
                     },
                     iconByName: {
                       for (final c in _payments.creditCards)

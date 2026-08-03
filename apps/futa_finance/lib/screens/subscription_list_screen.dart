@@ -48,6 +48,32 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
   /// グループ表示モード。デフォルトは「定額/変動別」（変動費を上に目立たせる）。
   _GroupMode _groupMode = _GroupMode.byAmountType;
 
+  /// アーカイブ表示。false=現行（終了月を過ぎていないもの）／true=終了済みのみ。
+  bool _showArchived = false;
+
+  /// 現在の年月キー（"YYYY-MM"）。終了判定に使う。
+  String get _currentYm {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}';
+  }
+
+  /// 終了月を過ぎた固定費か（＝アーカイブ対象）。
+  bool _isEnded(Subscription s) {
+    final e = s.endYearMonth;
+    return e != null && e.trim().isNotEmpty && e.compareTo(_currentYm) < 0;
+  }
+
+  /// 現在の表示モードでこの固定費を出すか。
+  bool _isVisible(Subscription s) => _showArchived ? _isEnded(s) : !_isEnded(s);
+
+  /// 表示対象だけに絞った固定費一覧（元の並び順は保持）。
+  List<Subscription> _visibleSubs(SubscriptionConfig config) =>
+      config.subscriptions.where(_isVisible).toList();
+
+  /// 終了済みの件数（アーカイブのバッジ用）。
+  int get _archivedCount =>
+      _config?.subscriptions.where(_isEnded).length ?? 0;
+
   @override
   void initState() {
     super.initState();
@@ -376,18 +402,15 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
       ),
       builder: (sheetCtx) => StatefulBuilder(
         builder: (ctx, setLocal) {
-          // フォーム入力可否（バリデーション）。場所は必須。
+          // フォーム入力可否（バリデーション）。必須は「名前」と「金額>0」のみ。
+          // 場所は任意（明細に付く場所タグ。未設定の既存固定費も編集・保存できるように）。
           final isValid = nameCtrl.text.trim().isNotEmpty &&
-              (parseAmount(amountCtrl.text) ?? 0) > 0 &&
-              storeCtrl.text.trim().isNotEmpty;
+              (parseAmount(amountCtrl.text) ?? 0) > 0;
 
           void onSave() {
             final name = nameCtrl.text.trim();
             final amount = parseAmount(amountCtrl.text);
-            if (name.isEmpty ||
-                amount == null ||
-                amount <= 0 ||
-                storeCtrl.text.trim().isEmpty) {
+            if (name.isEmpty || amount == null || amount <= 0) {
               Navigator.pop(ctx, null);
               return;
             }
@@ -428,7 +451,9 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
               plMajor: pl,
               categoryMajor: cm,
               categorySub: cs,
-              store: storeCtrl.text.trim(), // 必須（上のバリデーションで空は弾く）
+              store: storeCtrl.text.trim().isEmpty
+                  ? null
+                  : storeCtrl.text.trim(), // 任意（場所別集計用のタグ）
               receiptKind: receiptKind,
               startYearMonth:
                   (startYm == null || startYm!.trim().isEmpty)
@@ -753,7 +778,7 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                               ),
                             ],
                           ],
-                          // 場所（明細化したとき取引の「場所」に入る）。必須。
+                          // 場所（明細化したとき取引の「場所」に入る）。任意。
                           const SizedBox(height: 12),
                           TextField(
                             controller: storeCtrl,
@@ -762,7 +787,7 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                             decoration: const InputDecoration(
                               isDense: true,
                               border: OutlineInputBorder(),
-                              labelText: '場所',
+                              labelText: '場所（任意）',
                               hintText: '例: Amazon・コミュファ光',
                               helperText: '明細に付く「場所」。場所別の集計に出ます',
                             ),
@@ -1003,6 +1028,21 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF111827))),
         actions: [
+          // アーカイブ切替（現行 ⇄ 終了済みのみ）。終了済みがある時だけ件数バッジ。
+          IconButton(
+            tooltip: _showArchived ? '現行の固定費を表示' : 'アーカイブ（終了済み）を表示',
+            onPressed: () => setState(() => _showArchived = !_showArchived),
+            icon: Badge(
+              isLabelVisible: !_showArchived && _archivedCount > 0,
+              label: Text('$_archivedCount'),
+              child: Icon(
+                _showArchived ? Icons.unarchive_outlined : Icons.archive_outlined,
+                color: _showArchived
+                    ? const Color(0xFFEA580C)
+                    : const Color(0xFF1A237E),
+              ),
+            ),
+          ),
           // グループ表示モード切替（フラット / カテゴリ別 / 定額・変動別）
           PopupMenuButton<_GroupMode>(
             tooltip: 'グループ表示',
@@ -1086,25 +1126,33 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
       body: CenteredBody(
         child: config == null
             ? const Center(child: CircularProgressIndicator())
-            : SafeArea(
-                child: Column(
-                  children: [
-                    _inlineToolbar(),
-                    _summaryBar(config),
-                    Expanded(
-                      child: config.subscriptions.isEmpty
-                          ? _empty()
-                          : switch (_groupMode) {
-                              _GroupMode.byCategory =>
-                                _categorizedList(config),
-                              _GroupMode.byAmountType =>
-                                _byAmountTypeList(config),
-                              _GroupMode.none => _flatList(config),
-                            },
-                    ),
-                  ],
-                ),
-              ),
+            : Builder(builder: (_) {
+                // 表示モード（現行/アーカイブ）で絞り込んだビュー用config。
+                final viewConfig =
+                    config.copyWith(subscriptions: _visibleSubs(config));
+                return SafeArea(
+                  child: Column(
+                    children: [
+                      if (_showArchived) _archiveBanner(),
+                      _inlineToolbar(),
+                      _summaryBar(viewConfig),
+                      Expanded(
+                        child: viewConfig.subscriptions.isEmpty
+                            ? (_showArchived
+                                ? _archiveEmpty()
+                                : _empty())
+                            : switch (_groupMode) {
+                                _GroupMode.byCategory =>
+                                  _categorizedList(viewConfig),
+                                _GroupMode.byAmountType =>
+                                  _byAmountTypeList(viewConfig),
+                                _GroupMode.none => _flatList(viewConfig),
+                              },
+                      ),
+                    ],
+                  ),
+                );
+              }),
       ),
     );
   }
@@ -1385,10 +1433,19 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
   /// フラット表示時のドラッグ並び替え（subscriptions 配列の順序を直接更新）。
   void _reorderFlat(int oldIndex, int newIndex) {
     if (newIndex > oldIndex) newIndex--;
-    final list = [..._config!.subscriptions];
-    final item = list.removeAt(oldIndex);
-    list.insert(newIndex, item);
-    _update(list);
+    // 表示中（絞り込み後）の並びで入れ替え、全体configへ反映（非表示分の絶対位置は保持）。
+    final visible = _visibleSubs(_config!);
+    if (oldIndex < 0 || oldIndex >= visible.length) return;
+    final newVisible = [...visible];
+    final item = newVisible.removeAt(oldIndex);
+    newVisible.insert(newIndex.clamp(0, newVisible.length), item);
+    final visibleIds = visible.map((s) => s.id).toSet();
+    final full = [..._config!.subscriptions];
+    var vi = 0;
+    for (var i = 0; i < full.length; i++) {
+      if (visibleIds.contains(full[i].id)) full[i] = newVisible[vi++];
+    }
+    _update(full);
   }
 
   Widget _sectionHeader(String category, int count, int monthlyTotal) {
@@ -1460,6 +1517,8 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     final all = [..._config!.subscriptions];
 
     bool matches(Subscription s) {
+      // 表示中（絞り込み後）の項目だけを対象にし、表示インデックスと一致させる。
+      if (!_isVisible(s)) return false;
       final c = s.category;
       if (category == SubscriptionConfig.uncategorizedKey) {
         return c == null || c.isEmpty;
@@ -1925,6 +1984,65 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
               icon: const Icon(Icons.add),
               label: const Text('固定費を追加'),
               onPressed: _add,
+            ),
+          ],
+        ),
+      );
+
+  /// アーカイブ表示中に上部へ出す説明バナー。
+  Widget _archiveBanner() => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF7ED),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFFED7AA)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.archive_outlined,
+                size: 16, color: Color(0xFFEA580C)),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text('アーカイブ：終了月を過ぎた固定費のみ表示中',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF9A3412))),
+            ),
+            TextButton(
+              onPressed: () => setState(() => _showArchived = false),
+              style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+              child: const Text('現行に戻る',
+                  style: TextStyle(fontSize: 12, color: Color(0xFFEA580C))),
+            ),
+          ],
+        ),
+      );
+
+  /// アーカイブに1件も無いときの表示。
+  Widget _archiveEmpty() => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.inventory_2_outlined,
+                size: 64, color: Color(0xFFD1D5DB)),
+            const SizedBox(height: 12),
+            const Text('終了した固定費はありません',
+                style: TextStyle(fontSize: 14, color: Color(0xFF6B7280))),
+            const SizedBox(height: 4),
+            const Text('固定費編集で「終了月」を過ぎたものがここに入ります',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.unarchive_outlined, size: 18),
+              label: const Text('現行に戻る'),
+              onPressed: () => setState(() => _showArchived = false),
             ),
           ],
         ),
