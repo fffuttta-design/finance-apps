@@ -1,1 +1,1 @@
-{"version":"1.0.551","buildNumber":"552","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.551/futa-finance-v1.0.551.apk","releaseNotes":"医療機関の領収証などレシート読み取りの対応範囲を拡大。固定費編集で終了月を入れても保存できないバグを修正。固定費一覧にアーカイブ（終了済み）表示を追加。ホームの固定費・サブスク行もタップで一覧へ。"}
+{"version":"1.0.552","buildNumber":"553","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.552/futa-finance-v1.0.552.apk","releaseNotes":"レシート読み取り後の入力画面を品目数で振り分け。1品目（医療領収証など単票）は手入力と同じ「支出を記録」フォームに統一し、2品目以上のときだけ「品目ごとに記録」を使うようにしました。"}
