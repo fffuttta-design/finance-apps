@@ -1,1 +1,1 @@
-{"version":"1.0.549","buildNumber":"550","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.549/futa-finance-v1.0.549.apk","releaseNotes":"通帳の上部サマリー（月初/月末残高）がスマホで数字が縦に潰れていたのを修正。明細タイトルを2行表示で読めるように。クレジットカードのカテゴリを色付きバッジ表示にして見やすくしました。"}
+{"version":"1.0.550","buildNumber":"551","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.550/futa-finance-v1.0.550.apk","releaseNotes":"ホームの「支払方法別の内訳」の各行をタップで、その口座・カードの詳細画面へ飛べるように。各行にブランドロゴも表示。ホームの主役数字を「収支」から「今月の支出額」に変更。"}
