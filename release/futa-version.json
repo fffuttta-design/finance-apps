@@ -1,1 +1,1 @@
-{"version":"1.0.550","buildNumber":"551","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.550/futa-finance-v1.0.550.apk","releaseNotes":"ホームの「支払方法別の内訳」の各行をタップで、その口座・カードの詳細画面へ飛べるように。各行にブランドロゴも表示。ホームの主役数字を「収支」から「今月の支出額」に変更。"}
+{"version":"1.0.551","buildNumber":"552","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.551/futa-finance-v1.0.551.apk","releaseNotes":"医療機関の領収証などレシート読み取りの対応範囲を拡大。固定費編集で終了月を入れても保存できないバグを修正。固定費一覧にアーカイブ（終了済み）表示を追加。ホームの固定費・サブスク行もタップで一覧へ。"}
