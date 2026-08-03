@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/app_mode.dart';
 import '../data/drive_receipt_service.dart';
 import '../data/settings_repository.dart';
+import '../data/store_category_classifier.dart';
 import '../data/store_master_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/date_pick.dart';
@@ -452,17 +453,89 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     return true;
   }
 
-  /// 「カテゴリを提案」ボタン：店舗/取引内容の履歴から手動で予測する。
-  /// 見つからなければトーストで知らせる（勝手に変えないので安心）。
-  void _suggestCategory() {
-    final ok = _autoPredictCategory(manual: true);
-    setState(() {}); // 予測結果（大/小カテゴリ）を反映
-    if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('似た履歴が見つかりませんでした（店舗名か取引内容を入れて再度お試しください）')),
-      );
+  /// AI推定の実行中フラグ（「カテゴリを提案」ボタンにスピナーを出す）。
+  bool _suggesting = false;
+
+  /// 「カテゴリを提案」ボタン。
+  /// ① まず履歴/OCRベースの即時予測（店舗・取引内容の完全一致）。
+  /// ② 履歴に無ければ AI(Gemini) で店舗＋取引内容の文言からカテゴリを推定する。
+  ///    （例:「アレルギー内科クリニック」「検査・結果診断」→ 病院・薬 › 内科）
+  Future<void> _suggestCategory() async {
+    if (_suggesting) return;
+    // ① 履歴/OCRベースの即時予測。
+    if (_autoPredictCategory(manual: true)) {
+      setState(() {});
+      return;
     }
+    final store = _storeCtrl.text.trim();
+    final desc = _descCtrl.text.trim();
+    if (store.isEmpty && desc.isEmpty) {
+      _showSuggestSnack('店舗名か取引内容を入れて再度お試しください');
+      return;
+    }
+    final cfg = _categories;
+    if (cfg == null) return;
+    if (!StoreCategoryClassifier.available) {
+      _showSuggestSnack('似た履歴が見つかりませんでした（店舗名か取引内容を入れて再度お試しください）');
+      return;
+    }
+
+    // ② AIで文言からカテゴリを推定。
+    setState(() => _suggesting = true);
+    String norm(String s) => s.replaceFirst(RegExp(r'^\d+\.'), '').trim();
+    final menu = <String, List<String>>{};
+    for (var i = 0; i < cfg.majors.length; i++) {
+      final mj = cfg.majors[i];
+      if (mj.inactive) continue;
+      menu[mj.displayName(i)] = mj.subs;
+    }
+    final query =
+        [if (store.isNotEmpty) store, if (desc.isNotEmpty) desc].join(' / ');
+    List<Map<String, String>?> res;
+    try {
+      res = await StoreCategoryClassifier.instance.classify([query], menu);
+    } catch (_) {
+      res = const [];
+    }
+    if (!mounted) return;
+    final r = res.isNotEmpty ? res.first : null;
+    final major = r?['major']?.trim();
+    if (major == null || major.isEmpty) {
+      setState(() => _suggesting = false);
+      _showSuggestSnack('カテゴリを推定できませんでした。手動で選んでください');
+      return;
+    }
+    // 返ってきた大カテゴリを現在の一覧の表示名に解決（番号ズレに強く）。
+    String? matchedMajor;
+    int matchedIdx = -1;
+    for (var i = 0; i < cfg.majors.length; i++) {
+      final dn = cfg.majors[i].displayName(i);
+      if (dn == major || norm(dn) == norm(major)) {
+        matchedMajor = dn;
+        matchedIdx = i;
+        break;
+      }
+    }
+    final sub = r?['sub']?.trim() ?? '';
+    setState(() {
+      _suggesting = false;
+      if (matchedMajor != null) {
+        _majorCategory = matchedMajor;
+        final subs =
+            matchedIdx >= 0 ? cfg.majors[matchedIdx].subs : const <String>[];
+        _subCategory = (sub.isNotEmpty && subs.contains(sub)) ? sub : null;
+        _categoryPredicted = true;
+        _categoryTouched = true; // AI提案後に自動予測で上書きしない。
+      }
+    });
+    if (matchedMajor == null) {
+      _showSuggestSnack('カテゴリを推定できませんでした。手動で選んでください');
+    }
+  }
+
+  void _showSuggestSnack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   /// 取引内容のサジェスト候補（過去の入力から・頻度順に最大6件）。
@@ -1356,21 +1429,29 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               Row(
                 children: [
                   Expanded(child: _label('大カテゴリ')),
-                  // 手動でカテゴリを提案（店舗/取引内容の履歴から）。
+                  // 手動でカテゴリを提案（履歴→無ければAIで文言から推定）。
                   InkWell(
-                    onTap: _suggestCategory,
+                    onTap: _suggesting ? null : _suggestCategory,
                     borderRadius: BorderRadius.circular(6),
-                    child: const Padding(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.auto_awesome,
-                              size: 14, color: Color(0xFF7C3AED)),
-                          SizedBox(width: 3),
-                          Text('カテゴリを提案',
-                              style: TextStyle(
+                          _suggesting
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Color(0xFF7C3AED)),
+                                )
+                              : const Icon(Icons.auto_awesome,
+                                  size: 14, color: Color(0xFF7C3AED)),
+                          const SizedBox(width: 3),
+                          Text(_suggesting ? '推定中...' : 'カテゴリを提案',
+                              style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                   color: Color(0xFF7C3AED))),
