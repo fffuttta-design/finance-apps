@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../screens/expense_input_screen.dart';
 import '../screens/receipt_camera_screen.dart';
 import '../screens/receipt_split_screen.dart';
 import '../utils/modal_input.dart';
@@ -110,10 +111,12 @@ Future<bool> runReceiptOcrFlow(BuildContext context) async {
       receiptId: receiptId, receiptUrl: null);
 }
 
-/// 読み取り後、確認ダイアログを挟まず直接「品目ごと」の入力ポップアップへ。
+/// 読み取り後、確認ダイアログを挟まず直接 入力ポップアップへ。
 ///
-/// 以前は「まとめて1件 / 品目ごと」の2通りをトグルで選べたが、実運用では
-/// 品目ごとしか使わないため一本化した（v1.0.527）。
+/// 画面はレシートの品目数で振り分ける（Android/Windows 共通の挙動）:
+/// - 1品目（＝合計だけ読めた領収書・医療領収証なども含む）→ 通常の「支出を記録」
+///   フォーム（[ExpenseInputScreen]）。手入力時と全く同じ画面・項目に揃える。
+/// - 2品目以上 → 「品目ごとに記録」（[ReceiptSplitScreen]）で分割記録。
 Future<bool> _showOcrResult(BuildContext context, ReceiptOcrResult r,
     {required String receiptId, String? receiptUrl}) async {
   final nothing = r.amount == null &&
@@ -127,10 +130,37 @@ Future<bool> _showOcrResult(BuildContext context, ReceiptOcrResult r,
 
   // Drive保存（receiptId/receiptUrl）は呼び出し側で OCR と並行実行済み。
   if (!context.mounted) return false;
+
+  final rows = _rowsFor(r);
+  // 1品目以下（合計だけ・読み取り失敗も含む）は通常の支出フォームへ。
+  if (rows.length <= 1) {
+    final store = r.storeName?.trim() ?? '';
+    final singleName = rows.isNotEmpty ? rows.first.name.trim() : '';
+    // 取引内容は「品目名」を入れる。店名と同じなら重複させない。
+    final desc =
+        (singleName.isNotEmpty && singleName != store) ? singleName : null;
+    final amount = rows.isNotEmpty ? rows.first.price : r.amount;
+    final res = await showInputSheet<bool>(
+      context,
+      ExpenseInputScreen(
+        initialAmount: amount,
+        initialDate: r.date,
+        initialStore: store.isEmpty ? null : store,
+        initialDescription: desc,
+        initialCategoryMajor: r.categoryMajor ?? r.categoryGuess,
+        initialCategorySub: r.categorySub,
+        receiptId: receiptId,
+        initialReceiptUrl: receiptUrl,
+      ),
+    );
+    return res == true;
+  }
+
+  // 2品目以上は品目ごとに分割記録。
   final res = await showInputSheet<Object>(
     context,
     ReceiptSplitScreen(
-      items: _rowsFor(r),
+      items: rows,
       date: r.date,
       storeName: r.storeName,
       initialCategoryMajor: r.categoryMajor ?? r.categoryGuess,
