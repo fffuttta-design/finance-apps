@@ -10,9 +10,12 @@ import '../../data/payments_change_notifier.dart';
 import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
+import '../../screens/account_detail_screen.dart';
+import '../../screens/card_detail_screen.dart';
 import '../../screens/expense_list_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
 import '../../utils/formatters.dart';
+import '../../widgets/brand_logo.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
@@ -119,6 +122,31 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
   List<Transaction> _monthTxns(DateTime m) => _transactions
       .where((t) => t.date.year == m.year && t.date.month == m.month)
       .toList();
+
+  /// 支払方法名 → 対応するウォレットの詳細画面へ。クレカ＝CardDetailScreen、
+  /// 銀行/現金/電子マネー＝AccountDetailScreen（通帳）。未登録の支払方法は何もしない。
+  Future<void> _openWalletDetail(String name) async {
+    for (final c in _payments.creditCards) {
+      if (c.name == name) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => CardDetailScreen(card: c)),
+        );
+        if (mounted) await _load();
+        return;
+      }
+    }
+    for (final b in _payments.bankAccounts) {
+      if (b.name == name) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => AccountDetailScreen(account: b)),
+        );
+        if (mounted) await _load();
+        return;
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -316,7 +344,22 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
                 if (methodEntries.isNotEmpty) ...[
                   const SizedBox(height: V2Spacing.md),
                   _MethodBreakdownCard(
-                      entries: methodEntries, accent: accent),
+                    entries: methodEntries,
+                    accent: accent,
+                    tappable: {
+                      for (final c in _payments.creditCards) c.name,
+                      for (final b in _payments.bankAccounts) b.name,
+                    },
+                    iconByName: {
+                      for (final c in _payments.creditCards)
+                        if ((c.iconUrl ?? '').trim().isNotEmpty)
+                          c.name: c.iconUrl!.trim(),
+                      for (final b in _payments.bankAccounts)
+                        if ((b.iconUrl ?? '').trim().isNotEmpty)
+                          b.name: b.iconUrl!.trim(),
+                    },
+                    onTapMethod: _openWalletDetail,
+                  ),
                 ],
                 const SizedBox(height: V2Spacing.md),
                 if (wide)
@@ -393,25 +436,13 @@ class _HeroCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text('今月の収支',
+              Icon(Icons.trending_down, size: 16, color: onAccentSoft),
+              const SizedBox(width: 6),
+              Text(isBusiness ? '今月の経費' : '今月の支出',
                   style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: onAccentSoft)),
-              const SizedBox(width: 8),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(isBlack ? '黒字' : '赤字',
-                    style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: onAccent)),
-              ),
               const Spacer(),
               // 月の切替はトップバーの共有月ナビへ集約。ここは表示のみ。
               Text(monthLabel,
@@ -421,12 +452,13 @@ class _HeroCard extends StatelessWidget {
                       color: onAccentSoft)),
             ],
           ),
-          const SizedBox(height: 2),
-          Text(formatYen(net, withSign: true),
+          const SizedBox(height: 4),
+          // 主役の数字＝今月の支出額（収支ではなく支出を大きく）。
+          Text(formatYen(expense),
               style: const TextStyle(
-                fontSize: 27,
+                fontSize: 34,
                 fontWeight: FontWeight.w800,
-                letterSpacing: -0.6,
+                letterSpacing: -0.8,
                 color: onAccent,
                 fontFeatures: V2Typography.tabularNums,
               )),
@@ -454,7 +486,7 @@ class _HeroCard extends StatelessWidget {
                   bg: tileBg,
                   label: isBusiness ? '今月の売上' : '今月の収入',
                   value: formatYen(income),
-                  valueColor: accent,
+                  valueColor: const Color(0xFF16A34A),
                   labelColor: tileLabel,
                 ),
               ),
@@ -462,10 +494,13 @@ class _HeroCard extends StatelessWidget {
               Expanded(
                 child: _HeroSubTile(
                   bg: tileBg,
-                  label: isBusiness ? '今月の経費' : '今月の支出',
-                  value: formatYen(expense),
-                  valueColor: accent,
+                  label: '今月の収支',
+                  value: formatYen(net, withSign: true),
+                  valueColor: isBlack
+                      ? const Color(0xFF16A34A)
+                      : const Color(0xFFDC2626),
                   labelColor: tileLabel,
+                  badge: isBlack ? '黒字' : '赤字',
                 ),
               ),
             ],
@@ -482,18 +517,22 @@ class _HeroSubTile extends StatelessWidget {
   final String value;
   final Color valueColor;
   final Color labelColor;
+
+  /// ラベル右のミニバッジ（例: 黒字/赤字）。null なら出さない。
+  final String? badge;
   const _HeroSubTile({
     required this.bg,
     required this.label,
     required this.value,
     required this.valueColor,
     required this.labelColor,
+    this.badge,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(10),
@@ -501,15 +540,38 @@ class _HeroSubTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: labelColor)),
-          const SizedBox(height: 2),
+          Row(
+            children: [
+              Flexible(
+                child: Text(label,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: labelColor)),
+              ),
+              if (badge != null) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: valueColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(badge!,
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: valueColor)),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 3),
           Text(value,
               style: TextStyle(
-                  fontSize: 15,
+                  fontSize: 16,
                   fontWeight: FontWeight.w800,
                   color: valueColor,
                   fontFeatures: V2Typography.tabularNums)),
@@ -1054,8 +1116,21 @@ class _ReceiptGroupRowState extends State<_ReceiptGroupRow> {
 class _MethodBreakdownCard extends StatefulWidget {
   final List<MapEntry<String, int>> entries;
   final Color accent;
+
+  /// 詳細画面へ飛べる支払方法名（登録済みの口座・カード名）。
+  final Set<String> tappable;
+
+  /// 支払方法名 → ブランドロゴURL（登録済みで iconUrl があるものだけ）。
+  final Map<String, String> iconByName;
+
+  /// 行タップ時に呼ぶ（支払方法名を渡す）。
+  final void Function(String name) onTapMethod;
   const _MethodBreakdownCard(
-      {required this.entries, required this.accent});
+      {required this.entries,
+      required this.accent,
+      required this.tappable,
+      required this.iconByName,
+      required this.onTapMethod});
 
   @override
   State<_MethodBreakdownCard> createState() => _MethodBreakdownCardState();
@@ -1110,30 +1185,13 @@ class _MethodBreakdownCardState extends State<_MethodBreakdownCard> {
                 children: [
                   for (final e in widget.entries) ...[
                     const Divider(height: 1, color: V2Colors.divider),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 7,
-                            height: 7,
-                            decoration: BoxDecoration(
-                              color: widget.accent.withValues(alpha: 0.7),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(e.key,
-                                style: V2Typography.body,
-                                overflow: TextOverflow.ellipsis),
-                          ),
-                          Text(formatYen(e.value),
-                              style: V2Typography.caption.copyWith(
-                                  color: V2Colors.textSecondary,
-                                  fontFeatures: V2Typography.tabularNums)),
-                        ],
-                      ),
+                    _MethodRow(
+                      name: e.key,
+                      amount: e.value,
+                      accent: widget.accent,
+                      iconUrl: widget.iconByName[e.key],
+                      tappable: widget.tappable.contains(e.key),
+                      onTap: () => widget.onTapMethod(e.key),
                     ),
                   ],
                 ],
@@ -1141,6 +1199,65 @@ class _MethodBreakdownCardState extends State<_MethodBreakdownCard> {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// 支払方法別内訳の1行。登録済みウォレット（[tappable]）なら押して詳細へ飛べる
+/// （右端に「>」を出す）。未登録の支払方法（固定費・サブスク等）はタップ不可。
+class _MethodRow extends StatelessWidget {
+  final String name;
+  final int amount;
+  final Color accent;
+  final String? iconUrl;
+  final bool tappable;
+  final VoidCallback onTap;
+  const _MethodRow({
+    required this.name,
+    required this.amount,
+    required this.accent,
+    required this.iconUrl,
+    required this.tappable,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final row = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        children: [
+          BrandLogo(
+            iconUrl: iconUrl,
+            size: 24,
+            borderRadius: 6,
+            fallbackIcon: Icons.account_balance_wallet_outlined,
+            fallbackBgColor: accent.withValues(alpha: 0.12),
+            fallbackFgColor: accent.withValues(alpha: 0.9),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(name,
+                style: V2Typography.body, overflow: TextOverflow.ellipsis),
+          ),
+          Text(formatYen(amount),
+              style: V2Typography.caption.copyWith(
+                  color: V2Colors.textSecondary,
+                  fontFeatures: V2Typography.tabularNums)),
+          if (tappable) ...[
+            const SizedBox(width: 2),
+            const Icon(Icons.chevron_right,
+                size: 18, color: V2Colors.textMuted),
+          ] else
+            const SizedBox(width: 20),
+        ],
+      ),
+    );
+    if (!tappable) return row;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: row,
     );
   }
 }
