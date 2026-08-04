@@ -1,1 +1,1 @@
-{"version":"1.0.553","buildNumber":"554","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.553/futa-finance-v1.0.553.apk","releaseNotes":"「カテゴリを提案」を強化。履歴が無くても、店舗名・取引内容の文言からAIがカテゴリを推定します（例: アレルギー内科クリニック → 病院・薬 › 内科）。"}
+{"version":"1.0.554","buildNumber":"555","downloadUrl":"https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.554/futa-finance-v1.0.554.apk","releaseNotes":"月次の締め機能と確認チェックボックスを Windows/Web のみの表示にしました（Androidアプリでは非表示・スッキリ）。締めはPCで行う運用に合わせています。"}
