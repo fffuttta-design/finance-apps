@@ -1,4 +1,5 @@
 import 'package:finance_core/finance_core.dart' as core;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../../data/month_closing_repository.dart';
@@ -116,6 +117,9 @@ class _MonthClosingBarState extends State<MonthClosingBar> {
 
   @override
   Widget build(BuildContext context) {
+    // 締め機能は Windows/Web のみ。Androidアプリでは非表示（本人の運用方針）。
+    // Windowsデスクトップは Flutter Web を Electron で包む構成のため kIsWeb=true。
+    if (!kIsWeb) return const SizedBox.shrink();
     final closing = _closing;
     final isClosed = closing?.isClosed ?? false;
 

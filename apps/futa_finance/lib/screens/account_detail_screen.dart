@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
@@ -885,22 +886,23 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                         ? const Color(0xFF111827)
                         : const Color(0xFFDC2626))),
           ),
-          SizedBox(
-            width: 34,
-            child: Center(
-              child: SizedBox(
-                width: 24,
-                height: 24,
-                child: Checkbox(
-                  value: reviewed,
-                  visualDensity: VisualDensity.compact,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  activeColor: const Color(0xFF6B7280),
-                  onChanged: (v) => _toggleReviewed(t, v ?? false),
+          if (_showClosing)
+            SizedBox(
+              width: 34,
+              child: Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Checkbox(
+                    value: reviewed,
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    activeColor: const Color(0xFF6B7280),
+                    onChanged: (v) => _toggleReviewed(t, v ?? false),
+                  ),
                 ),
               ),
             ),
-          ),
           IconButton(
             icon: const Icon(Icons.edit_outlined,
                 size: 16, color: Color(0xFF6B7280)),
@@ -1513,17 +1515,18 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                   fontWeight: FontWeight.w700,
                   fontFamily: 'monospace',
                   color: amountColor)),
-          // 確認済みチェック
-          SizedBox(
-            width: 30,
-            child: Checkbox(
-              value: reviewed,
-              visualDensity: VisualDensity.compact,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              activeColor: const Color(0xFF6B7280),
-              onChanged: (v) => _toggleReviewed(t, v ?? false),
+          // 確認済みチェック（締め機能＝Windows/Webのみ）。
+          if (_showClosing)
+            SizedBox(
+              width: 30,
+              child: Checkbox(
+                value: reviewed,
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                activeColor: const Color(0xFF6B7280),
+                onChanged: (v) => _toggleReviewed(t, v ?? false),
+              ),
             ),
-          ),
           IconButton(
             icon: const Icon(Icons.edit_outlined,
                 size: 16, color: Color(0xFF6B7280)),
@@ -1940,20 +1943,21 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                 fontWeight: FontWeight.w700,
                 fontFamily: 'monospace')),
       ),
-      // 確認済みチェック（締め処理用）。
-      Center(
-        child: SizedBox(
-          width: 24,
-          height: 24,
-          child: Checkbox(
-            value: reviewed,
-            visualDensity: VisualDensity.compact,
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            activeColor: const Color(0xFF6B7280),
-            onChanged: (v) => _toggleReviewed(t, v ?? false),
+      // 確認済みチェック（締め機能＝Windows/Webのみ）。
+      if (_showClosing)
+        Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: Checkbox(
+              value: reviewed,
+              visualDensity: VisualDensity.compact,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              activeColor: const Color(0xFF6B7280),
+              onChanged: (v) => _toggleReviewed(t, v ?? false),
+            ),
           ),
         ),
-      ),
       IconButton(
         icon: const Icon(Icons.edit_outlined,
             size: 16, color: Color(0xFF6B7280)),
@@ -2206,7 +2210,12 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
 
   /// 月の締めバー（月選択時のみ）。
   /// 締め済みは「ユーザーが締めボタンを押したとき」だけ（チェック全部でも自動では締めない）。
+  /// 締め機能・確認チェックは Windows/Web でのみ表示（Androidアプリでは非表示）。
+  /// Windowsデスクトップは Flutter Web を Electron で包む構成のため kIsWeb=true。
+  bool get _showClosing => kIsWeb;
+
   Widget _closeMonthBar() {
+    if (!_showClosing) return const SizedBox.shrink();
     final m = _selectedMonth;
     if (m == null) return const SizedBox.shrink();
     final txns = _monthRelatedTxns();
