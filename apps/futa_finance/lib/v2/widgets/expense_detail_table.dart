@@ -275,10 +275,16 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
     setState(() => _colFrac = widths.map((w) => w / middleWidth).toList());
   }
 
+  /// 支出明細に振替（口座間移動・カード引落など）は出さない。振替は収支でも消費でもなく、
+  /// 月次決算の銀行CSV取り込みで別途補完されるため、この表からは常に除外する。
+  List<core.Transaction> get _nonTransferRows => widget.rows
+      .where((t) => t.type != core.TransactionType.transfer)
+      .toList();
+
   List<_Row> _sortFilter() {
     final rows = <_Row>[
       // 同じレシートの品目は1行に束ねる（カード明細1行＝アプリ1行にするため）。
-      ..._groupByReceipt(widget.rows),
+      ..._groupByReceipt(_nonTransferRows),
       ...widget.fixedRows.map(_Row.fixed),
     ];
     // 全角数字（１２３）でも金額検索できるよう半角化してから照合する。
@@ -370,7 +376,7 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
   /// 決済手段の選択肢（件数の多い順）。取引＋固定費の両方から集計。
   List<({String key, int count})> _payOptions() {
     final all = <_Row>[
-      ..._groupByReceipt(widget.rows),
+      ..._groupByReceipt(_nonTransferRows),
       ...widget.fixedRows.map(_Row.fixed),
     ];
     final counts = <String, int>{};
