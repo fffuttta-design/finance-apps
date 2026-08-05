@@ -102,9 +102,11 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     if (c != null) await _repo.save(c);
   }
 
-  void _update(List<Subscription> newList) {
+  Future<void> _update(List<Subscription> newList) async {
     setState(() => _config = _config!.copyWith(subscriptions: newList));
-    _save();
+    // 保存の完了を待つ。await しないと、直後に _load() が書き込み前の
+    // 古いデータを読み、終了月などの編集が「保存されない」ように見える（race）。
+    await _save();
   }
 
   String _genId() => DateTime.now().microsecondsSinceEpoch.toString();
@@ -1009,7 +1011,7 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     if (r == null) return;
     final list = [..._config!.subscriptions];
     list[i] = r;
-    _update(list);
+    await _update(list); // 保存完了を待ってから再読込（終了月が消える race を防ぐ）
     // 明細化済みの取引にも編集内容（カテゴリ/支払方法/名前）を反映する。
     await FixedCostMaterializer.syncMaterialized(r);
     if (mounted) await _load();

@@ -1,6 +1,7 @@
 import 'package:finance_core/finance_core.dart' as core;
 
 import 'app_mode.dart';
+import 'settings_repository.dart';
 import 'subscription_repository.dart';
 import 'transaction_repository.dart';
 
@@ -41,6 +42,13 @@ class FixedCostMaterializer {
   static Future<List<core.Transaction>> run() async {
     final txns = await TransactionRepository.instance.loadAll();
     final subs = (await SubscriptionRepository.instance.load()).subscriptions;
+    // カード払いの固定費は自動生成しない（引落・利用はカードCSVの取り込みで本物が入るため、
+    // 自動生成すると二重計上になる＝通帳ミラー方針。クレカ引落の自動生成停止と同じ考え方）。
+    final cardNames = (await SettingsRepository.instance.loadPayments())
+        .creditCards
+        .map((c) => c.name.trim())
+        .where((n) => n.isNotEmpty)
+        .toSet();
     final now = DateTime.now();
     final curYm = _ym(now.year, now.month);
     final existingIds = txns.map((t) => t.id).toSet();
@@ -55,6 +63,9 @@ class FixedCostMaterializer {
 
     for (final sub in subs) {
       if (sub.cycle != core.SubscriptionCycle.monthly) continue;
+      // カード払いはスキップ（カードCSVで実額が入るので自動生成しない）。
+      final subPay = sub.paymentMethod?.trim() ?? '';
+      if (subPay.isNotEmpty && cardNames.contains(subPay)) continue;
       final bd = sub.billingDay ?? 1;
       final nn = _norm(sub.name);
 
