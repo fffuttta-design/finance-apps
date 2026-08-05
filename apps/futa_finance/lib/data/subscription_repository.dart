@@ -108,6 +108,22 @@ class FirestoreSubscriptionRepository implements SubscriptionRepository {
   @override
   Future<void> save(SubscriptionConfig config) async {
     final mk = _modeKey;
+    // 🛡 安全ガード: 空リストで「2件以上ある既存」を上書きしようとしたら拒否する。
+    // 過去に事業14件→0・個人6件→2 の消失事故があった（引き金は未特定：誤った
+    // バックアップ取り込み／読み込み時のパース失敗で空キャッシュ→保存、等が疑い）。
+    // 破滅的な“全消し上書き”だけを防ぐ。1件→0（最後の1件削除）は通す。
+    if (config.subscriptions.isEmpty) {
+      try {
+        final raw = (await _docFor(mk).get()).data()?['json'] as String?;
+        if (raw != null &&
+            SubscriptionConfig.fromJsonString(raw).subscriptions.length >= 2) {
+          // 既存が2件以上あるのに空で上書き＝異常。保存を中止して既存を守る。
+          return;
+        }
+      } catch (_) {
+        // 既存確認に失敗したら従来どおり保存する（ガードは保守的に）。
+      }
+    }
     _cache[mk] = config;
     await _docFor(mk).set({
       'json': config.toJsonString(),
