@@ -58,7 +58,6 @@ void main() {
                 onOpenGroup: _noopGroup,
                 showReceiptCheck: true,
                 onToggleReceipt: _noopToggle,
-                onToggleReviewed: _noopToggle,
               ),
             ),
           ),

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/app_mode.dart';
-import '../data/month_closing_repository.dart';
 import '../data/month_cursor.dart';
 import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
@@ -54,14 +53,10 @@ class _CardDetailScreenState extends State<CardDetailScreen>
 
   /// 初回ロードで「利用のある最新月」を初期選択にしたか（以後はユーザー操作を尊重）。
   bool _monthPicked = false;
-  // 月締め処理中フラグ（ボタン多重押し防止）。
-  bool _busyCardClose = false;
   // 明細の並び替え「編集」モード（銀行の通帳と同じ挙動）。
   // ・OFF（既定）：保存したカスタム順で固定表示（未設定は日付順フォールバック・ハンドルなし）。
   // ・ON：ハンドルでドラッグ並び替え＋「日付順に並べ直す」。
   bool _cardCustom = false;
-  // カード×月ごとの「締め済み」状態（明示的にボタンを押したときだけ立つ）。
-  core.MonthClosingConfig _closing = core.MonthClosingConfig.empty();
   late final TabController _tabController =
       TabController(length: 2, vsync: this);
 
@@ -111,12 +106,10 @@ class _CardDetailScreenState extends State<CardDetailScreen>
   Future<void> _load() async {
     final list = await TransactionRepository.instance.loadAll();
     final subs = await SubscriptionRepository.instance.load();
-    final closing = await MonthClosingRepository.instance.load();
     if (!mounted) return;
     setState(() {
       _all = list;
       _subs = subs.subscriptions;
-      _closing = closing;
       // 初回だけ初期月を確定。
       // ・過去月を選んで開いたとき（＝共有カーソルが当月以外）は、その月を尊重。
       // ・当月（＝特に月指定していない）のときだけ「利用のある最新月」を既定にする。
@@ -194,7 +187,6 @@ class _CardDetailScreenState extends State<CardDetailScreen>
         paymentMethod: sub.paymentMethod,
         categoryLabel: label,
         sortOrder: sub.sortOrder,
-        reviewed: sub.reviewedMonths[ym] ?? false,
         pending: pending,
       ));
     }
@@ -249,180 +241,22 @@ class _CardDetailScreenState extends State<CardDetailScreen>
     if (mounted) await _load();
   }
 
-  /// 固定費の確認済み（選択中の月）をトグルして保存する。
-  ///
-  /// チェックは即座に反映（楽観的更新）。以前は保存→_load() の往復を待って
-  /// いたため、反映が遅れて「チェックが入らない」ように見えることがあった。
-  Future<void> _toggleFixedReviewed(String subId, bool value) async {
-    final m = _selectedMonth;
-    if (m == null) return;
-    final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
-    core.Subscription apply(core.Subscription s) {
-      if (s.id != subId) return s;
-      final map = Map<String, bool>.from(s.reviewedMonths);
-      if (value) {
-        map[ym] = true;
-      } else {
-        map.remove(ym);
-      }
-      return s.copyWith(reviewedMonths: map);
-    }
-
-    // ① ローカル _subs を即更新（チェックがすぐ入る／外れる）。
-    setState(() => _subs = _subs.map(apply).toList());
-    // ② 永続化は裏で。失敗時のみ再読込して元に戻す。
-    try {
-      final cfg = await SubscriptionRepository.instance.load();
-      final newSubs = cfg.subscriptions.map(apply).toList();
-      await SubscriptionRepository.instance
-          .save(core.SubscriptionConfig(subscriptions: newSubs));
-    } catch (_) {
-      if (mounted) await _load();
-    }
-  }
-
-  /// カード×月の締めキー（月グローバル・口座の締めと衝突しない接頭辞付き）。
-  String _cardMonthKey(DateTime m) =>
-      'card:${_card.name}:${m.year}-${m.month.toString().padLeft(2, '0')}';
-
-  bool get _isCardMonthClosed {
-    final m = _selectedMonth;
-    if (m == null || _range != null) return false;
-    final key = _cardMonthKey(m);
-    return _closing.closings.any((c) => c.yearMonth == key && c.isClosed);
-  }
-
-  Future<void> _setCardClosedFlag(DateTime m, bool closed) async {
-    final key = _cardMonthKey(m);
-    final existing = _closing.closings.firstWhere(
-      (c) => c.yearMonth == key,
-      orElse: () => core.MonthClosing(yearMonth: key),
-    );
-    final updated = closed
-        ? existing.copyWith(closedAt: DateTime.now())
-        : existing.copyWith(clearClosedAt: true);
-    await MonthClosingRepository.instance.save(_closing.upsert(updated));
-  }
-
-  /// この月を締める＝この月の利用（取引＋固定費）を全部「確認済み」にして締めフラグを立てる。
-  Future<void> _closeCardMonth(
-      List<core.Transaction> monthTxns, List<FixedCostRow> fixed) async {
-    final m = _selectedMonth;
-    if (m == null) return;
-    final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
-    final total = monthTxns.length + fixed.length;
-    if (total == 0) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dctx) => AlertDialog(
-        title: Text('${m.month}月を締めますか？'),
-        content: Text(
-            '「${_card.name}」の${m.year}年${m.month}月の利用 $total件を、'
-            'すべて「確認済み（金額に間違いなし）」にします。'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(dctx, false),
-              child: const Text('キャンセル')),
-          FilledButton(
-              onPressed: () => Navigator.pop(dctx, true),
-              child: const Text('締める')),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    setState(() => _busyCardClose = true);
-    await _setCardMonthReviewed(monthTxns, fixed, ym, true);
-    await _setCardClosedFlag(m, true);
-    if (!mounted) return;
-    await _load();
-    if (!mounted) return;
-    setState(() => _busyCardClose = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${m.month}月を締めました')));
-  }
-
-  /// 締めを解除＝締めフラグを外す（確認チェックはそのまま残す）。
-  Future<void> _reopenCardMonth(
-      List<core.Transaction> monthTxns, List<FixedCostRow> fixed) async {
-    final m = _selectedMonth;
-    if (m == null) return;
-    setState(() => _busyCardClose = true);
-    await _setCardClosedFlag(m, false);
-    if (!mounted) return;
-    await _load();
-    if (!mounted) return;
-    setState(() => _busyCardClose = false);
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('${m.month}月の締めを解除しました')));
-  }
-
-  /// 取引の reviewed と、固定費の reviewedMonths[ym] をまとめて value に。
-  Future<void> _setCardMonthReviewed(List<core.Transaction> monthTxns,
-      List<FixedCostRow> fixed, String ym, bool value) async {
-    final txUpdates = monthTxns
-        .where((t) => t.reviewed != value)
-        .map((t) => t.copyWith(reviewed: value))
-        .toList();
-    if (txUpdates.isNotEmpty) {
-      await TransactionRepository.instance.updateMany(txUpdates);
-    }
-    if (fixed.isNotEmpty) {
-      final subIds = fixed.map((f) => f.id).toSet();
-      final cfg = await SubscriptionRepository.instance.load();
-      final newSubs = cfg.subscriptions.map((s) {
-        if (!subIds.contains(s.id)) return s;
-        final map = Map<String, bool>.from(s.reviewedMonths);
-        if (value) {
-          map[ym] = true;
-        } else {
-          map.remove(ym);
-        }
-        return s.copyWith(reviewedMonths: map);
-      }).toList();
-      await SubscriptionRepository.instance
-          .save(core.SubscriptionConfig(subscriptions: newSubs));
-    }
-  }
-
-  /// カードの月締めバー（月モードのみ）。全部確認済みなら締め済み表示。
-  Widget _cardCloseMonthBar(
+  /// カード明細の並び順トグルバー（月モードのみ）。
+  Widget _cardSortBar(
       List<core.Transaction> monthTxns, List<FixedCostRow> fixed) {
     if (_selectedMonth == null || _range != null) {
       return const SizedBox.shrink();
     }
     final total = monthTxns.length + fixed.length;
     if (total == 0) return const SizedBox.shrink();
-    final done = monthTxns.where((t) => t.reviewed).length +
-        fixed.where((f) => f.reviewed).length;
-    // 締め済みは「ユーザーが締めボタンを押したとき」だけ（チェック全部でも自動では締めない）。
-    final closed = _isCardMonthClosed;
     return Container(
-      color: closed ? const Color(0xFFE7F6EF) : const Color(0xFFF7F8FA),
+      color: const Color(0xFFF7F8FA),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Row(
         children: [
-          Icon(closed ? Icons.verified : Icons.fact_check_outlined,
-              size: 18,
-              color: closed
-                  ? const Color(0xFF059669)
-                  : const Color(0xFF6B7280)),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              closed
-                  ? '${_selectedMonth!.month}月は締め済み（全$total件 確認済み）'
-                  : '確認済み $done/$total件',
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: closed
-                      ? const Color(0xFF059669)
-                      : const Color(0xFF6B7280)),
-            ),
-          ),
-          // 並び順トグル（締めボタンの隣・固定位置。スクロールで消えない）。
-          // 銀行の通帳と同じ：ふだんは保存したカスタム順で固定表示、ボタンONで
-          // 並び替え編集（ハンドル表示）。ONのまま画面から離れても並びは保存される。
+          const Spacer(),
+          // 並び順トグル（ふだんは保存したカスタム順で固定表示、ボタンONで
+          // 並び替え編集）。銀行の通帳と同じ挙動。
           Tooltip(
             message: _cardCustom
                 ? '並び替え中（ハンドルをドラッグ）。もう一度押すとこの並びで固定'
@@ -451,31 +285,6 @@ class _CardDetailScreenState extends State<CardDetailScreen>
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          if (closed)
-            TextButton(
-              onPressed: _busyCardClose
-                  ? null
-                  : () => _reopenCardMonth(monthTxns, fixed),
-              child: const Text('締め解除'),
-            )
-          else
-            FilledButton.icon(
-              onPressed: _busyCardClose
-                  ? null
-                  : () => _closeCardMonth(monthTxns, fixed),
-              icon: _busyCardClose
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.check_circle, size: 16),
-              label: Text('${_selectedMonth!.month}月を締める'),
-              style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF059669),
-                  visualDensity: VisualDensity.compact),
-            ),
         ],
       ),
     );
@@ -703,17 +512,9 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                     Column(
                       children: [
                         _monthSelector(),
-                        _cardCloseMonthBar(monthTxns, cardFixed),
+                        _cardSortBar(monthTxns, cardFixed),
                         const Divider(height: 1),
-                        // 締め済みの月は本文（明細）を薄く（グレーアウト）。
                         Expanded(
-                          // 締め済みは薄い青のトーンを重ねて背景と区別。
-                          child: ColoredBox(
-                            color: _isCardMonthClosed
-                                ? const Color(0xFFF6E7C9)
-                                : Colors.transparent,
-                            child: Opacity(
-                            opacity: _isCardMonthClosed ? 0.72 : 1.0,
                           // PC幅は支出明細と同じ表（検索・並び替え・列幅）。
                           // スマホ幅は従来のカード型リスト。
                           child: constraints.maxWidth >= 900
@@ -745,13 +546,6 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                                           .update(t.copyWith(receiptSaved: v));
                                       if (mounted) await _load();
                                     },
-                                    onToggleReviewed: (t, v) async {
-                                      await TransactionRepository.instance
-                                          .update(t.copyWith(reviewed: v));
-                                      if (mounted) await _load();
-                                    },
-                                    onToggleReviewedFixed: (f, v) =>
-                                        _toggleFixedReviewed(f.id, v),
                                     onReorderDay: _saveReorder,
                                     // 銀行の通帳と同じく常にカスタム順で表示
                                     // （未設定は日付順フォールバック）。ボタンONの
@@ -773,8 +567,6 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                                   },
                                   child: _historyList(monthTxns),
                                 ),
-                          ),
-                          ),
                         ),
                       ],
                     ),
@@ -1236,38 +1028,7 @@ class _CardDetailScreenState extends State<CardDetailScreen>
   }
 
   /// 明細テーブル行タップ → 取引を編集して再読込。
-  /// 締め済みの月の取引を変更しようとしたとき、確認アラートを出す。
-  /// 「変更する」を選んだときだけ true。
-  Future<bool> _confirmEditClosed(core.Transaction t) async {
-    final key = _cardMonthKey(DateTime(t.date.year, t.date.month));
-    final closed = _closing.closings.any((c) => c.yearMonth == key && c.isClosed);
-    if (!closed) return true;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dctx) => AlertDialog(
-        title: const Text('締め済みの月です'),
-        content: Text(
-            '${t.date.month}月は締め済みです。この取引の金額や内容を変更すると、'
-            '締めた月の集計・請求が変わります。それでも変更しますか？'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(dctx, false),
-              child: const Text('やめる')),
-          FilledButton(
-            style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFDC2626)),
-            onPressed: () => Navigator.pop(dctx, true),
-            child: const Text('変更する'),
-          ),
-        ],
-      ),
-    );
-    return ok == true;
-  }
-
   Future<void> _editCardTxn(core.Transaction t) async {
-    if (!await _confirmEditClosed(t)) return;
-    if (!mounted) return;
     // 支出タブ（rich_expenses の _edit）と同じく、まず明細の詳細画面を出す。
     // ⚠ ここだけ編集フォームを直接開いていたため、同じ「鉛筆」でも
     //   クレカ明細だけ挙動が違っていた。詳細画面から編集/削除へ進む。
@@ -1282,8 +1043,6 @@ class _CardDetailScreenState extends State<CardDetailScreen>
   /// レシートまとめ（「N品」）行タップ：品目の内訳は「まとめ明細」画面で見せる。
   /// 表の中で展開すると他の明細が下に押し出されて見づらいため。
   Future<void> _openCardGroup(List<core.Transaction> members) async {
-    if (!await _confirmEditClosed(members.first)) return;
-    if (!mounted) return;
     await Navigator.push<bool>(
       context,
       MaterialPageRoute(

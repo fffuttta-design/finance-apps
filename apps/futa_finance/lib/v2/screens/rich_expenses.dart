@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../../data/app_mode.dart';
-import '../../data/month_closing_repository.dart';
 import '../../data/month_cursor.dart';
 import '../../data/nav_history.dart';
 import '../../data/settings_repository.dart';
@@ -26,7 +25,6 @@ import '../theme/spacing.dart';
 import '../theme/typography.dart';
 import '../widgets/credit_card_reconcile.dart';
 import '../widgets/expense_detail_table.dart';
-import '../widgets/month_closing_bar.dart';
 
 /// サマリーの「高額明細」に出す下限（実質負担がこの額以上の取引を並べる）。
 const int _kBigAmount = 10000;
@@ -52,32 +50,17 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   core.PaymentMethodsConfig _payments = core.PaymentMethodsConfig.empty();
   /// 大カテゴリ名 → アイコンキー（カテゴリ内訳のアイコン表示用）。
   Map<String, String?> _catIcons = {};
-  // 月締めの状態（締め済みの月は本体をグレーアウトするのに使う）。
-  core.MonthClosingConfig _closing = core.MonthClosingConfig.empty();
+
+  /// 「消費に含めない（非消費）」大カテゴリ名の集合（番号プレフィックス除去済み）。
+  /// 税金・社会保険・各種手数料など、必須だが消費でない支出を分けるために使う。
+  Set<String> _nonConsumMajors = {};
   bool _loading = true;
-
-  bool get _isMonthClosed =>
-      _closing.forMonth(_month.year, _month.month)?.isClosed ?? false;
-
-  /// この月に「締め済み」のウォレット名（口座 `w:` / カード `card:` 複合キーから抽出）。
-  Set<String> get _closedWalletNames {
-    final suffix = ':$_ymKey';
-    final names = <String>{};
-    for (final c in _closing.closings) {
-      if (!c.isClosed) continue;
-      final k = c.yearMonth;
-      if (!k.endsWith(suffix)) continue;
-      if (k.startsWith('w:')) {
-        names.add(k.substring(2, k.length - suffix.length));
-      } else if (k.startsWith('card:')) {
-        names.add(k.substring(5, k.length - suffix.length));
-      }
-    }
-    return names;
-  }
 
   /// 支出合計カードの内訳を展開しているか。
   bool _summaryOpen = false;
+
+  /// 「必須・非消費」小計セクションを展開しているか（既定は控えめに畳む）。
+  bool _nonConsumOpen = false;
 
   /// 事業モードの諸経費/制作原価サブタブ（個人モードは null）。
   TabController? _subTab;
@@ -87,31 +70,6 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
 
   String get _ymKey =>
       '${_month.year}-${_month.month.toString().padLeft(2, '0')}';
-
-  /// 全体締めの前に締めておくべきウォレット（当月に動きがあるものだけ）。
-  /// 締めキーは account_detail / card_detail と同じ w:/card: 形式。
-  List<({String key, String label})> _walletsToClose() {
-    final y = _month.year, mo = _month.month;
-    final monthTx = _transactions
-        .where((t) => t.date.year == y && t.date.month == mo)
-        .toList();
-    final out = <({String key, String label})>[];
-    for (final b in _payments.bankAccounts) {
-      if (b.inactive) continue;
-      final active = monthTx.any((t) =>
-          t.paymentMethod == b.name ||
-          t.transferFromAccount == b.name ||
-          t.transferToAccount == b.name);
-      if (active) out.add((key: 'w:${b.name}:$_ymKey', label: b.name));
-    }
-    for (final c in _payments.creditCards) {
-      if (c.inactive) continue;
-      final active = monthTx.any((t) =>
-          t.paymentMethod == c.name || t.transferToAccount == c.name);
-      if (active) out.add((key: 'card:${c.name}:$_ymKey', label: c.name));
-    }
-    return out;
-  }
 
   bool get _isBusiness =>
       AppModeManager.instance.current == AppMode.business;
@@ -237,17 +195,27 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     final subs = await SubscriptionRepository.instance.load();
     final payments = await _settings.loadPayments();
     final cats = await _settings.loadCategories();
-    final closing = await MonthClosingRepository.instance.load();
     if (!mounted) return;
     setState(() {
       _transactions = txns;
       _subs = subs.subscriptions;
       _payments = payments;
       _catIcons = {for (final m in cats.majors) m.name: m.iconKey};
-      _closing = closing;
+      _nonConsumMajors = {
+        for (final m in cats.majors)
+          if (m.nonConsumption) _bareMajor(m.name),
+      };
       _loading = false;
     });
   }
+
+  /// 番号プレフィックス（"7."）を外した素の大カテゴリ名。
+  String _bareMajor(String s) =>
+      s.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
+
+  /// その取引の大カテゴリが「消費に含めない（非消費）」指定か。
+  bool _isNonConsumMajor(String major) =>
+      _nonConsumMajors.contains(_bareMajor(major));
 
 
   /// 名前の正規化（実取引との照合用）。
@@ -508,7 +476,6 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
         paymentMethod: sub.paymentMethod,
         categoryLabel: label,
         sortOrder: sub.sortOrder,
-        reviewed: sub.reviewedMonths[ym] ?? false,
         pending: pending,
       ));
     }
@@ -545,24 +512,6 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
           .save(core.SubscriptionConfig(subscriptions: newSubs));
       if (mounted) await _load();
     }
-  }
-
-  /// 固定費の確認済み（表示中の月）をトグルして保存する。
-  Future<void> _toggleFixedReviewed(String subId, bool value) async {
-    final cfg = await SubscriptionRepository.instance.load();
-    final newSubs = cfg.subscriptions.map((s) {
-      if (s.id != subId) return s;
-      final m = Map<String, bool>.from(s.reviewedMonths);
-      if (value) {
-        m[_ymKey] = true;
-      } else {
-        m.remove(_ymKey);
-      }
-      return s.copyWith(reviewedMonths: m);
-    }).toList();
-    await SubscriptionRepository.instance
-        .save(core.SubscriptionConfig(subscriptions: newSubs));
-    if (mounted) await _load();
   }
 
   /// 固定費（サブスク）の編集画面をディープリンクで開く。
@@ -748,11 +697,8 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
           ? keihiAll.where((t) => !_isAdvisoryTx(t)).toList()
           : keihiAll;
       final subTotal = _subsOf(_month);           // 表示（隠す設定を反映）
-      final subTotalFull = _subsOf(_month, _subs); // 締め用（実額・全件）
       final keihiTotal =
           keihi.fold<int>(0, (s, t) => s + t.effectiveAmount) + subTotal;
-      final keihiFullTotal =
-          keihiAll.fold<int>(0, (s, t) => s + t.effectiveAmount) + subTotalFull;
       final gaichuTotal = gaichu.fold<int>(0, (s, t) => s + t.effectiveAmount);
       return Center(
         child: ConstrainedBox(
@@ -767,20 +713,13 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                     style:
                         V2Typography.h1.copyWith(color: V2Colors.textPrimary)),
               ),
-              // 月の切替はトップバーの共有月ナビに集約。ここは締めボタンだけ右に。
+              // 月の切替はトップバーの共有月ナビに集約。
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: V2Spacing.md),
                 child: Row(
                   children: [
                     // 事業モード：税務顧問料を除外して見るトグル。
                     _advisoryToggleChip(),
-                    const Spacer(),
-                    MonthClosingBar(
-                        month: _month,
-                        snapshotExpense: keihiFullTotal + gaichuTotal,
-                        dense: true,
-                        walletsToClose: _walletsToClose(),
-                        onChanged: _load),
                   ],
                 ),
               ),
@@ -799,20 +738,20 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 child: TabBarView(
                   controller: _subTab,
                   children: [
-                    _grey(_buildBody(
+                    _buildBody(
                         rows: keihi,
                         showFixedAndCard: true,
                         title: null,
                         detailLabel: '経費明細',
-                        showTopHeader: false)),
-                    _grey(_buildBody(
+                        showTopHeader: false),
+                    _buildBody(
                         rows: gaichu,
                         showFixedAndCard: false,
                         receiptLabel: '請求書',
                         teamSortDefault: true,
                         title: null,
                         detailLabel: '制作原価明細',
-                        showTopHeader: false)),
+                        showTopHeader: false),
                   ],
                 ),
               ),
@@ -825,21 +764,13 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     final personalRows = _rentHidden
         ? _monthExpenses.where((t) => !_isRentTx(t)).toList()
         : _monthExpenses;
-    // 締めスナップショットは常に家賃込みの実額を記録する（隠していても正しい額を残す）。
-    final snapshotFull = _rentHidden
-        ? _monthExpenses.fold<int>(0, (s, t) => s + t.effectiveAmount) +
-            _subsOf(_month, _subs)
-        : null;
-    return _grey(_buildBody(
+    return _buildBody(
         rows: personalRows,
         showFixedAndCard: true,
         title: '支出',
-        detailLabel: '支出明細',
-        snapshotExpenseFull: snapshotFull));
+        detailLabel: '支出明細');
   }
 
-  /// 締め処理済みの月は本文に「薄い暖色（セピア）のトーン」を重ねて「もう確定」を示す。
-  /// 青は読みにくかったので、読みやすさ優先で不透明度を上げ、色味も落ち着いた暖色に。
   /// 家賃を除外して見るトグル（個人モードの支出タブ）。
   /// 家賃はハズレ値で他の支出が霞むため、ワンタップで表示/非表示を切替える。
   Widget _rentToggleChip() {
@@ -924,13 +855,6 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     );
   }
 
-  Widget _grey(Widget child) => _isMonthClosed
-      ? ColoredBox(
-          color: const Color(0xFFF6E7C9),
-          child: Opacity(opacity: 0.72, child: child),
-        )
-      : child;
-
   /// 支出本文（タブ共用）。title が null ならタイトル見出しは出さない（タブ側で表示済）。
   /// showFixedAndCard=false（制作原価タブ）では固定費・クレカ照合を出さない。
   Widget _buildBody({
@@ -942,17 +866,29 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     String receiptLabel = '領収書',
     // 制作原価タブは既定を「小カテゴリ昇順→場所降順」の複合順にする。
     bool teamSortDefault = false,
-    // 事業モードは月セレクタ＋締めをタブより上に出すため、本文側では隠す。
+    // 事業モードは月セレクタをタブより上に出すため、本文側では隠す。
     bool showTopHeader = true,
-    // 締めスナップショットに記録する実額（家賃を隠していても実額を残すため）。
-    // null なら表示中の合計（total）をそのまま使う。
-    int? snapshotExpenseFull,
   }) {
     final accent = widget.accent;
     final summaryLabel = detailLabel.replaceAll('明細', '');
-    final txTotal = rows.fold<int>(0, (s, t) => s + t.effectiveAmount);
+    // 消費 / 非消費（税金・社会保険・各種手数料など）で取引を分ける。
+    // 非消費は「支出合計・内訳の表示」からのみ外して別小計に回す。行自体は消さない。
+    // ⚠ 残高・収支の計算（rich_home 等）はここを通らず全支出で計算するので不変。
+    // 固定費（サブスク）は従来どおり消費側に含める（非消費対象は取引カテゴリのみ）。
+    final consumptionRows =
+        rows.where((t) => !_isNonConsumMajor(t.category.major)).toList();
+    final nonConsumRows =
+        rows.where((t) => _isNonConsumMajor(t.category.major)).toList();
+    final txTotal =
+        consumptionRows.fold<int>(0, (s, t) => s + t.effectiveAmount);
+    final nonConsumTotal =
+        nonConsumRows.fold<int>(0, (s, t) => s + t.effectiveAmount);
     final subTotal = showFixedAndCard ? _subsOf(_month) : 0;
+    // 表示の主役＝消費支出（消費取引＋固定費）。非消費はここに足さない。
     final total = txTotal + subTotal;
+    // 支出合計（消費＋非消費）＝実際に出て行ったお金。必ずどこかで分かるよう表示する。
+    final grandTotal = total + nonConsumTotal;
+    final hasNonConsum = nonConsumTotal > 0;
     final fixedLines = showFixedAndCard
         ? _fixedLinesForMonth(_month)
         : <({
@@ -965,11 +901,11 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
           })>[];
 
     // カテゴリ内訳（大カテゴリ別・固定費込み）＋ドリルダウン用の取引一覧。
+    // 消費支出のみを対象にする（非消費は下の別セクションで見せる）。
     final byMajor = <String, int>{};
     final txnsByMajor = <String, List<core.Transaction>>{};
-    for (final t in rows) {
-      final major =
-          t.category.major.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
+    for (final t in consumptionRows) {
+      final major = _bareMajor(t.category.major);
       if (major.isEmpty) continue;
       byMajor[major] = (byMajor[major] ?? 0) + t.effectiveAmount;
       (txnsByMajor[major] ??= []).add(t);
@@ -980,9 +916,23 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     final majorEntries = byMajor.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
+    // 非消費（税金・手数料など）の大カテゴリ別内訳＋ドリルダウン用の取引一覧。
+    final byMajorNonConsum = <String, int>{};
+    final txnsByMajorNonConsum = <String, List<core.Transaction>>{};
+    for (final t in nonConsumRows) {
+      final major = _bareMajor(t.category.major);
+      if (major.isEmpty) continue;
+      byMajorNonConsum[major] =
+          (byMajorNonConsum[major] ?? 0) + t.effectiveAmount;
+      (txnsByMajorNonConsum[major] ??= []).add(t);
+    }
+    final nonConsumEntries = byMajorNonConsum.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
     // 支払方法別（取引＋固定費）。サマリーの展開で「どの財布から出たか」を表示。
+    // 消費支出サマリーの内訳なので消費取引のみ集計（合計＝消費支出に一致させる）。
     final byPayment = <String, int>{};
-    for (final t in rows) {
+    for (final t in consumptionRows) {
       final pm =
           t.paymentMethod.trim().isEmpty ? '未設定' : t.paymentMethod.trim();
       byPayment[pm] = (byPayment[pm] ?? 0) + t.effectiveAmount;
@@ -1011,7 +961,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     // 高額明細（1万円以上）。「今月なににお金が飛んだか」をサマリーの展開だけで
     // つかめるようにする（カテゴリ内訳を1つずつ開かなくて済む）。金額降順。
     // 実質負担（立替を引いた額）で判定＝立替で戻る分は高額扱いしない。
-    final bigRows = rows.where((t) => t.effectiveAmount >= _kBigAmount).toList()
+    final bigRows = consumptionRows
+        .where((t) => t.effectiveAmount >= _kBigAmount)
+        .toList()
       ..sort((a, b) => b.effectiveAmount.compareTo(a.effectiveAmount));
 
     // 支出本文のセクション群。
@@ -1019,22 +971,13 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     //   制約の都合でスマホの明細が真っ白（レイアウト例外）になったため、確実に表示できる
     //   SingleChildScrollView に戻した。スクロール軽量化は別途安全な方法で行う。
     final children = <Widget>[
-              // タブ上部：タイトル（個人モードのみ）＋ 中央に月セレクタ（資産タブと
-              // 同じシンプルな見た目）＋ 右上に締め処理チップ。
+              // タブ上部：個人モードのみ家賃を除外して見るトグルを出す。
               // 事業モードでは月セレクタをタブより上に出すため、ここは省略する。
-              // 月の切替はトップバーの共有月ナビに集約。ここは締めボタンだけ右に。
-              if (showTopHeader) ...[
+              // 月の切替はトップバーの共有月ナビに集約。
+              if (showTopHeader && !_isBusiness) ...[
                 Row(
                   children: [
-                    // 個人モードのみ：家賃を除外して見るトグル。
-                    if (!_isBusiness) _rentToggleChip(),
-                    const Spacer(),
-                    MonthClosingBar(
-                        month: _month,
-                        snapshotExpense: snapshotExpenseFull ?? total,
-                        dense: true,
-                        walletsToClose: _walletsToClose(),
-                        onChanged: _load),
+                    _rentToggleChip(),
                   ],
                 ),
                 const SizedBox(height: V2Spacing.md),
@@ -1058,7 +1001,10 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('${_month.month}月の$summaryLabel合計',
+                            Text(
+                                hasNonConsum && !_isBusiness
+                                    ? '${_month.month}月の消費支出'
+                                    : '${_month.month}月の$summaryLabel合計',
                                 style: V2Typography.caption.copyWith(
                                     color: V2Colors.textSecondary)),
                             const SizedBox(height: 6),
@@ -1068,6 +1014,41 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                                     fontWeight: FontWeight.w800,
                                     color: V2Colors.textPrimary,
                                     fontFeatures: V2Typography.tabularNums)),
+                            // 非消費（税金・手数料など）を薄く添え、支出合計も明示。
+                            if (hasNonConsum) ...[
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text('＋ 税金・手数料など（非消費）',
+                                        style: V2Typography.micro.copyWith(
+                                            color: V2Colors.textMuted)),
+                                  ),
+                                  Text(formatYen(nonConsumTotal),
+                                      style: V2Typography.micro.copyWith(
+                                          color: V2Colors.textMuted,
+                                          fontFeatures:
+                                              V2Typography.tabularNums)),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text('支出合計（消費＋非消費）',
+                                        style: V2Typography.micro.copyWith(
+                                            color: V2Colors.textSecondary,
+                                            fontWeight: FontWeight.w700)),
+                                  ),
+                                  Text(formatYen(grandTotal),
+                                      style: V2Typography.micro.copyWith(
+                                          color: V2Colors.textSecondary,
+                                          fontWeight: FontWeight.w700,
+                                          fontFeatures:
+                                              V2Typography.tabularNums)),
+                                ],
+                              ),
+                            ],
                             const SizedBox(height: 6),
                             Row(
                               children: [
@@ -1102,7 +1083,8 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                             if (subTotal > 0)
                               _summaryLine('固定費（サブスク）', subTotal),
                             _summaryLine(
-                                '変動費（各種支出${rows.length}件）', txTotal),
+                                '変動費（各種支出${consumptionRows.length}件）',
+                                txTotal),
                             const SizedBox(height: 14),
                             const Divider(height: 1, color: V2Colors.divider),
                             const SizedBox(height: 14),
@@ -1205,6 +1187,92 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 ),
                 const SizedBox(height: V2Spacing.xl),
               ],
+              // 必須・非消費（税金・社会保険・各種手数料など）— 消費とは別小計。
+              // 控えめに（薄色・既定は畳む）。行はクリックで内訳まで辿れる。
+              if (hasNonConsum) ...[
+                Container(
+                  decoration: BoxDecoration(
+                    color: V2Colors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: V2Colors.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      InkWell(
+                        onTap: () => setState(
+                            () => _nonConsumOpen = !_nonConsumOpen),
+                        borderRadius: BorderRadius.circular(14),
+                        child: Padding(
+                          padding: const EdgeInsets.all(V2Spacing.md),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.receipt_long_outlined,
+                                  size: 16, color: V2Colors.textSecondary),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text('必須・非消費（税金・手数料など）',
+                                    style: V2Typography.caption.copyWith(
+                                        color: V2Colors.textSecondary,
+                                        fontWeight: FontWeight.w700)),
+                              ),
+                              Text(formatYen(nonConsumTotal),
+                                  style: V2Typography.caption.copyWith(
+                                      color: V2Colors.textSecondary,
+                                      fontWeight: FontWeight.w700,
+                                      fontFeatures: V2Typography.tabularNums)),
+                              const SizedBox(width: 4),
+                              Icon(
+                                  _nonConsumOpen
+                                      ? Icons.expand_less
+                                      : Icons.expand_more,
+                                  size: 16,
+                                  color: V2Colors.textSecondary),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (_nonConsumOpen) ...[
+                        const Divider(height: 1, color: V2Colors.divider),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: V2Spacing.md, vertical: 4),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (final e in nonConsumEntries)
+                                _CatBar(
+                                  name: e.key,
+                                  value: e.value,
+                                  ratio: nonConsumTotal == 0
+                                      ? 0
+                                      : e.value / nonConsumTotal,
+                                  accent: accent,
+                                  iconKey: _catIcons[e.key],
+                                  // 消費とは別物と分かるよう控えめなグレー。
+                                  barColor: const Color(0xFF94A3B8),
+                                  details: [
+                                    for (final t in ([
+                                      ...?txnsByMajorNonConsum[e.key]
+                                    ]..sort((a, b) =>
+                                        b.amount.compareTo(a.amount))))
+                                      _CatDetailRow(
+                                          label: t.description.trim().isEmpty
+                                              ? formatMonthDay(t.date)
+                                              : '${formatMonthDay(t.date)}  ${t.description.trim()}',
+                                          amount: t.amount,
+                                          onTap: () => _edit(t)),
+                                  ],
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: V2Spacing.xl),
+              ],
               // ウォレット（クレカ引落照合・棚卸し）— カテゴリ内訳の下
               if (showFixedAndCard) ...[
                 CreditCardBillingSection(
@@ -1216,7 +1284,6 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                   subscriptions: _subs,
                   ym: _ymKey,
                   onOpenReconcile: _openCardReconcile,
-                  closedWalletNames: _closedWalletNames,
                 ),
                 const SizedBox(height: V2Spacing.xl),
               ],
@@ -1360,14 +1427,6 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                   await _txRepo.update(t.copyWith(receiptSaved: v));
                   if (mounted) await _load();
                 },
-                // 確認済み（検収）チェック：締め処理で1件ずつ確認する用途。
-                onToggleReviewed: (t, v) async {
-                  await _txRepo.update(t.copyWith(reviewed: v));
-                  if (mounted) await _load();
-                },
-                // 固定費の確認済み（月別）。
-                onToggleReviewedFixed: (f, v) =>
-                    _toggleFixedReviewed(f.id, v),
                 // 同じ日付内の手動並び替え：新しい順で sortOrder を 0,1,2… と振る。
                 // 取引は取引に、固定費はサブスクに保存する。
                 onReorderDay: _saveReorder,

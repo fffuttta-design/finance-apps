@@ -11,7 +11,6 @@ import '../../utils/formatters.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
-import '../widgets/month_closing_bar.dart';
 
 /// 新デザイン（リッチUI）の売上／収入タブ。
 /// サマリーカード（合計＋確定/見込み）＋明細リスト。既存 V2IncomeScreen は温存。
@@ -114,17 +113,10 @@ class _RichIncomeScreenState extends State<RichIncomeScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 月の切替はトップバーの共有月ナビに集約。ここは締めボタンだけ右に。
-              Row(
-                children: [
-                  Text(isBusiness ? '売上' : '収入',
-                      style: V2Typography.h1
-                          .copyWith(color: V2Colors.textPrimary)),
-                  const Spacer(),
-                  MonthClosingBar(
-                      month: _month, snapshotIncome: total, dense: true),
-                ],
-              ),
+              // 月の切替はトップバーの共有月ナビに集約。
+              Text(isBusiness ? '売上' : '収入',
+                  style: V2Typography.h1
+                      .copyWith(color: V2Colors.textPrimary)),
               const SizedBox(height: V2Spacing.md),
               // サマリーカード
               Container(

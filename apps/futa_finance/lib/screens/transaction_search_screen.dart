@@ -16,7 +16,20 @@ String _bareName(String s) =>
 /// キーワード/期間/種別/カテゴリ/支払方法/検収 で絞り込み、
 /// 選んだ明細に「カテゴリ」「支払方法」をまとめて適用できる。
 class TransactionSearchScreen extends StatefulWidget {
-  const TransactionSearchScreen({super.key});
+  /// ドリルダウン用の初期絞り込み（集計マトリクスのセルタップから渡す）。全て任意。
+  /// initialKeyword はキーワード欄に入れる（category.major も検索対象なので科目名で絞れる）。
+  final core.TransactionType? initialType;
+  final String? initialKeyword;
+  final DateTime? initialFrom;
+  final DateTime? initialTo;
+
+  const TransactionSearchScreen({
+    super.key,
+    this.initialType,
+    this.initialKeyword,
+    this.initialFrom,
+    this.initialTo,
+  });
 
   @override
   State<TransactionSearchScreen> createState() =>
@@ -42,7 +55,6 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
   core.TransactionType? _type; // null=すべて
   String? _majorFilter; // null=すべて（素の名前で照合）
   String? _paymentFilter; // null=すべて
-  bool? _reviewedFilter; // null=すべて / true=済 / false=未
   bool? _fixedFilter; // null=すべて / true=固定費のみ / false=固定費以外
 
   final _selected = <String>{};
@@ -50,6 +62,13 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
   @override
   void initState() {
     super.initState();
+    // ドリルダウンの初期絞り込みを反映（集計マトリクスのセルタップ経由）。
+    _type = widget.initialType;
+    _from = widget.initialFrom;
+    _to = widget.initialTo;
+    if (widget.initialKeyword != null) {
+      _kwCtrl.text = widget.initialKeyword!;
+    }
     _load();
   }
 
@@ -117,9 +136,6 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
         if (pm.isEmpty || _registeredNames.contains(pm)) return false;
       } else if (_paymentFilter != null &&
           t.paymentMethod != _paymentFilter) {
-        return false;
-      }
-      if (_reviewedFilter != null && t.reviewed != _reviewedFilter) {
         return false;
       }
       if (_fixedFilter != null && t.isFixed != _fixedFilter) {
@@ -511,17 +527,6 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
                 ],
                 onChanged: (v) => setState(() => _paymentFilter = v),
               ),
-              // 検収
-              _dropChip<bool?>(
-                label: '検収',
-                value: _reviewedFilter,
-                items: const [
-                  (null, 'すべて'),
-                  (true, '済'),
-                  (false, '未'),
-                ],
-                onChanged: (v) => setState(() => _reviewedFilter = v),
-              ),
               // 固定費フラグ
               _dropChip<bool?>(
                 label: '固定費',
@@ -548,7 +553,7 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
               ),
               if (_from != null || _to != null || _type != null ||
                   _majorFilter != null || _paymentFilter != null ||
-                  _reviewedFilter != null || _fixedFilter != null ||
+                  _fixedFilter != null ||
                   _kwCtrl.text.isNotEmpty)
                 TextButton(
                   onPressed: () => setState(() {
@@ -558,7 +563,6 @@ class _TransactionSearchScreenState extends State<TransactionSearchScreen> {
                     _type = null;
                     _majorFilter = null;
                     _paymentFilter = null;
-                    _reviewedFilter = null;
                     _fixedFilter = null;
                   }),
                   child: const Text('条件クリア'),

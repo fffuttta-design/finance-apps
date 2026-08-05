@@ -8,9 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_mode.dart';
-import 'checklist_repository.dart';
 import 'income_source_repository.dart';
-import 'month_closing_repository.dart';
 import 'monthly_snapshot_repository.dart';
 import 'settings_repository.dart';
 import 'subscription_repository.dart';
@@ -56,8 +54,6 @@ class BackupRepository {
     'income_sources',
     'subscriptions',
     'monthly_snapshots',
-    'checklist',
-    'month_closing',
   ];
 
   String _fullKey(String modePrefix, String key) => 'futa.$modePrefix.$key';
@@ -271,10 +267,6 @@ class BackupRepository {
           () async => (await IncomeSourceRepository.instance.load()).toJsonString());
       await addConfig('monthly_snapshots',
           () async => (await MonthlySnapshotRepository.instance.load()).toJsonString());
-      await addConfig('month_closing',
-          () async => (await MonthClosingRepository.instance.load()).toJsonString());
-      await addConfig('checklist',
-          () async => (await ChecklistRepository.instance.load()).toJsonString());
 
       data[modeLabel] = modeData;
     }
@@ -424,14 +416,6 @@ class BackupRepository {
           final config = core.MonthlySnapshotConfig.fromJsonString(source);
           await MonthlySnapshotRepository.instance.save(config);
           break;
-        case 'month_closing':
-          final config = core.MonthClosingConfig.fromJsonString(source);
-          await MonthClosingRepository.instance.save(config);
-          break;
-        case 'checklist':
-          final config = core.ChecklistConfig.fromJsonString(source);
-          await ChecklistRepository.instance.save(config);
-          break;
       }
     } catch (e) {
       if (kDebugMode) {
@@ -458,11 +442,10 @@ class BackupRepository {
 
   /// 各キーの JSON 文字列から「件数」を抽出する。
   /// 想定形式：
-  /// - transactions / income_sources / month_closing / monthly_snapshots → List
+  /// - transactions / income_sources / monthly_snapshots → List
   /// - payments → bankAccounts + creditCards の合計
   /// - categories → majors.length
   /// - subscriptions → subscriptions.length
-  /// - checklist → items.length（サブ項目は数えない）
   int _countItems(String key, String? raw) {
     if (raw == null || raw.isEmpty) return 0;
     try {
@@ -487,11 +470,6 @@ class BackupRepository {
             return (parsed['subscriptions'] as List?)?.length ?? 0;
           }
           return 0;
-        case 'checklist':
-          if (parsed is Map<String, dynamic>) {
-            return (parsed['items'] as List?)?.length ?? 0;
-          }
-          return 0;
         case 'income_sources':
           if (parsed is Map<String, dynamic>) {
             return (parsed['sources'] as List?)?.length ?? 0;
@@ -501,12 +479,6 @@ class BackupRepository {
         case 'monthly_snapshots':
           if (parsed is Map<String, dynamic>) {
             return (parsed['snapshots'] as List?)?.length ?? 0;
-          }
-          if (parsed is List) return parsed.length;
-          return 0;
-        case 'month_closing':
-          if (parsed is Map<String, dynamic>) {
-            return (parsed['closings'] as List?)?.length ?? 0;
           }
           if (parsed is List) return parsed.length;
           return 0;

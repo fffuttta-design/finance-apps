@@ -54,7 +54,7 @@ class _SidebarOrderScreenState extends State<SidebarOrderScreen> {
     'report': (
       label: '業績',
       icon: Icons.bar_chart,
-      hint: '業績タブ（統計・テーブル・月末締め）'
+      hint: '業績タブ（統計・テーブル）'
     ),
     'settings': (
       label: '設定',

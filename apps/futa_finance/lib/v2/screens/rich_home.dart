@@ -20,7 +20,6 @@ import '../../widgets/brand_logo.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
-import '../widgets/month_closing_bar.dart';
 
 /// 新デザイン（リッチUI）のホーム画面。
 ///
@@ -342,12 +341,6 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // 締め処理チップ（右上・他タブと統一）
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: MonthClosingBar(month: _month, dense: true),
-                ),
-                const SizedBox(height: V2Spacing.sm),
                 hero,
                 const SizedBox(height: V2Spacing.md),
                 balanceCard,

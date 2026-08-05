@@ -7,6 +7,7 @@ import 'package:finance_core/finance_core.dart' as core;
 import '../../data/app_mode.dart';
 import '../../data/month_cursor.dart';
 import '../../data/monthly_snapshot_repository.dart';
+import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/tax_estimate_repository.dart';
 import '../../data/transaction_repository.dart';
@@ -131,6 +132,12 @@ class _V2ReportScreenState extends State<V2ReportScreen>
   /// 個人の「支出の内訳」を、カテゴリ別(false)か場所別(true)で見るか。
   bool _breakdownByStore = false;
 
+  /// 表示ビュー。false=既存の業績（PL/棒グラフ）/ true=月×科目マトリクス（カテゴリ別・月次）。
+  bool _matrixView = false;
+
+  /// カテゴリ設定（マトリクスのセクション分け・非消費バッジに使う）。
+  core.CategoryConfig? _categories;
+
   /// 決算期の期首月。当社は 10月〜翌9月 が事業年度。
   final int _fyStartMonth = 10;
   late int _fyYear = _calcFyYear();
@@ -192,11 +199,13 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     final subs =
         (await SubscriptionRepository.instance.load()).subscriptions;
     final snaps = await MonthlySnapshotRepository.instance.load();
+    final cats = await SettingsRepository().loadCategories();
     if (!mounted) return;
     setState(() {
       _transactions = txns;
       _subs = subs;
       _snapshots = snaps;
+      _categories = cats;
       _loading = false;
     });
   }
@@ -431,6 +440,23 @@ class _V2ReportScreenState extends State<V2ReportScreen>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _searchEntry(),
+          _viewToggle(),
+          if (_matrixView) ...[
+            // マトリクスは常に年度12ヶ月。年度ナビだけ出す。
+            Padding(
+              padding: const EdgeInsets.only(bottom: V2Spacing.md),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: MonthNavBar(
+                  label:
+                      '$_fyYear 年度（$_fyStartMonth月〜$fyEndYear年$fyEndMonth月）',
+                  onPrev: () => _shiftYear(-1),
+                  onNext: () => _shiftYear(1),
+                ),
+              ),
+            ),
+            ..._matrixSection(),
+          ] else ...[
           // 期間(当月/1年) + 詳細/簡易 切替 + 月/年ナビ
           Padding(
             padding: const EdgeInsets.only(bottom: V2Spacing.md),
@@ -498,6 +524,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
             _detailedTableCard(months),
             const SizedBox(height: V2Spacing.lg),
             _categoryNoteCard(),
+          ],
           ],
         ],
       ),
@@ -617,6 +644,10 @@ class _V2ReportScreenState extends State<V2ReportScreen>
               ],
             ),
           ),
+          _viewToggle(),
+          if (_matrixView)
+            ..._matrixSection()
+          else ...[
           // 年間サマリーKPI（収入/支出/収支/貯蓄率・前年比つき）。
           _yearKpiCard(
             year: year,
@@ -692,6 +723,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
                 values: balances, labels: labels, signed: false),
           ),
           const SizedBox(height: V2Spacing.lg),
+          ],
         ],
       ),
     );
@@ -1509,6 +1541,287 @@ class _V2ReportScreenState extends State<V2ReportScreen>
   /// a + b - c（表示月数に追従）
   List<int> _addSub(List<int> a, List<int> b, List<int> c) =>
       List.generate(a.length, (i) => a[i] + b[i] - c[i]);
+
+  // ═════════════════════════════════════════════════
+  // 月×科目マトリクス（カテゴリ別・月次）
+  // ═════════════════════════════════════════════════
+
+  /// 業績ビュー / カテゴリ別（マトリクス）ビューの切替。
+  Widget _viewToggle() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: V2Spacing.md),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: SegmentedButton<bool>(
+          showSelectedIcon: false,
+          segments: const [
+            ButtonSegment(
+                value: false,
+                label: Text('業績'),
+                icon: Icon(Icons.insights, size: 16)),
+            ButtonSegment(
+                value: true,
+                label: Text('カテゴリ別'),
+                icon: Icon(Icons.grid_on, size: 16)),
+          ],
+          selected: {_matrixView},
+          onSelectionChanged: (s) => setState(() => _matrixView = s.first),
+        ),
+      ),
+    );
+  }
+
+  /// マトリクスの月範囲：事業=決算年度の12ヶ月／個人=暦年の12ヶ月。
+  /// 既存 PL/棒グラフと同じ年度・年の判定を流用する（_fyMonths / _personalYear）。
+  List<DateTime> get _matrixMonths =>
+      AppModeManager.instance.current == AppMode.business
+          ? _fyMonths
+          : List<DateTime>.generate(12, (i) => DateTime(_personalYear, i + 1));
+
+  /// 指定 type の「科目(素名) → 月別合計」を1パスで作る。
+  /// expense は実質コスト（立替回収を差し引き）＋会計科目を紐付けたサブスクも合算し、
+  /// PL と整合させる。income は満額（amount）。
+  Map<String, List<int>> _matrixMap(
+      List<DateTime> months, core.TransactionType type) {
+    final map = <String, List<int>>{};
+    List<int> arrFor(String major) =>
+        map.putIfAbsent(major, () => List<int>.filled(months.length, 0));
+    for (final t in _transactions) {
+      if (t.type != type) continue;
+      final idx = months.indexWhere(
+          (m) => m.year == t.date.year && m.month == t.date.month);
+      if (idx < 0) continue;
+      final major = _bareMajor(t.category.major);
+      if (major.isEmpty) continue;
+      arrFor(major)[idx] +=
+          type == core.TransactionType.expense ? t.effectiveAmount : t.amount;
+    }
+    if (type == core.TransactionType.expense) {
+      final cur = _currentYm;
+      for (final s in _subs) {
+        final pm = s.plMajor;
+        if (pm == null) continue;
+        final major = _bareMajor(pm);
+        if (major.isEmpty) continue;
+        final arr = arrFor(major);
+        for (int i = 0; i < months.length; i++) {
+          final m = months[i];
+          final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
+          arr[i] += s.plAmountForMonth(ym, cur);
+        }
+      }
+    }
+    return map;
+  }
+
+  int _sum(List<int> a) => a.fold<int>(0, (s, v) => s + v);
+
+  /// 支出マトリクスの行。事業（カテゴリ設定あり）はセクションでグルーピングして
+  /// セクション小計行を挟む。個人はフラット（年計降順）。末尾に「月合計」行。
+  List<_MatrixRow> _expenseMatrixRows(List<DateTime> months) {
+    final map = _matrixMap(months, core.TransactionType.expense);
+    // 年計0の科目は出さない（見やすさ優先。合計計算には元々寄与しない）。
+    map.removeWhere((k, v) => _sum(v) == 0);
+    final len = months.length;
+    final rows = <_MatrixRow>[];
+    final grand = List<int>.filled(len, 0);
+    for (final v in map.values) {
+      for (int i = 0; i < len; i++) {
+        grand[i] += v[i];
+      }
+    }
+
+    final config = _categories;
+    final grouped =
+        AppModeManager.instance.current == AppMode.business && config != null;
+
+    if (grouped) {
+      // 科目(素名) → セクション / 非消費 / 設定内の並び順。
+      final sectionOf = <String, String>{};
+      final nonConsumeOf = <String, bool>{};
+      final orderOf = <String, int>{};
+      for (int i = 0; i < config.majors.length; i++) {
+        final m = config.majors[i];
+        final bare = _bareMajor(m.name);
+        sectionOf[bare] =
+            (m.section == null || m.section!.isEmpty) ? 'その他' : m.section!;
+        nonConsumeOf[bare] = m.nonConsumption;
+        orderOf[bare] = i;
+      }
+      final bySection = <String, List<String>>{};
+      for (final major in map.keys) {
+        bySection.putIfAbsent(sectionOf[major] ?? 'その他', () => []).add(major);
+      }
+      // セクションの並び：設定の登場順 → 設定に無いものは末尾。
+      final sectionOrder = <String>[
+        ...config.sectionsInOrder.where(bySection.containsKey),
+        for (final s in bySection.keys)
+          if (!config.sectionsInOrder.contains(s)) s,
+      ];
+      for (final sec in sectionOrder) {
+        final majors = bySection[sec]!
+          ..sort((a, b) {
+            // 非消費は後ろへ。同区分内は設定順→年計降順。
+            final na = nonConsumeOf[a] ?? false;
+            final nb = nonConsumeOf[b] ?? false;
+            if (na != nb) return na ? 1 : -1;
+            final oa = orderOf[a] ?? 1 << 20;
+            final ob = orderOf[b] ?? 1 << 20;
+            if (oa != ob) return oa.compareTo(ob);
+            return _sum(map[b]!).compareTo(_sum(map[a]!));
+          });
+        final secTotal = List<int>.filled(len, 0);
+        for (final major in majors) {
+          final vals = map[major]!;
+          for (int i = 0; i < len; i++) {
+            secTotal[i] += vals[i];
+          }
+        }
+        rows.add(_MatrixRow(
+            label: sec, values: secTotal, kind: _MatrixRowKind.section));
+        for (final major in majors) {
+          rows.add(_MatrixRow(
+            label: major,
+            values: map[major]!,
+            kind: _MatrixRowKind.data,
+            nonConsumption: nonConsumeOf[major] ?? false,
+          ));
+        }
+      }
+    } else {
+      final majors = map.keys.toList()
+        ..sort((a, b) => _sum(map[b]!).compareTo(_sum(map[a]!)));
+      for (final major in majors) {
+        rows.add(_MatrixRow(
+            label: major, values: map[major]!, kind: _MatrixRowKind.data));
+      }
+    }
+
+    rows.add(_MatrixRow(
+        label: '月合計', values: grand, kind: _MatrixRowKind.grandTotal));
+    return rows;
+  }
+
+  /// 収入マトリクスの行（収入源別＝major・フラット・年計降順）。末尾に「月合計」行。
+  List<_MatrixRow> _incomeMatrixRows(List<DateTime> months) {
+    final map = _matrixMap(months, core.TransactionType.income);
+    map.removeWhere((k, v) => _sum(v) == 0);
+    final len = months.length;
+    final rows = <_MatrixRow>[];
+    final grand = List<int>.filled(len, 0);
+    final majors = map.keys.toList()
+      ..sort((a, b) => _sum(map[b]!).compareTo(_sum(map[a]!)));
+    for (final major in majors) {
+      final vals = map[major]!;
+      for (int i = 0; i < len; i++) {
+        grand[i] += vals[i];
+      }
+      rows.add(_MatrixRow(
+          label: major, values: vals, kind: _MatrixRowKind.data));
+    }
+    rows.add(_MatrixRow(
+        label: '月合計', values: grand, kind: _MatrixRowKind.grandTotal));
+    return rows;
+  }
+
+  /// マトリクスビュー本体（支出＋収入の2表）。事業/個人 共通。
+  List<Widget> _matrixSection() {
+    final months = _matrixMonths;
+    final expenseRows = _expenseMatrixRows(months);
+    final incomeRows = _incomeMatrixRows(months);
+    return [
+      _matrixCard(
+        title: '支出（月×科目）',
+        months: months,
+        rows: expenseRows,
+        type: core.TransactionType.expense,
+        empty: expenseRows.length <= 1, // 月合計行のみ＝データ無し
+      ),
+      const SizedBox(height: V2Spacing.lg),
+      _matrixCard(
+        title: '収入（月×収入源）',
+        months: months,
+        rows: incomeRows,
+        type: core.TransactionType.income,
+        empty: incomeRows.length <= 1,
+      ),
+    ];
+  }
+
+  Widget _matrixCard({
+    required String title,
+    required List<DateTime> months,
+    required List<_MatrixRow> rows,
+    required core.TransactionType type,
+    required bool empty,
+  }) {
+    return V2Card(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                V2Spacing.lg, V2Spacing.md, V2Spacing.lg, V2Spacing.sm),
+            child: Row(
+              children: [
+                Icon(Icons.grid_on_outlined, size: 18, color: widget.accent),
+                const SizedBox(width: V2Spacing.sm),
+                Expanded(child: Text(title, style: V2Typography.h2)),
+                Text('← 横スクロール →',
+                    style: V2Typography.micro
+                        .copyWith(color: V2Colors.textMuted)),
+              ],
+            ),
+          ),
+          if (empty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 28),
+              child: Center(
+                child: Text('この期間の記録がまだありません',
+                    style: TextStyle(color: V2Colors.textSecondary)),
+              ),
+            )
+          else
+            _MatrixTable(
+              months: months,
+              rows: rows,
+              onCellTap: (row, monthIdx) =>
+                  _openMatrixDrilldown(months, type, row, monthIdx),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// セルタップ → その月（年計セルは期間全体）・その科目の明細をキーワード＋期間で開く。
+  /// 検索画面のキーワードは category.major も対象なので、科目名で安全に絞れる。
+  void _openMatrixDrilldown(List<DateTime> months, core.TransactionType type,
+      _MatrixRow row, int monthIdx) {
+    if (row.kind != _MatrixRowKind.data) return; // 単一科目の行のみ
+    DateTime from;
+    DateTime to;
+    if (monthIdx >= months.length) {
+      from = DateTime(months.first.year, months.first.month, 1);
+      final last = months.last;
+      to = DateTime(last.year, last.month + 1, 0);
+    } else {
+      final m = months[monthIdx];
+      from = DateTime(m.year, m.month, 1);
+      to = DateTime(m.year, m.month + 1, 0);
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TransactionSearchScreen(
+          initialType: type,
+          initialKeyword: row.label,
+          initialFrom: from,
+          initialTo: to,
+        ),
+      ),
+    );
+  }
 }
 
 class _PLRow {
@@ -1956,4 +2269,222 @@ class _DonutPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DonutPainter old) =>
       old.values != values;
+}
+
+// ═════════════════════════════════════════════════
+// 月×科目マトリクス表
+// ═════════════════════════════════════════════════
+
+/// マトリクス行の種別。
+enum _MatrixRowKind {
+  /// セクション小計行（事業モードの「販管費」など。淡いグレー背景）
+  section,
+
+  /// 科目データ行（タップでドリルダウン可）
+  data,
+
+  /// 月合計行（表の一番下・強ハイライト）
+  grandTotal,
+}
+
+class _MatrixRow {
+  final String label;
+  final List<int> values; // 各月（months と同じ長さ）
+  final _MatrixRowKind kind;
+
+  /// 非消費科目（税金・手数料など）。true でラベル横に小バッジを出す。
+  final bool nonConsumption;
+
+  const _MatrixRow({
+    required this.label,
+    required this.values,
+    required this.kind,
+    this.nonConsumption = false,
+  });
+
+  int get total => values.fold<int>(0, (s, v) => s + v);
+}
+
+/// 月×科目マトリクス表（横スクロール・1列目は固定幅の科目名）。
+/// 列＝各月＋末尾「年計」。data 行のセルタップで onCellTap(row, monthIndex)。
+/// monthIndex == months.length のとき「年計」列。
+class _MatrixTable extends StatelessWidget {
+  final List<DateTime> months;
+  final List<_MatrixRow> rows;
+  final void Function(_MatrixRow row, int monthIndex)? onCellTap;
+  const _MatrixTable({
+    required this.months,
+    required this.rows,
+    this.onCellTap,
+  });
+
+  static const labelColWidth = 150.0;
+  static const monthColWidth = 84.0;
+  static const totalColWidth = 104.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Container(
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: V2Colors.border, width: 1)),
+        ),
+        child: Column(
+          children: [
+            _header(),
+            for (final r in rows)
+              _MatrixBodyRow(
+                  row: r, monthCount: months.length, onCellTap: onCellTap),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _header() {
+    return Container(
+      color: V2Colors.surfaceMuted,
+      child: Row(
+        children: [
+          SizedBox(
+            width: labelColWidth,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(
+                  horizontal: V2Spacing.md, vertical: 8),
+              child: Text('科目', style: V2Typography.tableHeader),
+            ),
+          ),
+          for (final m in months)
+            SizedBox(
+              width: monthColWidth,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 8),
+                child: Text('${m.month}月',
+                    style: V2Typography.tableHeader,
+                    textAlign: TextAlign.right),
+              ),
+            ),
+          SizedBox(
+            width: totalColWidth,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Text('年計',
+                  style: V2Typography.tableHeader.copyWith(
+                      color: V2Colors.textPrimary,
+                      fontWeight: FontWeight.w800),
+                  textAlign: TextAlign.right),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MatrixBodyRow extends StatelessWidget {
+  final _MatrixRow row;
+  final int monthCount;
+  final void Function(_MatrixRow row, int monthIndex)? onCellTap;
+  const _MatrixBodyRow({
+    required this.row,
+    required this.monthCount,
+    this.onCellTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isSection = row.kind == _MatrixRowKind.section;
+    final isGrand = row.kind == _MatrixRowKind.grandTotal;
+    final isData = row.kind == _MatrixRowKind.data;
+    final tappable = isData && onCellTap != null;
+
+    final bg = isGrand
+        ? const Color(0xFFFEF9C3)
+        : (isSection ? const Color(0xFFF1F5F9) : null);
+    final labelStyle = isData
+        ? V2Typography.body
+        : V2Typography.bodyStrong.copyWith(
+            color: V2Colors.textPrimary,
+            fontWeight: isGrand ? FontWeight.w800 : FontWeight.w700);
+
+    Color cellColor(int v) {
+      if (v == 0) return V2Colors.textMuted;
+      if (isData) return V2Colors.textPrimary;
+      return isGrand ? V2Colors.textPrimary : V2Colors.textSecondary;
+    }
+
+    Widget cell(int v, int idx) {
+      final w = idx >= monthCount
+          ? _MatrixTable.totalColWidth
+          : _MatrixTable.monthColWidth;
+      final text = Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: Text(
+          v == 0 ? '-' : formatYen(v),
+          textAlign: TextAlign.right,
+          style: V2Typography.numericCell.copyWith(
+              color: cellColor(v),
+              fontSize: 12,
+              fontWeight: isData ? FontWeight.w600 : FontWeight.w700),
+        ),
+      );
+      if (tappable && v != 0) {
+        return SizedBox(
+          width: w,
+          child: InkWell(onTap: () => onCellTap!(row, idx), child: text),
+        );
+      }
+      return SizedBox(width: w, child: text);
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        border: Border(
+            top: BorderSide(
+                color: (isSection || isGrand)
+                    ? V2Colors.border
+                    : V2Colors.divider,
+                width: 1)),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: _MatrixTable.labelColWidth,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(isData ? 20 : 12, 8, 8, 8),
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(row.label,
+                        style: labelStyle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                  if (row.nonConsumption) ...[
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: V2Colors.badgePurpleSoft,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text('非消費',
+                          style: V2Typography.micro.copyWith(
+                              color: V2Colors.badgePurple, fontSize: 9)),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          for (int i = 0; i < monthCount; i++) cell(row.values[i], i),
+          cell(row.total, monthCount),
+        ],
+      ),
+    );
+  }
 }

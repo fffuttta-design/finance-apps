@@ -46,9 +46,6 @@ class FixedCostRow {
   /// 同じ日付内の手動並び順（元サブスクの sortOrder）。null は未設定。
   final double? sortOrder;
 
-  /// この月の確認済み（検収）状態。
-  final bool reviewed;
-
   /// 変動費で今月の金額が未入力＝「入力待ち」。金額の代わりにバッジを出す。
   final bool pending;
 
@@ -60,7 +57,6 @@ class FixedCostRow {
     this.paymentMethod,
     this.categoryLabel = '',
     this.sortOrder,
-    this.reviewed = false,
     this.pending = false,
   });
 }
@@ -123,13 +119,6 @@ class ExpenseDetailTable extends StatefulWidget {
   /// 領収書チェックの切替（保存はここで行う）。showReceiptCheck=true 時は必須。
   final Future<void> Function(core.Transaction t, bool value)? onToggleReceipt;
 
-  /// 確認済み（検収済み）チェックの切替。指定すると金額の隣にチェック列が出る。
-  /// チェックした行は薄くグレーアウトする（締め処理の確認用）。
-  final Future<void> Function(core.Transaction t, bool value)? onToggleReviewed;
-
-  /// 固定費行の確認済みチェックの切替（月別）。
-  final Future<void> Function(FixedCostRow f, bool value)? onToggleReviewedFixed;
-
   /// 手動並び替えの保存。指定するとヘッダーに「手で並び替え」トグルが出る。
   /// 引数はその日の項目（取引・固定費）を新しい上→下の順に並べたリスト
   /// （呼び出し側で index を sortOrder として振って保存する）。
@@ -165,8 +154,6 @@ class ExpenseDetailTable extends StatefulWidget {
     this.receiptLabel = '領収書',
     this.defaultTeamSort = false,
     this.onToggleReceipt,
-    this.onToggleReviewed,
-    this.onToggleReviewedFixed,
     this.onReorderDay,
     this.customOrder,
     this.customEditable = true,
@@ -664,17 +651,14 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                     ),
                     _plainRows(
                       detailRows,
-                      // ⚠️ スマホ幅は領収書/検収のチェックボックスを出さない（2026-07-18）。
-                      //   締め処理（検収）は必ずPCで行うので、狭い画面ではチェックが場所を
-                      //   食うだけで使わない。行タップは編集/まとめ明細に使い、チェックは
-                      //   PC（広い幅）とデスクトップに任せる。
+                      // ⚠️ スマホ幅は領収書チェックボックスを出さない（2026-07-18）。
+                      //   狭い画面ではチェックが場所を食うだけで使わない。行タップは
+                      //   編集/まとめ明細に使い、チェックはPC（広い幅）に任せる。
                       (r) => r.isFixed
                           ? _NarrowFixedRow(
                               f: r.fx!,
                               onTap: () => widget.onEditFixed?.call(r.fx!),
                               showReceipt: false,
-                              showReview: false,
-                              onToggleReviewed: null,
                             )
                           : r.isGroup
                               ? _NarrowGroupRow(
@@ -688,26 +672,19 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                                   onTap: () => widget.onEditTxn(r.txn!),
                                   showReceipt: false,
                                   onToggleReceipt: null,
-                                  showReview: false,
-                                  onToggleReviewed: null,
                                 ),
                     ),
                   ],
                 );
               }
               final innerW = cons.maxWidth - 24;
-              final showReview = widget.onToggleReviewed != null ||
-                  widget.onToggleReviewedFixed != null;
               final receiptExtra =
                   widget.showReceiptCheck ? (_kReceiptW + _kColGap) : 0.0;
-              final reviewExtra =
-                  showReview ? (_kReviewW + _kColGap) : 0.0;
               // 中央6列。固定は date ＋ date|major の隙間 ＋ ハンドル5本。
               final fixed = _kDateW +
                   _kColGap +
                   _kHandleW * 5 +
-                  receiptExtra +
-                  reviewExtra;
+                  receiptExtra;
               final mw = (innerW - fixed) < 240 ? 240.0 : innerW - fixed;
               final w = _ColW(
                 date: _kDateW,
@@ -729,7 +706,6 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                     onSort: _onSort,
                     accent: widget.accent,
                     showReceipt: widget.showReceiptCheck,
-                    showReview: showReview,
                     touched: _sortTouched,
                     receiptLabel: widget.receiptLabel,
                   ),
@@ -741,8 +717,6 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                             onTap: () => widget.onEditFixed?.call(r.fx!),
                             w: w,
                             showReceipt: widget.showReceiptCheck,
-                            showReview: showReview,
-                            onToggleReviewed: widget.onToggleReviewedFixed,
                           )
                         : r.isGroup
                             ? _ExpenseGroupRow(
@@ -752,8 +726,6 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                                 w: w,
                                 showReceipt: widget.showReceiptCheck,
                                 onToggleReceipt: widget.onToggleReceipt,
-                                showReview: showReview,
-                                onToggleReviewed: widget.onToggleReviewed,
                               )
                             : _ExpenseRow(
                                 t: r.txn!,
@@ -761,8 +733,6 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                                 w: w,
                                 showReceipt: widget.showReceiptCheck,
                                 onToggleReceipt: widget.onToggleReceipt,
-                                showReview: showReview,
-                                onToggleReviewed: widget.onToggleReviewed,
                               ),
                   ),
                 ],
@@ -839,17 +809,12 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                         : r.txn!.category.major.trim())));
         final amount = isFixed ? r.fx!.amount : r.txn!.amount;
         final pending = isFixed && r.fx!.pending;
-        final reviewed = isFixed ? r.fx!.reviewed : r.txn!.reviewed;
-        final showReview = widget.onToggleReviewed != null ||
-            widget.onToggleReviewedFixed != null;
-        // 通帳（銀行）のカスタム順と同じ「ハンドル＋日付＋内容＋金額＋確認＋編集」の1行。
+        // 通帳（銀行）のカスタム順と同じ「ハンドル＋日付＋内容＋金額＋編集」の1行。
         return DecoratedBox(
           key: ValueKey(isFixed ? 'fx_${r.fx!.id}' : 'tx_${r.txn!.id}'),
           decoration: BoxDecoration(
-            // 通常表示と同じく、固定費は淡いアンバー背景で区別（確認済みはグレー優先）。
-            color: reviewed
-                ? _kReviewedBg
-                : (isFixed ? _kFixedBg : Colors.white),
+            // 固定費は淡いアンバー背景で区別。
+            color: isFixed ? _kFixedBg : Colors.white,
             border:
                 const Border(bottom: BorderSide(color: V2Colors.divider)),
           ),
@@ -868,11 +833,8 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                 width: 50,
                 child: Text(
                     '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: reviewed
-                            ? const Color(0xFF9CA3AF)
-                            : const Color(0xFF6B7280))),
+                    style: const TextStyle(
+                        fontSize: 12, color: Color(0xFF6B7280))),
               ),
               if (isFixed)
                 Padding(
@@ -954,30 +916,6 @@ class _ExpenseDetailTableState extends State<ExpenseDetailTable> {
                                   ?.call(r.txn!, v ?? false),
                             ),
                           ),
-                  ),
-                ),
-              ],
-              if (showReview) ...[
-                const SizedBox(width: 4),
-                SizedBox(
-                  width: 30,
-                  child: Center(
-                    child: SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: Checkbox(
-                        value: reviewed,
-                        visualDensity: VisualDensity.compact,
-                        materialTapTargetSize:
-                            MaterialTapTargetSize.shrinkWrap,
-                        activeColor: const Color(0xFF6B7280),
-                        onChanged: (v) => isFixed
-                            ? widget.onToggleReviewedFixed
-                                ?.call(r.fx!, v ?? false)
-                            : widget.onToggleReviewed
-                                ?.call(r.txn!, v ?? false),
-                      ),
-                    ),
                   ),
                 ),
               ],
@@ -1316,8 +1254,6 @@ const double _kDateW = 64; // 「06/29(月)」が収まる幅。
 const double _kColGap = 8;
 const double _kHandleW = 12;
 const double _kReceiptW = 56; // 領収書チェック列の幅（事業モード）。
-const double _kReviewW = 44; // 確認済みチェック列の幅。
-const Color _kReviewedBg = Color(0xFFF3F4F6); // 確認済み行のグレー背景。
 const double _kRowH = 40; // データ行の固定高さ（縦罫線をこの高さで引く）。
 const double _kHeadH = 34; // ヘッダー行の固定高さ。
 const Color _kGridLine = Color(0xFFEDF0F3); // 薄い縦罫線（表のセル区切り）。
@@ -1389,7 +1325,6 @@ class _ExpenseTableHeader extends StatelessWidget {
   final void Function(_SortCol col) onSort;
   final Color accent;
   final bool showReceipt;
-  final bool showReview;
   final bool touched;
   final String receiptLabel;
   const _ExpenseTableHeader({
@@ -1401,7 +1336,6 @@ class _ExpenseTableHeader extends StatelessWidget {
     required this.onSort,
     required this.accent,
     this.showReceipt = false,
-    this.showReview = false,
     this.touched = false,
     this.receiptLabel = '領収書',
   });
@@ -1475,23 +1409,11 @@ class _ExpenseTableHeader extends StatelessWidget {
           _handle(4),
           SizedBox(
               width: w.amount, child: _h('金額', _SortCol.amount, right: true)),
-          // 事業モードは「領収書 → 確認」の順で並べる。
           if (showReceipt) ...[
             _vGrid(_kColGap, _kHeadH),
             SizedBox(
               width: _kReceiptW,
               child: Text(receiptLabel,
-                  textAlign: TextAlign.center,
-                  style: V2Typography.micro.copyWith(
-                      color: V2Colors.textMuted,
-                      fontWeight: FontWeight.w700)),
-            ),
-          ],
-          if (showReview) ...[
-            _vGrid(_kColGap, _kHeadH),
-            SizedBox(
-              width: _kReviewW,
-              child: Text('確認',
                   textAlign: TextAlign.center,
                   style: V2Typography.micro.copyWith(
                       color: V2Colors.textMuted,
@@ -1510,21 +1432,16 @@ class _ExpenseRow extends StatelessWidget {
   final _ColW w;
   final bool showReceipt;
   final Future<void> Function(core.Transaction t, bool value)? onToggleReceipt;
-  final bool showReview;
-  final Future<void> Function(core.Transaction t, bool value)? onToggleReviewed;
   const _ExpenseRow({
     required this.t,
     required this.onTap,
     required this.w,
     this.showReceipt = false,
     this.onToggleReceipt,
-    this.showReview = false,
-    this.onToggleReviewed,
   });
 
   @override
   Widget build(BuildContext context) {
-    final reviewed = t.reviewed;
     // 固定費は従来どおりオレンジ系で色分け＋淡い背景（実取引化しても見た目を保つ）。
     final isFixedCat = t.category.major.contains('固定費');
     final accent =
@@ -1547,12 +1464,8 @@ class _ExpenseRow extends StatelessWidget {
       onTap: onTap,
       child: Container(
         height: _kRowH,
-        // 確認済み=グレー背景 / 固定費=淡いオレンジ背景（それ以外は無し）。
-        color: reviewed
-            ? _kReviewedBg
-            : (isFixedCat ? _kFixedBg : null),
-        child: Opacity(
-        opacity: reviewed ? 0.5 : 1,
+        // 固定費=淡いオレンジ背景（それ以外は無し）。
+        color: isFixedCat ? _kFixedBg : null,
         child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(
@@ -1668,30 +1581,7 @@ class _ExpenseRow extends StatelessWidget {
                 ),
               ),
             ],
-            if (showReview) ...[
-              _vGrid(_kColGap, _kRowH),
-              SizedBox(
-                width: _kReviewW,
-                child: Center(
-                  child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: Checkbox(
-                      value: reviewed,
-                      visualDensity: VisualDensity.compact,
-                      materialTapTargetSize:
-                          MaterialTapTargetSize.shrinkWrap,
-                      activeColor: const Color(0xFF6B7280),
-                      onChanged: onToggleReviewed == null
-                          ? null
-                          : (v) => onToggleReviewed!(t, v ?? false),
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ],
-        ),
         ),
         ),
       ),
@@ -1709,8 +1599,6 @@ class _ExpenseGroupRow extends StatelessWidget {
   final _ColW w;
   final bool showReceipt;
   final Future<void> Function(core.Transaction t, bool value)? onToggleReceipt;
-  final bool showReview;
-  final Future<void> Function(core.Transaction t, bool value)? onToggleReviewed;
   const _ExpenseGroupRow({
     required this.members,
     required this.total,
@@ -1718,8 +1606,6 @@ class _ExpenseGroupRow extends StatelessWidget {
     required this.w,
     this.showReceipt = false,
     this.onToggleReceipt,
-    this.showReview = false,
-    this.onToggleReviewed,
   });
 
   core.Transaction get _head => members.first;
@@ -1735,7 +1621,6 @@ class _ExpenseGroupRow extends StatelessWidget {
 
   /// 束ごとの一括チェック。全員ONのときだけON、押すと全員に反映する。
   bool get _allReceipt => members.every((t) => t.receiptSaved);
-  bool get _allReviewed => members.every((t) => t.reviewed);
 
   @override
   Widget build(BuildContext context) {
@@ -1757,15 +1642,12 @@ class _ExpenseGroupRow extends StatelessWidget {
             ? 'レシート'
             : _head.description.trim());
     final pay = _common((t) => t.paymentMethod) ?? '複数';
-    final reviewed = _allReviewed;
     return InkWell(
       onTap: onTap,
       child: Container(
         height: _kRowH,
-        color: reviewed ? _kReviewedBg : _kGroupBg,
-        child: Opacity(
-          opacity: reviewed ? 0.5 : 1,
-          child: Padding(
+        color: _kGroupBg,
+        child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -1905,37 +1787,10 @@ class _ExpenseGroupRow extends StatelessWidget {
                     ),
                   ),
                 ],
-                if (showReview) ...[
-                  _vGrid(_kColGap, _kRowH),
-                  SizedBox(
-                    width: _kReviewW,
-                    child: Center(
-                      child: SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: Checkbox(
-                          value: reviewed,
-                          visualDensity: VisualDensity.compact,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          activeColor: const Color(0xFF6B7280),
-                          onChanged: onToggleReviewed == null
-                              ? null
-                              : (v) async {
-                                  for (final t in members) {
-                                    await onToggleReviewed!(t, v ?? false);
-                                  }
-                                },
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
         ),
-      ),
     );
   }
 }
@@ -1945,30 +1800,22 @@ class _FixedRow extends StatelessWidget {
   final VoidCallback onTap;
   final _ColW w;
   final bool showReceipt;
-  final bool showReview;
-  final Future<void> Function(FixedCostRow f, bool value)? onToggleReviewed;
   const _FixedRow({
     required this.f,
     required this.onTap,
     required this.w,
     this.showReceipt = false,
-    this.showReview = false,
-    this.onToggleReviewed,
   });
 
   @override
   Widget build(BuildContext context) {
     final cat = f.categoryLabel.trim();
-    final reviewed = f.reviewed;
     return InkWell(
       onTap: onTap,
       child: Container(
         height: _kRowH,
-        // 確認済みはグレー背景（固定費のアンバーより優先）。
-        color: reviewed ? _kReviewedBg : _kFixedBg,
+        color: _kFixedBg,
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Opacity(
-        opacity: reviewed ? 0.5 : 1,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -2091,30 +1938,7 @@ class _FixedRow extends StatelessWidget {
                 ),
               ),
             ],
-            if (showReview) ...[
-              _vGrid(_kColGap, _kRowH),
-              SizedBox(
-                width: _kReviewW,
-                child: Center(
-                  child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: Checkbox(
-                      value: reviewed,
-                      visualDensity: VisualDensity.compact,
-                      materialTapTargetSize:
-                          MaterialTapTargetSize.shrinkWrap,
-                      activeColor: const Color(0xFF6B7280),
-                      onChanged: onToggleReviewed == null
-                          ? null
-                          : (v) => onToggleReviewed!(f, v ?? false),
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ],
-        ),
         ),
       ),
     );
@@ -2244,15 +2068,12 @@ class _NarrowGroupRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final head = members.first;
-    final reviewed = members.every((t) => t.reviewed);
     return InkWell(
       onTap: onTap,
       child: Container(
-        color: reviewed ? _kReviewedBg : _kGroupBg,
+        color: _kGroupBg,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Opacity(
-          opacity: reviewed ? 0.5 : 1,
-          child: Row(
+        child: Row(
             children: [
               Expanded(
                 child: Column(
@@ -2302,7 +2123,6 @@ class _NarrowGroupRow extends StatelessWidget {
                       fontFeatures: V2Typography.tabularNums)),
             ],
           ),
-        ),
       ),
     );
   }
@@ -2313,20 +2133,15 @@ class _NarrowRow extends StatelessWidget {
   final VoidCallback onTap;
   final bool showReceipt;
   final Future<void> Function(core.Transaction t, bool value)? onToggleReceipt;
-  final bool showReview;
-  final Future<void> Function(core.Transaction t, bool value)? onToggleReviewed;
   const _NarrowRow({
     required this.t,
     required this.onTap,
     this.showReceipt = false,
     this.onToggleReceipt,
-    this.showReview = false,
-    this.onToggleReviewed,
   });
 
   @override
   Widget build(BuildContext context) {
-    final reviewed = t.reviewed;
     // 固定費は従来どおりオレンジ系で色分け＋淡い背景（実取引化しても見た目を保つ）。
     final isFixedCat = t.category.major.contains('固定費');
     final accent =
@@ -2343,34 +2158,14 @@ class _NarrowRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Container(
-        color: reviewed
-            ? _kReviewedBg
-            : (isFixedCat ? _kFixedBg : null),
+        color: isFixedCat ? _kFixedBg : null,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Opacity(
-        opacity: reviewed ? 0.5 : 1,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1行目：日付 + 内容 + 金額（＋確認チェック）
+            // 1行目：日付 + 内容 + 金額
             Row(
               children: [
-                if (showReview) ...[
-                  SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: Checkbox(
-                      value: reviewed,
-                      visualDensity: VisualDensity.compact,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      activeColor: const Color(0xFF6B7280),
-                      onChanged: onToggleReviewed == null
-                          ? null
-                          : (v) => onToggleReviewed!(t, v ?? false),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                ],
                 _DateWithWeekday(date: t.date),
                 const SizedBox(width: 8),
                 Expanded(
@@ -2489,7 +2284,6 @@ class _NarrowRow extends StatelessWidget {
             ),
           ],
         ),
-        ),
       ),
     );
   }
@@ -2500,50 +2294,27 @@ class _NarrowFixedRow extends StatelessWidget {
   final FixedCostRow f;
   final VoidCallback onTap;
   final bool showReceipt;
-  final bool showReview;
-  final Future<void> Function(FixedCostRow f, bool value)? onToggleReviewed;
   const _NarrowFixedRow({
     required this.f,
     required this.onTap,
     this.showReceipt = false,
-    this.showReview = false,
-    this.onToggleReviewed,
   });
 
   @override
   Widget build(BuildContext context) {
     final cat = f.categoryLabel.trim();
     final pay = (f.paymentMethod ?? '').trim();
-    final reviewed = f.reviewed;
     return InkWell(
       onTap: onTap,
       child: Container(
-        color: reviewed ? _kReviewedBg : _kFixedBg,
+        color: _kFixedBg,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Opacity(
-        opacity: reviewed ? 0.5 : 1,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1行目：（確認）日付 + 内容 + 金額
+            // 1行目：日付 + 内容 + 金額
             Row(
               children: [
-                if (showReview) ...[
-                  SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: Checkbox(
-                      value: reviewed,
-                      visualDensity: VisualDensity.compact,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      activeColor: const Color(0xFF6B7280),
-                      onChanged: onToggleReviewed == null
-                          ? null
-                          : (v) => onToggleReviewed!(f, v ?? false),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                ],
                 _DateWithWeekday(date: f.date),
                 const SizedBox(width: 8),
                 Expanded(
@@ -2634,7 +2405,6 @@ class _NarrowFixedRow extends StatelessWidget {
               ],
             ),
           ],
-        ),
         ),
       ),
     );

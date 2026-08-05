@@ -3,9 +3,7 @@ import 'package:finance_core/finance_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_mode.dart';
-import 'checklist_repository.dart';
 import 'income_source_repository.dart';
-import 'month_closing_repository.dart';
 import 'monthly_snapshot_repository.dart';
 import 'settings_repository.dart';
 import 'subscription_repository.dart';
@@ -124,28 +122,6 @@ class DataMigrationService {
           await MonthlySnapshotRepository.instance.save(config);
         },
         isEmpty: (config) => config.snapshots.isEmpty,
-      );
-      await _migrateConfig<MonthClosingConfig>(
-        uid: uid,
-        mode: mode,
-        configKey: 'month_closing',
-        loadLocal: () async => await LocalMonthClosingRepository().load(),
-        saveCloud: (config) async {
-          await MonthClosingRepository.instance.save(config);
-        },
-        isEmpty: (config) => config.closings.isEmpty,
-      );
-      await _migrateConfig<ChecklistConfig>(
-        uid: uid,
-        mode: mode,
-        configKey: 'checklist',
-        loadLocal: () async => await LocalChecklistRepository().load(),
-        saveCloud: (config) async {
-          await ChecklistRepository.instance.save(config);
-        },
-        // チェックリストは「デフォルト」が常にあるので isEmpty 判定で
-        // 「未編集ならクラウドへアップロードしない」とする。
-        isEmpty: (config) => config.items.isEmpty,
       );
     } finally {
       // モードを元に戻す

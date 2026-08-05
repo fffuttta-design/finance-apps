@@ -21,7 +21,6 @@ import '../utils/web_reload_stub.dart'
 import 'account_editor_screen.dart';
 import 'card_editor_screen.dart';
 import 'category_editor_screen.dart';
-import 'checklist_editor_screen.dart';
 import 'income_master_screen.dart';
 import 'sidebar_order_screen.dart';
 import 'subscription_list_screen.dart';
@@ -346,16 +345,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               context,
               MaterialPageRoute(
                   builder: (_) => const SubscriptionListScreen()),
-            ),
-          ),
-          _tile(
-            icon: Icons.checklist,
-            title: '月末締めチェックリスト',
-            subtitle: '締め前に確認するサイト・項目を登録',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const ChecklistEditorScreen()),
             ),
           ),
           _tile(
@@ -793,14 +782,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           return 'カテゴリ';
         case 'subscriptions':
           return '固定費';
-        case 'checklist':
-          return 'チェックリスト';
         case 'income_sources':
           return '収入マスタ';
         case 'monthly_snapshots':
           return '月初残高';
-        case 'month_closing':
-          return '月末締め';
       }
       return key;
     }

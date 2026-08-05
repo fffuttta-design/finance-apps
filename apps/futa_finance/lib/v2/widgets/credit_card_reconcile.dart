@@ -63,9 +63,6 @@ class CreditCardBillingSection extends StatelessWidget {
   /// 行タップ → 照合シートを開く。
   final void Function(ReconcileWallet wallet) onOpenReconcile;
 
-  /// この月に「締め済み」のウォレット名（行を薄く＋締め済バッジ表示）。
-  final Set<String> closedWalletNames;
-
   const CreditCardBillingSection({
     super.key,
     required this.cards,
@@ -74,7 +71,6 @@ class CreditCardBillingSection extends StatelessWidget {
     this.subscriptions = const [],
     required this.ym,
     required this.onOpenReconcile,
-    this.closedWalletNames = const {},
   });
 
   /// 当月・当ウォレットの明細合計（予定金額）。取引＋このウォレット払いの固定費。
@@ -234,7 +230,6 @@ class CreditCardBillingSection extends StatelessWidget {
                   planned: rows[i].planned,
                   actual: rows[i].actual,
                   onOpenReconcile: onOpenReconcile,
-                  closed: closedWalletNames.contains(rows[i].wallet.name),
                 ),
               ],
             ],
@@ -284,24 +279,17 @@ class _BillingRow extends StatelessWidget {
   /// 行タップ → 照合シートを開く。
   final void Function(ReconcileWallet wallet) onOpenReconcile;
 
-  /// この月が締め済みか（薄く＋「締め済」バッジを出す）。
-  final bool closed;
-
   const _BillingRow({
     required this.wallet,
     required this.planned,
     required this.actual,
     required this.onOpenReconcile,
-    this.closed = false,
   });
 
   @override
   Widget build(BuildContext context) {
     // 予定（明細合計）だけを表示。実際額の照合は各ウォレットの詳細画面で行う。
-    // 締め済みのウォレットは薄く表示して「もう確定」を示す。
-    return Opacity(
-      opacity: closed ? 0.5 : 1.0,
-      child: InkWell(
+    return InkWell(
       onTap: () => onOpenReconcile(wallet),
       child: Padding(
         padding: const EdgeInsets.symmetric(
@@ -327,22 +315,6 @@ class _BillingRow extends StatelessWidget {
                             style: V2Typography.body
                                 .copyWith(fontWeight: FontWeight.w700)),
                       ),
-                      if (closed) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE7F6EF),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text('締め済',
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF059669))),
-                        ),
-                      ],
                     ],
                   ),
                   if (wallet.subtitle != null)
@@ -367,7 +339,6 @@ class _BillingRow extends StatelessWidget {
                 size: 18, color: V2Colors.textMuted),
           ],
         ),
-      ),
       ),
     );
   }

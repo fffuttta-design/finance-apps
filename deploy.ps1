@@ -154,6 +154,11 @@ if ($LASTEXITCODE -eq 0) {
 $apkRenamed = Join-Path $appDir "build\$assetName"
 Copy-Item -Path $apkSrc -Destination $apkRenamed -Force
 
+# Keep only the just-built APK: remove older futa-finance-v*.apk. See C:\dev CLAUDE.md.
+Get-ChildItem -LiteralPath (Join-Path $appDir 'build') -Filter 'futa-finance-v*.apk' -File |
+  Where-Object { $_.Name -ne $assetName } |
+  ForEach-Object { Write-Host "  removed old: $($_.Name)"; Remove-Item $_.FullName -Force }
+
 gh release create $tag $apkRenamed `
   --repo $repo `
   --title "FutaFinance v$fullVersion" `

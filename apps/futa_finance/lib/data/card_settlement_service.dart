@@ -1,7 +1,6 @@
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../utils/jp_holidays.dart';
-import 'month_closing_repository.dart';
 import 'settings_repository.dart';
 import 'subscription_repository.dart';
 import 'transaction_repository.dart';
@@ -44,8 +43,6 @@ class CardSettlementService {
     final cfg = await SettingsRepository.instance.loadPayments();
     final txns = await TransactionRepository.instance.loadAll();
     final subs = (await SubscriptionRepository.instance.load()).subscriptions;
-    // 締め済みの月には引落を作らない（締めた後に明細が湧く問題の対策）。
-    final closing = await MonthClosingRepository.instance.load();
 
     final today = DateTime.now();
     final todayD = DateTime(today.year, today.month, today.day);
@@ -87,15 +84,13 @@ class CardSettlementService {
         final id = 'cardsettle_${card.id}_$usageYm';
         if (existingIds.contains(id)) continue;
 
-        // 引落日の月（W）が締め済みなら作らない（引落口座/カードのどちらかが締め済みでも）。
-        final wYm = '${w.year}-${w.month.toString().padLeft(2, '0')}';
-        final bankName = bank.name; // closure 外で確定（null 昇格のため）
-        final cardName = card.name;
-        final monthClosed = closing.closings.any((c) =>
-            (c.yearMonth == 'w:$bankName:$wYm' ||
-                c.yearMonth == 'card:$cardName:$wYm') &&
-            c.isClosed);
-        if (monthClosed) continue;
+        // 既にその月にこのカード宛の振替（手動ミラー/自動引落）があれば二重生成しない。
+        final alreadySettled = txns.any((t) =>
+            t.type == core.TransactionType.transfer &&
+            t.transferToAccount == card.name &&
+            t.date.year == w.year &&
+            t.date.month == w.month);
+        if (alreadySettled) continue;
 
         final amount = card.monthlyActualBillings[usageYm] ??
             _planned(card.name, usageYm, txns, subs, curYm);

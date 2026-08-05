@@ -501,7 +501,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                                 color: Color(0xFF111827))),
                         subtitle: Text(
                             _isPending
-                                ? '発生月に計上。残高は更新しない。\n月末締めの「入金締め処理」で確定に切り替え。'
+                                ? '発生月に計上。残高は更新しない。\n入金されたら確定に切り替える。'
                                 : 'OFF: 通常の確定入金として記録（残高も更新）',
                             style: const TextStyle(
                                 fontSize: 11,

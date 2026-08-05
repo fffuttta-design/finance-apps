@@ -14,7 +14,6 @@ import '../../screens/budget_items_screen.dart';
 import '../../screens/compliance_calendar_screen.dart';
 import '../../screens/card_editor_screen.dart';
 import '../../screens/category_editor_screen.dart';
-import '../../screens/checklist_editor_screen.dart';
 import '../../screens/store_master_screen.dart';
 import '../../screens/subscription_list_screen.dart';
 import 'panels/v2_backup_panel.dart';
@@ -97,8 +96,6 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
           desc: '算定基礎届・年度更新・申告期限などの締切'),
       _MenuItem('replacements', '変換マスタ', Icons.find_replace,
           desc: 'レシートの表記ゆれを置換'),
-      _MenuItem('checklist', '月末締めチェックリスト', Icons.checklist,
-          desc: '月末の確認項目を編集'),
     ]),
     _MenuGroup(title: 'データ管理', items: [
       _MenuItem('backup', 'バックアップ / 取り込み',
@@ -250,12 +247,6 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
             note: '算定基礎届・労働保険の年度更新・各種申告期限など、'
                 '会社の手続きの締切を管理します。',
             icon: Icons.event_note_outlined,
-            iconColor: V2Colors.info);
-      case 'checklist':
-        return _embedV1(const ChecklistEditorScreen(),
-            title: '月末締めチェックリスト',
-            note: '月末締めの確認項目（2階層）を編集。動的リンクで銀行/クレカと自動紐付け。',
-            icon: Icons.checklist,
             iconColor: V2Colors.info);
       case 'replacements':
         return const V2ReplacementPanel();

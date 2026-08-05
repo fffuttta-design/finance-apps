@@ -1,12 +1,10 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../widgets/find_in_page.dart';
-import '../data/month_closing_repository.dart';
 import '../data/month_cursor.dart';
 import '../data/payments_change_notifier.dart';
 import '../data/settings_repository.dart';
@@ -61,10 +59,6 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   /// 各取引の sortOrder に保存する。残高はこのモードでも表示し、
   /// 「表示順に沿って積み上げた値」を出す（並び替えるたびに再計算される）。
   bool _customOrder = false;
-  // 月締め処理中フラグ（ボタン多重押し防止）。
-  bool _busyClose = false;
-  // ウォレット×月ごとの「締め済み」状態（明示的にボタンを押したときだけ立つ）。
-  core.MonthClosingConfig _closing = core.MonthClosingConfig.empty();
 
   // ─── 未保存編集の管理 ─────────────────────
   /// ユーザーが手入力で上書きした月初残高（保存前のローカル状態）。
@@ -141,57 +135,10 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
 
   Future<void> _load() async {
     final list = await TransactionRepository.instance.loadAll();
-    final closing = await MonthClosingRepository.instance.load();
     if (!mounted) return;
     setState(() {
       _all = list;
-      _closing = closing;
     });
-  }
-
-  /// ウォレット×月の締めキー（月グローバルの締めと衝突しない接頭辞付き）。
-  String _walletMonthKey(DateTime m) =>
-      'w:${_account.name}:${m.year}-${m.month.toString().padLeft(2, '0')}';
-
-  bool get _isMonthClosed {
-    final m = _selectedMonth;
-    if (m == null) return false;
-    final key = _walletMonthKey(m);
-    return _closing.closings.any((c) => c.yearMonth == key && c.isClosed);
-  }
-
-  /// 指定取引の「この口座の月」が締め済みか（全期間表示でも取引日で判定）。
-  bool _isClosedForTxn(core.Transaction t) {
-    final key = 'w:${_account.name}:'
-        '${t.date.year}-${t.date.month.toString().padLeft(2, '0')}';
-    return _closing.closings.any((c) => c.yearMonth == key && c.isClosed);
-  }
-
-  /// 締め済みの月の取引を変更しようとしたとき、確認アラートを出す。
-  /// 「変更する」を選んだときだけ true を返す（それ以外は false＝編集させない）。
-  Future<bool> _confirmEditClosed(core.Transaction t) async {
-    if (!_isClosedForTxn(t)) return true;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dctx) => AlertDialog(
-        title: const Text('締め済みの月です'),
-        content: Text(
-            '${t.date.month}月は締め済みです。この取引の金額や内容を変更すると、'
-            '締めた月の集計・残高が変わります。それでも変更しますか？'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(dctx, false),
-              child: const Text('やめる')),
-          FilledButton(
-            style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFDC2626)),
-            onPressed: () => Navigator.pop(dctx, true),
-            child: const Text('変更する'),
-          ),
-        ],
-      ),
-    );
-    return ok == true;
   }
 
   // ───────────────────────────────────────────────────────────
@@ -493,21 +440,11 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         // メインカラムレイアウト: 広い画面では中央寄せ + 最大幅
         body: _wrapFind(LayoutBuilder(
           builder: (ctx, constraints) {
-            // 締め済みの月は本文（残高カード＋明細）を薄く（グレーアウト）。
-            final closed = _isMonthClosed;
             final content = Column(
               children: [
                 _monthSelector(),
-                _closeMonthBar(),
                 Expanded(
-                  // 締め済みは薄い青のトーンを重ねて背景と区別（灰色だと紛らわしい）。
-                  child: ColoredBox(
-                    color: closed
-                        ? const Color(0xFFF6E7C9)
-                        : Colors.transparent,
-                    child: Opacity(
-                    opacity: closed ? 0.72 : 1.0,
-                    child: Column(
+                  child: Column(
                       children: [
                         _summaryCard(
                           inSum: inSum,
@@ -544,8 +481,6 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                         ),
                       ],
                     ),
-                  ),
-                  ),
                 ),
               ],
             );
@@ -837,9 +772,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     final t = row.txn;
     final isOut = row.signedAmount < 0;
     final desc = _ledgerDescOf(row);
-    final reviewed = t.reviewed;
     return Container(
-      color: reviewed ? const Color(0xFFF3F4F6) : Colors.white,
+      color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11),
       child: Row(
         children: [
@@ -847,11 +781,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
             width: 74,
             child: Text(
                 '${t.date.month.toString().padLeft(2, '0')}/${t.date.day.toString().padLeft(2, '0')}',
-                style: TextStyle(
-                    fontSize: 12,
-                    color: reviewed
-                        ? const Color(0xFF9CA3AF)
-                        : const Color(0xFF6B7280))),
+                style: const TextStyle(
+                    fontSize: 12, color: Color(0xFF6B7280))),
           ),
           Expanded(
             child: HiliteText(desc,
@@ -886,23 +817,6 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                         ? const Color(0xFF111827)
                         : const Color(0xFFDC2626))),
           ),
-          if (_showClosing)
-            SizedBox(
-              width: 34,
-              child: Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: Checkbox(
-                    value: reviewed,
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    activeColor: const Color(0xFF6B7280),
-                    onChanged: (v) => _toggleReviewed(t, v ?? false),
-                  ),
-                ),
-              ),
-            ),
           IconButton(
             icon: const Icon(Icons.edit_outlined,
                 size: 16, color: Color(0xFF6B7280)),
@@ -1276,8 +1190,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
             4: FixedColumnWidth(88), // 支出
             5: FixedColumnWidth(104), // 振替
             6: FixedColumnWidth(108), // 残高
-            7: FixedColumnWidth(44), // 確認チェック
-            8: FixedColumnWidth(40), // 編集
+            7: FixedColumnWidth(40), // 編集
           },
           defaultVerticalAlignment: TableCellVerticalAlignment.middle,
           border: const TableBorder(
@@ -1432,7 +1345,6 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     final isTransfer = t.type == core.TransactionType.transfer;
     final isAdjust = t.category.major == '差額調整';
     final desc = _ledgerDescOf(row);
-    final reviewed = t.reviewed;
     final amountColor = isTransfer ? _cTransfer : (isOut ? _cRed : _cGreen);
     final amountStr = isOut
         ? '−${formatYen(-row.signedAmount)}'
@@ -1442,9 +1354,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       decoration: BoxDecoration(
         color: current
             ? const Color(0xFFFFECB3)
-            : reviewed
-                ? const Color(0xFFF3F4F6)
-                : Colors.white,
+            : Colors.white,
         border:
             const Border(bottom: BorderSide(color: Color(0xFFF1F2F4))),
       ),
@@ -1461,13 +1371,11 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
               children: [
                 Text(
                     '${t.date.month.toString().padLeft(2, '0')}/${t.date.day.toString().padLeft(2, '0')}',
-                    style: TextStyle(
+                    style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         fontFamily: 'monospace',
-                        color: reviewed
-                            ? const Color(0xFF9CA3AF)
-                            : const Color(0xFF374151))),
+                        color: Color(0xFF374151))),
                 Text('${t.date.year}',
                     style: const TextStyle(
                         fontSize: 9, color: Color(0xFF9CA3AF))),
@@ -1515,18 +1423,6 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                   fontWeight: FontWeight.w700,
                   fontFamily: 'monospace',
                   color: amountColor)),
-          // 確認済みチェック（締め機能＝Windows/Webのみ）。
-          if (_showClosing)
-            SizedBox(
-              width: 30,
-              child: Checkbox(
-                value: reviewed,
-                visualDensity: VisualDensity.compact,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                activeColor: const Color(0xFF6B7280),
-                onChanged: (v) => _toggleReviewed(t, v ?? false),
-              ),
-            ),
           IconButton(
             icon: const Icon(Icons.edit_outlined,
                 size: 16, color: Color(0xFF6B7280)),
@@ -1563,15 +1459,6 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         h('支出', right: true),
         h('振替', right: true),
         h('残高', right: true),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 9),
-          child: Text('確認',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF6B7280))),
-        ),
         const SizedBox.shrink(),
       ],
     );
@@ -1625,8 +1512,6 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                   fontWeight: FontWeight.w700,
                   fontFamily: 'monospace')),
         ),
-        // 確認列（残高行にはチェック無し）。
-        const SizedBox.shrink(),
         // 編集列（鉛筆）。
         IconButton(
           icon: Icon(Icons.edit,
@@ -1855,7 +1740,6 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       amount: diff.abs(),
       transferFromAccount: up ? '差額調整' : _account.name,
       transferToAccount: up ? _account.name : '差額調整',
-      reviewed: true,
       memo: 'アプリ導入前などのズレを、入力した月末残高に合わせて調整',
     );
     await TransactionRepository.instance.add(tx);
@@ -1879,24 +1763,18 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                   fontWeight: FontWeight.w600,
                   fontFamily: 'monospace')),
         );
-    final reviewed = t.reviewed;
     return TableRow(
-      // ページ内検索の「現在の1件」は琥珀色で強調（確認済みグレーより優先）。
+      // ページ内検索の「現在の1件」は琥珀色で強調。
       decoration: current
           ? const BoxDecoration(color: Color(0xFFFFECB3))
-          : reviewed
-              ? const BoxDecoration(color: Color(0xFFF3F4F6))
-              : null,
+          : null,
       children: [
       Padding(
         padding: _cellPad,
         child: Text(
             '${t.date.year}/${t.date.month.toString().padLeft(2, '0')}/${t.date.day.toString().padLeft(2, '0')}',
-            style: TextStyle(
-                fontSize: 12,
-                color: reviewed
-                    ? const Color(0xFF9CA3AF)
-                    : const Color(0xFF6B7280))),
+            style: const TextStyle(
+                fontSize: 12, color: Color(0xFF6B7280))),
       ),
       // 種別（入金/出金/振替）。タップで変更（振替は移動先を尋ねる）。
       _typeCell(t),
@@ -1943,21 +1821,6 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                 fontWeight: FontWeight.w700,
                 fontFamily: 'monospace')),
       ),
-      // 確認済みチェック（締め機能＝Windows/Webのみ）。
-      if (_showClosing)
-        Center(
-          child: SizedBox(
-            width: 24,
-            height: 24,
-            child: Checkbox(
-              value: reviewed,
-              visualDensity: VisualDensity.compact,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              activeColor: const Color(0xFF6B7280),
-              onChanged: (v) => _toggleReviewed(t, v ?? false),
-            ),
-          ),
-        ),
       IconButton(
         icon: const Icon(Icons.edit_outlined,
             size: 16, color: Color(0xFF6B7280)),
@@ -2046,12 +1909,11 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     }
   }
 
-  /// 明細の種別を変更する（収入⇔支出⇔振替）。締め済み月なら先に確認。
+  /// 明細の種別を変更する（収入⇔支出⇔振替）。
   /// 収入/支出はこの口座の取引として付け替え、振替は相手口座を選ばせる。
   Future<void> _changeType(
       core.Transaction t, core.TransactionType to) async {
     if (t.type == to) return;
-    if (!await _confirmEditClosed(t)) return;
     if (!mounted) return;
     if (to == core.TransactionType.transfer) {
       final counterpart = await _pickCounterpartAccount();
@@ -2121,169 +1983,11 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     );
   }
 
-  Future<void> _toggleReviewed(core.Transaction t, bool value) async {
-    await TransactionRepository.instance
-        .update(t.copyWith(reviewed: value));
-    if (mounted) await _load();
-  }
-
-  /// 選択中の月で、このウォレットに関係する取引（支払元/入金先/振替の相手）。
-  List<core.Transaction> _monthRelatedTxns() {
-    final m = _selectedMonth;
-    if (m == null) return const [];
-    final name = _account.name;
-    return _all.where((t) {
-      if (t.date.year != m.year || t.date.month != m.month) return false;
-      if (t.type == core.TransactionType.transfer) {
-        return t.transferFromAccount == name || t.transferToAccount == name;
-      }
-      return t.paymentMethod == name;
-    }).toList();
-  }
-
-  /// この月を締める＝この月のこのウォレットの取引を全部「確認済み」にする。
-  Future<void> _setClosedFlag(DateTime m, bool closed) async {
-    final key = _walletMonthKey(m);
-    final existing = _closing.closings.firstWhere(
-      (c) => c.yearMonth == key,
-      orElse: () => core.MonthClosing(yearMonth: key),
-    );
-    final updated = closed
-        ? existing.copyWith(closedAt: DateTime.now())
-        : existing.copyWith(clearClosedAt: true);
-    await MonthClosingRepository.instance.save(_closing.upsert(updated));
-  }
-
-  /// この月を締める＝取引を全部「確認済み」にして、明示的な締めフラグを立てる。
-  Future<void> _closeMonth() async {
-    final m = _selectedMonth;
-    if (m == null) return;
-    final txns = _monthRelatedTxns();
-    final todo = txns.where((t) => !t.reviewed).toList();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dctx) => AlertDialog(
-        title: Text('${m.month}月を締めますか？'),
-        content: Text(
-            txns.isEmpty
-                ? '「${_account.name}」の${m.year}年${m.month}月は明細が1件もありません。\n'
-                    'このまま「明細なし」で締めます。'
-                : '「${_account.name}」の${m.year}年${m.month}月の取引 ${txns.length}件を、'
-                    'すべて「確認済み（金額に間違いなし）」にして締めます。'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(dctx, false),
-              child: const Text('キャンセル')),
-          FilledButton(
-              onPressed: () => Navigator.pop(dctx, true),
-              child: const Text('締める')),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    setState(() => _busyClose = true);
-    for (final t in todo) {
-      await TransactionRepository.instance.update(t.copyWith(reviewed: true));
-    }
-    await _setClosedFlag(m, true);
-    if (!mounted) return;
-    await _load();
-    if (!mounted) return;
-    setState(() => _busyClose = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${m.month}月を締めました')));
-  }
-
-  /// 締めを解除＝締めフラグを外す（確認チェックはそのまま残す）。
-  Future<void> _reopenMonth() async {
-    final m = _selectedMonth;
-    if (m == null) return;
-    setState(() => _busyClose = true);
-    await _setClosedFlag(m, false);
-    if (!mounted) return;
-    await _load();
-    if (!mounted) return;
-    setState(() => _busyClose = false);
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('${m.month}月の締めを解除しました')));
-  }
-
-  /// 月の締めバー（月選択時のみ）。
-  /// 締め済みは「ユーザーが締めボタンを押したとき」だけ（チェック全部でも自動では締めない）。
-  /// 締め機能・確認チェックは Windows/Web でのみ表示（Androidアプリでは非表示）。
-  /// Windowsデスクトップは Flutter Web を Electron で包む構成のため kIsWeb=true。
-  bool get _showClosing => kIsWeb;
-
-  Widget _closeMonthBar() {
-    if (!_showClosing) return const SizedBox.shrink();
-    final m = _selectedMonth;
-    if (m == null) return const SizedBox.shrink();
-    final txns = _monthRelatedTxns();
-    // 明細が1件も無い月でも締められる（例：2月の PayPay で取引ゼロでも締めたい）。
-    final empty = txns.isEmpty;
-    final closed = _isMonthClosed;
-    final doneCount = txns.where((t) => t.reviewed).length;
-    return Container(
-      color: closed ? const Color(0xFFE7F6EF) : const Color(0xFFF7F8FA),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: Row(
-        children: [
-          Icon(closed ? Icons.verified : Icons.fact_check_outlined,
-              size: 18,
-              color: closed
-                  ? const Color(0xFF059669)
-                  : const Color(0xFF6B7280)),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              closed
-                  ? (empty
-                      ? '${m.month}月は締め済み（明細なし）'
-                      : '${m.month}月は締め済み（全${txns.length}件 確認済み）')
-                  : (empty
-                      ? '${m.month}月は明細がありません'
-                      : '確認済み $doneCount/${txns.length}件'),
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: closed
-                      ? const Color(0xFF059669)
-                      : const Color(0xFF6B7280)),
-            ),
-          ),
-          if (closed)
-            TextButton(
-              onPressed: _busyClose ? null : _reopenMonth,
-              child: const Text('締め解除'),
-            )
-          else
-            FilledButton.icon(
-              onPressed: _busyClose ? null : _closeMonth,
-              icon: _busyClose
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.check_circle, size: 16),
-              label: Text('${m.month}月を締める'),
-              style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF059669),
-                  visualDensity: VisualDensity.compact),
-            ),
-        ],
-      ),
-    );
-  }
-
   // ───────────────────────────────────────────────────────────
   // 編集ダイアログ（行の鉛筆アイコンから呼ぶ）
   // ───────────────────────────────────────────────────────────
 
   Future<void> _showEditDialog(core.Transaction t) async {
-    // 締め済みの月の取引なら、まず確認アラート。「変更する」以外は編集しない。
-    if (!await _confirmEditClosed(t)) return;
-    if (!mounted) return;
     // 種類別に、アプリ共通の入力画面（中央ポップアップ）で編集する。
     // 以前はこの画面だけ独自の AlertDialog で、広い画面だと中身がグレーの
     // まま出ない不具合があったため、他画面と同じ入力フォームに統一した。

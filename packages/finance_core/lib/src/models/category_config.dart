@@ -238,6 +238,11 @@ class MajorCategory {
   /// 既存取引や集計には影響しない（編集画面では薄く表示して復帰可能）。
   final bool inactive;
 
+  /// 非消費フラグ。true なら「それ以外（税金・社会保険・各種手数料など、
+  /// 必須だが消費ではない支出）」として扱い、支出画面の消費合計から除外して別集計する。
+  /// false（既定）＝通常の消費支出。残高計算・取引データには影響しない（集計/表示のみ）。
+  final bool nonConsumption;
+
   /// ユーザー指定のカテゴリ色（ARGB int）。null なら名前から自動生成。
   final int? colorValue;
 
@@ -248,6 +253,7 @@ class MajorCategory {
     this.subIcons,
     this.section,
     this.inactive = false,
+    this.nonConsumption = false,
     this.colorValue,
   });
 
@@ -264,6 +270,7 @@ class MajorCategory {
         'subIcons': subIcons,
         'section': section,
         'inactive': inactive,
+        'nonConsumption': nonConsumption,
         'colorValue': colorValue,
       };
 
@@ -275,6 +282,7 @@ class MajorCategory {
             ?.map((k, v) => MapEntry(k, v as String)),
         section: json['section'] as String?,
         inactive: json['inactive'] as bool? ?? false,
+        nonConsumption: json['nonConsumption'] as bool? ?? false,
         colorValue: (json['colorValue'] as num?)?.toInt(),
       );
 
@@ -285,6 +293,7 @@ class MajorCategory {
     Map<String, String>? subIcons,
     String? section,
     bool? inactive,
+    bool? nonConsumption,
     int? colorValue,
     bool clearColor = false,
   }) =>
@@ -295,6 +304,7 @@ class MajorCategory {
         subIcons: subIcons ?? this.subIcons,
         section: section ?? this.section,
         inactive: inactive ?? this.inactive,
+        nonConsumption: nonConsumption ?? this.nonConsumption,
         colorValue: clearColor ? null : (colorValue ?? this.colorValue),
       );
 }

@@ -280,6 +280,16 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
     _update(list);
   }
 
+  /// 「消費に含めない（税金・手数料など）」トグル。
+  /// ON にすると nonConsumption=true になり、支出タブの「消費支出」合計から外れて
+  /// 別小計（必須・非消費）に回る。残高・収支の計算には一切影響しない（表示のみ）。
+  void _toggleNonConsumption(int index) {
+    final list = [..._config!.majors];
+    list[index] =
+        list[index].copyWith(nonConsumption: !list[index].nonConsumption);
+    _update(list);
+  }
+
   /// カテゴリ色を10色プリセットから選ぶ（「自動」で指定解除）。
   Future<void> _pickColor(int index) async {
     final current = _config!.majors[index].colorValue;
@@ -600,6 +610,22 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
                             ),
                             const SizedBox(width: 6),
                           ],
+                          if (major.nonConsumption) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEDE9FE),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: const Text('非消費',
+                                  style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF6D28D9))),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
                           Text(
                             '小カテゴリ${major.subs.length}件 ・ ',
                             style: const TextStyle(
@@ -636,6 +662,21 @@ class _CategoryEditorScreenState extends State<CategoryEditorScreen> {
                         : const Color(0xFF9CA3AF)),
                 onPressed: () => _pickColor(index),
                 tooltip: '色を選ぶ',
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                    major.nonConsumption
+                        ? Icons.remove_shopping_cart
+                        : Icons.shopping_cart_outlined,
+                    size: 18,
+                    color: major.nonConsumption
+                        ? const Color(0xFF7C3AED)
+                        : const Color(0xFF9CA3AF)),
+                onPressed: () => _toggleNonConsumption(index),
+                tooltip: major.nonConsumption
+                    ? '消費に含める'
+                    : '消費に含めない（税金・手数料など）',
               ),
               IconButton(
                 visualDensity: VisualDensity.compact,
