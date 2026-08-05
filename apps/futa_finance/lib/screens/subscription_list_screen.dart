@@ -159,6 +159,9 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     String? endYm = initial?.endYearMonth;
     // 実明細化したときの領収書の受け取り方（'paper'/'drive'/null）。
     String? receiptKind = initial?.receiptKind;
+    // 支出タブで「消費に含めない（非消費）」として別小計に回すか。
+    // 明示指定。未指定でも会計科目が非消費カテゴリなら支出タブ側で非消費扱いになる。
+    bool nonConsumption = initial?.nonConsumption ?? false;
 
     // カテゴリ設定を読み込む。
     final catConfig = await _settings.loadCategories();
@@ -464,6 +467,7 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                   : endYm,
               // 変動費の月別実額は編集で消さない（保持）。
               monthlyActuals: initial?.monthlyActuals ?? const {},
+              nonConsumption: nonConsumption,
             );
             Navigator.pop(ctx, result);
           }
@@ -915,6 +919,23 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                               style: TextStyle(
                                   fontSize: 11, color: Color(0xFF9CA3AF)),
                             ),
+                          ),
+                          // 支出タブの「消費／非消費」振り分け。ONで消費合計から外して
+                          // 「必須・非消費（税金・手数料など）」の別小計に回す（支出タブの表示のみ・
+                          // 収支/残高/PLの計算は不変）。OFFでも会計科目が非消費カテゴリなら非消費扱い。
+                          const SizedBox(height: 8),
+                          SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            dense: true,
+                            value: nonConsumption,
+                            onChanged: (v) =>
+                                setLocal(() => nonConsumption = v),
+                            title: const Text('消費に含めない（非消費）',
+                                style: TextStyle(fontSize: 13)),
+                            subtitle: const Text(
+                                '税金・社会保険・各種手数料など。支出タブで消費合計から外し別小計に表示します。',
+                                style: TextStyle(
+                                    fontSize: 11, color: Color(0xFF9CA3AF))),
                           ),
                           const SizedBox(height: 16),
                           _logoUrlField(iconUrlCtrl, '🔁', setLocal,

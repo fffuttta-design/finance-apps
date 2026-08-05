@@ -99,6 +99,14 @@ class Subscription {
   /// 支出の store と同じ扱い。場所別の集計に固定費も乗せたいとき用。
   final String? store;
 
+  /// 非消費フラグ。true なら支出タブで「消費に含めない（税金・社会保険・各種手数料など、
+  /// 必須だが消費でない支出）」として扱い、消費合計から外して別小計に回す。
+  /// false（既定）でも、会計科目 plMajor が非消費カテゴリなら非消費扱いになる
+  /// （このフラグは plMajor 判定より優先する明示指定）。
+  /// ⚠ 表示上の振り分けだけに使う。残高・収支・PL・月次スナップショット等の計算には
+  /// 一切影響しない（実際の出金は全額計上のまま）。
+  final bool nonConsumption;
+
   const Subscription({
     required this.id,
     required this.name,
@@ -121,6 +129,7 @@ class Subscription {
     this.categoryMajor,
     this.categorySub,
     this.store,
+    this.nonConsumption = false,
   });
 
   /// 指定月("YYYY-MM")の表示金額。変動費は未入力なら0、固定費は定額。
@@ -190,6 +199,7 @@ class Subscription {
         if (categoryMajor != null) 'categoryMajor': categoryMajor,
         if (categorySub != null) 'categorySub': categorySub,
         if (store != null) 'store': store,
+        if (nonConsumption) 'nonConsumption': true,
       };
 
   factory Subscription.fromJson(Map<String, dynamic> j) => Subscription(
@@ -227,6 +237,7 @@ class Subscription {
         categoryMajor: j['categoryMajor'] as String?,
         categorySub: j['categorySub'] as String?,
         store: j['store'] as String?,
+        nonConsumption: j['nonConsumption'] as bool? ?? false,
       );
 
   Subscription copyWith({
@@ -258,6 +269,7 @@ class Subscription {
     bool clearCategorySub = false,
     String? store,
     bool clearStore = false,
+    bool? nonConsumption,
   }) =>
       Subscription(
         id: id,
@@ -289,6 +301,7 @@ class Subscription {
         categorySub:
             clearCategorySub ? null : (categorySub ?? this.categorySub),
         store: clearStore ? null : (store ?? this.store),
+        nonConsumption: nonConsumption ?? this.nonConsumption,
       );
 }
 

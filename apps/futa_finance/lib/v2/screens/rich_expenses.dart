@@ -217,6 +217,17 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   bool _isNonConsumMajor(String major) =>
       _nonConsumMajors.contains(_bareMajor(major));
 
+  /// その固定費（サブスク）が「消費に含めない（非消費）」か。
+  /// ①明示フラグ nonConsumption を最優先 → ②無ければ会計科目 plMajor を
+  /// 非消費カテゴリ（_nonConsumMajors）と突合。＝カテゴリの非消費フラグを
+  /// 唯一の正として再利用しつつ、個人モード等で plMajor 未設定でも明示指定できる。
+  bool _isNonConsumSub(core.Subscription s) {
+    if (s.nonConsumption) return true;
+    final pl = (s.plMajor ?? '').trim();
+    if (pl.isEmpty) return false;
+    return _isNonConsumMajor(pl);
+  }
+
 
   /// 名前の正規化（実取引との照合用）。
   String _normName(String s) =>
@@ -344,7 +355,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
         String? iconUrl,
         int? billingDay,
         bool pending
-      })> _fixedLinesForMonth(DateTime m) {
+      })> _fixedLinesForMonth(DateTime m,
+      [List<core.Subscription>? subsOverride]) {
+    final subsList = subsOverride ?? _visibleSubs;
     final now = DateTime.now();
     final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
@@ -356,8 +369,8 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
       int? billingDay,
       bool pending
     })>[];
-    final matched = _matchedSubIds(m);
-    for (final sub in _visibleSubs) {
+    final matched = _matchedSubIds(m, subsList);
+    for (final sub in subsList) {
       // 実取引がある固定費は予定行を出さない（実取引を採用）。
       if (matched.contains(sub.id)) continue;
       final amt = sub.plAmountForMonth(ym, curYm);
@@ -874,31 +887,47 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     // 消費 / 非消費（税金・社会保険・各種手数料など）で取引を分ける。
     // 非消費は「支出合計・内訳の表示」からのみ外して別小計に回す。行自体は消さない。
     // ⚠ 残高・収支の計算（rich_home 等）はここを通らず全支出で計算するので不変。
-    // 固定費（サブスク）は従来どおり消費側に含める（非消費対象は取引カテゴリのみ）。
     final consumptionRows =
         rows.where((t) => !_isNonConsumMajor(t.category.major)).toList();
     final nonConsumRows =
         rows.where((t) => _isNonConsumMajor(t.category.major)).toList();
     final txTotal =
         consumptionRows.fold<int>(0, (s, t) => s + t.effectiveAmount);
+    // 固定費（サブスク）も「消費／非消費」で分ける。非消費サブスク（明示フラグ or
+    // 会計科目が非消費カテゴリ）は消費合計に足さず、下の非消費小計に回す。
+    // ⚠ 実際の出金は全額どこかに必ず表示され、金額が消えることはない。
+    final consumSubsList =
+        _visibleSubs.where((s) => !_isNonConsumSub(s)).toList();
+    final nonConsumSubsList =
+        _visibleSubs.where((s) => _isNonConsumSub(s)).toList();
+    final subTotal = showFixedAndCard ? _subsOf(_month, consumSubsList) : 0;
+    final nonConsumSubTotal =
+        showFixedAndCard ? _subsOf(_month, nonConsumSubsList) : 0;
+    // 非消費小計＝非消費取引＋非消費固定費。
     final nonConsumTotal =
-        nonConsumRows.fold<int>(0, (s, t) => s + t.effectiveAmount);
-    final subTotal = showFixedAndCard ? _subsOf(_month) : 0;
-    // 表示の主役＝消費支出（消費取引＋固定費）。非消費はここに足さない。
+        nonConsumRows.fold<int>(0, (s, t) => s + t.effectiveAmount) +
+            nonConsumSubTotal;
+    // 表示の主役＝消費支出（消費取引＋消費固定費）。非消費はここに足さない。
     final total = txTotal + subTotal;
     // 支出合計（消費＋非消費）＝実際に出て行ったお金。必ずどこかで分かるよう表示する。
     final grandTotal = total + nonConsumTotal;
     final hasNonConsum = nonConsumTotal > 0;
+    final emptyFixedLines = <({
+      String id,
+      String name,
+      int amount,
+      String? iconUrl,
+      int? billingDay,
+      bool pending
+    })>[];
+    // 消費側の固定費明細（固定費・サブスクのドリルダウン＝合計と一致させる）。
     final fixedLines = showFixedAndCard
-        ? _fixedLinesForMonth(_month)
-        : <({
-            String id,
-            String name,
-            int amount,
-            String? iconUrl,
-            int? billingDay,
-            bool pending
-          })>[];
+        ? _fixedLinesForMonth(_month, consumSubsList)
+        : emptyFixedLines;
+    // 非消費側の固定費明細（非消費小計のドリルダウンで金額を辿れるように）。
+    final nonConsumFixedLines = showFixedAndCard
+        ? _fixedLinesForMonth(_month, nonConsumSubsList)
+        : emptyFixedLines;
 
     // カテゴリ内訳（大カテゴリ別・固定費込み）＋ドリルダウン用の取引一覧。
     // 消費支出のみを対象にする（非消費は下の別セクションで見せる）。
@@ -926,6 +955,12 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
           (byMajorNonConsum[major] ?? 0) + t.effectiveAmount;
       (txnsByMajorNonConsum[major] ??= []).add(t);
     }
+    // 非消費固定費（サブスク）も非消費小計の内訳に「固定費・サブスク」として足す
+    // （消費側と同じ扱い。ドリルダウンは nonConsumFixedLines で辿れる）。
+    if (nonConsumSubTotal > 0) {
+      byMajorNonConsum['固定費・サブスク'] =
+          (byMajorNonConsum['固定費・サブスク'] ?? 0) + nonConsumSubTotal;
+    }
     final nonConsumEntries = byMajorNonConsum.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
@@ -944,8 +979,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
       // ⚠ 実明細としてもう記録済みの固定費は足さない（rows に入っているので二重計上になる）。
       //   種類別の合計(_subsOf)は同じ _matchedSubIds で除外しているのに、ここだけ
       //   全件足していたため「支払方法別のオリコだけウォレットより多い」ズレが出ていた。
-      final matched = _matchedSubIds(_month);
-      for (final s in _visibleSubs) {
+      // 消費支出の支払方法別なので、消費固定費のみ足す（非消費は別小計側で扱う）。
+      final matched = _matchedSubIds(_month, consumSubsList);
+      for (final s in consumSubsList) {
         if (matched.contains(s.id)) continue;
         final amt = s.plAmountForMonth(ym, curYm);
         if (amt <= 0) continue;
@@ -1248,21 +1284,36 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                                       ? 0
                                       : e.value / nonConsumTotal,
                                   accent: accent,
-                                  iconKey: _catIcons[e.key],
+                                  iconKey: e.key == '固定費・サブスク'
+                                      ? null
+                                      : _catIcons[e.key],
                                   // 消費とは別物と分かるよう控えめなグレー。
                                   barColor: const Color(0xFF94A3B8),
-                                  details: [
-                                    for (final t in ([
-                                      ...?txnsByMajorNonConsum[e.key]
-                                    ]..sort((a, b) =>
-                                        b.amount.compareTo(a.amount))))
-                                      _CatDetailRow(
-                                          label: t.description.trim().isEmpty
-                                              ? formatMonthDay(t.date)
-                                              : '${formatMonthDay(t.date)}  ${t.description.trim()}',
-                                          amount: t.amount,
-                                          onTap: () => _edit(t)),
-                                  ],
+                                  // 固定費・サブスクは固定費明細を、その他は非消費取引を辿る。
+                                  details: e.key == '固定費・サブスク'
+                                      ? [
+                                          for (final f in nonConsumFixedLines
+                                              .where((x) => !x.pending))
+                                            _CatDetailRow(
+                                                label: f.name,
+                                                amount: f.amount,
+                                                onTap: () =>
+                                                    _editSubscription(f.id)),
+                                        ]
+                                      : [
+                                          for (final t in ([
+                                            ...?txnsByMajorNonConsum[e.key]
+                                          ]..sort((a, b) =>
+                                              b.amount.compareTo(a.amount))))
+                                            _CatDetailRow(
+                                                label: t.description
+                                                        .trim()
+                                                        .isEmpty
+                                                    ? formatMonthDay(t.date)
+                                                    : '${formatMonthDay(t.date)}  ${t.description.trim()}',
+                                                amount: t.amount,
+                                                onTap: () => _edit(t)),
+                                        ],
                                 ),
                             ],
                           ),
