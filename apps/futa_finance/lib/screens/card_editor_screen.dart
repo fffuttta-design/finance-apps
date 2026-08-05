@@ -65,6 +65,8 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
     String? selectedSettlementId = initial?.settlementAccountId;
     // 引落明細のカテゴリ（大カテゴリ・任意。未設定なら「振替」で表示）。
     String? selectedSettlementCat = initial?.settlementCategoryMajor;
+    // 引落を自動生成しない（通帳ミラー運用）。
+    bool selectedNoAutoSettlement = initial?.noAutoSettlement ?? false;
     bool selectedInactive = initial?.inactive ?? false;
     // ロゴURLの入力欄を開いているか（既にロゴがあれば畳んで「ロゴを編集」だけ）。
     bool logoEditing = (initial?.iconUrl ?? '').trim().isEmpty;
@@ -110,6 +112,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                     paymentDay: paymentDay,
                     settlementAccountId: selectedSettlementId,
                     settlementCategoryMajor: selectedSettlementCat,
+                    noAutoSettlement: selectedNoAutoSettlement,
                     inactive: selectedInactive,
                   ));
             } else {
@@ -128,6 +131,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                     clearSettlementAccount: selectedSettlementId == null,
                     settlementCategoryMajor: selectedSettlementCat,
                     clearSettlementCategory: selectedSettlementCat == null,
+                    noAutoSettlement: selectedNoAutoSettlement,
                     inactive: selectedInactive,
                   ));
             }
@@ -298,6 +302,27 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                               onToggleEdit: () =>
                                   setLocal(() => logoEditing = true)),
                           const SizedBox(height: 12),
+                          // 引落を自動生成しない（通帳ミラー運用のカード）。
+                          // ON にすると、このカードの引落は自動生成せず、銀行明細の
+                          // 取り込み（銀行CSV）から本物の引落だけが入る。二重・見込みズレを防ぐ。
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: selectedNoAutoSettlement,
+                            onChanged: (v) =>
+                                setLocal(() => selectedNoAutoSettlement = v),
+                            title: const Text('引落を自動生成しない（銀行明細から取り込む）',
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF111827))),
+                            subtitle: const Text(
+                                '引落口座を銀行CSVでミラーしているカードはON。'
+                                '引落は銀行明細から本物が入るので、見込みの自動引落を作りません',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF6B7280))),
+                          ),
+                          const SizedBox(height: 4),
                           // 未使用フラグ。設定の「未使用を隠す」が ON のとき
                           // ホーム/資産/クレカタブ から除外される。
                           SwitchListTile(

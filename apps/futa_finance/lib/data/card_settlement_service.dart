@@ -54,6 +54,8 @@ class CardSettlementService {
     final created = <core.Transaction>[];
     for (final card in cfg.creditCards) {
       if (card.inactive) continue;
+      // 通帳ミラー運用のカードは引落を自動生成しない（引落は銀行CSVから本物が入る）。
+      if (card.noAutoSettlement) continue;
       final acctId = card.settlementAccountId;
       final day = card.paymentDay;
       if (acctId == null || day == null) continue;

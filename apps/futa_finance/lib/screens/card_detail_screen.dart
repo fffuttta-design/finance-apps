@@ -12,6 +12,7 @@ import '../data/transaction_repository.dart';
 import '../v2/theme/mode_accent.dart';
 import '../utils/category_colors.dart';
 import '../utils/formatters.dart';
+import '../utils/jp_holidays.dart';
 import '../utils/modal_input.dart';
 import '../utils/thousands_separator_input_formatter.dart';
 import '../v2/widgets/credit_card_reconcile.dart';
@@ -953,8 +954,12 @@ class _CardDetailScreenState extends State<CardDetailScreen>
     if (paymentDay != null) {
       final billYear = month == 12 ? year + 1 : year;
       final billMonth = month == 12 ? 1 : month + 1;
+      // 引落日は月末クランプ → 土日祝なら翌営業日にずらす（自動引落の生成と同じ規則）。
+      final lastDay = DateTime(billYear, billMonth + 1, 0).day;
+      final due = JpHolidays.nextBusinessDay(DateTime(
+          billYear, billMonth, paymentDay > lastDay ? lastDay : paymentDay));
       billingLabel =
-          '$billYear/${billMonth.toString().padLeft(2, '0')}/${paymentDay.toString().padLeft(2, '0')} 引落';
+          '${due.year}/${due.month.toString().padLeft(2, '0')}/${due.day.toString().padLeft(2, '0')} 引落';
     }
     final ratio = maxAmount > 0 ? (amount / maxAmount).clamp(0.0, 1.0) : 0.0;
     return InkWell(

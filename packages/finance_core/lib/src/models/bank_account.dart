@@ -195,6 +195,13 @@ class RegisteredCreditCard {
   final String? settlementCategoryMajor;
   final String? settlementCategorySub;
 
+  /// 引落を自動生成しないフラグ。true のとき、このカードは
+  /// [CardSettlementService] による引落（振替）の自動生成をスキップする。
+  /// 引落口座を「銀行明細でミラーしている口座」にしているカードは、引落が
+  /// 銀行CSVから本物として入ってくるので、自動生成すると二重・見込みズレの原因になる。
+  /// 通帳ミラー運用のカードは true にする。
+  final bool noAutoSettlement;
+
   /// 未使用フラグ。true=休眠中。
   /// 当月利用が偶々 0 円のアクティブカードと区別するため明示設定。
   final bool inactive;
@@ -216,6 +223,7 @@ class RegisteredCreditCard {
     this.settlementAccountId,
     this.settlementCategoryMajor,
     this.settlementCategorySub,
+    this.noAutoSettlement = false,
     this.inactive = false,
     this.monthlyActualBillings = const {},
   });
@@ -237,6 +245,7 @@ class RegisteredCreditCard {
           'settlementCategoryMajor': settlementCategoryMajor,
         if (settlementCategorySub != null)
           'settlementCategorySub': settlementCategorySub,
+        'noAutoSettlement': noAutoSettlement,
         'inactive': inactive,
         'monthlyActualBillings': monthlyActualBillings,
       };
@@ -254,6 +263,7 @@ class RegisteredCreditCard {
         settlementAccountId: j['settlementAccountId'] as String?,
         settlementCategoryMajor: j['settlementCategoryMajor'] as String?,
         settlementCategorySub: j['settlementCategorySub'] as String?,
+        noAutoSettlement: j['noAutoSettlement'] as bool? ?? false,
         inactive: j['inactive'] as bool? ?? false,
         monthlyActualBillings: (j['monthlyActualBillings'] as Map<String, dynamic>?)
                 ?.map((k, v) => MapEntry(k, (v as num).toInt())) ??
@@ -272,6 +282,7 @@ class RegisteredCreditCard {
     String? settlementCategoryMajor,
     String? settlementCategorySub,
     bool clearSettlementCategory = false,
+    bool? noAutoSettlement,
     bool? inactive,
     Map<String, int>? monthlyActualBillings,
     bool clearMemo = false,
@@ -297,6 +308,7 @@ class RegisteredCreditCard {
         settlementCategorySub: clearSettlementCategory
             ? null
             : (settlementCategorySub ?? this.settlementCategorySub),
+        noAutoSettlement: noAutoSettlement ?? this.noAutoSettlement,
         inactive: inactive ?? this.inactive,
         monthlyActualBillings:
             monthlyActualBillings ?? this.monthlyActualBillings,
