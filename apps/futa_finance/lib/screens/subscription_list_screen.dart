@@ -70,10 +70,6 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
   List<Subscription> _visibleSubs(SubscriptionConfig config) =>
       config.subscriptions.where(_isVisible).toList();
 
-  /// 終了済みの件数（アーカイブのバッジ用）。
-  int get _archivedCount =>
-      _config?.subscriptions.where(_isEnded).length ?? 0;
-
   @override
   void initState() {
     super.initState();
@@ -1051,19 +1047,15 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF111827))),
         actions: [
-          // アーカイブ切替（現行 ⇄ 終了済みのみ）。終了済みがある時だけ件数バッジ。
+          // アーカイブ切替（現行 ⇄ 終了済みのみ）。件数バッジは出さない（アイコンのみ）。
           IconButton(
             tooltip: _showArchived ? '現行の固定費を表示' : 'アーカイブ（終了済み）を表示',
             onPressed: () => setState(() => _showArchived = !_showArchived),
-            icon: Badge(
-              isLabelVisible: !_showArchived && _archivedCount > 0,
-              label: Text('$_archivedCount'),
-              child: Icon(
-                _showArchived ? Icons.unarchive_outlined : Icons.archive_outlined,
-                color: _showArchived
-                    ? const Color(0xFFEA580C)
-                    : const Color(0xFF1A237E),
-              ),
+            icon: Icon(
+              _showArchived ? Icons.unarchive_outlined : Icons.archive_outlined,
+              color: _showArchived
+                  ? const Color(0xFFEA580C)
+                  : const Color(0xFF1A237E),
             ),
           ),
           // グループ表示モード切替（フラット / カテゴリ別 / 定額・変動別）
@@ -1598,24 +1590,21 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
       color: Colors.white,
       child: Row(
         children: [
-          // アーカイブ切替（現行 ⇄ 終了済み）。終了済みがある時だけ件数バッジ。
+          // アーカイブ切替（現行 ⇄ 終了済み）。
           // ※AppBar版と同じ機能。埋め込み時はAppBarが潰れて押せないためここに常設。
+          //   件数バッジは目立ちすぎるため出さない（アイコンのみ）。
           IconButton(
             tooltip: _showArchived ? '現行の固定費を表示' : 'アーカイブ（終了済み）を表示',
             visualDensity: VisualDensity.compact,
             onPressed: () => setState(() => _showArchived = !_showArchived),
-            icon: Badge(
-              isLabelVisible: !_showArchived && _archivedCount > 0,
-              label: Text('$_archivedCount'),
-              child: Icon(
-                _showArchived
-                    ? Icons.unarchive_outlined
-                    : Icons.archive_outlined,
-                size: 20,
-                color: _showArchived
-                    ? const Color(0xFFEA580C)
-                    : const Color(0xFF1A237E),
-              ),
+            icon: Icon(
+              _showArchived
+                  ? Icons.unarchive_outlined
+                  : Icons.archive_outlined,
+              size: 20,
+              color: _showArchived
+                  ? const Color(0xFFEA580C)
+                  : const Color(0xFF1A237E),
             ),
           ),
           // グループ表示
