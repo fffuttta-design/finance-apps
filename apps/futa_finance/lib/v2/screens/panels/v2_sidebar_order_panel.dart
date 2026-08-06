@@ -44,15 +44,15 @@ class _V2SidebarOrderPanelState extends State<V2SidebarOrderPanel> {
       icon: Icons.bar_chart_outlined,
       hint: '業績タブ（PL）'
     ),
+    'assets': (
+      label: '資産',
+      icon: Icons.account_balance_wallet_outlined,
+      hint: '資産タブ（口座・カード・月初残高）'
+    ),
     'settings': (
       label: '設定',
       icon: Icons.settings_outlined,
       hint: '設定画面'
-    ),
-    'devLab': (
-      label: '🧪 開発中',
-      icon: Icons.science_outlined,
-      hint: '事業モード専用の試作タブ'
     ),
   };
 

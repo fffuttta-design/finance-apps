@@ -34,6 +34,7 @@ class UiPreferences extends ChangeNotifier {
 
   /// タブ（上ナビ）の選択可能な全識別子（デフォルト並び）。
   /// v2.1 上タブに一本化済み。旧 v1 の asset/cards は廃止（report は「業績」）。
+  /// devLab（開発中タブ）は廃止済みのため一覧からも除外（v1.0.562）。
   static const defaultSidebarOrder = <String>[
     'home',
     'expenses',
@@ -41,7 +42,6 @@ class UiPreferences extends ChangeNotifier {
     'report',
     'assets',
     'settings',
-    'devLab',
   ];
 
   /// v2 UI（デスクトップ向け抜本リデザイン）を強制 ON/OFF するキー。

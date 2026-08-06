@@ -1157,8 +1157,7 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                   child: Column(
                     children: [
                       if (_showArchived) _archiveBanner(),
-                      _inlineToolbar(),
-                      _summaryBar(viewConfig),
+                      _toolbar(viewConfig),
                       Expanded(
                         child: viewConfig.subscriptions.isEmpty
                             ? (_showArchived
@@ -1588,15 +1587,37 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     await _delete(idx);
   }
 
-  /// 常設の操作バー（追加 / グループ表示 / 並び順）。
-  /// 設定ページに埋め込まれた際は AppBar が潰れてボタンが消えるため、
-  /// 本体にも同等の操作を常に出しておく。
-  Widget _inlineToolbar() {
+  /// 常設の操作バー＋サマリーを1行に集約。
+  /// （アーカイブ切替 / グループ表示 / 並び順 / 月額換算・年間総コスト / 追加）
+  /// 設定ページに埋め込まれると AppBar が潰れてボタンが消えるため本体にも常設。
+  /// 旧「ツールバー行＋サマリー白パネル行」の2段を1段にまとめ、余白を圧縮した。
+  Widget _toolbar(SubscriptionConfig config) {
+    final hasItems = config.subscriptions.isNotEmpty;
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 8, 0),
+      padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
       color: Colors.white,
       child: Row(
         children: [
+          // アーカイブ切替（現行 ⇄ 終了済み）。終了済みがある時だけ件数バッジ。
+          // ※AppBar版と同じ機能。埋め込み時はAppBarが潰れて押せないためここに常設。
+          IconButton(
+            tooltip: _showArchived ? '現行の固定費を表示' : 'アーカイブ（終了済み）を表示',
+            visualDensity: VisualDensity.compact,
+            onPressed: () => setState(() => _showArchived = !_showArchived),
+            icon: Badge(
+              isLabelVisible: !_showArchived && _archivedCount > 0,
+              label: Text('$_archivedCount'),
+              child: Icon(
+                _showArchived
+                    ? Icons.unarchive_outlined
+                    : Icons.archive_outlined,
+                size: 20,
+                color: _showArchived
+                    ? const Color(0xFFEA580C)
+                    : const Color(0xFF1A237E),
+              ),
+            ),
+          ),
           // グループ表示
           PopupMenuButton<_GroupMode>(
             tooltip: 'グループ表示',
@@ -1635,7 +1656,48 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                   value: _SortMode.amountAsc, child: Text('月額の安い順')),
             ],
           ),
-          const Spacer(),
+          // 月額換算・年間総コストをインライン表示（旧・白パネルを廃止し省スペース化）。
+          if (hasItems)
+            Expanded(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    const SizedBox(width: 4),
+                    const Text('月額 ',
+                        style: TextStyle(
+                            fontSize: 10, color: Color(0xFF6B7280))),
+                    Text(formatYen(config.monthlyEquivalentTotal),
+                        style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF111827),
+                            fontFamily: 'monospace')),
+                    Container(
+                        width: 1,
+                        height: 14,
+                        margin: const EdgeInsets.symmetric(horizontal: 10),
+                        color: const Color(0xFFE5E7EB)),
+                    const Text('年間 ',
+                        style: TextStyle(
+                            fontSize: 10, color: Color(0xFF6B7280))),
+                    Text(formatYen(config.totalAnnualCost),
+                        style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFDC2626),
+                            fontFamily: 'monospace')),
+                  ],
+                ),
+              ),
+            )
+          else
+            const Spacer(),
+          const SizedBox(width: 8),
           FilledButton.icon(
             onPressed: _config == null ? null : _add,
             icon: const Icon(Icons.add, size: 18),
@@ -1651,48 +1713,6 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
       ),
     );
   }
-
-  /// Summary bar:
-  /// - 月額換算（月払い + 年払い÷12）→ 毎月いくらかかってる感覚値
-  /// - 年間総コスト（月払い×12 + 年払い）→ 年でいくら払ってるかの強調指標
-  Widget _summaryBar(SubscriptionConfig config) {
-    if (config.subscriptions.isEmpty) return const SizedBox.shrink();
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      color: Colors.white,
-      child: Row(
-        children: [
-          Expanded(
-              child: _sumBlock(
-                  '月額換算', formatYen(config.monthlyEquivalentTotal))),
-          Container(
-              width: 1, height: 36, color: const Color(0xFFE5E7EB)),
-          Expanded(
-              child: _sumBlock(
-                  '年間総コスト', formatYen(config.totalAnnualCost),
-                  highlight: true)),
-        ],
-      ),
-    );
-  }
-
-  Widget _sumBlock(String label, String value, {bool highlight = false}) =>
-      Column(
-        children: [
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 10, color: Color(0xFF6B7280))),
-          const SizedBox(height: 3),
-          Text(value,
-              style: TextStyle(
-                  fontSize: highlight ? 18 : 15,
-                  fontWeight: FontWeight.bold,
-                  color: highlight
-                      ? const Color(0xFFDC2626)
-                      : const Color(0xFF111827),
-                  fontFamily: 'monospace')),
-        ],
-      );
 
   /// 固定費tile（コンパクト版）。
   /// - 左端: ドラッグハンドル（並び替え用、手動モード時のみ表示）

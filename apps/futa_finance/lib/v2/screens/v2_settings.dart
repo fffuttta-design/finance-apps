@@ -9,7 +9,6 @@ import '../../data/ui_preferences.dart';
 import '../../data/update_flow.dart';
 import '../../data/windows_update.dart';
 import '../../screens/account_editor_screen.dart';
-import '../../screens/balance_adjust_screen.dart';
 import '../../screens/budget_items_screen.dart';
 import '../../screens/compliance_calendar_screen.dart';
 import '../../screens/card_editor_screen.dart';
@@ -84,8 +83,6 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
           desc: '口座・クレジットカードを登録'),
       _MenuItem('storeMaster', '場所マスタ', Icons.place_outlined,
           desc: '購入場所を登録（表記ゆれの統合もできる）'),
-      _MenuItem('balanceAdjust', '残高調整', Icons.tune_outlined,
-          desc: 'ウォレット残高を実際に合わせる（差は営業外に記録）'),
       _MenuItem('incomeMaster', '収入マスタ', Icons.savings_outlined,
           desc: '収入源（売上）を登録'),
       _MenuItem('subscription', '固定費・サブスクマスタ', Icons.event_repeat,
@@ -218,13 +215,6 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
             note: '購入場所を登録します。表記ゆれ（ファミマ／ファミリーマート等）は'
                 '「統合」でまとめると、過去の明細も一括で書き換わります。事業・個人で共通です。',
             icon: Icons.place_outlined,
-            iconColor: V2Colors.info);
-      case 'balanceAdjust':
-        return _embedV1(const BalanceAdjustScreen(),
-            title: '残高調整',
-            note: 'ウォレットの残高を実際の金額に合わせます。ズレ分は「残高調整」として記録し、'
-                '収支に含めます（事業モードのPLでは営業外）。',
-            icon: Icons.tune_outlined,
             iconColor: V2Colors.info);
       case 'incomeMaster':
         return const V2IncomeMasterPanel();
