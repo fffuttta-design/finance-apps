@@ -14,6 +14,7 @@ class TxCategory {
 const expenseCategories = <TxCategory>[
   TxCategory('食費', Icons.restaurant_rounded, Color(0xFFFF8FA3)),
   TxCategory('外食', Icons.ramen_dining_rounded, Color(0xFFFFB088)),
+  TxCategory('Uber', Icons.delivery_dining_rounded, Color(0xFF7FD1A6)),
   TxCategory('日用品', Icons.shopping_basket_rounded, Color(0xFFB8C0FF)),
   TxCategory('デート', Icons.favorite_rounded, Color(0xFFFF6B8A)),
   TxCategory('住居', Icons.home_rounded, Color(0xFF9CD9C5)),

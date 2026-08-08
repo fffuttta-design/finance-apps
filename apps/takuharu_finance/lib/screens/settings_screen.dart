@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/auth_service.dart';
+import '../data/categories.dart';
 import '../data/household_service.dart';
 import '../data/notify_prefs_service.dart';
 import '../data/tx_repository.dart';
@@ -21,16 +22,20 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // サイドバーで選択中のカテゴリ（0:ふたり 1:お金 2:通知 3:データ 4:アプリ）。
+  // サイドバーで選択中のカテゴリ（0:ふたり 1:お金 2:カテゴリ 3:通知 4:データ 5:アプリ）。
   int _tab = 0;
 
   /// 通知の受け取り設定の読み込み完了フラグ。
   bool _notifyLoaded = false;
 
+  /// カテゴリ編集タブで「支出／収入」どちらを編集中か（false=支出）。
+  bool _catIncome = false;
+
   /// サイドバーの項目（アイコン＋ラベル）。
   static const _navItems = <({IconData icon, String label})>[
     (icon: Icons.favorite_rounded, label: 'ふたり'),
     (icon: Icons.account_balance_wallet_rounded, label: 'お金'),
+    (icon: Icons.category_rounded, label: 'カテゴリ'),
     (icon: Icons.notifications_rounded, label: '通知'),
     (icon: Icons.storage_rounded, label: 'データ'),
     (icon: Icons.smartphone_rounded, label: 'アプリ'),
@@ -284,6 +289,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   _coupleTab(),
                   _moneyTab(),
+                  _categoryTab(),
                   _notifyTab(),
                   _dataTab(),
                   _appTab(),
@@ -489,7 +495,167 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// タブ③「通知」：自分が受け取る通知の種類を ON/OFF。
+  /// タブ③「カテゴリ」：カテゴリの一覧確認と、カスタムカテゴリの追加・削除。
+  /// 既定カテゴリ（食費・外食…）は消せない基本セット。追加したカテゴリは
+  /// ここでもチップの×から削除できる（ふたりで共有）。
+  Widget _categoryTab() {
+    final hs = HouseholdService.instance;
+    final defaults = _catIncome ? incomeCategories : expenseCategories;
+    final customs = hs.customCats(income: _catIncome);
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        // 支出／収入の切り替え。
+        SegmentedButton<bool>(
+          segments: const [
+            ButtonSegment(value: false, label: Text('支出'), icon: Icon(Icons.south_west_rounded, size: 16)),
+            ButtonSegment(value: true, label: Text('収入'), icon: Icon(Icons.north_east_rounded, size: 16)),
+          ],
+          selected: {_catIncome},
+          onSelectionChanged: (s) => setState(() => _catIncome = s.first),
+          style: ButtonStyle(
+            visualDensity: VisualDensity.compact,
+          ),
+        ),
+        const SizedBox(height: 20),
+        _sectionTitle('自分で追加したカテゴリ'),
+        const SizedBox(height: 8),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (customs.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: Text('まだ追加したカテゴリはありません。',
+                        style: TextStyle(fontSize: 12, color: AppColors.textSub)),
+                  )
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final name in customs)
+                        _catChip(name, deletable: true),
+                    ],
+                  ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: _addCustomCat,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('カテゴリを追加'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        _sectionTitle('基本のカテゴリ'),
+        const SizedBox(height: 4),
+        const Padding(
+          padding: EdgeInsets.only(left: 4, bottom: 8),
+          child: Text('もともと用意されているカテゴリです（消せません）。',
+              style: TextStyle(fontSize: 11, color: AppColors.textSub)),
+        ),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final c in defaults) _catChip(c.name, deletable: false),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// カテゴリ1つを表すチップ（アイコン色つき）。deletable のときは×で削除。
+  Widget _catChip(String name, {required bool deletable}) {
+    final c = categoryFor(name, income: _catIncome);
+    return Chip(
+      avatar: CircleAvatar(
+        backgroundColor: c.color,
+        child: Icon(c.icon, size: 15, color: Colors.white),
+      ),
+      label: Text(name),
+      backgroundColor: AppColors.pinkSoft,
+      onDeleted: deletable ? () => _removeCustomCat(name) : null,
+    );
+  }
+
+  /// カスタムカテゴリを追加する（既定・既存と重複しないもののみ）。
+  Future<void> _addCustomCat() async {
+    final ctrl = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(_catIncome ? '収入カテゴリを追加' : '支出カテゴリを追加'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '例: Uber / サブスク / ペット'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx),
+              child: const Text('やめる')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dctx, ctrl.text.trim()),
+              child: const Text('追加')),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return;
+    // 既定カテゴリと同名は追加不要（既にある）。
+    final defaults = _catIncome ? incomeCategories : expenseCategories;
+    if (defaults.any((c) => c.name == name)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('そのカテゴリは元からあります')));
+      }
+      return;
+    }
+    await HouseholdService.instance.addCustomCategory(name, income: _catIncome);
+    if (mounted) setState(() {});
+  }
+
+  /// カスタムカテゴリを削除する（確認つき）。既存の記録のカテゴリ名は変わらない。
+  Future<void> _removeCustomCat(String name) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('「$name」を削除'),
+        content: const Text(
+            'このカテゴリを一覧から消します。\n'
+            'これまでこのカテゴリで記録した分の金額・内容は消えません（そのまま残ります）。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx, false),
+              child: const Text('やめる')),
+          FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppColors.pinkDark),
+              onPressed: () => Navigator.pop(dctx, true),
+              child: const Text('削除')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await HouseholdService.instance.removeCustomCategory(name, income: _catIncome);
+    if (mounted) setState(() {});
+  }
+
+  /// タブ④「通知」：自分が受け取る通知の種類を ON/OFF。
   /// （各自の設定。OFF にした種類は自分にだけ届かなくなる）
   Widget _notifyTab() {
     final myName = HouseholdService.instance
@@ -551,7 +717,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// タブ④「データ」：貼り付け取り込み・変換マスタ。
+  /// タブ⑤「データ」：貼り付け取り込み・変換マスタ。
   Widget _dataTab() {
     return ListView(
         padding: const EdgeInsets.all(20),
@@ -641,7 +807,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  /// タブ④「アプリ」：アカウント・更新・サインアウト。
+  /// タブ⑥「アプリ」：アカウント・更新・サインアウト。
   Widget _appTab() {
     final myEmail = AuthService.instance.currentUser?.email ?? '';
     return ListView(
