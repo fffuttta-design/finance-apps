@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.101",
-    "buildNumber":  "106",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.101/takuharu-finance-v0.2.101.apk",
-    "releaseNotes":  "・分析タブで前の月もさかのぼって見られるようにしました（◀▶で月を切替。円グラフ・カテゴリ内訳・エンゲル係数がその月の内容になります）。\n・固定費が支払日になると、自動で支出に記録されるようになりました（毎月ボタンを押さなくてOK。二重には記録されません）。"
+    "version":  "0.2.102",
+    "buildNumber":  "107",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.102/takuharu-finance-v0.2.102.apk",
+    "releaseNotes":  "・明細を共有できるようになりました。レシート画面の右上「共有」ボタンから、LINEやDiscordに送れるリンクを発行できます。\n・相手（たく／はる）がそのリンクをタップすると、アプリが自動で開いてその明細（内訳つき）が表示されます。アプリを入れていない場合はWeb版が開きます。"
 }
