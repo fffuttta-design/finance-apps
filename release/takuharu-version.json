@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.103",
-    "buildNumber":  "108",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.103/takuharu-finance-v0.2.103.apk",
-    "releaseNotes":  "・設定に「カテゴリ」タブが増えました。支出／収入それぞれで、自分でカテゴリを追加・削除できます（ふたりで共有）。\n・支出カテゴリに「Uber」を追加しました。"
+    "version":  "0.2.104",
+    "buildNumber":  "109",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.104/takuharu-finance-v0.2.104.apk",
+    "releaseNotes":  "・設定の「カテゴリ」タブを見やすいリスト表示にしました。「自分で追加」と「基本」の区別をなくし、1つのリストにまとめて、ドラッグで自由に並び替えできます（並び順は記録画面のカテゴリ選択にも反映）。\n・カテゴリは×で一覧から消せます（消しても、これまでの記録の金額・内容は残ります）。消した基本カテゴリは下の「消したカテゴリ」から戻せます。\n・「個人の食費わく」をONにすると、カテゴリが自動で「共用食費」に切り替わるようにしました。"
 }
