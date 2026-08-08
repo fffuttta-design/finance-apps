@@ -123,6 +123,34 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
       .where((t) => t.date.year == m.year && t.date.month == m.month)
       .toList();
 
+  /// 月初総資産＝各口座の「その月初より前」の残高（startingBalance＋Σ）の合計。
+  /// 通帳(account_detail_screen)と同じ規則で口座別に積み上げて合算する。
+  /// ミラー運用で全口座が銀行明細と一致しているため、CSVを取り込むたびに
+  /// 自動で正しくなる（手入力の MonthlySnapshot が無くても月初残高が出る）。
+  int _monthStartTotalAssets(DateTime month) {
+    final monthFirst = DateTime(month.year, month.month, 1);
+    var total = 0;
+    for (final acc in _payments.bankAccounts) {
+      if (acc.inactive) continue; // 休眠口座は資産に数えない
+      var bal = acc.startingBalance ?? 0;
+      final name = acc.name;
+      for (final t in _transactions) {
+        if (!t.date.isBefore(monthFirst)) continue; // 月初以降は除外
+        if (t.type == TransactionType.transfer) {
+          if (t.transferFromAccount == name) {
+            bal -= t.amount;
+          } else if (t.transferToAccount == name) {
+            bal += t.amount;
+          }
+        } else if (t.paymentMethod == name) {
+          bal += t.type == TransactionType.income ? t.amount : -t.amount;
+        }
+      }
+      total += bal;
+    }
+    return total;
+  }
+
   /// 支払方法名 → 対応するウォレットの詳細画面へ。クレカ＝CardDetailScreen、
   /// 銀行/現金/電子マネー＝AccountDetailScreen（通帳）。未登録の支払方法は何もしない。
   Future<void> _openWalletDetail(String name) async {
@@ -216,10 +244,13 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
     final isCurrentMonth =
         _month.year == now.year && _month.month == now.month;
     final snap = _snapshots.forMonth(_month.year, _month.month);
-    final initialBalance = snap?.initialBalance ?? 0;
+    // 月初残高＝手入力スナップショットがあればそれ、無ければ口座残高から自動計算。
+    final initialBalance =
+        snap?.initialBalance ?? _monthStartTotalAssets(_month);
     final projected = initialBalance + income - expense;
     final actual = isCurrentMonth
         ? _payments.bankAccounts
+            .where((b) => !b.inactive) // 休眠口座は実測残高に数えない
             .fold<int>(0, (s, b) => s + (b.displayBalance ?? 0))
         : projected;
     final diff = actual - projected;
@@ -287,7 +318,7 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
     );
 
     final balanceCard = _BalanceCard(
-      hasSnap: snap != null,
+      hasSnap: true, // 月初残高は常に自動計算で出る（手入力が無くても未記録にしない）
       isCurrentMonth: isCurrentMonth,
       projected: projected,
       actual: actual,
