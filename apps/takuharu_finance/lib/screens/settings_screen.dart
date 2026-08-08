@@ -495,105 +495,149 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// タブ③「カテゴリ」：カテゴリの一覧確認と、カスタムカテゴリの追加・削除。
-  /// 既定カテゴリ（食費・外食…）は消せない基本セット。追加したカテゴリは
-  /// ここでもチップの×から削除できる（ふたりで共有）。
+  /// タブ③「カテゴリ」：カテゴリを1つのリストで管理（既定・追加の区別なし）。
+  /// ドラッグで並び替え、×で一覧から消す（消しても記録は残る）。追加も自由。
   Widget _categoryTab() {
     final hs = HouseholdService.instance;
-    final defaults = _catIncome ? incomeCategories : expenseCategories;
-    final customs = hs.customCats(income: _catIncome);
-    return ListView(
-      padding: const EdgeInsets.all(20),
+    final names = hs.orderedCategoryNames(income: _catIncome);
+    final hidden = hs.hiddenCats(income: _catIncome);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // 支出／収入の切り替え。
-        SegmentedButton<bool>(
-          segments: const [
-            ButtonSegment(value: false, label: Text('支出'), icon: Icon(Icons.south_west_rounded, size: 16)),
-            ButtonSegment(value: true, label: Text('収入'), icon: Icon(Icons.north_east_rounded, size: 16)),
-          ],
-          selected: {_catIncome},
-          onSelectionChanged: (s) => setState(() => _catIncome = s.first),
-          style: ButtonStyle(
-            visualDensity: VisualDensity.compact,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+          child: SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(
+                  value: false,
+                  label: Text('支出'),
+                  icon: Icon(Icons.south_west_rounded, size: 16)),
+              ButtonSegment(
+                  value: true,
+                  label: Text('収入'),
+                  icon: Icon(Icons.north_east_rounded, size: 16)),
+            ],
+            selected: {_catIncome},
+            onSelectionChanged: (s) => setState(() => _catIncome = s.first),
+            style: const ButtonStyle(visualDensity: VisualDensity.compact),
           ),
         ),
-        const SizedBox(height: 20),
-        _sectionTitle('自分で追加したカテゴリ'),
-        const SizedBox(height: 8),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (customs.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 8),
-                    child: Text('まだ追加したカテゴリはありません。',
-                        style: TextStyle(fontSize: 12, color: AppColors.textSub)),
-                  )
-                else
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final name in customs)
-                        _catChip(name, deletable: true),
-                    ],
-                  ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: OutlinedButton.icon(
-                    onPressed: _addCustomCat,
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('カテゴリを追加'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        _sectionTitle('基本のカテゴリ'),
-        const SizedBox(height: 4),
         const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 8),
-          child: Text('もともと用意されているカテゴリです（消せません）。',
+          padding: EdgeInsets.fromLTRB(24, 0, 24, 6),
+          child: Text('右の ≡ をドラッグで並び替え。× で一覧から消せます（これまでの記録は残ります）。',
               style: TextStyle(fontSize: 11, color: AppColors.textSub)),
         ),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final c in defaults) _catChip(c.name, deletable: false),
+        // 並び替えできるカテゴリ一覧（既定＋追加をまとめて表示）。
+        Expanded(
+          child: names.isEmpty
+              ? const Center(
+                  child: Text('カテゴリがありません',
+                      style: TextStyle(color: AppColors.textSub)))
+              : ReorderableListView(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  buildDefaultDragHandles: false,
+                  onReorder: _onReorderCat,
+                  children: [
+                    for (var i = 0; i < names.length; i++)
+                      _catRow(names[i], i),
+                  ],
+                ),
+        ),
+        // フッター：追加ボタン＋非表示にしたカテゴリの復元。
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _addCat,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('カテゴリを追加'),
+                ),
+              ),
+              if (hidden.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Text('消したカテゴリ（タップで戻す）',
+                    style:
+                        TextStyle(fontSize: 11, color: AppColors.textSub)),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final name in hidden)
+                      ActionChip(
+                        avatar: const Icon(Icons.undo_rounded, size: 16),
+                        label: Text(name),
+                        onPressed: () => _restoreCat(name),
+                      ),
+                  ],
+                ),
               ],
-            ),
+            ],
           ),
         ),
       ],
     );
   }
 
-  /// カテゴリ1つを表すチップ（アイコン色つき）。deletable のときは×で削除。
-  Widget _catChip(String name, {required bool deletable}) {
+  /// カテゴリ1行（アイコン＋名前＋削除×＋ドラッグハンドル）。
+  Widget _catRow(String name, int index) {
     final c = categoryFor(name, income: _catIncome);
-    return Chip(
-      avatar: CircleAvatar(
-        backgroundColor: c.color,
-        child: Icon(c.icon, size: 15, color: Colors.white),
+    return Container(
+      key: ValueKey('cat_${_catIncome}_$name'),
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.divider),
       ),
-      label: Text(name),
-      backgroundColor: AppColors.pinkSoft,
-      onDeleted: deletable ? () => _removeCustomCat(name) : null,
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: c.color,
+          child: Icon(c.icon, size: 18, color: Colors.white),
+        ),
+        title:
+            Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.close_rounded,
+                  size: 20, color: AppColors.textSub),
+              tooltip: '一覧から消す',
+              onPressed: () => _deleteCat(name),
+            ),
+            ReorderableDragStartListener(
+              index: index,
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: Icon(Icons.drag_handle_rounded,
+                    color: AppColors.textSub),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  /// カスタムカテゴリを追加する（既定・既存と重複しないもののみ）。
-  Future<void> _addCustomCat() async {
+  /// 並び替えを保存する（ドラッグ完了時）。
+  void _onReorderCat(int oldIndex, int newIndex) {
+    final names =
+        HouseholdService.instance.orderedCategoryNames(income: _catIncome);
+    if (newIndex > oldIndex) newIndex -= 1;
+    final item = names.removeAt(oldIndex);
+    names.insert(newIndex, item);
+    HouseholdService.instance.setCategoryOrder(names, income: _catIncome);
+    setState(() {});
+  }
+
+  /// カテゴリを追加する（既に表示中の名前は追加しない。消した既定と同名なら戻す）。
+  Future<void> _addCat() async {
     final ctrl = TextEditingController();
     final name = await showDialog<String>(
       context: context,
@@ -616,42 +660,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
     if (name == null || name.isEmpty) return;
-    // 既定カテゴリと同名は追加不要（既にある）。
-    final defaults = _catIncome ? incomeCategories : expenseCategories;
-    if (defaults.any((c) => c.name == name)) {
+    final hs = HouseholdService.instance;
+    if (hs.orderedCategoryNames(income: _catIncome).contains(name)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('そのカテゴリは元からあります')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('そのカテゴリはもうあります')));
       }
       return;
     }
-    await HouseholdService.instance.addCustomCategory(name, income: _catIncome);
+    // addCustomCategory は、消した既定と同名なら自動で復活させる。
+    await hs.addCustomCategory(name, income: _catIncome);
     if (mounted) setState(() {});
   }
 
-  /// カスタムカテゴリを削除する（確認つき）。既存の記録のカテゴリ名は変わらない。
-  Future<void> _removeCustomCat(String name) async {
+  /// カテゴリを一覧から消す（確認つき）。記録のカテゴリ名・金額は変わらない。
+  Future<void> _deleteCat(String name) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (dctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('「$name」を削除'),
+        title: Text('「$name」を消す'),
         content: const Text(
-            'このカテゴリを一覧から消します。\n'
+            'このカテゴリを選択リストから消します。\n'
             'これまでこのカテゴリで記録した分の金額・内容は消えません（そのまま残ります）。'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(dctx, false),
               child: const Text('やめる')),
           FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: AppColors.pinkDark),
+              style:
+                  FilledButton.styleFrom(backgroundColor: AppColors.pinkDark),
               onPressed: () => Navigator.pop(dctx, true),
-              child: const Text('削除')),
+              child: const Text('消す')),
         ],
       ),
     );
     if (ok != true) return;
-    await HouseholdService.instance.removeCustomCategory(name, income: _catIncome);
+    await HouseholdService.instance.deleteCategory(name, income: _catIncome);
+    if (mounted) setState(() {});
+  }
+
+  /// 消した（非表示にした）カテゴリを戻す。
+  Future<void> _restoreCat(String name) async {
+    await HouseholdService.instance.restoreCategory(name, income: _catIncome);
     if (mounted) setState(() {});
   }
 

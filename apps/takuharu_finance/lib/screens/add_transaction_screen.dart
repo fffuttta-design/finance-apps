@@ -155,13 +155,22 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     super.dispose();
   }
 
-  List<TxCategory> get _cats {
-    final base = _isIncome ? incomeCategories : expenseCategories;
-    final custom = HouseholdService.instance.customCats(income: _isIncome);
-    return [
-      ...base,
-      for (final n in custom) categoryFor(n, income: _isIncome),
-    ];
+  // カテゴリ候補（設定の並び順・非表示を反映した既定＋カスタムの統合リスト）。
+  List<TxCategory> get _cats =>
+      HouseholdService.instance.orderedCategories(income: _isIncome);
+
+  /// 個人の食費わくトグルの切り替え。ONにしたら既定で「共用食費」カテゴリにする
+  /// （共用の食費わくから買ったものだと一覧で見分けられるように）。
+  void _setPersonalFood(bool v) {
+    setState(() {
+      _personalFood = v;
+      if (v) {
+        _category = sharedFoodCategory;
+        // 選択肢に無ければ用意する（次回以降も選べるように・重複は無視される）。
+        HouseholdService.instance
+            .addCustomCategory(sharedFoodCategory, income: false);
+      }
+    });
   }
 
   Future<void> _pickDate() async {
@@ -788,7 +797,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     final partnerName = inPartnerBudget ? (names[existing] ?? '相手') : null;
     // 探さなくても気づくよう、OFFでもピンクの枠で目立たせる。
     final toggle = GestureDetector(
-      onTap: () => setState(() => _personalFood = !_personalFood),
+      onTap: () => _setPersonalFood(!_personalFood),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -834,7 +843,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             Switch(
               value: _personalFood,
               activeThumbColor: AppColors.pink,
-              onChanged: (v) => setState(() => _personalFood = v),
+              onChanged: _setPersonalFood,
             ),
           ],
         ),

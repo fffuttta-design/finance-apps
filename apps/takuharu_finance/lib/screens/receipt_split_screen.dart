@@ -165,7 +165,8 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              for (final c in expenseCategories)
+              for (final c
+                  in HouseholdService.instance.orderedCategories(income: false))
                 GestureDetector(
                   onTap: () => Navigator.pop(sheet, c.name),
                   child: Container(

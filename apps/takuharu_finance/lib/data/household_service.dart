@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import 'categories.dart';
+
 /// 世帯（二人で共有する家計データの単位）の管理。
 ///
 /// データ構造:
@@ -65,13 +67,59 @@ class HouseholdService extends ChangeNotifier {
   List<String> customExpenseCats = [];
   List<String> customIncomeCats = [];
 
+  /// カテゴリの並び順（既定＋カスタムを混ぜた1本の順番。名前の配列）。
+  /// households/{hid}.expenseCatOrder / incomeCatOrder。未設定なら既定→カスタムの順。
+  List<String> expenseCatOrder = [];
+  List<String> incomeCatOrder = [];
+
+  /// 非表示にした既定カテゴリ（一覧・選択から隠す。記録済みの表示には影響しない）。
+  /// households/{hid}.hiddenExpenseCats / hiddenIncomeCats。
+  List<String> hiddenExpenseCats = [];
+  List<String> hiddenIncomeCats = [];
+
   List<String> customCats({required bool income}) =>
       income ? customIncomeCats : customExpenseCats;
+
+  List<String> hiddenCats({required bool income}) =>
+      income ? hiddenIncomeCats : hiddenExpenseCats;
+
+  /// 選択・表示に使う「並び順を反映した」カテゴリ名の一覧
+  /// （既定＋カスタムを統合、非表示は除外）。保存済み順を先頭に、
+  /// 順に無い新顔（あとから増えた既定・カスタム）は末尾に足す。
+  List<String> orderedCategoryNames({required bool income}) {
+    final base = <String>[
+      ...(income ? incomeCategories : expenseCategories).map((c) => c.name),
+      ...(income ? customIncomeCats : customExpenseCats),
+    ];
+    final order = income ? incomeCatOrder : expenseCatOrder;
+    final hidden = income ? hiddenIncomeCats : hiddenExpenseCats;
+    final seen = <String>{};
+    final out = <String>[];
+    for (final n in order) {
+      if (base.contains(n) && !hidden.contains(n) && seen.add(n)) out.add(n);
+    }
+    for (final n in base) {
+      if (!hidden.contains(n) && seen.add(n)) out.add(n);
+    }
+    return out;
+  }
+
+  /// 並び順を反映した選択用カテゴリ（アイコン・色つき）。
+  List<TxCategory> orderedCategories({required bool income}) =>
+      orderedCategoryNames(income: income)
+          .map((n) => categoryFor(n, income: income))
+          .toList();
 
   Future<void> addCustomCategory(String name, {required bool income}) async {
     final hid = _householdId;
     final n = name.trim();
     if (hid == null || n.isEmpty) return;
+    // 非表示にしていた既定カテゴリと同名なら、隠しを解除して戻す。
+    final hidden = income ? hiddenIncomeCats : hiddenExpenseCats;
+    if (hidden.contains(n)) {
+      await restoreCategory(n, income: income);
+      return;
+    }
     final list = income ? customIncomeCats : customExpenseCats;
     if (list.contains(n)) return;
     list.add(n);
@@ -89,6 +137,57 @@ class HouseholdService extends ChangeNotifier {
     list.remove(name);
     await _households.doc(hid).set({
       income ? 'customIncomeCats' : 'customExpenseCats': list,
+    }, SetOptions(merge: true));
+    notifyListeners();
+  }
+
+  /// カテゴリを一覧から消す。カスタムは完全削除、既定は「非表示」にする
+  /// （どちらも選択リストから消えるが、これまでの記録の金額・内容は変わらない）。
+  Future<void> deleteCategory(String name, {required bool income}) async {
+    final hid = _householdId;
+    if (hid == null) return;
+    final customs = income ? customIncomeCats : customExpenseCats;
+    final data = <String, dynamic>{};
+    if (customs.contains(name)) {
+      customs.remove(name);
+      data[income ? 'customIncomeCats' : 'customExpenseCats'] = customs;
+    } else {
+      final hidden = income ? hiddenIncomeCats : hiddenExpenseCats;
+      if (!hidden.contains(name)) hidden.add(name);
+      data[income ? 'hiddenIncomeCats' : 'hiddenExpenseCats'] = hidden;
+    }
+    final order = income ? incomeCatOrder : expenseCatOrder;
+    order.remove(name);
+    data[income ? 'incomeCatOrder' : 'expenseCatOrder'] = order;
+    await _households.doc(hid).set(data, SetOptions(merge: true));
+    notifyListeners();
+  }
+
+  /// 非表示にした既定カテゴリを元に戻す。
+  Future<void> restoreCategory(String name, {required bool income}) async {
+    final hid = _householdId;
+    if (hid == null) return;
+    final hidden = income ? hiddenIncomeCats : hiddenExpenseCats;
+    hidden.remove(name);
+    await _households.doc(hid).set({
+      income ? 'hiddenIncomeCats' : 'hiddenExpenseCats': hidden,
+    }, SetOptions(merge: true));
+    notifyListeners();
+  }
+
+  /// カテゴリの並び順を保存する（名前の配列）。
+  Future<void> setCategoryOrder(List<String> names,
+      {required bool income}) async {
+    final hid = _householdId;
+    if (hid == null) return;
+    final clean = names.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    if (income) {
+      incomeCatOrder = List.of(clean);
+    } else {
+      expenseCatOrder = List.of(clean);
+    }
+    await _households.doc(hid).set({
+      income ? 'incomeCatOrder' : 'expenseCatOrder': clean,
     }, SetOptions(merge: true));
     notifyListeners();
   }
@@ -119,6 +218,10 @@ class HouseholdService extends ChangeNotifier {
     replacements = clean;
     notifyListeners();
   }
+
+  /// Firestore の動的な値を文字列リストに変換（List でなければ空）。
+  List<String> _strList(dynamic v) =>
+      v is List ? v.map((e) => '$e').toList() : <String>[];
 
   CollectionReference<Map<String, dynamic>> get _users =>
       _db.collection('users');
@@ -218,12 +321,12 @@ class HouseholdService extends ChangeNotifier {
     } else {
       paymentMethods = List.of(defaultPayments);
     }
-    customExpenseCats = (data?['customExpenseCats'] is List)
-        ? (data!['customExpenseCats'] as List).map((e) => '$e').toList()
-        : <String>[];
-    customIncomeCats = (data?['customIncomeCats'] is List)
-        ? (data!['customIncomeCats'] as List).map((e) => '$e').toList()
-        : <String>[];
+    customExpenseCats = _strList(data?['customExpenseCats']);
+    customIncomeCats = _strList(data?['customIncomeCats']);
+    expenseCatOrder = _strList(data?['expenseCatOrder']);
+    incomeCatOrder = _strList(data?['incomeCatOrder']);
+    hiddenExpenseCats = _strList(data?['hiddenExpenseCats']);
+    hiddenIncomeCats = _strList(data?['hiddenIncomeCats']);
     final pfb = data?['personalFoodBudgets'];
     personalFoodBudgets = pfb is Map
         ? pfb.map((k, v) => MapEntry('$k', (v as num?)?.toInt() ?? 0))

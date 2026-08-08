@@ -570,7 +570,8 @@ class _SubEditSheetState extends State<_SubEditSheet> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                for (final c in expenseCategories)
+                for (final c
+                    in HouseholdService.instance.orderedCategories(income: false))
                   ChoiceChip(
                     label: Text(c.name),
                     selected: _category == c.name,

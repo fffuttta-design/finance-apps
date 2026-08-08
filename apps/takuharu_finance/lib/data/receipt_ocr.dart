@@ -3,7 +3,6 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
-import 'categories.dart';
 import 'household_service.dart';
 
 /// レシート記録画面のトグルで「まとめて1件 ⇄ 品目ごと」を切り替えるための
@@ -49,7 +48,8 @@ class ReceiptOcr {
   static bool get available => _apiKey.isNotEmpty;
 
   String _prompt() {
-    final cats = expenseCategories.map((c) => c.name).join('、');
+    final cats =
+        HouseholdService.instance.orderedCategoryNames(income: false).join('、');
     return '''このレシートまたは納品書の画像（イオンネットスーパー等のネットスーパー注文明細を含む）を読み取り、次のJSONだけを返してください（説明文・コードフェンス不要）。
 {
   "amount": 合計金額の整数（税込・最終支払額。円。数値のみ。読めなければ null）,

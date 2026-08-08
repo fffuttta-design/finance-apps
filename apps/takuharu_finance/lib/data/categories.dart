@@ -38,9 +38,14 @@ const incomeCategories = <TxCategory>[
   TxCategory('その他', Icons.more_horiz_rounded, Color(0xFFA7D9CB)),
 ];
 
+/// 個人の食費わくをONにしたときに、自動でこのカテゴリへ切り替える
+/// （共用の食費わくから買ったものだと一目で分かるように）。
+const sharedFoodCategory = '共用食費';
+
 /// 「個人の食費わく」の対象にできる支出カテゴリ。
 /// 食費に加え、レジ袋など食費まわりで一緒に買うことがある日用品も対象にする。
-const personalFoodCategories = <String>{'食費', '日用品'};
+/// 「共用食費」もわくトグルを表示・維持できるよう対象に含める。
+const personalFoodCategories = <String>{'食費', '日用品', sharedFoodCategory};
 
 /// [major] が「個人の食費わく」の対象カテゴリか。
 bool isPersonalFoodCategory(String major) =>
