@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.102",
-    "buildNumber":  "107",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.102/takuharu-finance-v0.2.102.apk",
-    "releaseNotes":  "・明細を共有できるようになりました。レシート画面の右上「共有」ボタンから、LINEやDiscordに送れるリンクを発行できます。\n・相手（たく／はる）がそのリンクをタップすると、アプリが自動で開いてその明細（内訳つき）が表示されます。アプリを入れていない場合はWeb版が開きます。"
+    "version":  "0.2.103",
+    "buildNumber":  "108",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.103/takuharu-finance-v0.2.103.apk",
+    "releaseNotes":  "・設定に「カテゴリ」タブが増えました。支出／収入それぞれで、自分でカテゴリを追加・削除できます（ふたりで共有）。\n・支出カテゴリに「Uber」を追加しました。"
 }
