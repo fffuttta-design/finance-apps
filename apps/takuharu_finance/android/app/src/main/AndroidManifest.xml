@@ -33,6 +33,14 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- 明細共有リンク（takuharu://receipt/{id}）でアプリを開く。
+                 Discordに貼るhttps中継ページ(open.html)が intent 経由でこのスキームを叩く。 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="takuharu"/>
+            </intent-filter>
         </activity>
         <!-- 通知の小アイコン（白シルエットの貯金箱＋ハート）と色（ピンク） -->
         <meta-data

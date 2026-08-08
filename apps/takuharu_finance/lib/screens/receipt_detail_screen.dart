@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/auth_service.dart';
@@ -107,6 +108,40 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
     if (mounted) Navigator.pop(context, true);
   }
 
+  /// この明細（レシート）を共有する。
+  /// Discord等に貼れる https 中継リンク（open.html?r=receiptId）を発行し、
+  /// 端末の共有シートを開く。相手がタップするとアプリ（未導入ならWeb版）が開く。
+  Future<void> _shareReceipt() async {
+    final rid = _receiptId;
+    if (rid == null || rid.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('この明細は共有できません。')),
+        );
+      }
+      return;
+    }
+    final total = _members.fold<int>(0, (s, t) => s + t.amount);
+    final store = _members
+        .map((t) => t.store?.trim() ?? '')
+        .firstWhere((s) => s.isNotEmpty, orElse: () => 'まとめ記録');
+    final url =
+        'https://fffuttta-design.github.io/finance-apps/takuharu/open.html?r=$rid';
+    final text =
+        '【たくはるファイナンス】\n$store  -${formatYen(total)}\nこの明細を見てね💗\n$url';
+    try {
+      await SharePlus.instance
+          .share(ShareParams(text: text, subject: '$store の明細'));
+    } catch (_) {
+      if (!mounted) return;
+      await Clipboard.setData(ClipboardData(text: url));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('共有できなかったのでリンクをコピーしました。')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -115,7 +150,16 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
         if (!didPop && mounted) Navigator.pop(context, _changed);
       },
       child: Scaffold(
-        appBar: AppBar(title: const Text('レシート')),
+        appBar: AppBar(
+          title: const Text('レシート'),
+          actions: [
+            IconButton(
+              onPressed: _shareReceipt,
+              icon: const Icon(Icons.ios_share),
+              tooltip: '明細を共有',
+            ),
+          ],
+        ),
         body: CommentThread(
           source: _source,
           header: _header(),

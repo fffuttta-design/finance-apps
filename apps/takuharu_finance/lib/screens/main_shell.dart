@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../data/deep_link_service.dart';
 import '../data/household_service.dart';
 import '../data/push_service.dart';
 import '../data/subscription_auto_record.dart';
@@ -41,6 +42,8 @@ class _MainShellState extends State<MainShell>
     _repairAdjustmentCategoriesOnce();
     // 支払日が来た固定費を自動で支出に記帳（裏で静かに・二重計上なし）。
     _autoRecordSubscriptions();
+    // 明細共有リンク（takuharu://… / Web の ?r=）で開かれていたら、その明細へ。
+    DeepLinkService.instance.init();
   }
 
   /// 支払日を過ぎた固定費を今月分として自動記帳する（起動時・復帰時）。

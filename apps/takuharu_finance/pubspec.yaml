@@ -17,7 +17,7 @@ resolution: workspace
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.2.101+106
+version: 0.2.102+107
 
 environment:
   sdk: ^3.11.4
@@ -51,6 +51,10 @@ dependencies:
   dio: ^5.7.0
   # レシート画像のDriveリンクを開く。
   url_launcher: ^6.3.0
+  # 明細をLINE/Discord等へ共有（共有シートを開く）。
+  share_plus: ^11.0.0
+  # 明細共有リンク（takuharu://…）を受け取ってアプリを開く。
+  app_links: ^6.3.0
   permission_handler: ^12.0.0+1
   open_filex: ^4.5.0
   path_provider: ^2.1.5
