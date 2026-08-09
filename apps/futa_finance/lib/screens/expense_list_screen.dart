@@ -179,10 +179,8 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     final q = _query.trim().toLowerCase();
     final m = _month;
     var list = _transactions
-        // 支出に加えて振替も一覧に載せる（振替と分かるよう行側で区別表示）。
-        .where((t) =>
-            t.type == core.TransactionType.expense ||
-            t.type == core.TransactionType.transfer)
+        // 支出伝票だけを載せる（振替＝お金の移動は支出ではないので出さない）。
+        .where((t) => t.type == core.TransactionType.expense)
         .where((t) =>
             m == null || (t.date.year == m.year && t.date.month == m.month))
         .where((t) {

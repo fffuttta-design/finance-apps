@@ -294,15 +294,13 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
     final recent = [...monthTxns]..sort((a, b) => b.date.compareTo(a.date));
     final recentUnits = _groupByReceipt(recent).take(8).toList();
 
-    // ① 支払方法別の内訳（経費・固定費込み・金額降順）。
+    // ① 支払方法別の内訳（実際の支出伝票だけ・金額降順）。
+    // 固定費・サブスクはここに足さない（実際の支払はクレカ／銀行の伝票側に
+    // 出るので、足すと同じ支出を二重に見せてしまう）。
     final byMethod = <String, int>{};
     for (final t in monthTxns) {
       if (t.type != TransactionType.expense) continue;
       byMethod[t.paymentMethod] = (byMethod[t.paymentMethod] ?? 0) + t.effectiveAmount;
-    }
-    if (subTotal > 0) {
-      byMethod['固定費・サブスク'] =
-          (byMethod['固定費・サブスク'] ?? 0) + subTotal;
     }
     final methodEntries = byMethod.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
@@ -383,7 +381,6 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
                     tappable: {
                       for (final c in _payments.creditCards) c.name,
                       for (final b in _payments.bankAccounts) b.name,
-                      '固定費・サブスク',
                     },
                     iconByName: {
                       for (final c in _payments.creditCards)
@@ -446,23 +443,20 @@ class _HeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const onAccent = Colors.white;
-    final onAccentSoft = Colors.white.withValues(alpha: 0.88);
-    // サブタイルは「背景より明るい（ほぼ白）面」にして、数字をアクセント色で出す。
-    // 濃くするより薄くした方が見やすい、という方針。
-    final tileBg = Colors.white.withValues(alpha: 0.94);
-    const tileLabel = Color(0xFF5B6472); // 白タイル上で読みやすい落ち着いたグレー
     final isBlack = net >= 0;
+    // ⬇ 濃いベタ塗り（accent 一色）をやめ、白ベース＋要点だけ色。
+    // 数字は墨色で大きく出し、モード色(accent)はアイコンチップだけに使う。
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: accent,
+        color: V2Colors.surface,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
+        border: Border.all(color: V2Colors.border),
+        boxShadow: const [
           BoxShadow(
-            color: accent.withValues(alpha: 0.22),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
+            color: V2Colors.shadow,
+            blurRadius: 16,
+            offset: Offset(0, 6),
           ),
         ],
       ),
@@ -471,44 +465,52 @@ class _HeroCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.trending_down, size: 16, color: onAccentSoft),
-              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.trending_down, size: 15, color: accent),
+              ),
+              const SizedBox(width: 8),
               Text(isBusiness ? '今月の経費' : '今月の支出',
-                  style: TextStyle(
+                  style: const TextStyle(
                       fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: onAccentSoft)),
+                      fontWeight: FontWeight.w700,
+                      color: V2Colors.textSecondary)),
               const Spacer(),
               // 月の切替はトップバーの共有月ナビへ集約。ここは表示のみ。
               Text(monthLabel,
-                  style: TextStyle(
+                  style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: onAccentSoft)),
+                      color: V2Colors.textMuted)),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           // 主役の数字＝今月の支出額（収支ではなく支出を大きく）。
           Text(formatYen(expense),
               style: const TextStyle(
-                fontSize: 34,
+                fontSize: 36,
                 fontWeight: FontWeight.w800,
                 letterSpacing: -0.8,
-                color: onAccent,
+                color: V2Colors.textPrimary,
                 fontFeatures: V2Typography.tabularNums,
               )),
           if (incomePending > 0) ...[
             const SizedBox(height: 6),
             Row(
               children: [
-                Icon(Icons.hourglass_top, size: 14, color: onAccentSoft),
+                const Icon(Icons.hourglass_top,
+                    size: 14, color: V2Colors.warning),
                 const SizedBox(width: 5),
                 Text(
                     '${isBusiness ? '売上' : '収入'}のうち見込み ${formatYen(incomePending, withSign: true)}',
-                    style: TextStyle(
+                    style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: onAccentSoft,
+                        color: V2Colors.textSecondary,
                         fontFeatures: V2Typography.tabularNums)),
               ],
             ),
@@ -518,23 +520,22 @@ class _HeroCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _HeroSubTile(
-                  bg: tileBg,
+                  bg: V2Colors.surfaceMuted,
                   label: isBusiness ? '今月の売上' : '今月の収入',
                   value: formatYen(income),
-                  valueColor: const Color(0xFF16A34A),
-                  labelColor: tileLabel,
+                  valueColor: V2Colors.badgeGreen,
+                  labelColor: V2Colors.textSecondary,
                 ),
               ),
               const SizedBox(width: V2Spacing.md),
               Expanded(
                 child: _HeroSubTile(
-                  bg: tileBg,
+                  bg: V2Colors.surfaceMuted,
                   label: '今月の収支',
                   value: formatYen(net, withSign: true),
-                  valueColor: isBlack
-                      ? const Color(0xFF16A34A)
-                      : const Color(0xFFDC2626),
-                  labelColor: tileLabel,
+                  valueColor:
+                      isBlack ? V2Colors.badgeGreen : V2Colors.negative,
+                  labelColor: V2Colors.textSecondary,
                   badge: isBlack ? '黒字' : '赤字',
                 ),
               ),
