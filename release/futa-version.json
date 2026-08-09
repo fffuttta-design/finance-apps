@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.565",
-    "buildNumber":  "566",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.565/futa-finance-v1.0.565.apk",
-    "releaseNotes":  "v1.0.565+566 支出明細は支出伝票のみ/支払方法別からサブスク除外/ホームを白ベースに軽量化"
+    "version":  "1.0.566",
+    "buildNumber":  "567",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.566/futa-finance-v1.0.566.apk",
+    "releaseNotes":  "v1.0.566+567 銀行明細にカテゴリ表示/支出明細から税金・金融手数料を除外"
 }
