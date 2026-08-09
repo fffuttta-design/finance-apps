@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.564",
-    "buildNumber":  "565",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.564/futa-finance-v1.0.564.apk",
-    "releaseNotes":  "v1.0.564+565 月初残高を自動計算"
+    "version":  "1.0.565",
+    "buildNumber":  "566",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.565/futa-finance-v1.0.565.apk",
+    "releaseNotes":  "v1.0.565+566 支出明細は支出伝票のみ/支払方法別からサブスク除外/ホームを白ベースに軽量化"
 }
