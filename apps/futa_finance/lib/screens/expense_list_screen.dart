@@ -77,6 +77,24 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   /// 支払方法名→登録済みロゴを引くための支払方法マスタ（カード/口座）。
   core.PaymentMethodsConfig _payments = core.PaymentMethodsConfig.empty();
 
+  /// カテゴリ設定で「非消費」フラグが付いた大カテゴリ名（番号プレフィックス除去済み）。
+  Set<String> _nonConsumMajors = {};
+
+  /// 支出明細（＝消費の一覧）に混ぜない大カテゴリ（番号除去して照合）。
+  /// 税金・各種手数料など「実際の出金だが消費ではない」もの。
+  /// ⚠ 銀行明細（通帳）・業績には従来どおり出る。ここ（消費の一覧）でだけ隠す。
+  static const _hiddenMajorsInList = {
+    '税金', '金融手数料', '租税公課', '支払手数料',
+  };
+
+  String _bareMajor(String s) =>
+      s.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
+
+  bool _isHiddenInList(String major) {
+    final bare = _bareMajor(major);
+    return _hiddenMajorsInList.contains(bare) || _nonConsumMajors.contains(bare);
+  }
+
   _Sort _sort = _Sort.dateDesc;
   final _searchCtrl = TextEditingController();
   String _query = '';
@@ -150,9 +168,17 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   }
 
   Future<void> _loadPayments() async {
-    final p = await SettingsRepository.instance.loadPayments();
+    final sr = SettingsRepository.instance;
+    final p = await sr.loadPayments();
+    final cats = await sr.loadCategories();
     if (!mounted) return;
-    setState(() => _payments = p);
+    setState(() {
+      _payments = p;
+      _nonConsumMajors = {
+        for (final m in cats.majors)
+          if (m.nonConsumption) _bareMajor(m.name),
+      };
+    });
   }
 
   /// 支払方法名に一致する登録済みカード/口座のロゴURLを返す（無ければ null）。
@@ -181,6 +207,8 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     var list = _transactions
         // 支出伝票だけを載せる（振替＝お金の移動は支出ではないので出さない）。
         .where((t) => t.type == core.TransactionType.expense)
+        // 税金・金融手数料など「非消費」は支出明細に出さない（銀行明細には出る）。
+        .where((t) => !_isHiddenInList(t.category.major))
         .where((t) =>
             m == null || (t.date.year == m.year && t.date.month == m.month))
         .where((t) {

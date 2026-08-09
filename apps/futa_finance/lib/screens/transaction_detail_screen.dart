@@ -703,6 +703,12 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
     final acctValue = isTransfer
         ? '${_acctLabel(t.transferFromAccount)} → ${_acctLabel(t.transferToAccount)}'
         : _acctLabel(t.paymentMethod);
+    // カテゴリ（大 › 小）。クレカ明細と揃えて銀行明細でも出す。振替は対象外。
+    final catMajor =
+        t.category.major.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
+    final catText = t.category.sub.trim().isNotEmpty
+        ? '$catMajor › ${t.category.sub.trim()}'
+        : catMajor;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
@@ -759,7 +765,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            // 明細項目（口座／場所／日付／メモ）。カテゴリは出さない。
+            // 明細項目（口座／カテゴリ／場所／日付／メモ）。
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -769,6 +775,11 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
               child: Column(
                 children: [
                   _row(isTransfer ? '口座（振替）' : '口座', acctValue),
+                  // カテゴリ（振替＝お金の移動には出さない）。クレカ明細と揃える。
+                  if (!isTransfer && catText.isNotEmpty) ...[
+                    _div(),
+                    _row('カテゴリ', catText),
+                  ],
                   // 場所（ATM・店名など）。入っている時だけ出す。
                   if (t.store != null && t.store!.trim().isNotEmpty) ...[
                     _div(),
