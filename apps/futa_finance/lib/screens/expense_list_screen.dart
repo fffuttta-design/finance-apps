@@ -85,6 +85,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   /// ⚠ 銀行明細（通帳）・業績には従来どおり出る。ここ（消費の一覧）でだけ隠す。
   static const _hiddenMajorsInList = {
     '税金', '金融手数料', '租税公課', '支払手数料',
+    '保険料', '社会保険料', '社会保険', '法定福利費',
   };
 
   String _bareMajor(String s) =>
