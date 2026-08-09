@@ -116,7 +116,62 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
     final now = DateTime.now();
     final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
-    return _subs.fold<int>(0, (s, sub) => s + sub.plAmountForMonth(ym, curYm));
+    // 実取引化済み（fixedcost_* 明細やカードCSVミラー）の固定費は予定合計に足さない
+    // ＝二重計上しない。実取引側（通信費など本来のカテゴリ）で計上済み。
+    final matched = _matchedSubIds(m);
+    return _subs.fold<int>(
+        0,
+        (s, sub) => matched.contains(sub.id)
+            ? s
+            : s + sub.plAmountForMonth(ym, curYm));
+  }
+
+  /// 名前の正規化（実取引との照合用）。支出タブ(rich_expenses)と同じ規則。
+  String _normName(String s) =>
+      s.toLowerCase().replaceAll(RegExp(r'[（）()【】\[\]・:：\s　]'), '');
+
+  /// その月に「実取引が存在する」固定費サブスクのID集合。
+  /// 実取引があるサブスクは、予定行を出さず・二重計上もしない（実取引を採用）。
+  /// 照合＝同月の支出取引を、①名前一致 ②金額一致 の順で1対1に割り当てる。
+  Set<String> _matchedSubIds(DateTime m) {
+    final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
+    final txns = _transactions
+        .where((t) =>
+            t.type == TransactionType.expense &&
+            t.date.year == m.year &&
+            t.date.month == m.month)
+        .toList();
+    final claimed = <String>{};
+    final matched = <String>{};
+    for (final sub in _subs) {
+      final exp = sub.isVariable ? sub.monthlyActuals[ym] : sub.amount;
+      final nname = _normName(sub.name);
+      Transaction? hit;
+      if (nname.isNotEmpty) {
+        for (final t in txns) {
+          if (claimed.contains(t.id)) continue;
+          final nd = _normName(t.description);
+          if (nd.isNotEmpty && (nd.contains(nname) || nname.contains(nd))) {
+            hit = t;
+            break;
+          }
+        }
+      }
+      if (hit == null && exp != null && exp > 0) {
+        for (final t in txns) {
+          if (claimed.contains(t.id)) continue;
+          if (t.amount == exp) {
+            hit = t;
+            break;
+          }
+        }
+      }
+      if (hit != null) {
+        claimed.add(hit.id);
+        matched.add(sub.id);
+      }
+    }
+    return matched;
   }
 
   List<Transaction> _monthTxns(DateTime m) => _transactions
@@ -273,7 +328,10 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
           '${now.year}-${now.month.toString().padLeft(2, '0')}';
       final ym =
           '${_month.year}-${_month.month.toString().padLeft(2, '0')}';
+      // 実取引化済みの固定費は「固定費・サブスク」明細から除外（実カテゴリ側で計上済み）。
+      final matched = _matchedSubIds(_month);
       for (final sub in _subs) {
+        if (matched.contains(sub.id)) continue;
         final amt = sub.plAmountForMonth(ym, nowYm);
         if (amt > 0) {
           fixedLines.add(

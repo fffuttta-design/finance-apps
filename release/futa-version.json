@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.567",
-    "buildNumber":  "568",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.567/futa-finance-v1.0.567.apk",
-    "releaseNotes":  "v1.0.567+568 支出明細から保険料・社会保険も除外"
+    "version":  "1.0.568",
+    "buildNumber":  "569",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.568/futa-finance-v1.0.568.apk",
+    "releaseNotes":  "v1.0.568+569 ホームの固定費・サブスク二重計上を修正（実取引化済みは予定に足さない）"
 }
