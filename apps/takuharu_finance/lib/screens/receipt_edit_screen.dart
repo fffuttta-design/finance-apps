@@ -75,6 +75,13 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
   String? _adjTxId; // 既存の差額調整品目のid（あれば更新、なければ追加）
   core.Transaction? _adjSource; // 既存の差額調整品目（type等の引き継ぎ用）
 
+  // 水道検針票の使用量（登録時に紐づいていれば再編集できる）。
+  late final bool _hasUsage;
+  late final TextEditingController _usageAmountCtrl;
+  late final TextEditingController _usagePrevCtrl;
+  DateTime? _periodFrom;
+  DateTime? _periodTo;
+
   static bool _isAdjustment(core.Transaction m) =>
       m.description == _kAdjPlus || m.description == _kAdjMinus;
 
@@ -141,6 +148,21 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
     final fullTotal = widget.members.fold<int>(0, (s, m) => s + m.amount);
     _receiptTotalCtrl = TextEditingController(
         text: _adjTxId != null ? fullTotal.toString() : '');
+    // 使用量メタ（水道）が紐づいた品目があれば拾って編集できるようにする。
+    core.UsageDetail? u;
+    for (final m in widget.members) {
+      if (m.usage != null) {
+        u = m.usage;
+        break;
+      }
+    }
+    _hasUsage = u != null;
+    _usageAmountCtrl = TextEditingController(
+        text: u?.amount != null ? _fmtUsage(u!.amount!) : '');
+    _usagePrevCtrl = TextEditingController(
+        text: u?.prevAmount != null ? _fmtUsage(u!.prevAmount!) : '');
+    _periodFrom = u?.periodFrom;
+    _periodTo = u?.periodTo;
     final hid = HouseholdService.instance.householdId;
     if (hid != null) {
       AccountRepository.instance.loadAll(hid).then((a) {
@@ -153,10 +175,36 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
   void dispose() {
     _storeCtrl.dispose();
     _receiptTotalCtrl.dispose();
+    _usageAmountCtrl.dispose();
+    _usagePrevCtrl.dispose();
     for (final i in _items) {
       i.dispose();
     }
     super.dispose();
+  }
+
+  /// 使用量(m³)の表示整形。整数ならそのまま、端数があれば小数表示。
+  static String _fmtUsage(double v) =>
+      v == v.roundToDouble() ? v.toInt().toString() : v.toString();
+
+  /// 編集中の値から使用量メタを組み立てる（何も無ければ null）。
+  core.UsageDetail? _buildUsage() {
+    final amt = double.tryParse(_usageAmountCtrl.text.trim());
+    final prev = double.tryParse(_usagePrevCtrl.text.trim());
+    if (amt == null &&
+        prev == null &&
+        _periodFrom == null &&
+        _periodTo == null) {
+      return null;
+    }
+    return core.UsageDetail(
+      amount: amt,
+      unit: 'm3',
+      prevAmount: prev,
+      periodFrom: _periodFrom,
+      periodTo: _periodTo,
+      kind: 'water',
+    );
   }
 
   int get _total =>
@@ -411,6 +459,21 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
     // adj==0（または調整OFF）かつ既存の調整行があれば、keepIds に入れないので
     // 下の deletes でそのまま消える（差額が解消されたら調整行も自動で消える）。
 
+    // 水道の使用量メタは「水道料金」品目に載せ替える（編集で消えたらクリア）。
+    if (_hasUsage) {
+      final usage = _buildUsage();
+      void applyTo(List<core.Transaction> list) {
+        final idx = list.indexWhere((t) => t.description == '水道料金');
+        if (idx >= 0) {
+          list[idx] =
+              list[idx].copyWith(usage: usage, clearUsage: usage == null);
+        }
+      }
+
+      applyTo(updates);
+      applyTo(adds);
+    }
+
     // 残さない品目（消した既存品目＋OFFになった調整行）を削除対象に。
     // ※ keepIds は調整ブロックの後に確定するので、ここで算出する。
     final deletes =
@@ -587,6 +650,10 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
                 side: const BorderSide(color: AppColors.pinkSoft),
               ),
             ),
+            if (_hasUsage) ...[
+              const SizedBox(height: 12),
+              _usageCard(),
+            ],
             const SizedBox(height: 16),
             _reconCard(),
             const SizedBox(height: 20),
@@ -636,6 +703,120 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  /// 水道検針票の使用量（m³・前年同期・使用期間）を確認・編集するカード。
+  /// 金額の集計には影響しない（メタ情報として「水道料金」品目に紐づく）。
+  Widget _usageCard() {
+    return Card(
+      color: const Color(0xFF8ECAE6).withValues(alpha: 0.16),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.water_drop_rounded,
+                    size: 18, color: Color(0xFF2E7DA1)),
+                SizedBox(width: 8),
+                Text('水道の使用量',
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _usageField('今回使用量', _usageAmountCtrl)),
+                const SizedBox(width: 12),
+                Expanded(child: _usageField('前年同期', _usagePrevCtrl)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                    child: _periodPick('使用期間 開始', _periodFrom,
+                        (d) => setState(() => _periodFrom = d))),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: _periodPick('使用期間 終了', _periodTo,
+                        (d) => setState(() => _periodTo = d))),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text('※ 使用量は「水道料金」に紐づけて記録します（金額の集計には影響しません）',
+                style: TextStyle(fontSize: 11, color: AppColors.textSub)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _usageField(String label, TextEditingController c) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(fontSize: 11, color: AppColors.textSub)),
+        TextField(
+          controller: c,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+          decoration: const InputDecoration(
+            isDense: true,
+            suffixText: 'm³',
+            border: UnderlineInputBorder(),
+          ),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+      ],
+    );
+  }
+
+  Widget _periodPick(
+      String label, DateTime? value, ValueChanged<DateTime> onPick) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(fontSize: 11, color: AppColors.textSub)),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: value ?? _date,
+              firstDate: DateTime(2020),
+              lastDate: DateTime(2035, 12, 31),
+              builder: (ctx, child) => Theme(
+                data: Theme.of(ctx).copyWith(
+                  colorScheme:
+                      const ColorScheme.light(primary: Color(0xFF2E7DA1)),
+                ),
+                child: child!,
+              ),
+            );
+            if (picked != null) onPick(picked);
+          },
+          child: Row(
+            children: [
+              const Icon(Icons.event_rounded,
+                  size: 16, color: Color(0xFF2E7DA1)),
+              const SizedBox(width: 5),
+              Text(
+                  value == null
+                      ? '未設定'
+                      : '${value.year}/${value.month}/${value.day}',
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

@@ -1,4 +1,5 @@
 import 'category.dart';
+import 'usage_detail.dart';
 
 /// 取引種別。
 enum TransactionType {
@@ -141,6 +142,11 @@ class Transaction {
   /// デフォルト false。既存データは false で読まれる。
   final bool isFixed;
 
+  /// 使用量メタ（水道等の検針票）。任意・後方互換。
+  /// 金額の内訳は品目Transactionで持つので、ここは非金額のメタ（m³・前年・期間）に絞る。
+  /// 水道レシートの代表1件（「水道料金」品目の取引）にだけ載せる。
+  final UsageDetail? usage;
+
   const Transaction({
     required this.id,
     required this.date,
@@ -171,6 +177,7 @@ class Transaction {
     this.receiptType,
     this.reimbursed,
     this.isFixed = false,
+    this.usage,
   });
 
   Map<String, dynamic> toJson() => {
@@ -203,6 +210,7 @@ class Transaction {
         if (receiptType != null) 'receiptType': receiptType,
         if (reimbursed != null && reimbursed! > 0) 'reimbursed': reimbursed,
         if (isFixed) 'isFixed': isFixed,
+        if (usage != null) 'usage': usage!.toJson(),
       };
 
   factory Transaction.fromJson(Map<String, dynamic> j) => Transaction(
@@ -243,6 +251,9 @@ class Transaction {
         receiptType: j['receiptType'] as String?,
         reimbursed: (j['reimbursed'] as num?)?.toInt(),
         isFixed: j['isFixed'] as bool? ?? false,
+        usage: j['usage'] != null
+            ? UsageDetail.fromJson(Map<String, dynamic>.from(j['usage'] as Map))
+            : null,
       );
 
   Transaction copyWith({
@@ -279,6 +290,9 @@ class Transaction {
     /// true にすると reimbursed を null に戻す（立替の解除）。
     bool clearReimbursed = false,
     bool? isFixed,
+    UsageDetail? usage,
+    /// true にすると usage を null に戻す（使用量の解除）。
+    bool clearUsage = false,
   }) =>
       Transaction(
         id: id,
@@ -310,5 +324,6 @@ class Transaction {
         receiptType: receiptType ?? this.receiptType,
         reimbursed: clearReimbursed ? null : (reimbursed ?? this.reimbursed),
         isFixed: isFixed ?? this.isFixed,
+        usage: clearUsage ? null : (usage ?? this.usage),
       );
 }

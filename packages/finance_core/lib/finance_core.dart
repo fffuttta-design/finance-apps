@@ -8,3 +8,4 @@ export 'src/models/income_source.dart';
 export 'src/models/monthly_snapshot.dart';
 export 'src/models/subscription.dart';
 export 'src/models/transaction.dart';
+export 'src/models/usage_detail.dart';

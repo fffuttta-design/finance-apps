@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:finance_core/finance_core.dart';
 import 'package:http/http.dart' as http;
 
 import 'household_service.dart';
@@ -24,12 +25,16 @@ class ReceiptResult {
   final String? store;
   final String? category;
   final List<ReceiptItem> items;
+
+  /// 水道等の使用量メタ（検針票のとき。無ければ null）。
+  final UsageDetail? usage;
   const ReceiptResult({
     this.amount,
     this.date,
     this.store,
     this.category,
     this.items = const [],
+    this.usage,
   });
 }
 
@@ -58,9 +63,25 @@ class ReceiptOcr {
   "category": "レシート全体の代表カテゴリ。次のいずれか1つ: $cats",
   "items": [
     {"name": "品目名（簡潔に）", "price": その品目の金額の整数, "category": "次のいずれか1つ: $cats"}
-  ]
+  ],
+  "water": {
+    "isWaterBill": true/false（水道・上下水道の検針票/請求書/口座振替収書ならtrue。違えばfalseにしてこのブロックの他は無視）,
+    "usage": 今回使用量の数値（m³。例 31。読めなければ null）,
+    "prevUsage": 前年同時期の使用量（例 32。無ければ null）,
+    "periodFrom": "YYYY-MM-DD（使用期間の開始。和暦→西暦）",
+    "periodTo": "YYYY-MM-DD（使用期間の終了。和暦→西暦）",
+    "waterCharge": 水道料金の税込額の整数（例 3668。無ければ null）,
+    "sewerCharge": 下水道使用料の税込額の整数（例 2887。無ければ null）
+  }
 }
 重要な読み取りルール:
+- 水道・上下水道の検針票／請求書／口座振替収書なら water.isWaterBill=true にする。このとき:
+  - items は必ず「水道料金」(price=waterCharge) と「下水道使用料」(price=sewerCharge) の2件だけにする（片方しか無ければその1件）。各 category="光熱費"。
+  - amount はご請求金額（合計・税込）。store は "水道料金"。
+  - water.usage は使用量(m³)であり、消費税額や料金(円)とは絶対に混同しない（135や104のような「指示値」ではなく「今回のご使用量 ①-②+③」の m³ を使う）。
+  - 和暦（令和8年＝2026）は西暦に直す。
+  - ★用紙が左右2枚に分かれている場合（名古屋市等）：左＝「水道ご使用量のお知らせ / Water Service Statement」＝今回分、右＝「上下水道料金領収書（口座振替払用）」＝前回分の領収書、で金額も期間も違う。必ず**左の「今回ご請求金額」側**の数値だけを使う：waterCharge/sewerCharge・amount（ご請求金額 Total Charge）・usage（今回のご使用量）・prevUsage（《参考》前年同時期のご使用量）・periodFrom/periodTo（ご使用期間）。右側の領収書（振替金額・別期間の使用量）は絶対に混ぜない・使わない。
+- 水道でなければ water.isWaterBill=false にする（他フィールドは無視されてよい）。
 - 品目の price は「数量込みの金額」を使う。数量が複数の行は単価ではなく『合計』列（単価×数量）の金額を使うこと。
 - 外税（税抜）表記の伝票でも、各品目の price は表に記載されたその行の金額をそのまま使う。
 - amount（合計金額）は一番下の「合計金額」＝税込の最終支払額を使う（外税表記でも税込総額。配送手数料も含む）。
@@ -171,12 +192,70 @@ class ReceiptOcr {
       }
     }
 
+    // 水道検針票の使用量メタ（isWaterBill のときだけ）。
+    UsageDetail? usage;
+    var effItems = items;
+    var effStore = store;
+    var effCategory = category;
+    final w = parsed['water'];
+    if (w is Map && w['isWaterBill'] == true) {
+      int? pInt(dynamic v) {
+        if (v is num) return v.toInt();
+        if (v is String) {
+          return int.tryParse(v.replaceAll(RegExp(r'[^0-9]'), ''));
+        }
+        return null;
+      }
+
+      double? pDbl(dynamic v) {
+        if (v is num) return v.toDouble();
+        if (v is String) return double.tryParse(v.replaceAll(RegExp(r'[^0-9.]'), ''));
+        return null;
+      }
+
+      DateTime? pDate(dynamic v) =>
+          (v is String && v.isNotEmpty) ? DateTime.tryParse(v) : null;
+
+      final usageAmt = pDbl(w['usage']);
+      final prevUsage = pDbl(w['prevUsage']);
+      final periodFrom = pDate(w['periodFrom']);
+      final periodTo = pDate(w['periodTo']);
+      if (usageAmt != null || periodFrom != null || periodTo != null) {
+        usage = UsageDetail(
+          amount: usageAmt,
+          unit: 'm3',
+          prevAmount: prevUsage,
+          periodFrom: periodFrom,
+          periodTo: periodTo,
+          kind: 'water',
+        );
+      }
+
+      // items が空でも waterCharge / sewerCharge から2品目を組み立てる（OCRブレ対策）。
+      if (effItems.isEmpty) {
+        final waterCharge = pInt(w['waterCharge']);
+        final sewerCharge = pInt(w['sewerCharge']);
+        effItems = <ReceiptItem>[
+          if (waterCharge != null && waterCharge > 0)
+            ReceiptItem(name: '水道料金', price: waterCharge, category: '光熱費'),
+          if (sewerCharge != null && sewerCharge > 0)
+            ReceiptItem(name: '下水道使用料', price: sewerCharge, category: '光熱費'),
+        ];
+      }
+      if (effStore.isEmpty) effStore = '水道料金';
+      effCategory = (effCategory == null || effCategory.isEmpty)
+          ? '光熱費'
+          : effCategory;
+    }
+
     return ReceiptResult(
       amount: amount,
       date: date,
-      store: store.isEmpty ? null : store,
-      category: (category == null || category.isEmpty) ? null : category,
-      items: items,
+      store: effStore.isEmpty ? null : effStore,
+      category:
+          (effCategory == null || effCategory.isEmpty) ? null : effCategory,
+      items: effItems,
+      usage: usage,
     );
   }
 }

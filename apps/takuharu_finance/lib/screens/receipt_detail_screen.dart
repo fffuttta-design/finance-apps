@@ -236,6 +236,7 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
                   color: AppColors.textSub)),
           const SizedBox(height: 6),
           ..._members.map(_itemRow),
+          _usageInfo(),
           if (first.receiptUrl != null &&
               first.receiptUrl!.trim().isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -277,6 +278,87 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  /// 水道の使用量メタ（内訳の下に💧行として表示）。無ければ何も出さない。
+  Widget _usageInfo() {
+    core.UsageDetail? u;
+    for (final m in _members) {
+      if (m.usage != null) {
+        u = m.usage;
+        break;
+      }
+    }
+    if (u == null) return const SizedBox.shrink();
+    final unit = u.unit == 'm3' ? 'm³' : u.unit;
+    String fmt(double v) =>
+        v == v.roundToDouble() ? v.toInt().toString() : v.toString();
+
+    // 前年比（増減）。使用量が増えたら▲・減ったら▼。
+    String? diffText;
+    if (u.prevAmount != null) {
+      if (u.amount != null) {
+        final d = u.amount! - u.prevAmount!;
+        if (d == 0) {
+          diffText = '前年 ${fmt(u.prevAmount!)}$unit（同じ）';
+        } else {
+          final arrow = d > 0 ? '▲' : '▼';
+          diffText = '前年 ${fmt(u.prevAmount!)}$unit（$arrow${fmt(d.abs())}$unit）';
+        }
+      } else {
+        diffText = '前年 ${fmt(u.prevAmount!)}$unit';
+      }
+    }
+    String? periodText;
+    if (u.periodFrom != null || u.periodTo != null) {
+      String d(DateTime? t) =>
+          t == null ? '—' : '${t.year}/${t.month}/${t.day}';
+      periodText = '期間 ${d(u.periodFrom)}〜${d(u.periodTo)}';
+    }
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF8ECAE6).withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.water_drop_rounded,
+                  size: 16, color: Color(0xFF2E7DA1)),
+              const SizedBox(width: 6),
+              Text(
+                u.amount != null ? '使用量 ${fmt(u.amount!)}$unit' : '使用量',
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF2E7DA1)),
+              ),
+              if (diffText != null) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(diffText,
+                      style: const TextStyle(
+                          fontSize: 12, color: AppColors.textSub)),
+                ),
+              ],
+            ],
+          ),
+          if (periodText != null) ...[
+            const SizedBox(height: 3),
+            Padding(
+              padding: const EdgeInsets.only(left: 22),
+              child: Text(periodText,
+                  style:
+                      const TextStyle(fontSize: 12, color: AppColors.textSub)),
+            ),
+          ],
         ],
       ),
     );

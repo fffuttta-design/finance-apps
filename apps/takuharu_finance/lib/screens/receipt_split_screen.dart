@@ -59,6 +59,13 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
   bool _addAdjustment = true; // 差額を「消費税・調整」として自動追加するか
   bool _saving = false;
 
+  // 水道検針票の使用量（OCRが水道と判定できたときだけ表示・編集）。
+  late final bool _hasUsage;
+  late final TextEditingController _usageAmountCtrl; // 今回使用量(m³)
+  late final TextEditingController _usagePrevCtrl; // 前年同期(m³)
+  DateTime? _periodFrom;
+  DateTime? _periodTo;
+
   /// レシート記録の既定の支払元。手入力画面と揃える。
   static const _defaultPayment = 'ワンバンク';
 
@@ -73,6 +80,15 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
     _receiptTotalCtrl = TextEditingController(
         text: (r.amount != null && r.amount! > 0) ? r.amount!.toString() : '');
     _payer = AuthService.instance.currentUser?.uid;
+    // 水道検針票の使用量（OCRが読めたときだけカードを出す）。
+    final u = r.usage;
+    _hasUsage = u != null;
+    _usageAmountCtrl = TextEditingController(
+        text: u?.amount != null ? _fmtUsage(u!.amount!) : '');
+    _usagePrevCtrl = TextEditingController(
+        text: u?.prevAmount != null ? _fmtUsage(u!.prevAmount!) : '');
+    _periodFrom = u?.periodFrom;
+    _periodTo = u?.periodTo;
     for (final it in r.items) {
       _items.add(_Item(it.name, it.price, it.category ?? r.category));
     }
@@ -93,10 +109,37 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
   void dispose() {
     _storeCtrl.dispose();
     _receiptTotalCtrl.dispose();
+    _usageAmountCtrl.dispose();
+    _usagePrevCtrl.dispose();
     for (final i in _items) {
       i.dispose();
     }
     super.dispose();
+  }
+
+  /// 使用量(m³)の表示整形。整数ならそのまま、端数があれば小数表示。
+  static String _fmtUsage(double v) =>
+      v == v.roundToDouble() ? v.toInt().toString() : v.toString();
+
+  /// 編集中の値から使用量メタを組み立てる（何も無ければ null）。
+  core.UsageDetail? _buildUsage() {
+    if (!_hasUsage) return null;
+    final amt = double.tryParse(_usageAmountCtrl.text.trim());
+    final prev = double.tryParse(_usagePrevCtrl.text.trim());
+    if (amt == null &&
+        prev == null &&
+        _periodFrom == null &&
+        _periodTo == null) {
+      return null;
+    }
+    return core.UsageDetail(
+      amount: amt,
+      unit: 'm3',
+      prevAmount: prev,
+      periodFrom: _periodFrom,
+      periodTo: _periodTo,
+      kind: 'water',
+    );
   }
 
   int get _total => _items.fold<int>(
@@ -242,6 +285,13 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
         const SnackBar(content: Text('記録できる品目がありません')),
       );
       return;
+    }
+    // 水道の使用量メタは「水道料金」品目（無ければ先頭）に紐づける。
+    final usage = _buildUsage();
+    if (usage != null) {
+      final idx = txns.indexWhere((t) => t.description == '水道料金');
+      final target = idx >= 0 ? idx : 0;
+      txns[target] = txns[target].copyWith(usage: usage);
     }
     // レシート印字の合計（税込）と品目合計の差額を、消費税・送料・値引きぶんとして
     // 1行追加し、記録合計をレシートとピッタリ合わせる（外税レシート対策）。
@@ -411,6 +461,10 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                 side: const BorderSide(color: AppColors.pinkSoft),
               ),
             ),
+            if (_hasUsage) ...[
+              const SizedBox(height: 12),
+              _usageCard(),
+            ],
             const SizedBox(height: 16),
             _reconCard(),
             const SizedBox(height: 20),
@@ -461,6 +515,120 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  /// 水道検針票の使用量（m³・前年同期・使用期間）を確認・編集するカード。
+  /// 金額の集計には影響しない（メタ情報として「水道料金」品目に紐づく）。
+  Widget _usageCard() {
+    return Card(
+      color: const Color(0xFF8ECAE6).withValues(alpha: 0.16),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.water_drop_rounded,
+                    size: 18, color: Color(0xFF2E7DA1)),
+                SizedBox(width: 8),
+                Text('水道の使用量',
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _usageField('今回使用量', _usageAmountCtrl)),
+                const SizedBox(width: 12),
+                Expanded(child: _usageField('前年同期', _usagePrevCtrl)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                    child: _periodPick('使用期間 開始', _periodFrom,
+                        (d) => setState(() => _periodFrom = d))),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: _periodPick('使用期間 終了', _periodTo,
+                        (d) => setState(() => _periodTo = d))),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text('※ 使用量は「水道料金」に紐づけて記録します（金額の集計には影響しません）',
+                style: TextStyle(fontSize: 11, color: AppColors.textSub)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _usageField(String label, TextEditingController c) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(fontSize: 11, color: AppColors.textSub)),
+        TextField(
+          controller: c,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+          decoration: const InputDecoration(
+            isDense: true,
+            suffixText: 'm³',
+            border: UnderlineInputBorder(),
+          ),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+      ],
+    );
+  }
+
+  Widget _periodPick(
+      String label, DateTime? value, ValueChanged<DateTime> onPick) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(fontSize: 11, color: AppColors.textSub)),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: value ?? _date,
+              firstDate: DateTime(2020),
+              lastDate: DateTime(2035, 12, 31),
+              builder: (ctx, child) => Theme(
+                data: Theme.of(ctx).copyWith(
+                  colorScheme:
+                      const ColorScheme.light(primary: Color(0xFF2E7DA1)),
+                ),
+                child: child!,
+              ),
+            );
+            if (picked != null) onPick(picked);
+          },
+          child: Row(
+            children: [
+              const Icon(Icons.event_rounded,
+                  size: 16, color: Color(0xFF2E7DA1)),
+              const SizedBox(width: 5),
+              Text(
+                  value == null
+                      ? '未設定'
+                      : '${value.year}/${value.month}/${value.day}',
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
