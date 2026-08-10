@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.104",
-    "buildNumber":  "109",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.104/takuharu-finance-v0.2.104.apk",
-    "releaseNotes":  "・設定の「カテゴリ」タブを見やすいリスト表示にしました。「自分で追加」と「基本」の区別をなくし、1つのリストにまとめて、ドラッグで自由に並び替えできます（並び順は記録画面のカテゴリ選択にも反映）。\n・カテゴリは×で一覧から消せます（消しても、これまでの記録の金額・内容は残ります）。消した基本カテゴリは下の「消したカテゴリ」から戻せます。\n・「個人の食費わく」をONにすると、カテゴリが自動で「共用食費」に切り替わるようにしました。"
+    "version":  "0.2.105",
+    "buildNumber":  "110",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.105/takuharu-finance-v0.2.105.apk",
+    "releaseNotes":  "・水道（上下水道）の検針票を撮ると、水道料金として登録できるようになりました。「水道料金」「下水道使用料」の2件（光熱費）に自動で分かれ、合計はご請求金額に一致します。\n・使用量の内訳（今回の使用量・前年同期・使用期間）が一緒に記録され、レシート詳細に「💧 使用量 31m³（前年 32m³）／期間 …」のように表示されます。登録・編集画面で直せます。\n・名古屋市の左右2枚の様式でも、左の「今回ご請求金額」側を使うようにしています。"
 }
