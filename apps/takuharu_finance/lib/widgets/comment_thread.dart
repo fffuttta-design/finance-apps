@@ -76,7 +76,8 @@ class CommentThread extends StatefulWidget {
   State<CommentThread> createState() => _CommentThreadState();
 }
 
-class _CommentThreadState extends State<CommentThread> {
+class _CommentThreadState extends State<CommentThread>
+    with WidgetsBindingObserver {
   final _ctrl = TextEditingController();
   final _focus = FocusNode();
   final _scroll = ScrollController();
@@ -102,14 +103,41 @@ class _CommentThreadState extends State<CommentThread> {
   void initState() {
     super.initState();
     _stream = widget.source?.watch();
+    // キーボードの開閉（viewInsets 変化）を拾うために監視を登録する。
+    WidgetsBinding.instance.addObserver(this);
+    // 入力欄にフォーカスが入った瞬間も、最新コメントまで寄せる。
+    _focus.addListener(_onFocusChange);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _focus.removeListener(_onFocusChange);
     _ctrl.dispose();
     _focus.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  /// キーボードが出た／入力欄にフォーカスした瞬間に、最新コメントを
+  /// 入力バーの真上へ寄せる（LINE風の押し上げ）。押し上げ自体は Scaffold の
+  /// resizeToAvoidBottomInset（既定 true）が body を縮めて担うので、ここでは
+  /// 縮んだ表示域の末尾＝最新コメントが隠れないようスクロール位置だけ追従させる。
+  void _keepBottomVisibleForKeyboard() {
+    if (!_focus.hasFocus) return;
+    // レイアウトが縮んだ後の maxScrollExtent へ寄せる。キーボードは数フレーム
+    // かけてせり上がるので、確定後にもう一度寄せて取りこぼしを防ぐ。
+    WidgetsBinding.instance.addPostFrameCallback((_) => _animateToBottom());
+    Future.delayed(const Duration(milliseconds: 300), _animateToBottom);
+  }
+
+  void _onFocusChange() => _keepBottomVisibleForKeyboard();
+
+  // キーボードの高さ（viewInsets.bottom）が変わるたびに呼ばれる。
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    _keepBottomVisibleForKeyboard();
   }
 
   /// メッセージ本文を引用用の1行スニペットにする（改行は空白へ・長すぎは省略）。
