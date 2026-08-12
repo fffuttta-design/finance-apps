@@ -52,6 +52,37 @@ List<TxGroup> groupByReceipt(List<core.Transaction> rows) {
   return out;
 }
 
+/// 「個人わく」の支出に付ける小さなバッジ。
+/// 支出の記録カードで、カテゴリ／まとめ表示の右隣に置く。
+/// [uid] が null（＝共用）なら何も出さない。
+/// 名前が引ければ「たく個人」等に、引けなければ「個人」にする。
+Widget personalScopeBadge(String? uid) {
+  if (uid == null || uid.isEmpty) return const SizedBox.shrink();
+  final name = HouseholdService.instance.memberNames[uid]?.trim();
+  final label = (name != null && name.isNotEmpty) ? '$name個人' : '個人';
+  return Container(
+    margin: const EdgeInsets.only(left: 6),
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+    decoration: BoxDecoration(
+      color: AppColors.pink.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(6),
+      border: Border.all(color: AppColors.pinkSoft, width: 1),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.person_rounded, size: 11, color: AppColors.pinkDark),
+        const SizedBox(width: 2),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: AppColors.pinkDark)),
+      ],
+    ),
+  );
+}
+
 /// カテゴリ内訳を展開したときの明細リスト（ホーム／支出タブ共通）。
 /// 同じレシートの品目は**1レシート＝1行**にまとめ、そのカテゴリ分の合計を出す。
 /// タップでレシート詳細（品目全部）／単品は明細チャットへ。
@@ -211,6 +242,14 @@ class ReceiptGroupTile extends StatelessWidget {
     final memberSum = members.fold<int>(0, (s, t) => s + t.commentCount);
     final hid = HouseholdService.instance.householdId;
     final rid = first.receiptId;
+    // まとめの中に「個人わく」の品目があれば、その人の個人バッジを出す。
+    String? personalUid;
+    for (final m in members) {
+      if (m.personalFor != null && m.personalFor!.isNotEmpty) {
+        personalUid = m.personalFor;
+        break;
+      }
+    }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -235,9 +274,19 @@ class ReceiptGroupTile extends StatelessWidget {
         ),
         title: Text(store,
             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-        subtitle: Text(
-            '${first.date.month}/${first.date.day}　🧾 ${members.length}件まとめ',
-            style: const TextStyle(fontSize: 11, color: AppColors.textSub)),
+        subtitle: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                  '${first.date.month}/${first.date.day}　🧾 ${members.length}件まとめ',
+                  style: const TextStyle(fontSize: 11, color: AppColors.textSub),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ),
+            personalScopeBadge(personalUid),
+          ],
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [

@@ -397,8 +397,18 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
             maxLines: 1,
             overflow: TextOverflow.ellipsis),
-        subtitle: Text(sub,
-            style: const TextStyle(fontSize: 11, color: AppColors.textSub)),
+        subtitle: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(sub,
+                  style: const TextStyle(fontSize: 11, color: AppColors.textSub),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ),
+            personalScopeBadge(t.personalFor),
+          ],
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
