@@ -241,6 +241,15 @@ git push origin main
 - APK は `release/takuharu-version.json` の `downloadUrl` 経由でアプリが自動検知・OTA配信
 - ユーザーにスクリプト実行を頼まず、Claude が Bash で直接実行する
 
+> ⚠️ **署名鍵の地雷（配信前に必ず確認）**: リリースAPKは `android/app/takuharu-release.jks`
+> （alias `takuharu`）で署名する。署名情報は **`android/key.properties`（gitignore・本番鍵のパスワード入り）**
+> から読む。**この key.properties が無い作業機で `flutter build apk --release` すると、build.gradle.kts が
+> 黙って debug 鍵にフォールバック**し、実機で「パッケージが既存と競合してインストールできない」
+> （署名不一致）になる。**key.properties が無い機ではAndroidリリースを作らないこと**（ソース/Webのpushはしてよい。
+> Androidビルドは key.properties のあるメイン機で）。2026-08-12 にこの罠を踏んで takuharu-v0.2.107 を
+> 作り直した実績あり。配信前に `apktool`/`keytool` で署名者が本番鍵（SHA-1
+> `3C:53:51:C3:26:1E:B1:96:1D:F1:68:EC:45:8E:5D:86:0C:1A:87:3D`）か確認できるとより安全。
+
 ---
 
 ## はるファイナンス（apps/haru_finance）

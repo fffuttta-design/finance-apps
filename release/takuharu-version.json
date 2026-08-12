@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.107",
-    "buildNumber":  "112",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.107/takuharu-finance-v0.2.107.apk",
-    "releaseNotes":  "・チャットで相手のメッセージに「リプライ（引用返信）」ができるようになりました。吹き出しを長押しして「リプライ」を選ぶと、そのメッセージを引用して返信できます（画像にも返信OK）。\n・送信済みの吹き出しに引用が表示され、引用をタップすると元のメッセージまでジャンプします。\n・吹き出しの長押しから、文章の「コピー」もできます。"
+    "version":  "0.2.106",
+    "buildNumber":  "111",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.106/takuharu-finance-v0.2.106.apk",
+    "releaseNotes":  "・水道料金の取引日を「検針日」にそろえました。これまで「口座振替日（引き落とし日）」で登録され、翌月あつかいになって明細から見失うことがあったのを直しました。\n・迷子になっていた今回の水道明細（9/7→8/10）も8月に移動済みです。"
 }
