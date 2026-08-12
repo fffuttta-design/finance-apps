@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.107",
-    "buildNumber":  "112",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.107/takuharu-finance-v0.2.107.apk",
-    "releaseNotes":  "・チャットで相手のメッセージに「リプライ（引用返信）」ができるようになりました。吹き出しを長押しして「リプライ」を選ぶと、そのメッセージを引用して返信できます（画像にも返信OK）。\n・送信済みの吹き出しに引用が表示され、引用をタップすると元のメッセージまでジャンプします。\n・吹き出しの長押しから、文章の「コピー」もできます。"
+    "version":  "0.2.108",
+    "buildNumber":  "113",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.108/takuharu-finance-v0.2.108.apk",
+    "releaseNotes":  "・チャットで入力しようとキーボードを出したとき、これまで入力欄や最新メッセージがキーボードの裏に隠れることがありました。LINEと同じように、キーボードを出すとチャット欄ごと上に押し上がり、入力欄と最新コメントが常に見えるようにしました。"
 }
