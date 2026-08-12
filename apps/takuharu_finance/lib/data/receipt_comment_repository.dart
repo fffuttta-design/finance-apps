@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'comment_repository.dart' show TxComment, txCommentFromMap;
+import 'comment_repository.dart'
+    show TxComment, txCommentFromMap, ReplyRef, replyRefToMap;
 
 /// レシート単位のチャット（households/{hid}/receipts/{receiptId}/comments）。
 ///
@@ -45,7 +46,7 @@ class ReceiptCommentRepository {
 
   /// レシートのチャットに1件投稿（テキスト or 画像）。
   Future<void> add(String hid, String rid, String uid, String text,
-      {String? imageUrl}) async {
+      {String? imageUrl, ReplyRef? replyTo}) async {
     final t = text.trim();
     if (t.isEmpty && (imageUrl == null || imageUrl.isEmpty)) return;
     final id = DateTime.now().microsecondsSinceEpoch.toString();
@@ -54,6 +55,7 @@ class ReceiptCommentRepository {
       'uid': uid,
       'text': t,
       if (imageUrl != null && imageUrl.isNotEmpty) 'imageUrl': imageUrl,
+      ...replyRefToMap(replyTo),
       'createdAt': FieldValue.serverTimestamp(),
     });
     // レシート本体にコメント数を持たせて、一覧でバッジ表示できるようにする。

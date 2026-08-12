@@ -1,5 +1,30 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// リプライ（LINE風の引用返信）で参照する元メッセージの情報。
+///
+/// 元メッセージの本文を投稿時点でスナップショットして持つ（非正規化）。
+/// これにより引用を描くのに元コメントを引き直す必要がなく、元が消えても引用は残る。
+class ReplyRef {
+  /// 返信先メッセージの id（引用タップで元へスクロールするのに使う）。
+  final String id;
+
+  /// 返信先メッセージの投稿者 uid（引用の「だれ宛か」表示用）。
+  final String uid;
+
+  /// 返信先メッセージ本文のスナップショット（画像のみのときは空文字）。
+  final String text;
+
+  /// 返信先が画像コメントのときのサムネ用URL（任意）。
+  final String? imageUrl;
+
+  const ReplyRef({
+    required this.id,
+    required this.uid,
+    required this.text,
+    this.imageUrl,
+  });
+}
+
 /// 取引チャットの1メッセージ。
 class TxComment {
   final String id;
@@ -14,15 +39,34 @@ class TxComment {
   /// log は吹き出しではなく中央のグレー帯で表示する（たくはるカレンダーと同じ）。
   final String kind;
 
+  /// リプライ元メッセージの id（LINE風の引用返信。無ければ null）。
+  final String? replyToId;
+
+  /// リプライ元メッセージの投稿者 uid。
+  final String? replyToUid;
+
+  /// リプライ元メッセージ本文のスナップショット（画像のみのときは空文字）。
+  final String? replyToText;
+
+  /// リプライ元が画像コメントのときのサムネ用URL（任意）。
+  final String? replyToImageUrl;
+
   const TxComment(
       {required this.id,
       required this.uid,
       required this.text,
       this.imageUrl,
       this.createdAt,
-      this.kind = 'comment'});
+      this.kind = 'comment',
+      this.replyToId,
+      this.replyToUid,
+      this.replyToText,
+      this.replyToImageUrl});
 
   bool get isLog => kind == 'log';
+
+  /// このメッセージがリプライ（引用返信）かどうか。
+  bool get hasReply => replyToId != null && replyToId!.isNotEmpty;
 }
 
 /// Firestore の1ドキュメントから [TxComment] を作る（取引／レシート共通）。
@@ -33,7 +77,22 @@ TxComment txCommentFromMap(String id, Map<String, dynamic> m) => TxComment(
       imageUrl: m['imageUrl'] as String?,
       createdAt: (m['createdAt'] as Timestamp?)?.toDate(),
       kind: (m['kind'] ?? 'comment') as String,
+      replyToId: m['replyToId'] as String?,
+      replyToUid: m['replyToUid'] as String?,
+      replyToText: m['replyToText'] as String?,
+      replyToImageUrl: m['replyToImageUrl'] as String?,
     );
+
+/// リプライ参照を Firestore ドキュメント用のフィールドに落とす（取引／レシート共通）。
+Map<String, dynamic> replyRefToMap(ReplyRef? r) => (r == null)
+    ? const {}
+    : {
+        'replyToId': r.id,
+        'replyToUid': r.uid,
+        'replyToText': r.text,
+        if (r.imageUrl != null && r.imageUrl!.isNotEmpty)
+          'replyToImageUrl': r.imageUrl,
+      };
 
 /// 取引ごとのチャット（households/{hid}/transactions/{txId}/comments）。
 class CommentRepository {
@@ -62,7 +121,7 @@ class CommentRepository {
   }
 
   Future<void> add(String hid, String txId, String uid, String text,
-      {String? imageUrl}) async {
+      {String? imageUrl, ReplyRef? replyTo}) async {
     final t = text.trim();
     // テキストか画像のどちらかがあれば送信。
     if (t.isEmpty && (imageUrl == null || imageUrl.isEmpty)) return;
@@ -72,6 +131,7 @@ class CommentRepository {
       'uid': uid,
       'text': t,
       if (imageUrl != null && imageUrl.isNotEmpty) 'imageUrl': imageUrl,
+      ...replyRefToMap(replyTo),
       'createdAt': FieldValue.serverTimestamp(),
     });
     // 親取引にコメント数を持たせて、一覧でバッジ表示できるようにする。
