@@ -169,34 +169,53 @@ class _CommentThreadState extends State<CommentThread>
   void _cancelReply() => setState(() => _replyTarget = null);
 
   /// 吹き出し長押しメニュー（リプライ／コピー）。
+  /// LINE風に、長押しした位置のすぐそばにポップアップで出す（画面下シートではない）。
   /// log（変更履歴）は会話ではないのでメニューを出さない。
-  Future<void> _showBubbleMenu(TxComment m) async {
+  Future<void> _showBubbleMenu(TxComment m, Offset globalPos) async {
     if (m.isLog) return;
     final hasText = m.text.trim().isNotEmpty;
-    final action = await showModalBottomSheet<String>(
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox;
+    // 長押しした指の位置を起点に、その場でポップアップを出す。
+    final position = RelativeRect.fromRect(
+      Rect.fromLTWH(globalPos.dx, globalPos.dy, 0, 0),
+      Offset.zero & overlay.size,
+    );
+    final action = await showMenu<String>(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheet) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.reply_rounded, color: AppColors.pinkDark),
-              title: const Text('リプライ'),
-              onTap: () => Navigator.pop(sheet, 'reply'),
-            ),
-            if (hasText)
-              ListTile(
-                leading:
-                    const Icon(Icons.copy_rounded, color: AppColors.pinkDark),
-                title: const Text('コピー'),
-                onTap: () => Navigator.pop(sheet, 'copy'),
-              ),
-          ],
+      position: position,
+      color: Colors.white,
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      items: [
+        PopupMenuItem<String>(
+          value: 'reply',
+          height: 44,
+          child: Row(
+            children: const [
+              Icon(Icons.reply_rounded, size: 20, color: AppColors.pinkDark),
+              SizedBox(width: 12),
+              Text('リプライ',
+                  style: TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600)),
+            ],
+          ),
         ),
-      ),
+        if (hasText)
+          PopupMenuItem<String>(
+            value: 'copy',
+            height: 44,
+            child: Row(
+              children: const [
+                Icon(Icons.copy_rounded, size: 20, color: AppColors.pinkDark),
+                SizedBox(width: 12),
+                Text('コピー',
+                    style: TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+      ],
     );
     if (action == 'reply') {
       _startReply(m);
@@ -617,7 +636,7 @@ class _CommentThreadState extends State<CommentThread>
     final highlighted = _highlightId == m.id;
     return GestureDetector(
       key: key,
-      onLongPress: () => _showBubbleMenu(m),
+      onLongPressStart: (d) => _showBubbleMenu(m, d.globalPosition),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         decoration: BoxDecoration(
