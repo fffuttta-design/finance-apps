@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.109",
-    "buildNumber":  "114",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.109/takuharu-finance-v0.2.109.apk",
-    "releaseNotes":  "・支出の記録一覧で、個人わく（個人枠）から出した支出に、ひと目で分かる小さなピンクのバッジ「たく個人／はる個人」を付けました。日付・カテゴリ・まとめ表示のすぐ右隣に出ます。ふつうの単品カードも、レシートをまとめたカードも対応しています。"
+    "version":  "0.2.110",
+    "buildNumber":  "115",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.110/takuharu-finance-v0.2.110.apk",
+    "releaseNotes":  "・チャットの吹き出しを長押ししたときのメニュー（リプライ／コピー）を、画面下から出るのをやめて、LINEのように長押しした場所のすぐそばにポップアップで出すようにしました。目線の近くで選べて操作しやすくなります。"
 }
