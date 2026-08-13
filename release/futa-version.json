@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.571",
-    "buildNumber":  "572",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.571/futa-finance-v1.0.571.apk",
-    "releaseNotes":  "v1.0.571+572 二村秘書の記帳プッシュ通知が届かない不具合を修正（通知の送り先が保存されなかった）"
+    "version":  "1.0.572",
+    "buildNumber":  "573",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.572/futa-finance-v1.0.572.apk",
+    "releaseNotes":  "v1.0.572+573 二村秘書の記帳プッシュ通知に専用アイコンを追加"
 }
