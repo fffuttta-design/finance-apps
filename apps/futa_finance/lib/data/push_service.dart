@@ -40,29 +40,67 @@ class PushService {
   );
 
   /// ログイン後に1度呼ぶ。許可取得→トークン保存→更新監視→前面表示の設定。
+  ///
+  /// 🔥 各ステップは**独立した try/catch** にする。以前は全体を1つの try で包んで
+  ///    いたため、途中の1ステップ（通知チャンネル作成など）が投げるとトークン取得
+  ///    まで巻き添えで飛び、`catch (_) {}` が握り潰して**無言で何も起きなかった**
+  ///    （2026-08-13：トークンが1件も保存されない事象の原因）。
+  ///    ログは `[push]` タグで logcat に出す（`adb logcat | grep "\[push\]"`）。
   Future<void> register() async {
     if (_started) return;
     // Android 専用（Web / デスクトップは対象外）。
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
     _started = true;
+    debugPrint('[push] register: start');
+
     try {
-      await _fm.requestPermission(alert: true, badge: true, sound: true);
+      final s = await _fm.requestPermission(alert: true, badge: true, sound: true);
+      debugPrint('[push] requestPermission ok: ${s.authorizationStatus}');
+    } catch (e) {
+      debugPrint('[push] requestPermission FAILED: $e');
+    }
+
+    try {
       await _initLocalNotifications();
-      final token = await _fm.getToken();
-      if (token != null && token.isNotEmpty) {
-        await _saveToken(token);
+      debugPrint('[push] initLocalNotifications ok');
+    } catch (e) {
+      debugPrint('[push] initLocalNotifications FAILED: $e');
+    }
+
+    // トークン取得は最重要。1度失敗しても少し待って1回だけ再試行する。
+    String? token;
+    for (var i = 0; i < 2 && (token == null || token.isEmpty); i++) {
+      if (i > 0) await Future<void>.delayed(const Duration(seconds: 5));
+      try {
+        token = await _fm.getToken();
+        debugPrint('[push] getToken try${i + 1}: ${token == null ? "null" : "len=${token.length}"}');
+      } catch (e) {
+        debugPrint('[push] getToken try${i + 1} FAILED: $e');
       }
+    }
+    if (token != null && token.isNotEmpty) {
+      await _saveToken(token);
+    }
+
+    try {
       _fm.onTokenRefresh.listen(_saveToken);
       // 前面で受信したメッセージは OS が自動表示しないので、自前で表示する。
       FirebaseMessaging.onMessage.listen(_showForeground);
-    } catch (_) {
-      // 失敗しても致命的ではない。次回起動で再試行できるよう解除。
-      _started = false;
+    } catch (e) {
+      debugPrint('[push] listen FAILED: $e');
     }
+    debugPrint('[push] register: done');
   }
 
   /// ローカル通知の初期化（チャンネル作成＋許可）。
   Future<void> _initLocalNotifications() async {
+    // 🔥 Android実装を明示的に登録する。flutter_local_notifications v19+ は
+    //    Dart側の実装を `dart_plugin_registrant.dart`（flutterツールの自動生成）
+    //    経由で登録するが、**プラグインを後から追加したとき、このファイルが
+    //    再生成されず古いまま残ることがある**（2026-08-13：8/2生成のまま＝当プラグイン
+    //    未登録 → `LateInitializationError: Field '_instance'` で通知チャンネルが
+    //    作られず、前面バナーも出なかった）。ここで自前に登録すれば再発しない。
+    AndroidFlutterLocalNotificationsPlugin.registerWith();
     const initSettings = InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
     );
@@ -99,7 +137,10 @@ class PushService {
 
   Future<void> _saveToken(String token) async {
     final uid = AuthService.instance.currentUser?.uid;
-    if (uid == null) return;
+    if (uid == null) {
+      debugPrint('[push] saveToken skipped: not signed in');
+      return;
+    }
     try {
       await FirebaseFirestore.instance.collection('users').doc(uid).set(
         {
@@ -107,8 +148,10 @@ class PushService {
         },
         SetOptions(merge: true),
       );
-    } catch (_) {
+      debugPrint('[push] saveToken ok: uid=$uid');
+    } catch (e) {
       // 保存失敗は無視（オフライン等）。次回起動で再試行される。
+      debugPrint('[push] saveToken FAILED: $e');
     }
   }
 }
