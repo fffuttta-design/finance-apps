@@ -12,6 +12,7 @@ import 'data/data_migration_service.dart';
 import 'data/nav_history.dart';
 import 'data/nav_history_hook_stub.dart'
     if (dart.library.js_interop) 'data/nav_history_hook_web.dart';
+import 'data/push_service.dart';
 import 'data/repository_provider.dart';
 import 'data/ui_preferences.dart';
 import 'firebase_options.dart';
@@ -153,6 +154,9 @@ class _AuthGateState extends State<_AuthGate> {
 
         // ログイン済み → Firestore 版に切替（idempotent）
         RepositoryProvider.useFirestore(user.uid);
+
+        // プッシュ通知（二村秘書の記帳お知らせ）の登録。Android のみ実効・冪等。
+        unawaited(PushService.instance.register());
 
         // 初回サインイン時のローカル→Firestore移行を1回だけ実行
         if (_migratedUid != user.uid && !_migrating) {

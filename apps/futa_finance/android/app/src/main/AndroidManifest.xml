@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+    <!-- プッシュ通知（Android 13+ は実行時許可が必要） -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
@@ -41,6 +43,11 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- 背景/終了時に届く通知が使う既定チャンネル（push_service.dart の
+             AndroidNotificationChannel / サーバの channel_id と一致させる）。 -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="futa_finance_default" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

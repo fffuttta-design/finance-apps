@@ -17,7 +17,7 @@ resolution: workspace
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.568+569
+version: 1.0.569+570
 
 environment:
   sdk: ^3.11.4
@@ -65,6 +65,10 @@ dependencies:
   photo_manager: ^3.9.0
   # PWA タイトルバー色(theme-color)の実行時切替に使用（Webのみ、条件付きインポート）
   web: ^1.1.0
+
+  # プッシュ通知（二村秘書の記帳お知らせ・Android）。たくはるファイナンスと同世代・同版。
+  firebase_messaging: ^16.3.0
+  flutter_local_notifications: ^22.0.0
 
 dev_dependencies:
   flutter_test:
