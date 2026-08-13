@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.572",
-    "buildNumber":  "573",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.572/futa-finance-v1.0.572.apk",
-    "releaseNotes":  "v1.0.572+573 二村秘書の記帳プッシュ通知に専用アイコンを追加"
+    "version":  "1.0.573",
+    "buildNumber":  "574",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.573/futa-finance-v1.0.573.apk",
+    "releaseNotes":  "v1.0.573+574 HOME支払方法別に「立替差引後の実支払額」を注記"
 }
