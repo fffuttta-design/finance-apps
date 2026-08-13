@@ -1,3 +1,5 @@
+import 'dart:ui' show Color;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -102,7 +104,7 @@ class PushService {
     //    作られず、前面バナーも出なかった）。ここで自前に登録すれば再発しない。
     AndroidFlutterLocalNotificationsPlugin.registerWith();
     const initSettings = InitializationSettings(
-      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      android: AndroidInitializationSettings('@drawable/ic_stat_futa'),
     );
     await _local.initialize(settings: initSettings);
     final android = _local.resolvePlatformSpecificImplementation<
@@ -129,7 +131,11 @@ class PushService {
           channelDescription: _channel.description,
           importance: Importance.high,
           priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
+          // 小アイコンは白抜き専用のもの（@mipmap/ic_launcher を指定すると
+          // アイコン全体がシルエット化されて白い四角になる）。背景/終了時に
+          // OSが出す通知は AndroidManifest の default_notification_icon が使われる。
+          icon: '@drawable/ic_stat_futa',
+          color: const Color(0xFF2E65D7),
         ),
       ),
     );

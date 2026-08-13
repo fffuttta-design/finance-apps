@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 通知のアクセント色（アプリアイコンの青）。小アイコンはシルエット表示なので
+         この色で丸く塗られる。AndroidManifest の default_notification_color から参照。 -->
+    <color name="futa_notification">#2E65D7</color>
+</resources>

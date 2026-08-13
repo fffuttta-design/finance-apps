@@ -48,6 +48,15 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="futa_finance_default" />
+        <!-- 通知の小アイコン。指定しないとアプリアイコン全体がシルエット化されて
+             「白い四角」になるので、専用の白抜きアイコン（F＋グラフ）を使う。
+             色は丸背景のアクセント色。 -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_futa" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/futa_notification" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
