@@ -1256,10 +1256,19 @@ class _MethodBreakdownCardState extends State<_MethodBreakdownCard> {
                   const Icon(Icons.account_balance_wallet_outlined,
                       size: 17, color: V2Colors.textSecondary),
                   const SizedBox(width: 8),
-                  Text('支払方法別の内訳',
-                      style: V2Typography.bodyStrong
-                          .copyWith(color: V2Colors.textPrimary)),
-                  const Spacer(),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('支払方法別の内訳',
+                            style: V2Typography.bodyStrong
+                                .copyWith(color: V2Colors.textPrimary)),
+                        Text('立替を差し引いた実支払額',
+                            style: V2Typography.micro
+                                .copyWith(color: V2Colors.textMuted)),
+                      ],
+                    ),
+                  ),
                   Text(formatYen(total),
                       style: V2Typography.caption.copyWith(
                           color: V2Colors.textSecondary,
