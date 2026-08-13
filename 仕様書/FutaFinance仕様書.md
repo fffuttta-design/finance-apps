@@ -1,7 +1,20 @@
 # FutaFinance 仕様書
 
-> **最終更新: 2026-08-08 / v1.0.564+565**
+> **最終更新: 2026-08-13 / v1.0.569+570**
 > 変更があるたびにこのファイルを編集してバージョンを更新すること。
+>
+> **v1.0.569 の主な変更（2026-08-13）**（二村秘書の記帳をアプリにプッシュ通知）
+>
+> - 🔔 **二村秘書ボット(FutaHisho)がFutaFinanceに新規記帳すると、Androidアプリへ
+>   「二村秘書が登録しました：◯◯ ¥×××（事業/個人）」をプッシュ通知**する機能を新設。
+>   複数件はまとめ1通。アプリを手入力した分は鳴らない（bot記帳のみ）。
+>   - 受け口＝`lib/data/push_service.dart`（FCM登録・端末トークンを `users/{uid}.fcmTokens` に保存・
+>     前面時のバナー表示。**Android専用**＝Web/デスクトップは早期return）。`main.dart` のログイン後に
+>     `PushService.register()` を1回。`AndroidManifest` に `POST_NOTIFICATIONS` と既定通知チャンネル
+>     `futa_finance_default`。`build.gradle.kts` に core library desugaring（flutter_local_notifications v22要件）。
+>   - 送信側は二村秘書サーバ `core/finance/ledger/futafinance.py` の `write_transactions` 出口。
+>     詳細は takuharu_finance の `push_service.dart` を移植。
+>   - ⚠️ 通知は送信時に `users/{uid}` を1回読むため、Firestore無料枠が枯渇している時間帯は出ない。
 >
 > **v1.0.564 の主な変更（2026-08-08）**（月初残高を自動計算＝手入力スナップショット不要に）
 >
@@ -1658,5 +1671,5 @@ class AppModeManager extends ChangeNotifier {
 
 | 種別 | バージョン |
 |---|---|
-| Flutter アプリ（Web/Android） | 1.0.538+539 |
-| Electron Desktop（Windows） | 1.0.538（pubspec版に同期） |
+| Flutter アプリ（Web/Android） | 1.0.569+570 |
+| Electron Desktop（Windows） | pubspec版に同期（記帳プッシュ通知はAndroid専用のためデスクトップ再ビルドは見送り） |
