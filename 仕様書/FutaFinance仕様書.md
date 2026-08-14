@@ -1,7 +1,21 @@
 # FutaFinance 仕様書
 
-> **最終更新: 2026-08-14 / v1.0.574+575**
+> **最終更新: 2026-08-14 / v1.0.575+576**
 > 変更があるたびにこのファイルを編集してバージョンを更新すること。
+>
+> **v1.0.575 の主な変更（2026-08-14）**（Firestoreオフライン永続化ON＝無料枠の読取超過対策）
+>
+> - 🔥 **Web/デスクトップ版に Firestore のオフライン永続化を有効化**（`main.dart` の
+>   `Firebase.initializeApp` 直後・最初のFirestoreアクセスより前に `FirebaseFirestore.instance.settings`）。
+>   従来は永続化ゼロで、**リロード・再起動・事業↔個人のモード切替のたびに取引を全件サーバから
+>   読み直し**、Sparkの1日5万読取上限を超えていた（2026-08-14 実測 5.7万/日、cron修正後もなお超過）。
+>   ローカルキャッシュ＋差分同期(resume token)で、再購読時の読取をほぼ0にする。
+>   - API＝`Settings(persistenceEnabled: true, cacheSizeBytes: CACHE_SIZE_UNLIMITED,
+>     webPersistentTabManager: WebPersistentMultipleTabManager())`。⚠️ 本プロジェクトは
+>     `cloud_firestore 6.4.1`＝**classic API**（`PersistentCacheSettings` は無い／使うとビルド不可）。
+>     Web複数タブは `WebPersistentMultipleTabManager` で同期（既定の単一タブだと2枚目で永続化失敗→読取増）。
+>   - Android は元々ローカルキャッシュが既定で効くので実質Web/デスクトップ向けの是正。
+>   - 効果は翌日Firebaseコンソール（Firestore使用状況）の1日読取数で before(5.7万) と比較して確認する。
 >
 > **v1.0.574 の主な変更（2026-08-14）**（家賃を除外トグルに税金・社会保険も追加）
 >

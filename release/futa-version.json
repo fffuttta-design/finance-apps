@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.574",
-    "buildNumber":  "575",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.574/futa-finance-v1.0.574.apk",
-    "releaseNotes":  "v1.0.574+575 家賃を除外トグルに税金・社会保険も追加（個人モード支出タブ）"
+    "version":  "1.0.575",
+    "buildNumber":  "576",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.575/futa-finance-v1.0.575.apk",
+    "releaseNotes":  "v1.0.575+576 Firestoreオフライン永続化ONで無料枠の読取超過を是正（Web/デスクトップ）"
 }

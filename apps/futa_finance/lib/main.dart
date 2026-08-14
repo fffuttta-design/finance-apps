@@ -5,6 +5,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'data/app_mode.dart';
 import 'data/auth_service.dart';
@@ -29,6 +30,19 @@ Future<void> main() async {
   // Firebase 初期化（Web/Android 両対応、flutterfire configure 済み前提）
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
+  );
+  // 🔥 Firestore オフライン永続化を有効化（無料枠の読取超過対策）。
+  //   Web/デスクトップ(=中身Web)は永続化ゼロだと、リロード・再起動・事業↔個人の
+  //   モード切替のたびに取引を全件サーバから読み直し、Sparkの1日5万読取を超えていた
+  //   （2026-08-14 実測 5.7万/日）。ローカルキャッシュ＋差分同期(resume token)に変えて
+  //   再購読時の読取をほぼ0にする。★最初のFirestoreアクセスより前に設定する（順序厳守）。
+  //   Android は元々ローカルキャッシュが既定で効くので実質Web/デスクトップ向け。
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    // Web は複数タブ同期にする。既定(単一タブ)だと2枚目のタブで永続化が失敗して
+    // ネットワーク直読み(=読取増)に戻る。他プラットフォームでは無視される。
+    webPersistentTabManager: WebPersistentMultipleTabManager(),
   );
   // Google Sign-In 初期化
   await AuthService.instance.init();
