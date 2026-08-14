@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.573",
-    "buildNumber":  "574",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.573/futa-finance-v1.0.573.apk",
-    "releaseNotes":  "v1.0.573+574 HOME支払方法別に「立替差引後の実支払額」を注記"
+    "version":  "1.0.574",
+    "buildNumber":  "575",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.574/futa-finance-v1.0.574.apk",
+    "releaseNotes":  "v1.0.574+575 家賃を除外トグルに税金・社会保険も追加（個人モード支出タブ）"
 }
