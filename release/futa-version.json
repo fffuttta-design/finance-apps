@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.576",
-    "buildNumber":  "577",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.576/futa-finance-v1.0.576.apk",
-    "releaseNotes":  "v1.0.576+577 カード明細を公式CSVと同じ並び（日付降順＋同日はsortOrder）に統一"
+    "version":  "1.0.577",
+    "buildNumber":  "578",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.577/futa-finance-v1.0.577.apk",
+    "releaseNotes":  "v1.0.577+578 通帳の並びもカードと同じ（日付降順＋同日sortOrder）に統一・手入力の先頭浮きを解消"
 }
