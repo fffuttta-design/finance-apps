@@ -663,10 +663,16 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   List<_LedgerRow> _customSorted(List<_LedgerRow> rows) {
     final list = [...rows];
     list.sort((a, b) {
+      // 日付の新しい順＋同じ日の中はCSVの並び(sortOrder昇順)。手入力(sortOrder未設定)は
+      // その日付の位置に収まり(同日内は後ろ)、後からCSV取込がsortOrderを振って同日順を補正する。
+      // ※旧実装はsortOrder未設定を無条件で先頭に出していたため、手入力直後の明細が日付を無視して
+      //   一番上に浮いていた。カード明細(CardDetailScreen)と同じ堅牢ロジックへ統一（2026-08-15）。
+      final byDate = -a.txn.date.compareTo(b.txn.date);
+      if (byDate != 0) return byDate;
       final ao = a.txn.sortOrder, bo = b.txn.sortOrder;
-      if (ao == null && bo == null) return -a.txn.date.compareTo(b.txn.date);
-      if (ao == null) return -1;
-      if (bo == null) return 1;
+      if (ao == null && bo == null) return 0;
+      if (ao == null) return 1;
+      if (bo == null) return -1;
       return ao.compareTo(bo);
     });
     return list;
