@@ -366,7 +366,20 @@ class _CardDetailScreenState extends State<CardDetailScreen>
       return t.type == core.TransactionType.expense &&
           t.paymentMethod == name;
     }).toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
+      // 表示順＝「日付の新しい順＋同じ日の中はCSVの並び(sortOrder昇順)」。カード明細を
+      // クレカ会社CSVと同じ並びにする（2026-08-14・本人方針「表示はCSVと完全一致」）。
+      // sortOrder は取込(reconcileミラー)がCSV順で振る＝手入力の順ズレも取込時に補正される。
+      // 未設定(手入力直後など)は同日内で後ろ＝日付の粒度では崩れない（部分付与でも安全）。
+      // ※手動並び替えは完全一致時代前の名残（順次撤去予定）。
+      ..sort((a, b) {
+        final byDate = b.date.compareTo(a.date);
+        if (byDate != 0) return byDate;
+        final ao = a.sortOrder, bo = b.sortOrder;
+        if (ao == null && bo == null) return 0;
+        if (ao == null) return 1;
+        if (bo == null) return -1;
+        return ao.compareTo(bo);
+      });
   }
 
   @override
