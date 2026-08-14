@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.575",
-    "buildNumber":  "576",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.575/futa-finance-v1.0.575.apk",
-    "releaseNotes":  "v1.0.575+576 Firestoreオフライン永続化ONで無料枠の読取超過を是正（Web/デスクトップ）"
+    "version":  "1.0.576",
+    "buildNumber":  "577",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.576/futa-finance-v1.0.576.apk",
+    "releaseNotes":  "v1.0.576+577 カード明細を公式CSVと同じ並び（日付降順＋同日はsortOrder）に統一"
 }
