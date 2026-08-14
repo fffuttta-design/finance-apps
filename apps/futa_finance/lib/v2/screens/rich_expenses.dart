@@ -107,6 +107,39 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   /// 家賃を隠す表示が有効か（個人モードのみ・設定 ON のとき）。
   bool get _rentHidden => !_isBusiness && UiPreferences.instance.hideRent;
 
+  // ── 税金・社会保険（家賃と同じハズレ値）も同じトグルで隠す ──────────
+  /// 税金・社会保険とみなすキーワード（本人指定 2026-08-14）。家賃と同様に
+  /// 金額が大きく他の支出を霞ませるハズレ値なので、家賃トグルON時に一緒に隠す。
+  /// ⚠ 短すぎる語（「税」「年金」単体）は無関係な明細に誤ヒットするため使わず、
+  ///   具体的な税目・保険名だけを列挙する。
+  static const _taxKeywords = [
+    '税金', '個人事業税', '事業税', '住民税', '市民税', '県民税', '所得税',
+    '予定納税', '消費税', '固定資産税', '自動車税', '軽自動車税',
+    '国民健康保険', '健康保険料', '国民年金', '厚生年金', '社会保険',
+  ];
+
+  /// 文字列がいずれかの税金・社会保険キーワードを含むか。
+  bool _matchesTax(String? s) =>
+      s != null && _taxKeywords.any((k) => s.contains(k));
+
+  /// 税金・社会保険の取引か（大／小カテゴリ・摘要のいずれかにキーワードを含む）。
+  bool _isTaxTx(core.Transaction t) =>
+      _matchesTax(t.category.sub) ||
+      _matchesTax(t.category.major) ||
+      _matchesTax(t.description);
+
+  /// 税金・社会保険の固定費（サブスク）か。
+  bool _isTaxSub(core.Subscription s) =>
+      _matchesTax(s.name) ||
+      _matchesTax(s.category) ||
+      _matchesTax(s.plMajor);
+
+  /// 家賃トグルで隠す取引か（家賃＝共同生活費／税金・社会保険）。
+  bool _isRentOrTaxTx(core.Transaction t) => _isRentTx(t) || _isTaxTx(t);
+
+  /// 家賃トグルで隠す固定費か（家賃／税金・社会保険）。
+  bool _isRentOrTaxSub(core.Subscription s) => _isRentSub(s) || _isTaxSub(s);
+
   // ── 税務顧問料（事業モードのハズレ値）を隠す機能 ──────────────
   /// 税務顧問料とみなすキーワード（大/小カテゴリ・摘要のいずれかに含めば対象）。
   /// ⚠️ 実データの摘要は「VS税務顧問」（"料"なし）なので "税務顧問" で拾う
@@ -136,7 +169,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   /// 締めスナップショット等「実額」が要る箇所は _subs（全件）を明示的に使う。
   List<core.Subscription> get _visibleSubs {
     var list = _subs;
-    if (_rentHidden) list = list.where((s) => !_isRentSub(s)).toList();
+    if (_rentHidden) list = list.where((s) => !_isRentOrTaxSub(s)).toList();
     if (_advisoryHidden) {
       list = list.where((s) => !_isAdvisorySub(s)).toList();
     }
@@ -773,9 +806,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
         ),
       );
     }
-    // 個人モード（従来レイアウト）。家賃を隠す設定なら明細から家賃を除く。
+    // 個人モード（従来レイアウト）。家賃トグルONなら明細から家賃・税金を除く。
     final personalRows = _rentHidden
-        ? _monthExpenses.where((t) => !_isRentTx(t)).toList()
+        ? _monthExpenses.where((t) => !_isRentOrTaxTx(t)).toList()
         : _monthExpenses;
     return _buildBody(
         rows: personalRows,
@@ -784,8 +817,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
         detailLabel: '支出明細');
   }
 
-  /// 家賃を除外して見るトグル（個人モードの支出タブ）。
-  /// 家賃はハズレ値で他の支出が霞むため、ワンタップで表示/非表示を切替える。
+  /// 家賃・税金を除外して見るトグル（個人モードの支出タブ）。
+  /// 家賃・税金（社会保険含む）はハズレ値で他の支出が霞むため、ワンタップで
+  /// まとめて表示/非表示を切替える（本人指定 2026-08-14 に税金も対象へ拡張）。
   Widget _rentToggleChip() {
     final hidden = _rentHidden;
     return InkWell(
@@ -815,7 +849,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 size: 15,
                 color: hidden ? widget.accent : V2Colors.textSecondary),
             const SizedBox(width: 6),
-            Text(hidden ? '家賃を除外中' : '家賃を除く',
+            Text(hidden ? '家賃・税金を除外中' : '家賃・税金を除く',
                 style: V2Typography.micro.copyWith(
                     color:
                         hidden ? widget.accent : V2Colors.textSecondary,
