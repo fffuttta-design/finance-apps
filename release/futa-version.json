@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.577",
-    "buildNumber":  "578",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.577/futa-finance-v1.0.577.apk",
-    "releaseNotes":  "v1.0.577+578 通帳の並びもカードと同じ（日付降順＋同日sortOrder）に統一・手入力の先頭浮きを解消"
+    "version":  "1.0.578",
+    "buildNumber":  "579",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.578/futa-finance-v1.0.578.apk",
+    "releaseNotes":  "v1.0.578+579 記帳プッシュ通知に二村秘書（犬）ロゴを表示"
 }

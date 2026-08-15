@@ -46,6 +46,15 @@
 >     **支出合計・カテゴリ内訳・支払方法別・固定費・支出明細**すべてから一貫して除外される。
 >     締めスナップショットや引落照合など「実額」が要る箇所は従来どおり全件（隠さない）。
 >
+> **v1.0.578 の主な変更（2026-08-15）**（記帳プッシュ通知に二村秘書の犬ロゴを表示）
+>
+> - 🐶 **記帳プッシュ通知に「二村秘書」の犬ロゴ（他アプリでも使う本人アイコン）を表示**。
+>   - 背景/終了時（大半）＝送信側 `_send_app_push` の `AndroidNotification.image` に犬ロゴの公開URL
+>     （`raw.githubusercontent.com/.../apps/futa_finance/web/hisho-logo.png`）を指定。折りたたみ時は右側サムネ、展開時は大きく出る。
+>   - 前面時＝`push_service.dart` の `_showForeground` が `largeIcon: DrawableResourceAndroidBitmap('hisho_logo')` で同じ犬ロゴを表示。
+>     ロゴは `android/.../res/drawable/hisho_logo.png` に同梱＋公開URL用に `web/hisho-logo.png` にも同梱。
+>   - 小アイコン（ステータスバー）は従来どおり `ic_stat_futa`（白抜き）。
+>
 > **v1.0.569 の主な変更（2026-08-13）**（二村秘書の記帳をアプリにプッシュ通知）
 >
 > - 🔔 **二村秘書ボット(FutaHisho)がFutaFinanceに新規記帳すると、Androidアプリへ
