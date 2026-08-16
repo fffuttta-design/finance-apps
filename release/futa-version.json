@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.578",
-    "buildNumber":  "579",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.578/futa-finance-v1.0.578.apk",
-    "releaseNotes":  "v1.0.578+579 記帳プッシュ通知に二村秘書（犬）ロゴを表示"
+    "version":  "1.0.579",
+    "buildNumber":  "580",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.579/futa-finance-v1.0.579.apk",
+    "releaseNotes":  "v1.0.579+580 Claude使用量に『日別の使用履歴』テーブルを追加（日付ごと→タップでアプリ別内訳）"
 }
