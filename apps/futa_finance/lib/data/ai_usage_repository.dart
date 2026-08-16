@@ -231,12 +231,28 @@ class AiUsageDay {
   final double usd;
   final double jpy;
 
-  const AiUsageDay({required this.date, required this.usd, required this.jpy});
+  /// その日の合計（呼び出し回数・トークン数）。
+  final AiUsageTotals total;
+
+  /// その日の「アプリ別」内訳（消費の多い順）。日付×アプリの使用履歴に使う。
+  final List<AiUsageApp> apps;
+
+  const AiUsageDay({
+    required this.date,
+    required this.usd,
+    required this.jpy,
+    required this.total,
+    required this.apps,
+  });
 
   factory AiUsageDay.fromJson(Map<String, dynamic> j) => AiUsageDay(
         date: (j['d'] ?? '') as String,
         usd: _d(j['usd']),
         jpy: _d(j['jpy']),
+        total: AiUsageTotals.fromJson(j),
+        apps: ((j['apps'] as List?) ?? const [])
+            .map((e) => AiUsageApp.fromJson((e as Map).cast<String, dynamic>()))
+            .toList(),
       );
 }
 

@@ -115,6 +115,8 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
               const SizedBox(height: 12),
               _appRankingCard(),
               const SizedBox(height: 12),
+              _dailyHistoryCard(),
+              const SizedBox(height: 12),
               _modelCard(),
               const SizedBox(height: 12),
               _purchaseCard(),
@@ -280,6 +282,98 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
         ],
       ),
     );
+  }
+
+  /// 日付ごとの使用履歴。行をタップするとその日の「アプリ別」内訳が開く
+  /// （＝どの日にどのアプリが食い過ぎたか一目で分かる）。
+  Widget _dailyHistoryCard() {
+    final days = (_usage?.daily ?? const <AiUsageDay>[])
+        .where((d) => d.total.calls > 0)
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date)); // 新しい日が上
+    if (days.isEmpty) {
+      return _card(
+        title: '日別の使用履歴',
+        icon: Icons.calendar_view_day_outlined,
+        child: _empty(),
+      );
+    }
+    final maxJpy =
+        days.map((d) => d.jpy).fold<double>(0, (a, b) => a > b ? a : b);
+    return _card(
+      title: '日別の使用履歴',
+      icon: Icons.calendar_view_day_outlined,
+      child: Column(
+        children: [
+          for (final d in days)
+            Theme(
+              data:
+                  Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(left: 12, bottom: 8),
+                title: Row(
+                  children: [
+                    SizedBox(
+                      width: 48,
+                      child: Text(_dayLabel(d.date),
+                          style: const TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w600)),
+                    ),
+                    Expanded(child: _bar(maxJpy <= 0 ? 0 : d.jpy / maxJpy)),
+                    const SizedBox(width: 8),
+                    Text('¥${_fmt(d.jpy)}',
+                        style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(left: 48, top: 2),
+                  child: Text(
+                      '${_fmt(d.total.totalTokens.toDouble())} tok ・ ${_fmt(d.total.calls.toDouble())}回',
+                      style:
+                          const TextStyle(fontSize: 10, color: Colors.grey)),
+                ),
+                children: [
+                  for (final a in d.apps)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(a.name,
+                                style: const TextStyle(fontSize: 11),
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                          Text(
+                              '${_fmt(a.totals.totalTokens.toDouble())} tok',
+                              style: const TextStyle(
+                                  fontSize: 10, color: Colors.grey)),
+                          const SizedBox(width: 10),
+                          SizedBox(
+                            width: 64,
+                            child: Text('¥${_fmt(a.totals.jpy)}',
+                                textAlign: TextAlign.right,
+                                style: const TextStyle(fontSize: 11)),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// "2026-08-16" → "8/16"
+  static String _dayLabel(String ymd) {
+    final p = ymd.split('-');
+    if (p.length >= 3) {
+      return '${int.tryParse(p[1]) ?? p[1]}/${int.tryParse(p[2]) ?? p[2]}';
+    }
+    return ymd;
   }
 
   Widget _modelCard() {
