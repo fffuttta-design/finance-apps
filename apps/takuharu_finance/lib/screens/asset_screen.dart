@@ -7,6 +7,7 @@ import '../data/household_service.dart';
 import '../data/month_scope.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
+import '../widgets/web_layout.dart';
 import '../utils/format.dart';
 import '../widgets/settings_button.dart';
 import 'accounts_screen.dart';
@@ -109,7 +110,7 @@ class _AssetScreenState extends State<AssetScreen> {
                   stream: TxRepository.instance.watch(hid),
                   builder: (context, txSnap) {
                     final txns = txSnap.data ?? const <core.Transaction>[];
-                    return _body(accounts, txns);
+                    return WebCenter(child: _body(accounts, txns));
                   },
                 );
               },

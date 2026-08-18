@@ -15,6 +15,7 @@ import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 import '../widgets/receipt_group.dart';
+import '../widgets/web_layout.dart';
 import 'record_menu.dart';
 import 'calendar_screen.dart';
 import 'settings_screen.dart';
@@ -200,7 +201,8 @@ class _HomeScreenState extends State<HomeScreen> {
         label: const Text('きろく',
             style: TextStyle(fontWeight: FontWeight.w700)),
       ),
-      body: hid == null
+      body: WebCenter(
+        child: hid == null
           ? const Center(child: CircularProgressIndicator())
           : StreamBuilder<List<core.Transaction>>(
               stream: TxRepository.instance.watch(hid),
@@ -235,6 +237,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 return _body(month, recentAll);
               },
             ),
+      ),
     );
   }
 
@@ -257,6 +260,86 @@ class _HomeScreenState extends State<HomeScreen> {
     final catEntries = byCat.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
+    // 各セクションを部品として組み立て、画面幅で並べ方を変える。
+    final budgetBlock = <Widget>[
+      _sectionTitle('今月の予算'),
+      const SizedBox(height: 8),
+      _budgetCard(expense),
+    ];
+    final personalBlock = HouseholdService.instance.memberNames.isNotEmpty
+        ? <Widget>[
+            _sectionTitle('個人の食費わく'),
+            const SizedBox(height: 8),
+            _personalFoodCard(month),
+          ]
+        : const <Widget>[];
+    final categoryBlock = catEntries.isNotEmpty
+        ? <Widget>[
+            _sectionTitle('支出の内訳'),
+            const SizedBox(height: 8),
+            _categoryCard(catEntries, expense, txnsByCat, month),
+          ]
+        : const <Widget>[];
+    final recentBlock = <Widget>[
+      _sectionTitle('最近の入出金'),
+      const SizedBox(height: 8),
+      if (recentAll.isEmpty)
+        _empty()
+      else ...[
+        // 選択中の月の中で、日付の新しい順に最新5件。
+        // レシートの品目は1レシート＝親1行にまとめてから5件を数える。
+        ...groupByReceipt(recentAll).take(5).map((g) => g.isGroup
+            ? ReceiptGroupTile(
+                members: g.members,
+                onChanged: () {
+                  if (mounted) setState(() {});
+                })
+            : _txTile(g.single!)),
+        const SizedBox(height: 4),
+        _seeAllButton(month),
+      ],
+    ];
+
+    // 広い画面（Web/タブレット横）＝上部を2カラム、記録リストは下に全幅。
+    if (isWideLayout(context)) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
+        children: [
+          _monthBar(),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _summaryCard(income, expense),
+                    const SizedBox(height: 16),
+                    ...budgetBlock,
+                    if (personalBlock.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      ...personalBlock,
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [...categoryBlock],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          ...recentBlock,
+        ],
+      );
+    }
+
+    // 狭い画面（スマホ）＝従来どおり縦1列。
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
       children: [
@@ -264,63 +347,46 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 12),
         _summaryCard(income, expense),
         const SizedBox(height: 12),
-        _sectionTitle('今月の予算'),
-        const SizedBox(height: 8),
-        _budgetCard(expense),
+        ...budgetBlock,
         const SizedBox(height: 16),
-        if (HouseholdService.instance.memberNames.isNotEmpty) ...[
-          _sectionTitle('個人の食費わく'),
-          const SizedBox(height: 8),
-          _personalFoodCard(month),
+        if (personalBlock.isNotEmpty) ...[
+          ...personalBlock,
           const SizedBox(height: 16),
         ],
-        if (catEntries.isNotEmpty) ...[
-          _sectionTitle('支出の内訳'),
-          const SizedBox(height: 8),
-          _categoryCard(catEntries, expense, txnsByCat, month),
+        if (categoryBlock.isNotEmpty) ...[
+          ...categoryBlock,
           const SizedBox(height: 16),
         ],
-        _sectionTitle('最近の入出金'),
-        const SizedBox(height: 8),
-        if (recentAll.isEmpty)
-          _empty()
-        else ...[
-          // 選択中の月の中で、日付の新しい順に最新5件。
-          // レシートの品目は1レシート＝親1行にまとめてから5件を数える。
-          ...groupByReceipt(recentAll).take(5).map((g) => g.isGroup
-              ? ReceiptGroupTile(
-                  members: g.members,
-                  onChanged: () {
-                    if (mounted) setState(() {});
-                  })
-              : _txTile(g.single!)),
-          const SizedBox(height: 4),
-          InkWell(
-            onTap: widget.onOpenExpenses,
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    month.length > 5
-                        ? '支出をすべて見る（ほか ${month.length - 5}件）'
-                        : '支出をすべて見る',
-                    style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.pinkDark),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right_rounded,
-                      size: 18, color: AppColors.pinkDark),
-                ],
-              ),
-            ),
-          ),
-        ],
+        ...recentBlock,
       ],
+    );
+  }
+
+  /// 「支出をすべて見る」ボタン（支出タブへ切替）。
+  Widget _seeAllButton(List<core.Transaction> month) {
+    return InkWell(
+      onTap: widget.onOpenExpenses,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              month.length > 5
+                  ? '支出をすべて見る（ほか ${month.length - 5}件）'
+                  : '支出をすべて見る',
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.pinkDark),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right_rounded,
+                size: 18, color: AppColors.pinkDark),
+          ],
+        ),
+      ),
     );
   }
 

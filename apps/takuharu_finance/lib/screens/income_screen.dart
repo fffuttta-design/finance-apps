@@ -6,6 +6,7 @@ import '../data/household_service.dart';
 import '../data/month_scope.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
+import '../widgets/web_layout.dart';
 import '../widgets/settings_button.dart';
 import '../utils/format.dart';
 import 'add_transaction_screen.dart';
@@ -90,7 +91,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
                     .where(_inMonth)
                     .toList()
                   ..sort((a, b) => b.date.compareTo(a.date));
-                return _body(month);
+                return WebCenter(child: _body(month));
               },
             ),
     );

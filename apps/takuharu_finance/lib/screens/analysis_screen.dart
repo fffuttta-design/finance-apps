@@ -6,6 +6,7 @@ import '../data/household_service.dart';
 import '../data/month_scope.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
+import '../widgets/web_layout.dart';
 import '../utils/format.dart';
 import '../widgets/settings_button.dart';
 import '../widgets/simple_pie_chart.dart';
@@ -58,7 +59,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               builder: (context, snap) {
                 final all = snap.data ?? const <core.Transaction>[];
                 final m = _month.month;
-                return ListView(
+                return WebCenter(
+                    child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                   children: [
                     _monthBar(),
@@ -77,7 +79,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                     const SizedBox(height: 8),
                     _categoryCard(context, all),
                   ],
-                );
+                ));
               },
             ),
     );
