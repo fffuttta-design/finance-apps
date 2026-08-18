@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.110",
-    "buildNumber":  "115",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.110/takuharu-finance-v0.2.110.apk",
-    "releaseNotes":  "・チャットの吹き出しを長押ししたときのメニュー（リプライ／コピー）を、画面下から出るのをやめて、LINEのように長押しした場所のすぐそばにポップアップで出すようにしました。目線の近くで選べて操作しやすくなります。"
+    "version":  "0.2.111",
+    "buildNumber":  "116",
+    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.111/takuharu-finance-v0.2.111.apk",
+    "releaseNotes":  "・パソコン（Web）で開いたときの画面を作り直しました。スマホ画面を横に引き伸ばしただけの間延びした見た目をやめ、左にメニュー、中央に見やすい幅で情報を2列に並べる形にしました。スマホでは今まで通りの表示です。"
 }
