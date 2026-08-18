@@ -312,6 +312,53 @@ def _cookie_header() -> str:
     return "; ".join(jar)
 
 
+def _refresh_session_cookies(resp) -> None:
+    """毎時のHTTP応答に載る Set-Cookie を session.json に書き戻して、ローリングセッションを延命する。
+
+    🔥 なぜ要るのか（2026-08-18）：platform.claude.com は**アクセスのたびに**セッションCookieを
+       更新する（ローリング）。以前は毎朝のブラウザ取り込み(do_fetch)が storage_state を保存し直して
+       延命していたが、2026-08-16 に使用量スクレイパ(claude-usage.timer)を引退させた結果、その延命役が
+       消え、軽量HTTPの --balance-only だけでは新Cookieを保存しないため約10日でセッションが失効した。
+       毎時走る --balance-only 自身が Set-Cookie を書き戻せば、ブラウザ不要でセッションが延命され続ける。
+    """
+    try:
+        set_cookies = resp.headers.get_all("Set-Cookie") or []
+    except Exception:  # noqa: BLE001
+        set_cookies = []
+    updates = {}
+    for sc in set_cookies:
+        first = (sc or "").split(";", 1)[0].strip()
+        name, sep, value = first.partition("=")
+        name, value = name.strip(), value.strip()
+        # 空値は「Cookie削除」指示なので延命には使わない（消しにいかない）。
+        if sep and name and value:
+            updates[name] = value
+    if not updates:
+        return
+    try:
+        state = json.load(io.open(SESSION_FILE, encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return
+    changed = False
+    for c in state.get("cookies", []):
+        dom = c.get("domain", "").lstrip(".")
+        if dom in ("claude.com", "platform.claude.com") and c.get("name") in updates:
+            new_val = updates[c["name"]]
+            if c.get("value") != new_val:
+                c["value"] = new_val
+                changed = True
+    if not changed:
+        return
+    try:
+        tmp = SESSION_FILE + ".tmp"
+        with io.open(tmp, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False)
+        os.replace(tmp, SESSION_FILE)
+        print("🔄 セッションCookieを延命保存しました")
+    except Exception as e:  # noqa: BLE001
+        print("（セッションの延命保存に失敗:", str(e)[:120], "）")
+
+
 def do_balance_only() -> int:
     """残高だけを取ってPOSTする（毎時用）。
 
@@ -333,7 +380,9 @@ def do_balance_only() -> int:
     })
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
-            bal = json.loads(r.read().decode("utf-8"))
+            raw = r.read().decode("utf-8")
+            _refresh_session_cookies(r)   # ← 応答Cookieを書き戻してセッションを延命（ブラウザ不要）
+            bal = json.loads(raw)
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):
             print("❌ ログインが切れています。PCで --login を実行し直してください。")
