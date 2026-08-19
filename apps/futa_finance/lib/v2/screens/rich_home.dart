@@ -20,6 +20,7 @@ import '../../widgets/brand_logo.dart';
 import '../theme/colors.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
+import '../widgets/furusato_alert_card.dart';
 
 /// 新デザイン（リッチUI）のホーム画面。
 ///
@@ -428,6 +429,9 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // 期限が近いときだけ出る（12月＝枠の使い残し /
+                // 1〜3月＝ワンストップの申請期限・受領証明書の未着）。
+                const FurusatoAlertCard(),
                 hero,
                 const SizedBox(height: V2Spacing.md),
                 balanceCard,

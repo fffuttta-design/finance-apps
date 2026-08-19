@@ -1,6 +1,7 @@
 import 'app_mode.dart';
 import 'budget_item_repository.dart';
 import 'compliance_task_repository.dart';
+import 'furusato_repository.dart';
 import 'income_source_repository.dart';
 import 'monthly_snapshot_repository.dart';
 import 'settings_repository.dart';
@@ -34,6 +35,7 @@ class RepositoryProvider {
     BudgetItemRepository.instance.useFirestore(uid);
     ComplianceTaskRepository.instance.useFirestore(uid);
     AiUsageRepository.instance.useFirestore(uid);
+    FurusatoRepository.useFirestore(uid);
     _firestoreActive = true;
     _currentUid = uid;
   }
@@ -48,6 +50,7 @@ class RepositoryProvider {
     BudgetItemRepository.instance.useLocal();
     ComplianceTaskRepository.instance.useLocal();
     AiUsageRepository.instance.useLocal();
+    FurusatoRepository.useLocal();
     _firestoreActive = false;
     _currentUid = null;
   }

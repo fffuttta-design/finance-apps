@@ -16,6 +16,7 @@ import '../../screens/category_editor_screen.dart';
 import '../../screens/store_master_screen.dart';
 import '../../screens/subscription_list_screen.dart';
 import 'panels/v2_backup_panel.dart';
+import 'panels/v2_furusato_panel.dart';
 import 'panels/v2_income_master_panel.dart';
 import 'panels/v2_replacement_panel.dart';
 import 'panels/v2_sidebar_order_panel.dart';
@@ -93,6 +94,9 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
           desc: '算定基礎届・年度更新・申告期限などの締切'),
       _MenuItem('replacements', '変換マスタ', Icons.find_replace,
           desc: 'レシートの表記ゆれを置換'),
+      _MenuItem('furusato', 'ふるさと納税管理',
+          Icons.volunteer_activism_outlined,
+          desc: '枠の残りと受領証明書の回収状況'),
     ]),
     _MenuGroup(title: 'データ管理', items: [
       _MenuItem('backup', 'バックアップ / 取り込み',
@@ -240,6 +244,8 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
             iconColor: V2Colors.info);
       case 'replacements':
         return const V2ReplacementPanel();
+      case 'furusato':
+        return const V2FurusatoPanel();
       case 'aiUsage':
         return _embedV1(const AiUsageScreen(),
             title: 'Claude使用量',
