@@ -618,22 +618,20 @@ class _HeroCard extends StatelessWidget {
             ),
           ],
           if (showExcludeToggle) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
+            // 主役の数字を邪魔しないよう、右寄せ・控えめ（グレー小）にする。
             Align(
-              alignment: Alignment.centerLeft,
+              alignment: Alignment.centerRight,
               child: InkWell(
                 onTap: onToggleExclude,
                 borderRadius: BorderRadius.circular(999),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 7),
+                      horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: excludeActive
-                        ? accent.withValues(alpha: 0.12)
-                        : V2Colors.surfaceMuted,
+                    color: V2Colors.surfaceMuted,
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                        color: excludeActive ? accent : V2Colors.border),
+                    border: Border.all(color: V2Colors.border),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -641,20 +639,16 @@ class _HeroCard extends StatelessWidget {
                       Icon(
                           excludeActive
                               ? Icons.visibility_off_outlined
-                              : Icons.home_outlined,
-                          size: 15,
-                          color: excludeActive
-                              ? accent
-                              : V2Colors.textSecondary),
-                      const SizedBox(width: 6),
+                              : Icons.visibility_outlined,
+                          size: 13,
+                          color: V2Colors.textMuted),
+                      const SizedBox(width: 5),
                       Text(
                           excludeActive ? '家賃・税金を除外中' : '家賃・税金を除く',
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: excludeActive
-                                  ? accent
-                                  : V2Colors.textSecondary)),
+                          style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: V2Colors.textMuted)),
                     ],
                   ),
                 ),
