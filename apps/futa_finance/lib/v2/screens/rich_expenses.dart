@@ -758,6 +758,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
   /// まとめて表示/非表示を切替える（本人指定 2026-08-14 に税金も対象へ拡張）。
   Widget _rentToggleChip() {
     final hidden = _rentHidden;
+    // ホームの主役カードと同じ「右寄せ・控えめ（グレー小）」の見た目に揃える。
     return InkWell(
       onTap: () async {
         await UiPreferences.instance
@@ -766,14 +767,11 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
       },
       borderRadius: BorderRadius.circular(999),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: hidden
-              ? widget.accent.withValues(alpha: 0.12)
-              : V2Colors.surface,
+          color: V2Colors.surfaceMuted,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-              color: hidden ? widget.accent : V2Colors.border),
+          border: Border.all(color: V2Colors.border),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -781,15 +779,15 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
             Icon(
                 hidden
                     ? Icons.visibility_off_outlined
-                    : Icons.home_outlined,
-                size: 15,
-                color: hidden ? widget.accent : V2Colors.textSecondary),
-            const SizedBox(width: 6),
+                    : Icons.visibility_outlined,
+                size: 13,
+                color: V2Colors.textMuted),
+            const SizedBox(width: 5),
             Text(hidden ? '家賃・税金を除外中' : '家賃・税金を除く',
-                style: V2Typography.micro.copyWith(
-                    color:
-                        hidden ? widget.accent : V2Colors.textSecondary,
-                    fontWeight: FontWeight.w700)),
+                style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: V2Colors.textMuted)),
           ],
         ),
       ),
@@ -981,10 +979,10 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
               // 事業モードでは月セレクタをタブより上に出すため、ここは省略する。
               // 月の切替はトップバーの共有月ナビに集約。
               if (showTopHeader && !_isBusiness) ...[
-                Row(
-                  children: [
-                    _rentToggleChip(),
-                  ],
+                // 主役の数字を邪魔しないよう、ホームと同じ右寄せ・控えめにする。
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: _rentToggleChip(),
                 ),
                 const SizedBox(height: V2Spacing.md),
               ],

@@ -1,6 +1,6 @@
 {
-    "version": "1.0.583",
-    "buildNumber": "584",
-    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.583/futa-finance-v1.0.583.apk",
-    "releaseNotes": "v1.0.583+584 ホームの「家賃・税金を除外中」トグルを右寄せ・控えめ（グレー小）にして、主役の金額を邪魔しないようにした。"
+    "version": "1.0.584",
+    "buildNumber": "585",
+    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.584/futa-finance-v1.0.584.apk",
+    "releaseNotes": "v1.0.584+585 支出タブの「家賃・税金を除外中」バッジもホームと同じ右寄せ・控えめに統一。ホームと支出タブの除外ON/OFFを独立させ、片方だけ切り替えられるようにした。"
 }

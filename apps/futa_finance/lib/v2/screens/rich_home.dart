@@ -303,7 +303,7 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
     // 主役カードの「今月の支出」を消費ベースにする（個人モードのみ）。
     // 家賃・税金は"絶対にかかる金"で、見たいのは「今月いくら消費に使ったか」。
     // ＝表示専用の除外。収支(net)・残高計算からは外さない（実額のまま）。
-    final rentHidden = !isBusiness && UiPreferences.instance.hideRent;
+    final rentHidden = !isBusiness && UiPreferences.instance.hideRentHome;
     int heroExpense = expense;
     if (rentHidden) {
       final txCons = monthTxns
@@ -397,7 +397,7 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
       excludeActive: rentHidden,
       onToggleExclude: () async {
         await UiPreferences.instance
-            .setHideRent(!UiPreferences.instance.hideRent);
+            .setHideRentHome(!UiPreferences.instance.hideRentHome);
         if (mounted) setState(() {});
       },
     );

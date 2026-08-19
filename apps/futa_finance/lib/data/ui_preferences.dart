@@ -18,6 +18,12 @@ class UiPreferences extends ChangeNotifier {
   /// 冷静に他の支出を見たいときに隠せるようにする。デフォルト false（=表示）。
   static const _kHideRent = 'futa.ui.hide_rent';
 
+  /// ホームの主役カード（今月の支出）で「家賃・税金」を除外表示するか。
+  /// 支出タブ（_kHideRent）とは独立。ホームは「消費でいくら使ったか」を主役に
+  /// したい／支出タブは明細を全部見たい、と用途が別なので ON/OFF を分離する。
+  /// デフォルト true（＝消費ベースを主役にする）。
+  static const _kHideRentHome = 'futa.ui.hide_rent_home';
+
   /// 事業モードの経費タブで「税務顧問料」を除外表示するか。
   /// 顧問料は毎月ほぼ固定の大きめ費用で、他の経費の増減を見たいとき霞むため、
   /// 家賃(個人)と同じくワンタップで隠せるようにする。デフォルト false（=表示）。
@@ -71,6 +77,7 @@ class UiPreferences extends ChangeNotifier {
 
   bool _hideInactive = false;
   bool _hideRent = true; // 既定＝家賃・税金を除外（消費ベースを正とする）
+  bool _hideRentHome = true; // ホーム主役カード用（支出タブと独立）
   bool _hideAdvisory = false;
   List<String> _sidebarOrder = List.of(defaultSidebarOrder);
   bool? _useV2Ui;
@@ -83,6 +90,9 @@ class UiPreferences extends ChangeNotifier {
 
   /// 個人モードの支出タブで「家賃」を除外表示するか。
   bool get hideRent => _hideRent;
+
+  /// ホームの主役カード（今月の支出）で「家賃・税金」を除外表示するか。
+  bool get hideRentHome => _hideRentHome;
 
   /// 事業モードの経費タブで「税務顧問料」を除外表示するか。
   bool get hideAdvisory => _hideAdvisory;
@@ -132,6 +142,8 @@ class UiPreferences extends ChangeNotifier {
     // 家賃を隠す表示設定。既定＝除外(ON)。ホーム／支出タブの主役は「消費」を
     // 正とする方針のため、未設定の初期状態から家賃・税金を除いて表示する。
     _hideRent = prefs.getBool(_kHideRent) ?? true;
+    // ホーム主役カード用（支出タブと独立・既定＝除外ON）。
+    _hideRentHome = prefs.getBool(_kHideRentHome) ?? true;
     // 税務顧問料を隠す表示設定（事業モード）
     _hideAdvisory = prefs.getBool(_kHideAdvisory) ?? false;
     // サイドバー並び順
@@ -206,6 +218,15 @@ class UiPreferences extends ChangeNotifier {
     _hideRent = v;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kHideRent, v);
+    notifyListeners();
+  }
+
+  /// ホーム主役カード用の家賃・税金除外設定を更新して永続化（支出タブと独立）。
+  Future<void> setHideRentHome(bool v) async {
+    if (_hideRentHome == v) return;
+    _hideRentHome = v;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kHideRentHome, v);
     notifyListeners();
   }
 
