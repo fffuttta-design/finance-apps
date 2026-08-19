@@ -978,15 +978,8 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
               // タブ上部：個人モードのみ家賃を除外して見るトグルを出す。
               // 事業モードでは月セレクタをタブより上に出すため、ここは省略する。
               // 月の切替はトップバーの共有月ナビに集約。
-              if (showTopHeader && !_isBusiness) ...[
-                // 主役の数字を邪魔しないよう、ホームと同じ右寄せ・控えめにする。
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: _rentToggleChip(),
-                ),
-                const SizedBox(height: V2Spacing.md),
-              ],
-              // サマリー（タップで内訳を展開）
+              // サマリー（タップで内訳を展開）。家賃・税金の除外バッジは
+              // カード内の右上に重ねる（個人モードのみ・数字を邪魔しない控えめ表示）。
               Container(
                 decoration: BoxDecoration(
                   color: V2Colors.surface,
@@ -996,6 +989,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    Stack(children: [
                     InkWell(
                       onTap: () =>
                           setState(() => _summaryOpen = !_summaryOpen),
@@ -1073,6 +1067,13 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                         ),
                       ),
                     ),
+                    if (showTopHeader && !_isBusiness)
+                      Positioned(
+                        top: V2Spacing.md,
+                        right: V2Spacing.md,
+                        child: _rentToggleChip(),
+                      ),
+                    ]),
                     if (_summaryOpen) ...[
                       const Divider(height: 1, color: V2Colors.divider),
                       Padding(
