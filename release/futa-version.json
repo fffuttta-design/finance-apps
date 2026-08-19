@@ -1,6 +1,6 @@
 {
-    "version": "1.0.580",
-    "buildNumber": "581",
-    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.580/futa-finance-v1.0.580.apk",
-    "releaseNotes": "v1.0.580+581 ふるさと納税管理を新設（枠メーター・控除上限の計算機・受領証明書とワンストップの見張り・時期限定のホームアラート）"
+    "version": "1.0.582",
+    "buildNumber": "583",
+    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.582/futa-finance-v1.0.582.apk",
+    "releaseNotes": "v1.0.582+583 ホームの「今月の支出」を消費ベース（家賃・税金を除外）に。既定オン・トグルで実額に戻せる。収支/残高は実額のまま。カード明細・銀行通帳の手動並び替え（カスタム順）を廃止し、明細そのままの順に固定。"
 }
