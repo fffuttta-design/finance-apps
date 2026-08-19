@@ -179,7 +179,9 @@ class FurusatoConfig {
     this.entries = const [],
   });
 
-  static const defaultMajor = '税金・社会保険';
+  // カテゴリマスタに実在する組み合わせに合わせる。
+  // 新しい大カテゴリを足すと既存の集計が割れるので、既存の「税金」に小カテゴリを1つ足す形にした。
+  static const defaultMajor = '税金';
   static const defaultSub = 'ふるさと納税';
 
   /// ワンストップ特例が使える自治体数の上限。
