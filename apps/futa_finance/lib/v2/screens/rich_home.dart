@@ -10,11 +10,13 @@ import '../../data/payments_change_notifier.dart';
 import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
+import '../../data/ui_preferences.dart';
 import '../../screens/account_detail_screen.dart';
 import '../../screens/card_detail_screen.dart';
 import '../../screens/expense_list_screen.dart';
 import '../../screens/subscription_list_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
+import '../../utils/consumption_filter.dart' as cf;
 import '../../utils/formatters.dart';
 import '../../widgets/brand_logo.dart';
 import '../theme/colors.dart';
@@ -113,16 +115,19 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
     }
   }
 
-  int _subsTotalForMonth(DateTime m) {
+  int _subsTotalForMonth(DateTime m,
+      {bool Function(Subscription)? excludeSub}) {
     final now = DateTime.now();
     final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     final ym = '${m.year}-${m.month.toString().padLeft(2, '0')}';
     // 実取引化済み（fixedcost_* 明細やカードCSVミラー）の固定費は予定合計に足さない
     // ＝二重計上しない。実取引側（通信費など本来のカテゴリ）で計上済み。
+    // excludeSub 指定時は、その固定費（家賃・税金など）も合計から外す＝消費ベース。
     final matched = _matchedSubIds(m);
     return _subs.fold<int>(
         0,
-        (s, sub) => matched.contains(sub.id)
+        (s, sub) => (matched.contains(sub.id) ||
+                (excludeSub?.call(sub) ?? false))
             ? s
             : s + sub.plAmountForMonth(ym, curYm));
   }
@@ -295,6 +300,21 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
     final expense = txExpense + subTotal;
     final net = income - expense;
 
+    // 主役カードの「今月の支出」を消費ベースにする（個人モードのみ）。
+    // 家賃・税金は"絶対にかかる金"で、見たいのは「今月いくら消費に使ったか」。
+    // ＝表示専用の除外。収支(net)・残高計算からは外さない（実額のまま）。
+    final rentHidden = !isBusiness && UiPreferences.instance.hideRent;
+    int heroExpense = expense;
+    if (rentHidden) {
+      final txCons = monthTxns
+          .where((t) =>
+              t.type == TransactionType.expense && !cf.isRentOrTaxTx(t))
+          .fold<int>(0, (s, t) => s + t.effectiveAmount);
+      final subCons =
+          _subsTotalForMonth(_month, excludeSub: cf.isRentOrTaxSub);
+      heroExpense = txCons + subCons;
+    }
+
     // 推定残高 / 実測残高（旧ホームと同じ）
     final now = DateTime.now();
     final isCurrentMonth =
@@ -370,8 +390,16 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
       net: net,
       income: income,
       incomePending: incomePending,
-      expense: expense,
+      expense: heroExpense,
       isBusiness: isBusiness,
+      // 個人モードのみ「家賃・税金を除く／除外中」トグルを主役カードに出す。
+      showExcludeToggle: !isBusiness,
+      excludeActive: rentHidden,
+      onToggleExclude: () async {
+        await UiPreferences.instance
+            .setHideRent(!UiPreferences.instance.hideRent);
+        if (mounted) setState(() {});
+      },
     );
 
     final balanceCard = _BalanceCard(
@@ -493,6 +521,15 @@ class _HeroCard extends StatelessWidget {
   final int incomePending;
   final int expense;
   final bool isBusiness;
+
+  /// 「家賃・税金を除く」トグルを主役カードに出すか（個人モードのみ true）。
+  final bool showExcludeToggle;
+
+  /// 現在、家賃・税金を除外表示中か（＝expense は消費ベース）。
+  final bool excludeActive;
+
+  /// トグルのタップ（除外 ON/OFF を反転）。
+  final VoidCallback? onToggleExclude;
   const _HeroCard({
     required this.accent,
     required this.monthLabel,
@@ -501,6 +538,9 @@ class _HeroCard extends StatelessWidget {
     required this.incomePending,
     required this.expense,
     required this.isBusiness,
+    this.showExcludeToggle = false,
+    this.excludeActive = false,
+    this.onToggleExclude,
   });
 
   @override
@@ -575,6 +615,50 @@ class _HeroCard extends StatelessWidget {
                         color: V2Colors.textSecondary,
                         fontFeatures: V2Typography.tabularNums)),
               ],
+            ),
+          ],
+          if (showExcludeToggle) ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: InkWell(
+                onTap: onToggleExclude,
+                borderRadius: BorderRadius.circular(999),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: excludeActive
+                        ? accent.withValues(alpha: 0.12)
+                        : V2Colors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                        color: excludeActive ? accent : V2Colors.border),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                          excludeActive
+                              ? Icons.visibility_off_outlined
+                              : Icons.home_outlined,
+                          size: 15,
+                          color: excludeActive
+                              ? accent
+                              : V2Colors.textSecondary),
+                      const SizedBox(width: 6),
+                      Text(
+                          excludeActive ? '家賃・税金を除外中' : '家賃・税金を除く',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: excludeActive
+                                  ? accent
+                                  : V2Colors.textSecondary)),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ],
           const SizedBox(height: V2Spacing.md),

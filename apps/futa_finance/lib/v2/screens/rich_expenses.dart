@@ -16,6 +16,7 @@ import '../../screens/expense_input_screen.dart';
 import '../../screens/receipt_group_detail_screen.dart';
 import '../../screens/subscription_list_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
+import '../../utils/consumption_filter.dart' as cf;
 import '../../utils/emoji_palette.dart';
 import '../../utils/formatters.dart';
 import '../../utils/modal_input.dart';
@@ -81,85 +82,20 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     return m.contains('外注費') || m.contains('売上原価') || m.contains('制作原価');
   }
 
-  // ── 家賃（個人モードのハズレ値）を隠す機能 ──────────────────
-  /// 家賃とみなすキーワード。ユーザーは「家賃＝共同生活費」として運用しているため
-  /// 「共同生活費」等も同一視して除外対象にする。
-  /// 「ナカネ」は共同生活費（家賃）の振込先名義（摘要「振込 ナカネ ハルカ」）。
-  /// 銀行CSV取込の家賃振込を"家賃を除く"で拾うために含める。
-  static const _rentKeywords = ['家賃', '共同生活費', '共同生活', 'ナカネ'];
+  // ── ハズレ値（家賃・税金・税務顧問料）の判定は共通ユーティリティに一本化 ──
+  //   支出タブとホーム主役カード（rich_home）で「同じ除外定義」を使うため、
+  //   キーワード・判定は consumption_filter.dart を唯一の正とする。
 
-  /// 文字列がいずれかの家賃キーワードを含むか。
-  bool _matchesRent(String? s) =>
-      s != null && _rentKeywords.any((k) => s.contains(k));
+  /// 家賃トグルで隠す取引／固定費か（家賃＝共同生活費／税金・社会保険）。
+  bool _isRentOrTaxTx(core.Transaction t) => cf.isRentOrTaxTx(t);
+  bool _isRentOrTaxSub(core.Subscription s) => cf.isRentOrTaxSub(s);
 
-  /// 家賃の取引か（大／小カテゴリ・摘要のいずれかにキーワードを含む）。
-  bool _isRentTx(core.Transaction t) =>
-      _matchesRent(t.category.sub) ||
-      _matchesRent(t.category.major) ||
-      _matchesRent(t.description);
-
-  /// 家賃の固定費（サブスク）か（名称／カテゴリ／会計科目にキーワードを含む）。
-  bool _isRentSub(core.Subscription s) =>
-      _matchesRent(s.name) ||
-      _matchesRent(s.category) ||
-      _matchesRent(s.plMajor);
-
-  /// 家賃を隠す表示が有効か（個人モードのみ・設定 ON のとき）。
+  /// 家賃・税金を隠す表示が有効か（個人モードのみ・設定 ON のとき）。
   bool get _rentHidden => !_isBusiness && UiPreferences.instance.hideRent;
 
-  // ── 税金・社会保険（家賃と同じハズレ値）も同じトグルで隠す ──────────
-  /// 税金・社会保険とみなすキーワード（本人指定 2026-08-14）。家賃と同様に
-  /// 金額が大きく他の支出を霞ませるハズレ値なので、家賃トグルON時に一緒に隠す。
-  /// ⚠ 短すぎる語（「税」「年金」単体）は無関係な明細に誤ヒットするため使わず、
-  ///   具体的な税目・保険名だけを列挙する。
-  static const _taxKeywords = [
-    '税金', '個人事業税', '事業税', '住民税', '市民税', '県民税', '所得税',
-    '予定納税', '消費税', '固定資産税', '自動車税', '軽自動車税',
-    '国民健康保険', '健康保険料', '国民年金', '厚生年金', '社会保険',
-  ];
-
-  /// 文字列がいずれかの税金・社会保険キーワードを含むか。
-  bool _matchesTax(String? s) =>
-      s != null && _taxKeywords.any((k) => s.contains(k));
-
-  /// 税金・社会保険の取引か（大／小カテゴリ・摘要のいずれかにキーワードを含む）。
-  bool _isTaxTx(core.Transaction t) =>
-      _matchesTax(t.category.sub) ||
-      _matchesTax(t.category.major) ||
-      _matchesTax(t.description);
-
-  /// 税金・社会保険の固定費（サブスク）か。
-  bool _isTaxSub(core.Subscription s) =>
-      _matchesTax(s.name) ||
-      _matchesTax(s.category) ||
-      _matchesTax(s.plMajor);
-
-  /// 家賃トグルで隠す取引か（家賃＝共同生活費／税金・社会保険）。
-  bool _isRentOrTaxTx(core.Transaction t) => _isRentTx(t) || _isTaxTx(t);
-
-  /// 家賃トグルで隠す固定費か（家賃／税金・社会保険）。
-  bool _isRentOrTaxSub(core.Subscription s) => _isRentSub(s) || _isTaxSub(s);
-
-  // ── 税務顧問料（事業モードのハズレ値）を隠す機能 ──────────────
-  /// 税務顧問料とみなすキーワード（大/小カテゴリ・摘要のいずれかに含めば対象）。
-  /// ⚠️ 実データの摘要は「VS税務顧問」（"料"なし）なので "税務顧問" で拾う
-  /// （"税務顧問料" だと一致しない）。"顧問料"/"税理士" も念のため残す。
-  static const _advisoryKeywords = ['税務顧問', '顧問料', '税理士'];
-
-  bool _matchesAdvisory(String? s) =>
-      s != null && _advisoryKeywords.any((k) => s.contains(k));
-
-  /// 税務顧問料の取引か。
-  bool _isAdvisoryTx(core.Transaction t) =>
-      _matchesAdvisory(t.category.sub) ||
-      _matchesAdvisory(t.category.major) ||
-      _matchesAdvisory(t.description);
-
-  /// 税務顧問料の固定費（サブスク）か（顧問料を固定費登録している場合に対応）。
-  bool _isAdvisorySub(core.Subscription s) =>
-      _matchesAdvisory(s.name) ||
-      _matchesAdvisory(s.category) ||
-      _matchesAdvisory(s.plMajor);
+  /// 税務顧問料の取引／固定費か（事業モードのハズレ値）。
+  bool _isAdvisoryTx(core.Transaction t) => cf.isAdvisoryTx(t);
+  bool _isAdvisorySub(core.Subscription s) => cf.isAdvisorySub(s);
 
   /// 税務顧問料を隠す表示が有効か（事業モードのみ・設定 ON のとき）。
   bool get _advisoryHidden =>

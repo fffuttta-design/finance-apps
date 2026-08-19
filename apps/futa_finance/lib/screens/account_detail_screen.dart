@@ -55,11 +55,6 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   /// 月フィルタ。null = 全期間。
   DateTime? _selectedMonth;
 
-  /// カスタム順モード。ON のとき行をドラッグで並び替えでき、その順番を
-  /// 各取引の sortOrder に保存する。残高はこのモードでも表示し、
-  /// 「表示順に沿って積み上げた値」を出す（並び替えるたびに再計算される）。
-  bool _customOrder = false;
-
   // ─── 未保存編集の管理 ─────────────────────
   /// ユーザーが手入力で上書きした月初残高（保存前のローカル状態）。
   int? _pendingMonthStartBalance;
@@ -459,25 +454,22 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                         ),
                         const Divider(height: 1),
                         Expanded(
-                          child: _customOrder
-                              ? _reorderLedger(shownRows,
-                                  dispStart ?? (_account.startingBalance ?? 0))
-                              // PC幅は列そろえの表、スマホ幅は崩れない1行リスト。
-                              // 幅広の固定列 Table を狭い画面に押し込むと「摘要」や
-                              // 残高が1文字ずつ縦に折れて崩れるため、幅で出し分ける。
-                              : (constraints.maxWidth >= 900
-                                  ? _ledgerTable(
-                                      // カスタム順（保存した並び順）で表示。並びが未設定なら
-                                      // 日付順にフォールバックするので、通常の口座は今まで通り。
-                                      displayRows: shownRows,
-                                      monthStartBalance: dispStart,
-                                      monthEndBalance: dispEnd,
-                                    )
-                                  : _ledgerMobileList(
-                                      displayRows: shownRows,
-                                      monthStartBalance: dispStart,
-                                      monthEndBalance: dispEnd,
-                                    )),
+                          // 銀行明細そのままの順（日付の新しい順・同日はCSVの並び）を
+                          // 正とする。手動並び替え（カスタム順）は廃止＝並びは固定表示。
+                          // PC幅は列そろえの表、スマホ幅は崩れない1行リスト。
+                          // 幅広の固定列 Table を狭い画面に押し込むと「摘要」や
+                          // 残高が1文字ずつ縦に折れて崩れるため、幅で出し分ける。
+                          child: constraints.maxWidth >= 900
+                              ? _ledgerTable(
+                                  displayRows: shownRows,
+                                  monthStartBalance: dispStart,
+                                  monthEndBalance: dispEnd,
+                                )
+                              : _ledgerMobileList(
+                                  displayRows: shownRows,
+                                  monthStartBalance: dispStart,
+                                  monthEndBalance: dispEnd,
+                                ),
                         ),
                       ],
                     ),
@@ -606,39 +598,6 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                       color: Color(0xFF111827))),
             ),
           const Spacer(),
-          // カスタム順トグル（ON=長押しで並び替え可能・残高列は隠れる）。
-          Tooltip(
-            message: _customOrder
-                ? 'カスタム順：ON（長押しで並び替え・自動保存／残高は非表示）'
-                : 'カスタム順に切り替え（自由に並び替えて保存）',
-            child: OutlinedButton.icon(
-              onPressed: () => setState(() => _customOrder = !_customOrder),
-              icon: Icon(Icons.swap_vert,
-                  size: 16,
-                  color: _customOrder
-                      ? const Color(0xFF1A237E)
-                      : const Color(0xFF6B7280)),
-              label: Text('カスタム順',
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight:
-                          _customOrder ? FontWeight.w700 : FontWeight.w500,
-                      color: _customOrder
-                          ? const Color(0xFF1A237E)
-                          : const Color(0xFF6B7280))),
-              style: OutlinedButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                backgroundColor: _customOrder
-                    ? const Color(0xFF1A237E).withValues(alpha: 0.08)
-                    : null,
-                side: BorderSide(
-                    color: _customOrder
-                        ? const Color(0xFF1A237E)
-                        : const Color(0xFFD1D5DB)),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
           // 全期間 ⇄ 月別 切替。
           OutlinedButton.icon(
             onPressed: () => _setMonth(_selectedMonth == null
@@ -676,178 +635,6 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       return ao.compareTo(bo);
     });
     return list;
-  }
-
-  /// カスタム順モードのリスト（ハンドルをドラッグで並び替え・残高列なし）。
-  /// クレカ明細と同じ「ドラッグ並び替え」に統一（銀行/現金/電子マネー共通）。
-  Widget _reorderLedger(List<_LedgerRow> rows, int seedBalance) {
-    if (rows.isEmpty) {
-      return const Center(
-        child: Text('この期間の取引はありません',
-            style: TextStyle(color: Color(0xFF9CA3AF))),
-      );
-    }
-    // 表示順（上＝新しい／下＝古い）に沿って残高を積み上げる。
-    // 下（古い方）から月初残高に足していき、各行に「その行まで反映した残高」を出す。
-    // ＝並び替えるたびに、この表示順で残高が再計算される。
-    final balances = List<int>.filled(rows.length, seedBalance);
-    int running = seedBalance;
-    for (int i = rows.length - 1; i >= 0; i--) {
-      running += rows[i].signedAmount;
-      balances[i] = running;
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 6, 10, 4),
-          child: Row(
-            children: [
-              const Expanded(
-                child: Text('ハンドル（⋮⋮）をドラッグで並び替え（この順で保存・残高もこの順で再計算）',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
-              ),
-              // まず日付順（新しい順）に整えてから、手でドラッグ微調整する用。
-              TextButton.icon(
-                onPressed: () {
-                  final byDate = [...rows]
-                    ..sort((a, b) => -a.txn.date.compareTo(b.txn.date));
-                  _saveAccountReorder(byDate);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('日付順（新しい順）に並べ直しました'),
-                        duration: Duration(seconds: 2)),
-                  );
-                },
-                icon: const Icon(Icons.sort, size: 16),
-                label: const Text('日付順に並べ直す',
-                    style: TextStyle(fontSize: 12)),
-                style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    foregroundColor: const Color(0xFF1A237E)),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: ReorderableListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-            itemCount: rows.length,
-            buildDefaultDragHandles: false,
-            onReorder: (oldIndex, newIndex) {
-              if (newIndex > oldIndex) newIndex -= 1;
-              final list = [...rows];
-              final item = list.removeAt(oldIndex);
-              list.insert(newIndex, item);
-              _saveAccountReorder(list);
-            },
-            itemBuilder: (context, i) {
-              final row = rows[i];
-              return DecoratedBox(
-                key: ValueKey('acctreorder_${row.txn.id}'),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  border: Border(
-                    bottom: BorderSide(color: Color(0xFFF1F2F4)),
-                  ),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    ReorderableDragStartListener(
-                      index: i,
-                      child: const Padding(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                        child: Icon(Icons.drag_indicator,
-                            size: 20, color: Color(0xFF9CA3AF)),
-                      ),
-                    ),
-                    Expanded(child: _reorderRow(row, balances[i])),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _reorderRow(_LedgerRow row, int balanceAfter) {
-    final t = row.txn;
-    final isOut = row.signedAmount < 0;
-    final desc = _ledgerDescOf(row);
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 74,
-            child: Text(
-                '${t.date.month.toString().padLeft(2, '0')}/${t.date.day.toString().padLeft(2, '0')}',
-                style: const TextStyle(
-                    fontSize: 12, color: Color(0xFF6B7280))),
-          ),
-          Expanded(
-            child: HiliteText(desc,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-                style: const TextStyle(fontSize: 12, color: Color(0xFF111827))),
-          ),
-          const SizedBox(width: 8),
-          HiliteText(
-              isOut
-                  ? '-${formatYen(-row.signedAmount)}'
-                  : '+${formatYen(row.signedAmount)}',
-              amount: true,
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'monospace',
-                  color: isOut
-                      ? const Color(0xFFDC2626)
-                      : const Color(0xFF16A34A))),
-          // 残高（この表示順で積み上げた値）。
-          const SizedBox(width: 10),
-          SizedBox(
-            width: 96,
-            child: Text(formatYen(balanceAfter),
-                textAlign: TextAlign.right,
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: 'monospace',
-                    color: balanceAfter >= 0
-                        ? const Color(0xFF111827)
-                        : const Color(0xFFDC2626))),
-          ),
-          IconButton(
-            icon: const Icon(Icons.edit_outlined,
-                size: 16, color: Color(0xFF6B7280)),
-            padding: EdgeInsets.zero,
-            visualDensity: VisualDensity.compact,
-            constraints: const BoxConstraints(),
-            tooltip: '編集',
-            onPressed: () => _showEditDialog(t),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 並び替え結果を各取引の sortOrder（0,1,2…）として保存する。
-  /// updateMany で一括更新＝通知は1回だけ（並び替え中のチラつき防止）。
-  /// 画面は即反映され、サーバ書き込みは裏で完了。失敗時のみ再読込。
-  void _saveAccountReorder(List<_LedgerRow> ordered) {
-    final txns = [
-      for (int i = 0; i < ordered.length; i++)
-        ordered[i].txn.copyWith(sortOrder: i.toDouble())
-    ];
-    unawaited(TransactionRepository.instance.updateMany(txns).catchError((_) {
-      if (mounted) _load();
-    }));
   }
 
   static const _cGreen = Color(0xFF16A34A);

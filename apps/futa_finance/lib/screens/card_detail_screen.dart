@@ -54,10 +54,6 @@ class _CardDetailScreenState extends State<CardDetailScreen>
 
   /// 初回ロードで「利用のある最新月」を初期選択にしたか（以後はユーザー操作を尊重）。
   bool _monthPicked = false;
-  // 明細の並び替え「編集」モード（銀行の通帳と同じ挙動）。
-  // ・OFF（既定）：保存したカスタム順で固定表示（未設定は日付順フォールバック・ハンドルなし）。
-  // ・ON：ハンドルでドラッグ並び替え＋「日付順に並べ直す」。
-  bool _cardCustom = false;
   late final TabController _tabController =
       TabController(length: 2, vsync: this);
 
@@ -242,113 +238,6 @@ class _CardDetailScreenState extends State<CardDetailScreen>
     if (mounted) await _load();
   }
 
-  /// カード明細の並び順トグルバー（月モードのみ）。
-  Widget _cardSortBar(
-      List<core.Transaction> monthTxns, List<FixedCostRow> fixed) {
-    if (_selectedMonth == null || _range != null) {
-      return const SizedBox.shrink();
-    }
-    final total = monthTxns.length + fixed.length;
-    if (total == 0) return const SizedBox.shrink();
-    return Container(
-      color: const Color(0xFFF7F8FA),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: Row(
-        children: [
-          const Spacer(),
-          // 並び順トグル（ふだんは保存したカスタム順で固定表示、ボタンONで
-          // 並び替え編集）。銀行の通帳と同じ挙動。
-          Tooltip(
-            message: _cardCustom
-                ? '並び替え中（ハンドルをドラッグ）。もう一度押すとこの並びで固定'
-                : 'カスタム順で並び替える（この並びで固定される）',
-            child: OutlinedButton.icon(
-              onPressed: () => setState(() => _cardCustom = !_cardCustom),
-              icon: Icon(_cardCustom ? Icons.check : Icons.swap_vert,
-                  size: 16,
-                  color: _cardCustom
-                      ? const Color(0xFF059669)
-                      : const Color(0xFF6B7280)),
-              label: Text(_cardCustom ? '並び替え中' : 'カスタム順',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: _cardCustom
-                          ? const Color(0xFF059669)
-                          : const Color(0xFF6B7280))),
-              style: OutlinedButton.styleFrom(
-                backgroundColor:
-                    _cardCustom ? const Color(0xFFECFDF5) : null,
-                side: BorderSide(
-                    color: _cardCustom
-                        ? const Color(0xFF059669)
-                        : const Color(0xFFD1D5DB)),
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 手動並び替えの保存。取引は取引の sortOrder、固定費はサブスクの sortOrder。
-  ///
-  /// 通帳（銀行）と同じ「ドロップ位置を即ローカル反映 → 書き込みは裏で」方式。
-  /// ⚠ 以前は取引を unawaited 更新しつつ固定費側で `await _load()` していたため、
-  ///   取引の書き込みが未反映のまま再読込が走り、取引=旧順・固定費=新順の
-  ///   チグハグな状態で並び替わり、さらに stream 通知でもう一度並び替わって
-  ///   「一気に動かず、上から辿って徐々にその位置に来る」挙動になっていた。
-  ///   ここでは _all / _subs を1回の setState で新順に確定させ、再読込レースを断つ。
-  Future<void> _saveReorder(List<ReorderedItem> dayInNewOrder) async {
-    final subOrders = <String, double>{};
-    final txnOrders = <String, double>{};
-    for (int i = 0; i < dayInNewOrder.length; i++) {
-      final item = dayInNewOrder[i];
-      if (item.isFixed) {
-        subOrders[item.subscriptionId!] = i.toDouble();
-      } else {
-        txnOrders[item.txn!.id] = i.toDouble();
-      }
-    }
-    // ① ドロップ位置をその場で確定（再読込を待たない＝チラつき/戻りを防ぐ）。
-    setState(() {
-      if (txnOrders.isNotEmpty) {
-        _all = [
-          for (final t in _all)
-            txnOrders.containsKey(t.id)
-                ? t.copyWith(sortOrder: txnOrders[t.id])
-                : t,
-        ];
-      }
-      if (subOrders.isNotEmpty) {
-        _subs = [
-          for (final s in _subs)
-            subOrders.containsKey(s.id)
-                ? s.copyWith(sortOrder: subOrders[s.id])
-                : s,
-        ];
-      }
-    });
-    // ② 永続化は裏で（失敗時のみ再読込）。
-    if (txnOrders.isNotEmpty) {
-      final txnUpdates = [
-        for (final t in _all) if (txnOrders.containsKey(t.id)) t,
-      ];
-      unawaited(TransactionRepository.instance
-          .updateMany(txnUpdates)
-          .catchError((_) {
-        if (mounted) _load();
-      }));
-    }
-    if (subOrders.isNotEmpty) {
-      unawaited(SubscriptionRepository.instance
-          .save(core.SubscriptionConfig(subscriptions: _subs))
-          .catchError((_) {
-        if (mounted) _load();
-      }));
-    }
-  }
-
   /// 固定費行タップ → サブスク編集を開いて再読込。
   Future<void> _editCardFixed(String id) async {
     await Navigator.push<void>(
@@ -526,7 +415,6 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                     Column(
                       children: [
                         _monthSelector(),
-                        _cardSortBar(monthTxns, cardFixed),
                         const Divider(height: 1),
                         Expanded(
                           // PC幅は支出明細と同じ表（検索・並び替え・列幅）。
@@ -560,12 +448,10 @@ class _CardDetailScreenState extends State<CardDetailScreen>
                                           .update(t.copyWith(receiptSaved: v));
                                       if (mounted) await _load();
                                     },
-                                    onReorderDay: _saveReorder,
-                                    // 銀行の通帳と同じく常にカスタム順で表示
-                                    // （未設定は日付順フォールバック）。ボタンONの
-                                    // ときだけハンドルで並び替え可能にする。
-                                    customOrder: true,
-                                    customEditable: _cardCustom,
+                                    // クレジット明細そのままの順（日付の新しい順・
+                                    // 同日はCSVの並び）を正とする。手動並び替え
+                                    // （カスタム順）は廃止＝並びは固定表示。
+                                    customOrder: false,
                                     emptyHint: 'この期間の利用はありません',
                                   ),
                                 )

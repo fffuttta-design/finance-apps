@@ -70,7 +70,7 @@ class UiPreferences extends ChangeNotifier {
   double get homeAssetColumnWidth => _homeAssetWidth;
 
   bool _hideInactive = false;
-  bool _hideRent = false;
+  bool _hideRent = true; // 既定＝家賃・税金を除外（消費ベースを正とする）
   bool _hideAdvisory = false;
   List<String> _sidebarOrder = List.of(defaultSidebarOrder);
   bool? _useV2Ui;
@@ -129,8 +129,9 @@ class UiPreferences extends ChangeNotifier {
     } else {
       _hideInactive = false;
     }
-    // 家賃を隠す表示設定
-    _hideRent = prefs.getBool(_kHideRent) ?? false;
+    // 家賃を隠す表示設定。既定＝除外(ON)。ホーム／支出タブの主役は「消費」を
+    // 正とする方針のため、未設定の初期状態から家賃・税金を除いて表示する。
+    _hideRent = prefs.getBool(_kHideRent) ?? true;
     // 税務顧問料を隠す表示設定（事業モード）
     _hideAdvisory = prefs.getBool(_kHideAdvisory) ?? false;
     // サイドバー並び順
