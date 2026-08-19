@@ -1,6 +1,6 @@
 {
-    "version": "1.0.582",
-    "buildNumber": "583",
-    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.582/futa-finance-v1.0.582.apk",
-    "releaseNotes": "v1.0.582+583 ホームの「今月の支出」を消費ベース（家賃・税金を除外）に。既定オン・トグルで実額に戻せる。収支/残高は実額のまま。カード明細・銀行通帳の手動並び替え（カスタム順）を廃止し、明細そのままの順に固定。"
+    "version": "1.0.583",
+    "buildNumber": "584",
+    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.583/futa-finance-v1.0.583.apk",
+    "releaseNotes": "v1.0.583+584 ホームの「家賃・税金を除外中」トグルを右寄せ・控えめ（グレー小）にして、主役の金額を邪魔しないようにした。"
 }
