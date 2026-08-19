@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.579",
-    "buildNumber":  "580",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.579/futa-finance-v1.0.579.apk",
-    "releaseNotes":  "v1.0.579+580 Claude使用量に『日別の使用履歴』テーブルを追加（日付ごと→タップでアプリ別内訳）"
+    "version": "1.0.580",
+    "buildNumber": "581",
+    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.580/futa-finance-v1.0.580.apk",
+    "releaseNotes": "v1.0.580+581 ふるさと納税管理を新設（枠メーター・控除上限の計算機・受領証明書とワンストップの見張り・時期限定のホームアラート）"
 }
