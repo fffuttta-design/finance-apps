@@ -336,6 +336,8 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
     final txnsByMajor = <String, List<Transaction>>{};
     for (final t in monthTxns) {
       if (t.type != TransactionType.expense) continue;
+      // 家賃・税金を除外中なら、カテゴリ内訳からも外す（主役カードと足並みを揃える）。
+      if (rentHidden && cf.isRentOrTaxTx(t)) continue;
       final major =
           t.category.major.replaceFirst(RegExp(r'^\s*\d+\.\s*'), '').trim();
       if (major.isEmpty) continue;
@@ -353,6 +355,7 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
       final matched = _matchedSubIds(_month);
       for (final sub in _subs) {
         if (matched.contains(sub.id)) continue;
+        if (rentHidden && cf.isRentOrTaxSub(sub)) continue;
         final amt = sub.plAmountForMonth(ym, nowYm);
         if (amt > 0) {
           fixedLines.add(
@@ -361,8 +364,13 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
       }
       fixedLines.sort((a, b) => b.amount.compareTo(a.amount));
     }
-    if (subTotal > 0) {
-      byMajor['固定費・サブスク'] = (byMajor['固定費・サブスク'] ?? 0) + subTotal;
+    // 家賃・税金を除外中は、固定費・サブスクの合計も消費ベース（家賃/税金サブを除く）にする。
+    final breakdownSubTotal = rentHidden
+        ? _subsTotalForMonth(_month, excludeSub: cf.isRentOrTaxSub)
+        : subTotal;
+    if (breakdownSubTotal > 0) {
+      byMajor['固定費・サブスク'] =
+          (byMajor['固定費・サブスク'] ?? 0) + breakdownSubTotal;
     }
     final majorEntries = byMajor.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
