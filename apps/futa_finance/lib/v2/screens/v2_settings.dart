@@ -144,10 +144,27 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
                     fontSize: 17, fontWeight: FontWeight.w700)),
           ),
           body: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(V2Spacing.lg),
-              child: _buildPanel(),
-            ),
+            // 広い画面（デスクトップ等）でパネルが端まで間延びしないよう、
+            // ホーム/支出タブと同じ中央カラム（最大960px・センタリング）に収める。
+            // Row の stretch で縦は画面いっぱいのまま渡すので、内部で Expanded を
+            // 使うパネル（支払方法マスタ等）も崩れない。SizedBox で横は tight。
+            child: LayoutBuilder(builder: (ctx, c) {
+              final w = c.maxWidth < 960 ? c.maxWidth : 960.0;
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Spacer(),
+                  SizedBox(
+                    width: w,
+                    child: Padding(
+                      padding: const EdgeInsets.all(V2Spacing.lg),
+                      child: _buildPanel(),
+                    ),
+                  ),
+                  const Spacer(),
+                ],
+              );
+            }),
           ),
         ),
       ),
@@ -499,7 +516,11 @@ class _MobileSettingsList extends StatelessWidget {
     return SingleChildScrollView(
           primary: false,
       padding: const EdgeInsets.symmetric(vertical: V2Spacing.lg),
-      child: Column(
+      // 広い画面で設定メニューが端まで間延びしないよう中央カラム（最大960px）に収める。
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var gi = 0; gi < groups.length; gi++) ...[
@@ -537,6 +558,8 @@ class _MobileSettingsList extends StatelessWidget {
             ),
           ],
         ],
+          ),
+        ),
       ),
     );
   }

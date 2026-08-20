@@ -1,6 +1,6 @@
 {
-    "version": "1.0.588",
-    "buildNumber": "589",
-    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.588/futa-finance-v1.0.588.apk",
-    "releaseNotes": "v1.0.588+589 Windows版のアップデート案内ポップアップを、1バージョンにつき1回だけの表示にした（3分ごとの更新チェックで同じ案内が繰り返し出ていたのを解消）。"
+    "version": "1.0.589",
+    "buildNumber": "590",
+    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.589/futa-finance-v1.0.589.apk",
+    "releaseNotes": "v1.0.589+590 設定の各画面（バックアップ・表示設定など）が広い画面で端まで間延びしていたのを、ホーム/支出タブと同じ中央カラム（最大960px・センタリング）に統一した。"
 }
