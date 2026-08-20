@@ -461,8 +461,18 @@ function setupAutoUpdater() {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
+  // ダウンロード完了ダイアログは「1バージョンにつき1回だけ」。
+  // 3分ごとの checkForUpdates で update-downloaded が再発火しても、
+  // 一度案内した版はもう出さない（ポップアップの繰り返し表示を防ぐ）。
+  let notifiedVersion = null;
+  let updateDialogOpen = false;
+
   autoUpdater.on('update-downloaded', (info) => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (updateDialogOpen) return;            // 表示中に二重で開かない
+    if (notifiedVersion === info.version) return; // この版は案内済み
+    notifiedVersion = info.version;
+    updateDialogOpen = true;
     dialog.showMessageBox(mainWindow, {
       type: 'info',
       title: 'FutaFinance - アップデート準備完了',
@@ -471,7 +481,9 @@ function setupAutoUpdater() {
       buttons: ['今すぐ再起動', '後で'],
       defaultId: 0, cancelId: 1,
     }).then(({ response }) => {
+      updateDialogOpen = false;
       if (response === 0) autoUpdater.quitAndInstall();
+      // 「後で」を選んだら、この版はもう再提示しない（notifiedVersion 据え置き）。
     });
   });
 

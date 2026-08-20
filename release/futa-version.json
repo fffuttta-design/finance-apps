@@ -1,6 +1,6 @@
 {
-    "version": "1.0.587",
-    "buildNumber": "588",
-    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.587/futa-finance-v1.0.587.apk",
-    "releaseNotes": "v1.0.587+588 家賃・税金を除外中のとき、ホームの「カテゴリ内訳」からも家賃・税金を外すようにした。主役カードの支出額と内訳の合計が一致するようになった。"
+    "version": "1.0.588",
+    "buildNumber": "589",
+    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.588/futa-finance-v1.0.588.apk",
+    "releaseNotes": "v1.0.588+589 Windows版のアップデート案内ポップアップを、1バージョンにつき1回だけの表示にした（3分ごとの更新チェックで同じ案内が繰り返し出ていたのを解消）。"
 }
