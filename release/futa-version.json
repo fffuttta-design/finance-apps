@@ -1,6 +1,6 @@
 {
-    "version": "1.0.585",
-    "buildNumber": "586",
-    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.585/futa-finance-v1.0.585.apk",
-    "releaseNotes": "v1.0.585+586 支出タブの「家賃・税金を除外中」バッジを、白いカードの外ではなくカード内の右上に収めた。"
+    "version": "1.0.586",
+    "buildNumber": "587",
+    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.586/futa-finance-v1.0.586.apk",
+    "releaseNotes": "v1.0.586+587 「カテゴリ内訳」の見出しの右に合計金額を表示。何の内訳なのかが一目で分かるようにした（ホーム・支出タブ両方）。"
 }

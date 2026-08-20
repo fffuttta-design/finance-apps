@@ -924,8 +924,21 @@ class _CategoryCardState extends State<_CategoryCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('カテゴリ内訳',
-              style: V2Typography.h2.copyWith(color: V2Colors.textPrimary)),
+          // 見出しの右に合計金額を出す（何の内訳なのかを一目で分かるように）。
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text('カテゴリ内訳',
+                  style:
+                      V2Typography.h2.copyWith(color: V2Colors.textPrimary)),
+              const Spacer(),
+              Text(formatYen(total),
+                  style: V2Typography.h2.copyWith(
+                      color: V2Colors.textPrimary,
+                      fontFeatures: V2Typography.tabularNums)),
+            ],
+          ),
           const SizedBox(height: V2Spacing.md),
           if (segments.isEmpty || total == 0)
             Padding(

@@ -1130,6 +1130,8 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 Padding(
                   padding: const EdgeInsets.only(bottom: V2Spacing.sm),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
                     children: [
                       const Icon(Icons.donut_small_outlined,
                           size: 18, color: V2Colors.textSecondary),
@@ -1137,6 +1139,12 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                       Text('カテゴリ内訳',
                           style: V2Typography.h2
                               .copyWith(color: V2Colors.textPrimary)),
+                      const Spacer(),
+                      // 何の内訳かを一目で分かるよう、合計金額を右に添える。
+                      Text(formatYen(total),
+                          style: V2Typography.h2.copyWith(
+                              color: V2Colors.textPrimary,
+                              fontFeatures: V2Typography.tabularNums)),
                     ],
                   ),
                 ),
