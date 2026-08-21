@@ -136,9 +136,7 @@ class PushService {
           // OSが出す通知は AndroidManifest の default_notification_icon が使われる。
           icon: '@drawable/ic_stat_futa',
           color: const Color(0xFF2E65D7),
-          // 右側に「二村秘書」の犬ロゴ（外でも使っている本人アイコン）を出す。
-          // 背景/終了時はサーバ(FCM)の image フィールドで同じ犬ロゴが出る。
-          largeIcon: const DrawableResourceAndroidBitmap('hisho_logo'),
+          // 犬ロゴ(largeIcon)は本人要望で外した（2026-08-21）。小アイコン ic_stat_futa のみ。
         ),
       ),
     );
