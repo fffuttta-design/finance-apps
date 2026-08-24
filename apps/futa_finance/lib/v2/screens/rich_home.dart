@@ -344,6 +344,10 @@ class _RichHomeScreenState extends State<RichHomeScreen> with ModeAwareMixin {
       byMajor[major] = (byMajor[major] ?? 0) + t.effectiveAmount;
       (txnsByMajor[major] ??= []).add(t);
     }
+    // 内訳を開いたときの明細は日付の新しい順（降順）。登録順のままだと日付がばらつく。
+    for (final list in txnsByMajor.values) {
+      list.sort((a, b) => b.date.compareTo(a.date));
+    }
     // 固定費（サブスク）当月分の明細（名前・金額）。
     final fixedLines = <({String name, int amount})>[];
     {

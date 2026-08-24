@@ -907,6 +907,10 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
       byMajor[major] = (byMajor[major] ?? 0) + t.effectiveAmount;
       (txnsByMajor[major] ??= []).add(t);
     }
+    // 内訳を開いたときの明細は日付の新しい順（降順）。登録順のままだと日付がばらつく。
+    for (final list in txnsByMajor.values) {
+      list.sort((a, b) => b.date.compareTo(a.date));
+    }
     if (subTotal > 0) {
       byMajor['固定費・サブスク'] = (byMajor['固定費・サブスク'] ?? 0) + subTotal;
     }
@@ -922,6 +926,9 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
       byMajorNonConsum[major] =
           (byMajorNonConsum[major] ?? 0) + t.effectiveAmount;
       (txnsByMajorNonConsum[major] ??= []).add(t);
+    }
+    for (final list in txnsByMajorNonConsum.values) {
+      list.sort((a, b) => b.date.compareTo(a.date));
     }
     // 非消費固定費（サブスク）も非消費小計の内訳に「固定費・サブスク」として足す
     // （消費側と同じ扱い。ドリルダウンは nonConsumFixedLines で辿れる）。
