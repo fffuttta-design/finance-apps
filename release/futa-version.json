@@ -1,6 +1,6 @@
 {
-    "version": "1.0.589",
-    "buildNumber": "590",
-    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.589/futa-finance-v1.0.589.apk",
-    "releaseNotes": "v1.0.589+590 設定の各画面（バックアップ・表示設定など）が広い画面で端まで間延びしていたのを、ホーム/支出タブと同じ中央カラム（最大960px・センタリング）に統一した。"
+    "version": "1.0.591",
+    "buildNumber": "592",
+    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.591/futa-finance-v1.0.591.apk",
+    "releaseNotes": "v1.0.591+592 カテゴリ内訳を開いたときの明細が、日付の新しい順（降順）に並ぶようになった。ホーム・支出タブの両方。"
 }
