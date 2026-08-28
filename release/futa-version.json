@@ -1,6 +1,6 @@
 {
-    "version": "1.0.591",
-    "buildNumber": "592",
-    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.591/futa-finance-v1.0.591.apk",
-    "releaseNotes": "v1.0.591+592 カテゴリ内訳を開いたときの明細が、日付の新しい順（降順）に並ぶようになった。ホーム・支出タブの両方。"
+    "version": "1.0.592",
+    "buildNumber": "593",
+    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.592/futa-finance-v1.0.592.apk",
+    "releaseNotes": "v1.0.592+593 アプリを開くたびに裏で走っていた「逆モードの取引の丸ごと読み直し」をやめた。Firestoreの無料枠の消費が減り、枠切れで家計簿が開けなくなる事故が起きにくくなる。"
 }

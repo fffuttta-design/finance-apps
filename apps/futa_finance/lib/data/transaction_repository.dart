@@ -256,8 +256,15 @@ class FirestoreTransactionRepository implements TransactionRepository {
   Future<void> prefetch(String modeKey) async {
     if (_cache.containsKey(modeKey)) return; // 既に温まっていれば何もしない
     try {
-      final snap =
-          await _coll.where('mode', isEqualTo: modeKey).get();
+      // 🔥 ローカルキャッシュからだけ読む（v1.0.592・2026-08-28）。
+      //    これは「事業⇄個人の初回切替を速くする」ためだけの温め処理なのに、
+      //    既定の get() は**サーバーへ取りに行く**ので、アプリを起動するたびに
+      //    逆モードの取引を丸ごと課金対象で読み直していた（事業490件／個人762件）。
+      //    キャッシュが空（＝新しい端末・シークレット等）のときは温めを諦めるだけ＝
+      //    モード切替がひと呼吸もたつくが、データは listener が正しく届ける。
+      final snap = await _coll
+          .where('mode', isEqualTo: modeKey)
+          .get(const GetOptions(source: Source.cache));
       final minDate = _minDate(modeKey);
       final list = <Transaction>[];
       for (final d in snap.docs) {
