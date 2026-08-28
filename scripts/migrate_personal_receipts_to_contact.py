@@ -54,10 +54,10 @@ def main() -> None:
         raise SystemExit("FUTAFINANCE_UID が未設定です")
 
     # 1. 個人モードで receiptUrl を持つ取引を集める
-    coll = db.collection(f"users/{uid}/transactions")
+    # 🔥 `_client()` を直に叩かない（2026-08-28）。全期間を舐める必要がある道具なので all_docs だが、
+    #    ここを通せば読み取り数の計上と1日の上限にちゃんと乗る（直叩きは計上も上限もすり抜ける）。
     targets = []
-    for snap in coll.where("mode", "==", "personal").stream():
-        d = snap.to_dict() or {}
+    for snap_id, d in ff.all_docs("personal"):
         url = d.get("receiptUrl")
         fid = file_id_from_url(url) if url else None
         if not fid:
@@ -68,13 +68,13 @@ def main() -> None:
                 fileId=fid, fields="id,name,owners(emailAddress),mimeType",
                 supportsAllDrives=True).execute()
         except Exception as e:  # noqa: BLE001
-            print(f"  [skip] 取得できず tx={snap.id} file={fid}: {e}")
+            print(f"  [skip] 取得できず tx={snap_id} file={fid}: {e}")
             continue
         owners = [o.get("emailAddress") for o in meta.get("owners", [])]
         if OLD_OWNER not in owners:
             continue  # すでに contact@ 所有＝移行不要
         targets.append({
-            "txId": snap.id, "fileId": fid, "name": meta.get("name"),
+            "txId": snap_id, "fileId": fid, "name": meta.get("name"),
             "date": d.get("date"), "store": d.get("store"),
             "amount": d.get("amount"), "owners": owners,
         })
