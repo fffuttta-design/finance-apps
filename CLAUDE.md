@@ -107,7 +107,7 @@ Android リリース(finance-apps)と完全分離しているため干渉しな�
 ```powershell
 # Claude が PowerShell ツールで直接実行（バックグラウンド推奨・数分かかる）
 $env:GH_TOKEN = (gh auth token)
-cd C:\dev\CoreBusinessTools\finance-apps\apps\futa_finance\desktop\Scripts
+cd C:\dev\CompanyOps\Application\finance-apps\apps\futa_finance\desktop\Scripts
 .\build_desktop.ps1 -Publish
 # → flutter build web → web-dist へコピー → electron-builder(NSIS) → latest.yml と
 #   FutaFinance-setup.exe を futafinance-desktop-releases の v<pubspec版> へ publish
@@ -255,7 +255,7 @@ git push origin main
 ## はるファイナンス（apps/haru_finance）
 
 たくはるファイナンスを複製し、はる 1 人用に共用機能を削除した個人家計簿アプリ。
-配色は水色ベース。Firebase は `takuharu-finance` を流用し、データは `users/{uid}` 配下に分離。
+配色は水色ベース。Firebase は `takuharu-finance` を流用し、データは `haru/{uid}` 配下に分離。
 仕様は `仕様書/はるファイナンス仕様書.md`。
 
 ### バージョン管理
@@ -283,10 +283,12 @@ git push origin main
 ```
 - 署名は `android/app/takuharu-release.jks`（alias `takuharu`）を流用。
   SHA-1 = `3C:53:51:C3:26:1E:B1:96:1D:F1:68:EC:45:8E:5D:86:0C:1A:87:3D`。
-- ⚠️ **要初期作業（takuharumika@gmail.com 権限）**: `com.haru.finance` を takuharu-finance
-  プロジェクトに Android アプリとして登録し上記 SHA-1 を登録するまで、Google ログインは動かない
-  （ビルドは takuharu の android 設定を暫定流用して通している）。登録後に正式な
-  `android/app/google-services.json` と `firebase_options.dart` の android 設定へ差し替える。
+- Firebase への `com.haru.finance` 登録・SHA-1 登録・正式な `google-services.json` /
+  `firebase_options.dart` への差し替えは **2026-08-01 に完了済み**（初版配信時）。
+- ⚠️ **画像（レシート・給与明細）の保存先はたくはると別**: たくはるは共有アカウントの
+  フォルダへフル `drive` スコープで書くが、はるは**本人のドライブ直下「はるファイナンス」**へ
+  `drive.file` スコープで書く（v1.0.6〜）。`drive_receipt_service.dart` を
+  たくはるからコピーして上書きしないこと。
 
 ## このドキュメント自体の更新
 

@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
-import '../data/account.dart';
-import '../data/account_repository.dart';
 import '../data/auth_service.dart';
 import '../data/categories.dart';
 import '../data/drive_receipt_service.dart';
@@ -49,8 +47,7 @@ class _Item {
 class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
   late DateTime _date;
   String? _payer;
-  String? _payment; // 支払元（本人が登録した口座から選ぶ・既定なし）
-  List<Account> _accounts = []; // 登録済みの口座/クレカ
+  String? _payment; // 支払元（設定の支払方法：既定はクレカ／現金）
   final _items = <_Item>[];
   late final TextEditingController _storeCtrl; // 店名（読み取り結果を編集できる）
   // レシート印字の合計（税込・OCR読取、手修正可）。外税レシートでは品目合計が
@@ -76,13 +73,6 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
     // 品目が読めなかった場合でも、編集できるよう空の1行を用意。
     if (_items.isEmpty) {
       _items.add(_Item('', 0, r.category));
-    }
-    // 登録済みの口座/クレカを読み込む（支払元の選択肢）。
-    final hid = HouseholdService.instance.householdId;
-    if (hid != null) {
-      AccountRepository.instance.loadAll(hid).then((a) {
-        if (mounted) setState(() => _accounts = a);
-      });
     }
   }
 
@@ -361,11 +351,7 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              if (_accounts.isNotEmpty)
-                                ..._accounts.map((a) => _payChip(a.name))
-                              else
-                                ...HouseholdService.instance.paymentMethods
-                                    .map(_payChip),
+                              for (final m in _paymentOptions()) _payChip(m),
                             ],
                           ),
                         ],
@@ -562,6 +548,16 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
         ],
       ),
     );
+  }
+
+  /// 支払元の選択肢。設定の支払方法（既定「クレカ」「現金」）を並べる。
+  /// 昔の記録が今は無い支払元（口座名など）で保存されていたら、その値も
+  /// 末尾に足して選択が外れないようにする。
+  List<String> _paymentOptions() {
+    final list = List<String>.of(HouseholdService.instance.paymentMethods);
+    final cur = _payment;
+    if (cur != null && cur.isNotEmpty && !list.contains(cur)) list.add(cur);
+    return list;
   }
 
   Widget _payChip(String name) {

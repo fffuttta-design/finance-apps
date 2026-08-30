@@ -28,8 +28,8 @@ class HouseholdService extends ChangeNotifier {
   /// {uid: 表示名}。本人 1 人だけ。名前を出す画面のために保持する。
   Map<String, String> memberNames = {};
 
-  /// 支払方法の一覧（現金/クレカ/PayPay 等）。users/{uid}.paymentMethods。
-  static const defaultPayments = ['現金', 'クレジットカード', '電子マネー', '銀行振込'];
+  /// 支払方法の一覧。既定は「クレカ」「現金」の2つだけ（設定画面で増減できる）。
+  static const defaultPayments = ['クレカ', '現金'];
   List<String> paymentMethods = List.of(defaultPayments);
 
   /// 変換マスタ（読み取り表記ゆれ辞書）。users/{uid}.replacements。

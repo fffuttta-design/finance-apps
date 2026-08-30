@@ -10,9 +10,24 @@ import '../widgets/settings_button.dart';
 import '../widgets/simple_pie_chart.dart';
 import 'category_trend_screen.dart';
 
-/// 分析：月別の収支推移（6ヶ月）と今月のカテゴリ内訳（自前描画・依存なし）。
-class AnalysisScreen extends StatelessWidget {
+/// 分析：月で見るか年で見るかを、上のボタンで切り替える（自前描画・依存なし）。
+///
+/// - 月で見る：直近6ヶ月の収支と、今月のカテゴリ内訳
+/// - 年で見る：その年の総収入・総支出・差引、12ヶ月の推移、年のカテゴリ内訳、
+///             そして記録し始めてからの累計（ためた合計）
+class AnalysisScreen extends StatefulWidget {
   const AnalysisScreen({super.key});
+
+  @override
+  State<AnalysisScreen> createState() => _AnalysisScreenState();
+}
+
+class _AnalysisScreenState extends State<AnalysisScreen> {
+  /// 年で見るモードかどうか（false なら月で見る）。
+  bool _yearly = false;
+
+  /// 年モードで表示している年。
+  int _year = DateTime.now().year;
 
   @override
   Widget build(BuildContext context) {
@@ -29,19 +44,12 @@ class AnalysisScreen extends StatelessWidget {
                 return ListView(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
                   children: [
-                    _sectionTitle('月別の収支（6ヶ月）'),
-                    const SizedBox(height: 8),
-                    _trendCard(all),
-                    const SizedBox(height: 20),
-                    _sectionTitle('今月の支出内訳'),
-                    const SizedBox(height: 8),
-                    _pieCard(all),
-                    const SizedBox(height: 12),
-                    _engelCard(all),
+                    _modeSwitch(),
                     const SizedBox(height: 16),
-                    _sectionTitle('カテゴリ別（タップで1年の推移）'),
-                    const SizedBox(height: 8),
-                    _categoryCard(context, all),
+                    if (_yearly)
+                      ..._yearlyBody(context, all)
+                    else
+                      ..._monthlyBody(context, all),
                   ],
                 );
               },
@@ -49,10 +57,262 @@ class AnalysisScreen extends StatelessWidget {
     );
   }
 
-  Widget _trendCard(List<core.Transaction> all) {
+  // ── 月で見る / 年で見る の切替 ──────────────────────────────
+
+  Widget _modeSwitch() => Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.pinkSoft, width: 1.2),
+        ),
+        child: Row(
+          children: [
+            _modeTab('月で見る', false),
+            _modeTab('年で見る', true),
+          ],
+        ),
+      );
+
+  Widget _modeTab(String label, bool yearly) {
+    final selected = _yearly == yearly;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _yearly = yearly),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? AppColors.pink : Colors.transparent,
+            borderRadius: BorderRadius.circular(13),
+          ),
+          child: Text(label,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: selected ? Colors.white : AppColors.textSub)),
+        ),
+      ),
+    );
+  }
+
+  // ── 月で見るモード ─────────────────────────────────────────
+
+  List<Widget> _monthlyBody(BuildContext context, List<core.Transaction> all) {
     final now = DateTime.now();
     final months =
         List.generate(6, (i) => DateTime(now.year, now.month - (5 - i)));
+    return [
+      _sectionTitle('月別の収支（6ヶ月）'),
+      const SizedBox(height: 8),
+      _trendCard(all, months),
+      const SizedBox(height: 20),
+      _sectionTitle('今月の支出内訳'),
+      const SizedBox(height: 8),
+      _pieCard(_byCat(all, now.year, now.month), '今月の支出はまだないよ'),
+      const SizedBox(height: 12),
+      _engelCard(all),
+      const SizedBox(height: 16),
+      _sectionTitle('カテゴリ別（タップで1年の推移）'),
+      const SizedBox(height: 8),
+      _categoryCard(context, _byCat(all, now.year, now.month), '今月の支出はまだないよ'),
+    ];
+  }
+
+  // ── 年で見るモード ─────────────────────────────────────────
+
+  List<Widget> _yearlyBody(BuildContext context, List<core.Transaction> all) {
+    var income = 0, expense = 0;
+    for (final t in all) {
+      if (t.date.year != _year) continue;
+      if (t.type == core.TransactionType.income) {
+        income += t.amount;
+      } else if (t.type == core.TransactionType.expense) {
+        expense += t.amount;
+      }
+    }
+    final months = List.generate(12, (i) => DateTime(_year, i + 1));
+    return [
+      _yearBar(),
+      const SizedBox(height: 12),
+      _yearSummaryCard(income, expense),
+      const SizedBox(height: 16),
+      _sectionTitle('これまでの累計'),
+      const SizedBox(height: 8),
+      _lifetimeCard(all),
+      const SizedBox(height: 20),
+      _sectionTitle('月別の収支（$_year年）'),
+      const SizedBox(height: 8),
+      _trendCard(all, months, compact: true),
+      const SizedBox(height: 20),
+      _sectionTitle('$_year年の支出内訳'),
+      const SizedBox(height: 8),
+      _pieCard(_byCat(all, _year, null), '$_year年の支出はまだないよ'),
+      const SizedBox(height: 16),
+      _sectionTitle('カテゴリ別（タップで1年の推移）'),
+      const SizedBox(height: 8),
+      _categoryCard(context, _byCat(all, _year, null), '$_year年の支出はまだないよ'),
+    ];
+  }
+
+  /// 年の切替バー。
+  Widget _yearBar() => Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+              icon: const Icon(Icons.chevron_left_rounded),
+              onPressed: () => setState(() => _year--)),
+          Text('$_year年',
+              style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.text)),
+          IconButton(
+              icon: const Icon(Icons.chevron_right_rounded),
+              onPressed: () => setState(() => _year++)),
+        ],
+      );
+
+  /// その年の「貯まった分（収入−支出）」と、1年の総収入・総支出。
+  Widget _yearSummaryCard(int income, int expense) {
+    final diff = income - expense;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF6FD0F5), Color(0xFF1E9FD9)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+              color: AppColors.pink.withValues(alpha: 0.3),
+              blurRadius: 18,
+              offset: const Offset(0, 8)),
+        ],
+      ),
+      child: Column(
+        children: [
+          Text('$_year年に貯まった分',
+              style: const TextStyle(color: Colors.white70, fontSize: 13)),
+          const SizedBox(height: 4),
+          Text('${diff >= 0 ? '+' : ''}${formatYen(diff)}',
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 34,
+                  fontWeight: FontWeight.w900)),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: _whiteStat('1年の収入', income)),
+              Container(width: 1, height: 34, color: Colors.white24),
+              Expanded(child: _whiteStat('1年の支出', expense)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _whiteStat(String label, int value) => Column(
+        children: [
+          Text(label,
+              style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          const SizedBox(height: 2),
+          Text(formatYen(value),
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800)),
+        ],
+      );
+
+  /// 記録し始めてからの累計（収入−支出）＝ためた合計。
+  Widget _lifetimeCard(List<core.Transaction> all) {
+    var income = 0, expense = 0;
+    DateTime? first;
+    for (final t in all) {
+      if (t.type == core.TransactionType.income) {
+        income += t.amount;
+      } else if (t.type == core.TransactionType.expense) {
+        expense += t.amount;
+      } else {
+        continue;
+      }
+      if (first == null || t.date.isBefore(first)) first = t.date;
+    }
+    final diff = income - expense;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.pinkSoft, width: 1.2),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.savings_rounded,
+                  size: 26, color: AppColors.pinkDark),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('ためた合計（収入−支出）',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.text)),
+                    Text(
+                        first == null
+                            ? '記録がまだないよ'
+                            : '${first.year}年${first.month}月から今まで',
+                        style: const TextStyle(
+                            fontSize: 11, color: AppColors.textSub)),
+                  ],
+                ),
+              ),
+              Text('${diff >= 0 ? '+' : ''}${formatYen(diff)}',
+                  style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: diff >= 0 ? AppColors.income : AppColors.expense)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: _smallStat('ぜんぶの収入', income, AppColors.income)),
+              Expanded(
+                  child: _smallStat('ぜんぶの支出', expense, AppColors.expense)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _smallStat(String label, int value, Color color) => Column(
+        children: [
+          Text(label,
+              style: const TextStyle(fontSize: 11, color: AppColors.textSub)),
+          const SizedBox(height: 2),
+          Text(formatYen(value),
+              style: TextStyle(
+                  fontSize: 15, fontWeight: FontWeight.w800, color: color)),
+        ],
+      );
+
+  // ── 収支の棒グラフ（月モードは6本・年モードは12本）──────────
+
+  /// 渡した月ぶんの収支を並べた棒グラフ。
+  /// [compact] は12ヶ月ぶんを1画面に収めるための細めの表示。
+  Widget _trendCard(List<core.Transaction> all, List<DateTime> months,
+      {bool compact = false}) {
     final exp = <int>[];
     final inc = <int>[];
     for (final m in months) {
@@ -87,7 +347,8 @@ class AnalysisScreen extends StatelessWidget {
               children: [
                 for (int i = 0; i < months.length; i++)
                   Expanded(
-                    child: _monthColumn(months[i], inc[i], exp[i], maxV),
+                    child: _monthColumn(
+                        months[i], inc[i], exp[i], maxV, compact),
                   ),
               ],
             ),
@@ -106,9 +367,11 @@ class AnalysisScreen extends StatelessWidget {
     );
   }
 
-  Widget _monthColumn(DateTime m, int income, int expense, int maxV) {
+  Widget _monthColumn(
+      DateTime m, int income, int expense, int maxV, bool compact) {
     const barArea = 96.0;
     double h(int v) => maxV == 0 ? 0 : (v / maxV) * barArea;
+    final barWidth = compact ? 6.0 : 11.0;
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
@@ -116,21 +379,22 @@ class AnalysisScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            _bar(h(income), AppColors.income),
-            const SizedBox(width: 3),
-            _bar(h(expense), AppColors.expense),
+            _bar(h(income), AppColors.income, barWidth),
+            SizedBox(width: compact ? 2 : 3),
+            _bar(h(expense), AppColors.expense, barWidth),
           ],
         ),
         const SizedBox(height: 6),
         Text('${m.month}月',
-            style: const TextStyle(fontSize: 10, color: AppColors.textSub)),
+            style: TextStyle(
+                fontSize: compact ? 9 : 10, color: AppColors.textSub)),
       ],
     );
   }
 
-  Widget _bar(double height, Color color) {
+  Widget _bar(double height, Color color, double width) {
     return Container(
-      width: 11,
+      width: width,
       height: height < 2 && height > 0 ? 2 : height,
       decoration: BoxDecoration(
         color: color,
@@ -154,9 +418,10 @@ class AnalysisScreen extends StatelessWidget {
     );
   }
 
-  /// 今月の支出カテゴリ内訳（円グラフ）。
-  Widget _pieCard(List<core.Transaction> all) {
-    final entries = _thisMonthByCat(all);
+  // ── カテゴリ内訳（円グラフ／一覧）───────────────────────────
+
+  /// 支出カテゴリ内訳の円グラフ。
+  Widget _pieCard(List<MapEntry<String, int>> entries, String emptyText) {
     final total = entries.fold<int>(0, (s, e) => s + e.value);
     if (entries.isEmpty) {
       return Container(
@@ -167,14 +432,13 @@ class AnalysisScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: AppColors.pinkSoft, width: 1.2),
         ),
-        child: const Text('今月の支出はまだないよ',
-            style: TextStyle(color: AppColors.textSub, fontSize: 12)),
+        child: Text(emptyText,
+            style: const TextStyle(color: AppColors.textSub, fontSize: 12)),
       );
     }
     // 上位6カテゴリ＋残りを「その他」にまとめてスライス化。
     final top = entries.take(6).toList();
-    final restSum =
-        entries.skip(6).fold<int>(0, (s, e) => s + e.value);
+    final restSum = entries.skip(6).fold<int>(0, (s, e) => s + e.value);
     final slices = <PieSlice>[
       for (final e in top)
         PieSlice(e.key, e.value, categoryFor(e.key, income: false).color),
@@ -211,8 +475,7 @@ class AnalysisScreen extends StatelessWidget {
     );
   }
 
-  /// エンゲル係数カード（食料費 ÷ 支出合計）。
-  /// 食料費＝「食費」＋「外食」。
+  /// エンゲル係数カード（食料費 ÷ 支出合計）。食料費＝「食費」＋「外食」。
   Widget _engelCard(List<core.Transaction> all) {
     final now = DateTime.now();
     var food = 0, total = 0;
@@ -266,28 +529,29 @@ class AnalysisScreen extends StatelessWidget {
     );
   }
 
-  /// 今月のカテゴリ別支出を金額の多い順で返す。
-  List<MapEntry<String, int>> _thisMonthByCat(List<core.Transaction> all) {
-    final now = DateTime.now();
+  /// カテゴリ別支出を金額の多い順で返す。
+  /// [month] に null を渡すとその年ぜんぶ（＝年集計）。
+  List<MapEntry<String, int>> _byCat(
+      List<core.Transaction> all, int year, int? month) {
     final byCat = <String, int>{};
     for (final t in all) {
       if (t.type != core.TransactionType.expense) continue;
-      if (t.date.year != now.year || t.date.month != now.month) continue;
+      if (t.date.year != year) continue;
+      if (month != null && t.date.month != month) continue;
       byCat[t.category.major] = (byCat[t.category.major] ?? 0) + t.amount;
     }
-    return byCat.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
+    return byCat.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
   }
 
-  Widget _categoryCard(BuildContext context, List<core.Transaction> all) {
-    final entries = _thisMonthByCat(all);
+  Widget _categoryCard(BuildContext context,
+      List<MapEntry<String, int>> entries, String emptyText) {
     final total = entries.fold<int>(0, (s, e) => s + e.value);
     if (entries.isEmpty) {
       return Container(
         padding: const EdgeInsets.symmetric(vertical: 28),
         alignment: Alignment.center,
-        child: const Text('今月の支出はまだないよ',
-            style: TextStyle(color: AppColors.textSub, fontSize: 12)),
+        child: Text(emptyText,
+            style: const TextStyle(color: AppColors.textSub, fontSize: 12)),
       );
     }
     return Container(
@@ -305,16 +569,14 @@ class AnalysisScreen extends StatelessWidget {
     );
   }
 
-  Widget _catRow(
-      BuildContext context, String name, int amount, int total) {
+  Widget _catRow(BuildContext context, String name, int amount, int total) {
     final c = categoryFor(name, income: false);
     final ratio = total == 0 ? 0.0 : amount / total;
     final pct = (ratio * 100).round();
     return InkWell(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(
-            builder: (_) => CategoryTrendScreen(category: name)),
+        MaterialPageRoute(builder: (_) => CategoryTrendScreen(category: name)),
       ),
       borderRadius: BorderRadius.circular(12),
       child: Padding(

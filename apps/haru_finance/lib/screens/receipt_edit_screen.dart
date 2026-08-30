@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
-import '../data/account.dart';
-import '../data/account_repository.dart';
 import '../data/auth_service.dart';
 import '../data/categories.dart';
 import '../data/household_service.dart';
@@ -59,7 +57,6 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
   late DateTime _date;
   String? _payer;
   String? _payment;
-  List<Account> _accounts = [];
   final _items = <_EItem>[];
   bool _saving = false;
 
@@ -139,12 +136,6 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
     final fullTotal = widget.members.fold<int>(0, (s, m) => s + m.amount);
     _receiptTotalCtrl = TextEditingController(
         text: _adjTxId != null ? fullTotal.toString() : '');
-    final hid = HouseholdService.instance.householdId;
-    if (hid != null) {
-      AccountRepository.instance.loadAll(hid).then((a) {
-        if (mounted) setState(() => _accounts = a);
-      });
-    }
   }
 
   @override
@@ -491,11 +482,7 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              if (_accounts.isNotEmpty)
-                                ..._accounts.map((a) => _payChip(a.name))
-                              else
-                                ...HouseholdService.instance.paymentMethods
-                                    .map(_payChip),
+                              for (final m in _paymentOptions()) _payChip(m),
                             ],
                           ),
                         ],
@@ -692,6 +679,16 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
         ],
       ),
     );
+  }
+
+  /// 支払元の選択肢。設定の支払方法（既定「クレカ」「現金」）を並べる。
+  /// 昔の記録が今は無い支払元（口座名など）で保存されていたら、その値も
+  /// 末尾に足して選択が外れないようにする。
+  List<String> _paymentOptions() {
+    final list = List<String>.of(HouseholdService.instance.paymentMethods);
+    final cur = _payment;
+    if (cur != null && cur.isNotEmpty && !list.contains(cur)) list.add(cur);
+    return list;
   }
 
   Widget _payChip(String name) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../data/categories.dart';
+import '../data/drive_receipt_service.dart';
 import '../data/household_service.dart';
 import '../data/month_scope.dart';
 import '../data/tx_repository.dart';
@@ -9,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../widgets/settings_button.dart';
 import '../utils/format.dart';
 import 'add_transaction_screen.dart';
+import 'receipt_image_screen.dart';
 
 /// 収入タブ：月切替＋収入合計＋カテゴリ内訳＋収入一覧（可愛い系）。
 class IncomeScreen extends StatefulWidget {
@@ -227,6 +229,10 @@ class _IncomeScreenState extends State<IncomeScreen> {
   Widget _tile(core.Transaction t) {
     final c = categoryFor(t.category.major, income: true);
     final sub = '${t.date.month}/${t.date.day}　${t.category.major}';
+    final url = (t.receiptUrl ?? '').trim();
+    final hasImage = url.isNotEmpty;
+    // 画像を付けたのに保存できていない記録（昔の不具合ぶん）は、そう分かるようにする。
+    final imageLost = !hasImage && (t.receiptId ?? '').isNotEmpty;
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
@@ -244,14 +250,67 @@ class _IncomeScreenState extends State<IncomeScreen> {
             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
             maxLines: 1,
             overflow: TextOverflow.ellipsis),
-        subtitle: Text(sub,
-            style: const TextStyle(fontSize: 11, color: AppColors.textSub)),
+        subtitle: Row(
+          children: [
+            Flexible(
+              child: Text(sub,
+                  style:
+                      const TextStyle(fontSize: 11, color: AppColors.textSub),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ),
+            if (hasImage) ...[
+              const SizedBox(width: 6),
+              _badge('明細を見る', Icons.description_rounded, AppColors.income,
+                  () => _openImage(url)),
+            ] else if (imageLost) ...[
+              const SizedBox(width: 6),
+              _badge('明細をつけ直す', Icons.error_outline_rounded,
+                  AppColors.expense, () => _openAdd(t)),
+            ],
+          ],
+        ),
         trailing: Text('+${formatYen(t.amount)}',
             style: const TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 15,
                 color: AppColors.income)),
       ),
+    );
+  }
+
+  /// 一覧の中に出す小さなタップできる目印。
+  Widget _badge(String label, IconData icon, Color color, VoidCallback onTap) =>
+      GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 12, color: color),
+              const SizedBox(width: 3),
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: color)),
+            ],
+          ),
+        ),
+      );
+
+  /// 給与明細などの画像を、記録を開かずにそのまま表示する。
+  void _openImage(String url) {
+    final fileId = DriveReceiptService.fileIdFromUrl(url);
+    if (fileId == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ReceiptImageScreen(fileId: fileId)),
     );
   }
 

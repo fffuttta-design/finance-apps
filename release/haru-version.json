@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.5",
-    "buildNumber":  "6",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/haru-v1.0.5/haru-finance-v1.0.5.apk",
-    "releaseNotes":  "支出タブをピンクの配色にしました。"
+    "version": "1.0.6",
+    "buildNumber": "7",
+    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/haru-v1.0.6/haru-finance-v1.0.6.apk",
+    "releaseNotes": "支払元をクレカ／現金にしました。分析タブで「年で見る」ができるようになり、1年の収入・支出と、ためた合計が分かります。給与明細などの画像が保存できていなかった不具合も直しました。"
 }

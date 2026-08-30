@@ -8,8 +8,6 @@ import 'package:image_picker/image_picker.dart';
 
 import '../data/auth_service.dart';
 import '../data/categories.dart';
-import '../data/account.dart';
-import '../data/account_repository.dart';
 import '../data/drive_receipt_service.dart';
 import '../data/household_service.dart';
 import '../data/tx_repository.dart';
@@ -59,8 +57,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   late core.TransactionType _type;
   late DateTime _date;
   String? _category;
-  String? _payment; // 支払元（登録した口座/クレカの名前）
-  List<Account> _accounts = []; // 登録済みの口座/クレカ
+  String? _payment; // 支払元（設定の支払方法：既定はクレカ／現金）
   final _amountCtrl = TextEditingController();
   final _memoCtrl = TextEditingController();
   bool _saving = false;
@@ -70,11 +67,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   String? _receiptUrl; // Drive保存済みの閲覧URL（裏で付く）
   Uint8List? _attachPreview; // 今この画面で選んだ画像（即プレビュー用）
   bool _uploadingImage = false; // 裏のDrive保存中フラグ
+  /// 進行中のアップロード。保存ボタンはこれを待ってからURLを書き込む
+  /// （待たずに保存すると画像がどの記録にも紐づかず迷子になる）。
+  Future<String?>? _uploadTask;
+  String? _uploadError; // 直近のアップロード失敗理由（nullなら失敗なし）
 
   /// 手入力で付けた「くわしい情報」画像かどうか（receiptId の印で判定）。
   bool get _isDetailImage => (_receiptId ?? '').startsWith('detail_');
 
   bool get _isIncome => _type == core.TransactionType.income;
+
+  /// 添付画像の呼び名。収入は給与明細を貼ることが多いので言い方を変える。
+  String get _imageLabel => _isIncome ? '給与明細など（画像）' : 'くわしい情報（画像）';
 
   /// レシートの品目メモ（まとめて1件にぶら下がる内訳）。新規=initialMemo、編集=既存メモ。
   String? get _receiptMemo => widget.initialMemo ?? widget.editing?.memo;
@@ -112,13 +116,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           (widget.initialReceiptId != null
               ? DriveReceiptService.instance.urlFor(widget.initialReceiptId!)
               : null);
-    }
-    // 登録済みの口座/クレカを読み込む（支払元の選択肢）。
-    final hid = HouseholdService.instance.householdId;
-    if (hid != null) {
-      AccountRepository.instance.loadAll(hid).then((a) {
-        if (mounted) setState(() => _accounts = a);
-      });
     }
   }
 
@@ -175,6 +172,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       return;
     }
     setState(() => _saving = true);
+    // 画像の保存が終わるのを待つ。ここを待たずに保存すると、あとから付く
+    // URLがどの記録にも紐づかず「添付したのに見られない」状態になる。
+    if (!await _waitForImageUpload()) {
+      if (mounted) setState(() => _saving = false);
+      return;
+    }
     final tx = core.Transaction(
       id: widget.editing?.id ??
           DateTime.now().microsecondsSinceEpoch.toString(),
@@ -232,10 +235,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _receiptUrl = null;
       _attachPreview = imgBytes;
       _uploadingImage = true;
+      _uploadError = null;
     });
+    _startUpload(receiptId, imgBytes);
+  }
 
+  /// 画像をドライブへ保存する処理を開始し、その Future を保持する。
+  /// （保存ボタンはこの Future を待ってから記録を書き込む）
+  void _startUpload(String receiptId, Uint8List imgBytes) {
     final hid = HouseholdService.instance.householdId;
-    unawaited(() async {
+    final task = () async {
       final url = await DriveReceiptService.instance
           .uploadReceiptImage(bytes: imgBytes, date: _date);
       if (url != null) {
@@ -249,10 +258,82 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       if (mounted) {
         setState(() {
           if (url != null) _receiptUrl = url;
+          _uploadError =
+              url == null ? (DriveReceiptService.instance.lastError ?? '') : null;
           _uploadingImage = false;
         });
       }
-    }());
+      return url;
+    }();
+    _uploadTask = task;
+    unawaited(task);
+  }
+
+  /// 画像の保存待ち。保存してよければ true、やめるなら false を返す。
+  /// 失敗したときは理由を見せて「もう一度」か「画像なしで保存」を選んでもらう。
+  Future<bool> _waitForImageUpload() async {
+    final task = _uploadTask;
+    if (task == null || (_receiptUrl ?? '').isNotEmpty) return true;
+    final url = await task;
+    if (url != null) {
+      _receiptUrl = url;
+      return true;
+    }
+    if (!mounted) return false;
+    final retry = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: const Text('画像を保存できませんでした'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'ドライブへの保存に失敗しました。'
+              'もう一度ためすか、画像なしで記録できます。',
+              style: TextStyle(fontSize: 13, height: 1.5),
+            ),
+            if ((_uploadError ?? '').isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(_uploadError!,
+                  style: const TextStyle(
+                      fontSize: 11, color: AppColors.textSub, height: 1.4)),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dctx, false),
+              child: const Text('画像なしで保存')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dctx, true),
+              child: const Text('もう一度ためす')),
+        ],
+      ),
+    );
+    if (retry == true) {
+      final bytes = _attachPreview;
+      final rid = _receiptId;
+      if (bytes != null && rid != null) {
+        setState(() {
+          _uploadingImage = true;
+          _uploadError = null;
+        });
+        _startUpload(rid, bytes);
+        return _waitForImageUpload();
+      }
+      return false;
+    }
+    if (retry == null) return false; // ダイアログを閉じただけ＝保存もやめる
+    // 画像なしで保存：迷子の参照を残さないよう画像の紐づけを外す。
+    setState(() {
+      _receiptId = null;
+      _receiptUrl = null;
+      _attachPreview = null;
+      _uploadTask = null;
+      _uploadError = null;
+    });
+    return true;
   }
 
   void _removeDetailImage() {
@@ -261,6 +342,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _receiptUrl = null;
       _attachPreview = null;
       _uploadingImage = false;
+      _uploadTask = null;
+      _uploadError = null;
     });
   }
 
@@ -485,16 +568,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (_accounts.isNotEmpty)
-                  ..._accounts.map((a) => _payChip(a.name, a.name))
-                else
-                  ...HouseholdService.instance.paymentMethods
-                      .map((m) => _payChip(m, m)),
+                for (final m in _paymentOptions()) _payChip(m, m),
               ],
             ),
             const SizedBox(height: 18),
-            // くわしい情報（画像）
-            _section('くわしい情報（画像）'),
+            // くわしい情報（画像）／収入なら給与明細
+            _section(_imageLabel),
             _detailImageSection(),
             const SizedBox(height: 28),
             FilledButton(
@@ -633,6 +712,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     if (mounted) setState(() => _category = name);
   }
 
+  /// 支払元の選択肢。設定の支払方法（既定「クレカ」「現金」）を並べる。
+  /// 昔の記録が今は無い支払元（口座名など）で保存されていたら、その値も
+  /// 末尾に足して選択が外れないようにする。
+  List<String> _paymentOptions() {
+    final list = List<String>.of(HouseholdService.instance.paymentMethods);
+    final cur = _payment;
+    if (cur != null && cur.isNotEmpty && !list.contains(cur)) list.add(cur);
+    return list;
+  }
+
   Widget _payChip(String? value, String label) {
     final selected = _payment == value;
     return GestureDetector(
@@ -734,8 +823,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       const Text('保存中…',
                           style: TextStyle(
                               fontSize: 12, color: AppColors.textSub)),
-                    ] else
-                      const Text('画像を添付しました',
+                    ] else if (_uploadError != null)
+                      const Expanded(
+                        child: Text('保存できませんでした（記録すると出し直せます）',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.expense)),
+                      )
+                    else
+                      const Text('画像を保存しました',
                           style: TextStyle(
                               fontSize: 13, fontWeight: FontWeight.w700)),
                   ],
@@ -747,7 +844,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                         _receiptUrl != null &&
                         _receiptUrl!.isNotEmpty) ...[
                       _smallTextButton(
-                          _isDetailImage ? 'くわしい情報を見る' : 'レシートを見る',
+                          !_isDetailImage
+                              ? 'レシートを見る'
+                              : (_isIncome ? '明細を見る' : 'くわしい情報を見る'),
                           Icons.visibility_outlined, _viewDetailImage),
                       const SizedBox(width: 4),
                     ],
