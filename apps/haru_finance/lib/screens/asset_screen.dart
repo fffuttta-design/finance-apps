@@ -11,9 +11,11 @@ import '../utils/format.dart';
 import '../widgets/settings_button.dart';
 import 'accounts_screen.dart';
 
-/// 資産タブ：登録した各口座の「今の残高」と、
-/// 選択中の月（全タブ共通）の入出金の動きを表示する。
-/// 口座は初期登録せず、本人が「口座・残高を編集」から自由に追加する。
+/// 資産タブ：**ためた合計**（記録し始めてからの 収入−支出）を主役にした画面。
+///
+/// 口座ごとの残高管理は使っていないので、口座を登録していないときは
+/// 「ためた合計」と「その月の動き」だけを見せる。口座を登録した場合だけ、
+/// 下に口座ごとの残高カードが並ぶ（口座名＝取引の支払元 で集計）。
 class AssetScreen extends StatefulWidget {
   const AssetScreen({super.key});
 
@@ -91,24 +93,58 @@ class _AssetScreenState extends State<AssetScreen> {
   }
 
   Widget _body(List<Account> accounts, List<core.Transaction> txns) {
-    // 資産＝クレカ以外（銀行/現金/電子マネー）。クレカは負債なので除く。
+    // 口座を登録しているなら、その初期残高も「手元のお金」として足す。
+    // クレカは負債なので資産の合計からは除く。
     final assets =
         accounts.where((a) => a.type != AccountType.card && a.active).toList()
           ..sort((a, b) => a.name.compareTo(b.name));
-    final balances = {for (final a in assets) a.id: a.balanceFrom(txns)};
-    final total = balances.values.fold<int>(0, (s, b) => s + b);
+    final seed = assets.fold<int>(0, (s, a) => s + a.initialBalance);
+
+    // 記録し始めてからの累計。
+    var income = 0, expense = 0;
+    DateTime? first;
+    for (final t in txns) {
+      if (t.type == core.TransactionType.income) {
+        income += t.amount;
+      } else if (t.type == core.TransactionType.expense) {
+        expense += t.amount;
+      } else {
+        continue;
+      }
+      if (first == null || t.date.isBefore(first)) first = t.date;
+    }
+
+    // 選択中の月の動き（日付の新しい順）。
+    final moves = txns.where(_inMonth).where((t) {
+      return t.type == core.TransactionType.income ||
+          t.type == core.TransactionType.expense;
+    }).toList()
+      ..sort((a, b) {
+        final c = b.date.compareTo(a.date);
+        if (c != 0) return c;
+        return b.id.compareTo(a.id);
+      });
+    final mIncome = moves
+        .where((t) => t.type == core.TransactionType.income)
+        .fold<int>(0, (s, t) => s + t.amount);
+    final mExpense = moves
+        .where((t) => t.type == core.TransactionType.expense)
+        .fold<int>(0, (s, t) => s + t.amount);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
       children: [
+        _totalCard(seed + income - expense, income, expense, first),
+        const SizedBox(height: 18),
         _monthBar(),
-        const SizedBox(height: 12),
-        _totalCard(total),
-        const SizedBox(height: 16),
-        if (assets.isEmpty)
-          _empty()
-        else
-          ...assets.map((a) => _assetCard(a, balances[a.id] ?? 0, txns)),
+        const SizedBox(height: 8),
+        _monthCard(moves, mIncome, mExpense),
+        if (assets.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          _sectionTitle('口座の残高'),
+          const SizedBox(height: 8),
+          ...assets.map((a) => _assetCard(a, a.balanceFrom(txns), txns)),
+        ],
       ],
     );
   }
@@ -130,7 +166,9 @@ class _AssetScreenState extends State<AssetScreen> {
         ],
       );
 
-  Widget _totalCard(int total) => Container(
+  /// 主役のカード：ためた合計（記録開始からの 収入−支出）。
+  Widget _totalCard(int total, int income, int expense, DateTime? first) =>
+      Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
@@ -148,7 +186,7 @@ class _AssetScreenState extends State<AssetScreen> {
         ),
         child: Column(
           children: [
-            const Text('総資産',
+            const Text('ためた合計',
                 style: TextStyle(color: Colors.white70, fontSize: 13)),
             const SizedBox(height: 4),
             Text(formatYen(total),
@@ -156,13 +194,97 @@ class _AssetScreenState extends State<AssetScreen> {
                     color: Colors.white,
                     fontSize: 34,
                     fontWeight: FontWeight.w900)),
+            const SizedBox(height: 4),
+            Text(
+                first == null
+                    ? '記録がまだないよ'
+                    : '${first.year}年${first.month}月から今までの 収入 − 支出',
+                style: const TextStyle(color: Colors.white70, fontSize: 11)),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(child: _whiteStat('ぜんぶの収入', income)),
+                Container(width: 1, height: 34, color: Colors.white24),
+                Expanded(child: _whiteStat('ぜんぶの支出', expense)),
+              ],
+            ),
           ],
         ),
       );
 
+  Widget _whiteStat(String label, int value) => Column(
+        children: [
+          Text(label,
+              style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          const SizedBox(height: 2),
+          Text(formatYen(value),
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800)),
+        ],
+      );
+
+  /// 選択中の月の動き（入金・出金・差引＋明細）。
+  Widget _monthCard(List<core.Transaction> moves, int income, int expense) {
+    final diff = income - expense;
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text('${_month.month}月に増えた分',
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w700)),
+                ),
+                Text('${diff >= 0 ? '+' : ''}${formatYen(diff)}',
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color:
+                            diff >= 0 ? AppColors.income : AppColors.expense)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _sumChip(
+                      '${_month.month}月の入金', income, AppColors.income, '+'),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _sumChip(
+                      '${_month.month}月の出金', expense, AppColors.expense, '-'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Divider(height: 18),
+            if (moves.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 10),
+                child: Center(
+                  child: Text('この月の動きはまだないよ',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSub)),
+                ),
+              )
+            else
+              ...moves.map(_moveRow),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// 1口座ぶんのカード：残高＋今月の入出金サマリー＋その月の明細。
+  /// 口座を登録したときだけ出る（口座名＝取引の支払元 で集計）。
   Widget _assetCard(Account a, int balance, List<core.Transaction> allTxns) {
-    // この口座の当月の動き（支払元名の一致で判定）。日付の新しい順。
     final moves = allTxns
         .where((t) => t.paymentMethod == a.name && _inMonth(t))
         .toList()
@@ -219,7 +341,6 @@ class _AssetScreenState extends State<AssetScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            // 今月の入出金サマリー
             Row(
               children: [
                 Expanded(
@@ -235,14 +356,12 @@ class _AssetScreenState extends State<AssetScreen> {
             ),
             const SizedBox(height: 6),
             const Divider(height: 18),
-            // その月の明細
             if (moves.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 10),
                 child: Center(
                   child: Text('この月の動きはまだないよ',
-                      style:
-                          TextStyle(fontSize: 12, color: AppColors.textSub)),
+                      style: TextStyle(fontSize: 12, color: AppColors.textSub)),
                 ),
               )
             else
@@ -286,8 +405,8 @@ class _AssetScreenState extends State<AssetScreen> {
           SizedBox(
             width: 42,
             child: Text('${t.date.month}/${t.date.day}',
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSub)),
+                style:
+                    const TextStyle(fontSize: 12, color: AppColors.textSub)),
           ),
           Expanded(
             child: Text(title,
@@ -305,24 +424,12 @@ class _AssetScreenState extends State<AssetScreen> {
     );
   }
 
-  Widget _empty() => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 40),
-        child: Column(
-          children: [
-            const Icon(Icons.account_balance_wallet_rounded,
-                size: 48, color: Color(0xFFB6E1F5)),
-            const SizedBox(height: 10),
-            const Text('資産口座がまだないよ',
-                style: TextStyle(color: AppColors.textSub, fontSize: 13)),
-            const SizedBox(height: 4),
-            TextButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AccountsScreen()),
-              ),
-              child: const Text('口座を追加する'),
-            ),
-          ],
-        ),
+  Widget _sectionTitle(String t) => Padding(
+        padding: const EdgeInsets.only(left: 4),
+        child: Text(t,
+            style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: AppColors.text)),
       );
 }

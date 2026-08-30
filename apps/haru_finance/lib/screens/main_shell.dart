@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../data/account_repository.dart';
 import '../data/household_service.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
@@ -35,6 +36,34 @@ class _MainShellState extends State<MainShell>
     scheduleStartupUpdateCheck();
     // 過去の「消費税・調整／値引き・調整」のカテゴリ直し（一度きり・裏で静かに）。
     _repairAdjustmentCategoriesOnce();
+    // 支払元を「クレカ」に寄せ、初期に自動作成された口座を消す（一度きり）。
+    _migratePaymentAndSeedAccountsOnce();
+  }
+
+  /// v1.0.6 の後片づけ（端末ごとに一度だけ・裏で静かに）。
+  ///
+  /// - 支払元が、初期に自動作成された口座名（ワンバンク / UFJ銀行）のままの
+  ///   記録を「クレカ」に付け替える。
+  /// - その自動作成された口座（id が seed_ で始まるもの）を削除する。
+  ///   資産タブは v1.0.6 から口座ではなく「ためた合計」を主役にしたので、
+  ///   使っていない口座が残っていると総額が合わなくなるため。
+  Future<void> _migratePaymentAndSeedAccountsOnce() async {
+    const key = 'haru.pay_migrated.v1'; // gitleaks:allow（保存済みフラグ名）
+    const seedNames = ['ワンバンク', 'UFJ銀行'];
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool(key) == true) return;
+      final hid = HouseholdService.instance.householdId;
+      if (hid == null) return;
+      await TxRepository.instance
+          .replacePaymentMethod(hid, seedNames, 'クレカ');
+      for (final a in await AccountRepository.instance.loadAll(hid)) {
+        if (a.id.startsWith('seed_')) {
+          await AccountRepository.instance.delete(hid, a.id);
+        }
+      }
+      await prefs.setBool(key, true);
+    } catch (_) {/* 次の起動で再挑戦 */}
   }
 
   /// 差額調整の行が「その他」で入っていた過去分を、そのレシートの主なカテゴリへ

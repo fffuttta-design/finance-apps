@@ -156,6 +156,26 @@ class TxRepository {
     return fixed;
   }
 
+  /// 昔の記録の支払元を付け替える（一度きりの直し用）。
+  /// v1.0.6 で支払元が「登録口座の名前」から「設定の支払方法（クレカ/現金）」に
+  /// 変わったので、初期に自動作成された口座名で保存されていた記録を移し替える。
+  /// 戻り値は直した件数。金額・日付・品名・カテゴリは変更しない。
+  Future<int> replacePaymentMethod(
+      String hid, List<String> from, String to) async {
+    if (from.isEmpty) return 0;
+    final snap =
+        await _coll(hid).where('paymentMethod', whereIn: from).get();
+    var fixed = 0;
+    for (final d in snap.docs) {
+      await d.reference.set({
+        'paymentMethod': to,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      fixed++;
+    }
+    return fixed;
+  }
+
   /// 指定の receiptId 群のうち、既に存在するものを返す（固定費の二重記録防止）。
   Future<Set<String>> existingReceiptIds(
       String hid, List<String> ids) async {
