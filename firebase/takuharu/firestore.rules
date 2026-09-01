@@ -140,6 +140,15 @@ service cloud.firestore {
             && request.auth.uid in parentMembers();
       }
 
+      // 世帯配下の特別支出（旅行・引っ越しなど、支出を束ねる箱）
+      match /special_expenses/{seId} {
+        function parentMembers() {
+          return get(/databases/$(database)/documents/households/$(hid)).data.members;
+        }
+        allow read, write: if isAllowed()
+            && request.auth.uid in parentMembers();
+      }
+
       // 世帯配下の口座・クレカ（残高管理）
       match /accounts/{accountId} {
         function parentMembers() {

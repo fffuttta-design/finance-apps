@@ -14,6 +14,12 @@ class TxRepository {
       _db.collection('households/$hid/transactions');
 
   /// 取引のリアルタイム購読（日付の新しい順）。
+  ///
+  /// 🔥 **予定（isPending=true）はここに流さない。**
+  /// 予定＝特別支出（旅行など）で「予約済みだがまだ払っていない」金額。
+  /// まだ財布から出ていないので、月の支出・予算・分析・カレンダーに混ぜると
+  /// 使ってもいない金額で予算が溢れて見える。予定を見せるのは特別支出の画面だけ
+  /// （そちらは watchBySpecialExpense で別に引く）。
   Stream<List<core.Transaction>> watch(String hid) {
     return _coll(hid)
         .orderBy('date', descending: true)
@@ -22,7 +28,10 @@ class TxRepository {
       final list = <core.Transaction>[];
       for (final d in snap.docs) {
         try {
-          list.add(core.Transaction.fromJson(Map<String, dynamic>.from(d.data())));
+          final t =
+              core.Transaction.fromJson(Map<String, dynamic>.from(d.data()));
+          if (t.isPending) continue;
+          list.add(t);
         } catch (_) {}
       }
       return list;
@@ -104,6 +113,76 @@ class TxRepository {
     // id は登録時刻ベースなので、id 昇順で並びを安定させる。
     list.sort((a, b) => a.id.compareTo(b.id));
     return list;
+  }
+
+  /// 指定の特別支出にぶら下がる取引を購読する（日付の古い順）。
+  /// 月をまたいでも1つの箱として見たいので、月ではなく箱で引く。
+  Stream<List<core.Transaction>> watchBySpecialExpense(
+      String hid, String specialExpenseId) {
+    return _coll(hid)
+        .where('specialExpenseId', isEqualTo: specialExpenseId)
+        .snapshots()
+        .map((snap) {
+      final list = <core.Transaction>[];
+      for (final d in snap.docs) {
+        try {
+          list.add(
+              core.Transaction.fromJson(Map<String, dynamic>.from(d.data())));
+        } catch (_) {}
+      }
+      list.sort((a, b) => a.date.compareTo(b.date));
+      return list;
+    });
+  }
+
+  /// 特別支出にぶら下がる取引を一度だけ取得する（ホームのカード表示用）。
+  Future<List<core.Transaction>> listBySpecialExpense(
+      String hid, String specialExpenseId) async {
+    final list = <core.Transaction>[];
+    try {
+      final snap = await _coll(hid)
+          .where('specialExpenseId', isEqualTo: specialExpenseId)
+          .get();
+      for (final d in snap.docs) {
+        try {
+          list.add(
+              core.Transaction.fromJson(Map<String, dynamic>.from(d.data())));
+        } catch (_) {}
+      }
+    } catch (_) {}
+    list.sort((a, b) => a.date.compareTo(b.date));
+    return list;
+  }
+
+  /// 特別支出の「予定」をまとめて確定にする（当日まとめて払ったとき用）。
+  /// 金額・日付は変えず、予定フラグだけ落とす。戻り値は直した件数。
+  Future<int> confirmPendingOfSpecialExpense(
+      String hid, String specialExpenseId) async {
+    final snap = await _coll(hid)
+        .where('specialExpenseId', isEqualTo: specialExpenseId)
+        .where('isPending', isEqualTo: true)
+        .get();
+    if (snap.docs.isEmpty) return 0;
+    final batch = _db.batch();
+    for (final d in snap.docs) {
+      batch.set(d.reference, {'isPending': false}, SetOptions(merge: true));
+    }
+    await batch.commit();
+    return snap.docs.length;
+  }
+
+  /// 箱を消すときに、ぶら下がっていた取引から紐付けだけを外す（取引は残す）。
+  Future<void> detachSpecialExpense(String hid, String specialExpenseId) async {
+    final snap = await _coll(hid)
+        .where('specialExpenseId', isEqualTo: specialExpenseId)
+        .get();
+    if (snap.docs.isEmpty) return;
+    final batch = _db.batch();
+    for (final d in snap.docs) {
+      batch.set(d.reference, {'specialExpenseId': FieldValue.delete()},
+          SetOptions(merge: true));
+    }
+    await batch.commit();
   }
 
   /// 指定 receiptId の取引すべてに receiptUrl を後付けする（裏のDrive保存完了後）。

@@ -147,6 +147,10 @@ class Transaction {
   /// 水道レシートの代表1件（「水道料金」品目の取引）にだけ載せる。
   final UsageDetail? usage;
 
+  /// 特別支出（旅行・引っ越し等のまとまった出費）への参照ID。任意・後方互換。
+  /// 同じ特別支出に属する取引は同じIDを持ち、月をまたいでも1つの箱として集計・精算できる。
+  final String? specialExpenseId;
+
   const Transaction({
     required this.id,
     required this.date,
@@ -178,6 +182,7 @@ class Transaction {
     this.reimbursed,
     this.isFixed = false,
     this.usage,
+    this.specialExpenseId,
   });
 
   Map<String, dynamic> toJson() => {
@@ -211,6 +216,7 @@ class Transaction {
         if (reimbursed != null && reimbursed! > 0) 'reimbursed': reimbursed,
         if (isFixed) 'isFixed': isFixed,
         if (usage != null) 'usage': usage!.toJson(),
+        if (specialExpenseId != null) 'specialExpenseId': specialExpenseId,
       };
 
   factory Transaction.fromJson(Map<String, dynamic> j) => Transaction(
@@ -254,6 +260,7 @@ class Transaction {
         usage: j['usage'] != null
             ? UsageDetail.fromJson(Map<String, dynamic>.from(j['usage'] as Map))
             : null,
+        specialExpenseId: j['specialExpenseId'] as String?,
       );
 
   Transaction copyWith({
@@ -293,6 +300,9 @@ class Transaction {
     UsageDetail? usage,
     /// true にすると usage を null に戻す（使用量の解除）。
     bool clearUsage = false,
+    String? specialExpenseId,
+    /// true にすると specialExpenseId を null に戻す（特別支出から外す）。
+    bool clearSpecialExpenseId = false,
   }) =>
       Transaction(
         id: id,
@@ -325,5 +335,8 @@ class Transaction {
         reimbursed: clearReimbursed ? null : (reimbursed ?? this.reimbursed),
         isFixed: isFixed ?? this.isFixed,
         usage: clearUsage ? null : (usage ?? this.usage),
+        specialExpenseId: clearSpecialExpenseId
+            ? null
+            : (specialExpenseId ?? this.specialExpenseId),
       );
 }

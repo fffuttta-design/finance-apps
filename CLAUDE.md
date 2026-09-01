@@ -241,6 +241,25 @@ git push origin main
 - APK は `release/takuharu-version.json` の `downloadUrl` 経由でアプリが自動検知・OTA配信
 - ユーザーにスクリプト実行を頼まず、Claude が Bash で直接実行する
 
+### Firestore ルールの反映（Claudeが直接実行できる・2026-09-01 実証）
+
+たくはるの Firebase プロジェクト `takuharu-finance` の持ち主は **takuharumika@gmail.com** なので、
+`firebase deploy --only firestore:rules` は既定アカウント(contact@)だと 403 になり、
+`firebase login:add` の**対話ログインが要る**——というのが従来の手順だった。
+
+**サービスアカウントで Rules API を直接叩けば対話ログインは要らない。**
+`C:\dev\_secrets\takuharu-finance-sa.json`（Editor 相当）で:
+
+1. `POST https://firebaserules.googleapis.com/v1/projects/takuharu-finance/rulesets`
+   … `{"source":{"files":[{"name":"firestore.rules","content": <ルール本文>}]}}`
+2. `PATCH https://firebaserules.googleapis.com/v1/projects/takuharu-finance/releases/cloud.firestore`
+   … `{"release":{"name":"projects/takuharu-finance/releases/cloud.firestore","rulesetName": <1で返る name>}}`
+
+スコープは `cloud-platform`。**ルールを足したらこれで必ず反映まで済ませる**
+（反映を忘れると、新しいコレクションが permission-denied で黙って読めない）。
+
+---
+
 > ⚠️ **署名鍵の地雷（配信前に必ず確認）**: リリースAPKは `android/app/takuharu-release.jks`
 > （alias `takuharu`）で署名する。署名情報は **`android/key.properties`（gitignore・本番鍵のパスワード入り）**
 > から読む。**この key.properties が無い作業機で `flutter build apk --release` すると、build.gradle.kts が

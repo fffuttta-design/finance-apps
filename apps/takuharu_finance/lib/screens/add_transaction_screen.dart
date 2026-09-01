@@ -13,6 +13,8 @@ import '../data/account_repository.dart';
 import '../data/comment_repository.dart';
 import '../data/drive_receipt_service.dart';
 import '../data/household_service.dart';
+import '../data/special_expense.dart';
+import '../data/special_expense_repository.dart';
 import '../data/tx_diff.dart';
 import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
@@ -41,6 +43,9 @@ class AddTransactionScreen extends StatefulWidget {
   /// まとめて1件記録のとき、品目を「・品名 ¥金額」でこの記録にぶら下げる。
   final String? initialMemo;
 
+  /// 最初から紐付けておく特別支出のID（特別支出の画面から足すとき）。
+  final String? initialSpecialExpenseId;
+
   const AddTransactionScreen({
     super.key,
     this.editing,
@@ -52,6 +57,7 @@ class AddTransactionScreen extends StatefulWidget {
     this.initialReceiptId,
     this.initialReceiptUrl,
     this.initialMemo,
+    this.initialSpecialExpenseId,
   });
 
   @override
@@ -66,6 +72,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   String? _payment; // 支払元（登録した口座/クレカの名前）
   List<Account> _accounts = []; // 登録済みの口座/クレカ
   bool _personalFood = false; // この食費を個人わく（だれの分）から引くか
+  String? _specialExpenseId; // ひも付ける特別支出（旅行など）のID
+  List<SpecialExpense> _specials = const []; // 選べる特別支出（進行中のもの）
+  bool _isPending = false; // 予定（まだ払っていない）＝月の集計に入れない
   final _amountCtrl = TextEditingController();
   final _memoCtrl = TextEditingController();
   bool _saving = false;
@@ -118,6 +127,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _personalFood = e.personalFor == myUid;
       _receiptId = e.receiptId;
       _receiptUrl = e.receiptUrl;
+      _specialExpenseId = e.specialExpenseId;
+      _isPending = e.isPending;
     } else {
       _type = widget.initialType ?? core.TransactionType.expense;
       _date = widget.initialDate ?? DateTime.now();
@@ -145,7 +156,33 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       AccountRepository.instance.loadAll(hid).then((a) {
         if (mounted) setState(() => _accounts = a);
       });
+      _loadSpecials(hid);
     }
+  }
+
+  /// 進行中の特別支出を読み込む。新規記録のときは、日付が期間に入っている
+  /// ものを1つだけ自動で選んでおく（旅行中に開けば勝手に旅行へ入る）。
+  Future<void> _loadSpecials(String hid) async {
+    try {
+      final all = await SpecialExpenseRepository.instance.fetch(hid);
+      final open = all.where((e) => !e.settled).toList();
+      if (!mounted) return;
+      setState(() {
+        _specials = open;
+        if (_specialExpenseId == null && widget.editing == null) {
+          var suggested = widget.initialSpecialExpenseId;
+          if (suggested == null) {
+            for (final e in open) {
+              if (e.covers(_date)) {
+                suggested = e.id;
+                break;
+              }
+            }
+          }
+          _specialExpenseId = suggested;
+        }
+      });
+    } catch (_) {/* 選べないだけ。記録自体は続けられる */}
   }
 
   @override
@@ -232,6 +269,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           (_receiptId != null
               ? DriveReceiptService.instance.urlFor(_receiptId!)
               : null),
+      // 特別支出（旅行など）へのひも付けと、予定（未払い）フラグ。
+      specialExpenseId: _specialExpenseId,
+      isPending: _specialExpenseId != null && _isPending,
     );
     try {
       if (widget.editing != null) {
@@ -583,6 +623,24 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   _personChip(e.key, e.value),
               ],
             ),
+            // 特別支出（旅行・引っ越しなど）。支出のときだけ出す。
+            if (_type == core.TransactionType.expense &&
+                _specials.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              _section('特別支出'),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _specialChip(null, 'なし'),
+                  ..._specials.map((e) => _specialChip(e.id, e.name)),
+                ],
+              ),
+              if (_specialExpenseId != null) ...[
+                const SizedBox(height: 10),
+                _pendingToggle(),
+              ],
+            ],
             const SizedBox(height: 18),
             // くわしい情報（画像）。手入力でも写真を1枚ぶら下げられる。
             _section('くわしい情報（画像）'),
@@ -744,6 +802,88 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 fontSize: 13,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 color: AppColors.text)),
+      ),
+    );
+  }
+
+  /// 特別支出（旅行など）の選択チップ。null は「なし」。
+  Widget _specialChip(String? id, String label) {
+    final selected = _specialExpenseId == id;
+    return GestureDetector(
+      onTap: () => setState(() {
+        _specialExpenseId = id;
+        if (id == null) _isPending = false;
+      }),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color:
+              selected ? AppColors.pink.withValues(alpha: 0.18) : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected ? AppColors.pink : AppColors.divider,
+            width: selected ? 1.6 : 1,
+          ),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: AppColors.text)),
+      ),
+    );
+  }
+
+  /// 「予定（まだ払っていない）」トグル。
+  /// ONにすると月の支出・予算には入らず、特別支出の画面だけに見込みとして出る。
+  Widget _pendingToggle() {
+    return GestureDetector(
+      onTap: () => setState(() => _isPending = !_isPending),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: _isPending
+              ? AppColors.pink.withValues(alpha: 0.12)
+              : AppColors.pink.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: _isPending
+                ? AppColors.pink
+                : AppColors.pink.withValues(alpha: 0.45),
+            width: _isPending ? 1.8 : 1.4,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+                _isPending
+                    ? Icons.schedule_rounded
+                    : Icons.check_circle_outline_rounded,
+                size: 18,
+                color: AppColors.pinkDark),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('まだ払っていない（予定）',
+                      style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w700)),
+                  SizedBox(height: 2),
+                  Text('今月の支出・予算には入れず、特別支出の見込みとして数えます',
+                      style:
+                          TextStyle(fontSize: 11, color: AppColors.textSub)),
+                ],
+              ),
+            ),
+            Switch(
+              value: _isPending,
+              onChanged: (v) => setState(() => _isPending = v),
+            ),
+          ],
+        ),
       ),
     );
   }

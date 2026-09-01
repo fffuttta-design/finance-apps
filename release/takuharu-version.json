@@ -1,6 +1,6 @@
 {
-    "version":  "0.2.111",
-    "buildNumber":  "116",
-    "downloadUrl":  "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.111/takuharu-finance-v0.2.111.apk",
-    "releaseNotes":  "・パソコン（Web）で開いたときの画面を作り直しました。スマホ画面を横に引き伸ばしただけの間延びした見た目をやめ、左にメニュー、中央に見やすい幅で情報を2列に並べる形にしました。スマホでは今まで通りの表示です。"
+    "version": "0.2.112",
+    "buildNumber": "117",
+    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.112/takuharu-finance-v0.2.112.apk",
+    "releaseNotes": "・旅行やライブなど、日をまたぐまとまった出費を「特別支出」としてひとまとめにできるようになりました。合計と1人あたりの金額、どちらがいくら立て替えたか、差引だれがだれにいくら渡せば精算できるかが1画面で出ます。まだ払っていない予約分は「予定」として入れておけば、月の支出や予算には入らず、払った日にまとめて確定にできます。"
 }
