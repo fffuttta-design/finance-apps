@@ -5,66 +5,8 @@ import '../data/household_service.dart';
 import '../data/special_expense.dart';
 import '../data/special_expense_repository.dart';
 import '../theme/app_theme.dart';
+import '../widgets/settings_button.dart';
 import 'special_expense_detail_screen.dart';
-
-/// 特別支出（旅行・引っ越しなど）のホーム用カード。
-/// 進行中のものがあればその名前を、無ければ入口だけを出す。
-class SpecialExpenseSummaryCard extends StatelessWidget {
-  const SpecialExpenseSummaryCard({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final hid = HouseholdService.instance.householdId;
-    if (hid == null) return const SizedBox.shrink();
-    return StreamBuilder<List<SpecialExpense>>(
-      stream: SpecialExpenseRepository.instance.watch(hid),
-      builder: (context, snap) {
-        final all = snap.data ?? const <SpecialExpense>[];
-        final open = all.where((e) => !e.settled).toList();
-        final label = open.isEmpty
-            ? '旅行やイベントの出費をまとめる'
-            : (open.length == 1 ? open.first.name : '進行中 ${open.length}件');
-        return InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const SpecialExpensesScreen()),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.pinkSoft, width: 1.4),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.luggage_rounded,
-                    size: 20, color: AppColors.pink),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(label,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSub)),
-                ),
-                Text(open.isEmpty ? '作る' : '見る',
-                    style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.pinkDark)),
-                const Icon(Icons.chevron_right_rounded,
-                    color: AppColors.textSub),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
 
 /// 特別支出の一覧。進行中と、精算が済んだものを分けて出す。
 class SpecialExpensesScreen extends StatefulWidget {
@@ -100,7 +42,10 @@ class _SpecialExpensesScreenState extends State<SpecialExpensesScreen> {
     final hid = HouseholdService.instance.householdId;
     return Scaffold(
       backgroundColor: AppColors.bg,
-      appBar: AppBar(title: const Text('特別支出')),
+      appBar: AppBar(
+        title: const Text('特別支出'),
+        actions: const [SettingsButton()],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openEdit,
         icon: const Icon(Icons.add_rounded),

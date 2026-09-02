@@ -11,7 +11,6 @@ import '../utils/format.dart';
 import '../widgets/receipt_group.dart';
 import '../widgets/settings_button.dart';
 import 'record_menu.dart';
-import 'special_expenses_screen.dart';
 import 'subscriptions_screen.dart';
 import 'transaction_chat_screen.dart';
 
@@ -180,11 +179,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         _sectionTitle('固定費・サブスク'),
         const SizedBox(height: 8),
         const SubscriptionSummaryCard(),
-        const SizedBox(height: 16),
-        // 特別支出（旅行・引っ越しなど、日をまたぐまとまった出費）
-        _sectionTitle('特別支出'),
-        const SizedBox(height: 8),
-        const SpecialExpenseSummaryCard(),
         const SizedBox(height: 16),
         Row(
           children: [

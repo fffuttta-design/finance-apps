@@ -15,6 +15,7 @@ import 'expenses_screen.dart';
 import 'home_screen.dart';
 import 'income_screen.dart';
 import 'record_menu.dart';
+import 'special_expenses_screen.dart';
 
 /// ホーム・支出・収入・資産・分析を下部ナビで切り替えるメインシェル。
 class MainShell extends StatefulWidget {
@@ -96,10 +97,11 @@ class _MainShellState extends State<MainShell>
     }
   }
 
-  // 5タブの定義（下ナビ・サイドナビの両方で使う）。
+  // 6タブの定義（下ナビ・サイドナビの両方で使う）。
   static const _tabs = <_TabDef>[
     _TabDef('ホーム', Icons.home_outlined, Icons.home_rounded),
     _TabDef('支出', Icons.shopping_bag_outlined, Icons.shopping_bag_rounded),
+    _TabDef('特別', Icons.luggage_outlined, Icons.luggage_rounded),
     _TabDef('収入', Icons.savings_outlined, Icons.savings_rounded),
     _TabDef('資産', Icons.account_balance_outlined, Icons.account_balance_rounded),
     _TabDef('分析', Icons.bar_chart_outlined, Icons.bar_chart_rounded),
@@ -112,6 +114,7 @@ class _MainShellState extends State<MainShell>
           // ホームの「支出をすべて見る」から支出タブ(1)へ切替。
           _KeepAlivePage(child: HomeScreen(onOpenExpenses: () => _goTo(1))),
           const _KeepAlivePage(child: ExpensesScreen()),
+          const _KeepAlivePage(child: SpecialExpensesScreen()),
           const _KeepAlivePage(child: IncomeScreen()),
           const _KeepAlivePage(child: AssetScreen()),
           const _KeepAlivePage(child: AnalysisScreen()),
