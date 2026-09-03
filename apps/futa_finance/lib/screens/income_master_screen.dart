@@ -57,6 +57,8 @@ class _IncomeMasterScreenState extends State<IncomeMasterScreen> {
     IncomeCycle cycle = initial?.cycle ?? IncomeCycle.monthly;
 
     return showModalBottomSheet<IncomeSource?>(
+      // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+      constraints: const BoxConstraints(maxWidth: 560),
       context: context,
       isScrollControlled: true,
       useSafeArea: true,

@@ -322,6 +322,8 @@ class _TransferInputScreenState extends State<TransferInputScreen> {
     String firstValue() => choices.isNotEmpty ? choices.first.value : '現金';
 
     await showModalBottomSheet<void>(
+      // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+      constraints: const BoxConstraints(maxWidth: 560),
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,

@@ -30,6 +30,8 @@ Future<DateTime?> pickAdaptiveDate(
   // スマホ：従来のホイール（Cupertino）。
   DateTime temp = init;
   return showModalBottomSheet<DateTime>(
+    // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+    constraints: const BoxConstraints(maxWidth: 560),
     context: context,
     backgroundColor: Colors.white,
     shape: const RoundedRectangleBorder(

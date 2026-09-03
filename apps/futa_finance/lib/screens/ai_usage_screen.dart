@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/ai_usage_repository.dart';
 
+import '../widgets/centered_body.dart';
 /// Claude API の使用量（どのツールがいくら使ったか）を見る画面。
 ///
 /// 🔥 数字の出どころ
@@ -84,46 +85,50 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _load,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
-          children: [
-            _monthSwitcher(),
-            const SizedBox(height: 12),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 48),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else ...[
-              if (_error != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.shade200),
+      body: CenteredBody(
+        maxWidth: 900,
+        fill: true,
+        child: RefreshIndicator(
+          onRefresh: _load,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
+            children: [
+              _monthSwitcher(),
+              const SizedBox(height: 12),
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 48),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else ...[
+                if (_error != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.shade200),
+                    ),
+                    child: Text(_error!,
+                        style: TextStyle(
+                            fontSize: 11, color: Colors.orange.shade900)),
                   ),
-                  child: Text(_error!,
-                      style: TextStyle(
-                          fontSize: 11, color: Colors.orange.shade900)),
-                ),
+                  const SizedBox(height: 12),
+                ],
+                _summaryCard(),
                 const SizedBox(height: 12),
+                _appRankingCard(),
+                const SizedBox(height: 12),
+                _dailyHistoryCard(),
+                const SizedBox(height: 12),
+                _modelCard(),
+                const SizedBox(height: 12),
+                _purchaseCard(),
+                const SizedBox(height: 12),
+                _footnote(),
               ],
-              _summaryCard(),
-              const SizedBox(height: 12),
-              _appRankingCard(),
-              const SizedBox(height: 12),
-              _dailyHistoryCard(),
-              const SizedBox(height: 12),
-              _modelCard(),
-              const SizedBox(height: 12),
-              _purchaseCard(),
-              const SizedBox(height: 12),
-              _footnote(),
             ],
-          ],
+          ),
         ),
       ),
     );

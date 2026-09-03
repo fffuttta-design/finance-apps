@@ -73,6 +73,8 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
 
     // BottomSheet で編集フォーム表示（subscription_list と同じパターン）。
     final result = await showModalBottomSheet<RegisteredCreditCard?>(
+      // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+      constraints: const BoxConstraints(maxWidth: 560),
       context: context,
       isScrollControlled: true,
       useSafeArea: true,

@@ -16,6 +16,7 @@ import 'record_menu.dart';
 import 'calendar_screen.dart';
 import 'settings_screen.dart';
 
+import '../widgets/web_layout.dart';
 /// ホーム：月次サマリー＋カテゴリ内訳＋取引一覧（水色・シンプル）。
 class HomeScreen extends StatefulWidget {
   /// 「支出をすべて見る」タップで支出タブへ切替えるためのコールバック。
@@ -91,41 +92,46 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+      // 広い画面では、中央に寄せた本文の右端にボタンを合わせる。
+      floatingActionButtonLocation: const WebEndFloatFabLocation(),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openRecordMenu(),
         icon: const Icon(Icons.add_rounded),
         label: const Text('きろく',
             style: TextStyle(fontWeight: FontWeight.w700)),
       ),
-      body: hid == null
-          ? const Center(child: CircularProgressIndicator())
-          : StreamBuilder<List<core.Transaction>>(
-              stream: TxRepository.instance.watch(hid),
-              builder: (context, snap) {
-                if (snap.hasError) {
-                  final err = snap.error;
-                  final perm = err is FirebaseException &&
-                      err.code == 'permission-denied';
-                  return LoadErrorView(
-                    permissionError: perm,
-                    message: perm ? null : err.toString(),
-                    onRetry: () => setState(() {}),
-                  );
-                }
-                if (snap.connectionState == ConnectionState.waiting &&
-                    !snap.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final all = snap.data ?? const <core.Transaction>[];
-                final month = all.where(_inMonth).toList()
-                  ..sort((a, b) {
-                    final c = b.date.compareTo(a.date);
-                    if (c != 0) return c;
-                    return b.id.compareTo(a.id);
-                  });
-                return _body(month, month);
-              },
-            ),
+      body: WebCenterFill(
+        maxWidth: 1040,
+        child: hid == null
+            ? const Center(child: CircularProgressIndicator())
+            : StreamBuilder<List<core.Transaction>>(
+                stream: TxRepository.instance.watch(hid),
+                builder: (context, snap) {
+                  if (snap.hasError) {
+                    final err = snap.error;
+                    final perm = err is FirebaseException &&
+                        err.code == 'permission-denied';
+                    return LoadErrorView(
+                      permissionError: perm,
+                      message: perm ? null : err.toString(),
+                      onRetry: () => setState(() {}),
+                    );
+                  }
+                  if (snap.connectionState == ConnectionState.waiting &&
+                      !snap.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final all = snap.data ?? const <core.Transaction>[];
+                  final month = all.where(_inMonth).toList()
+                    ..sort((a, b) {
+                      final c = b.date.compareTo(a.date);
+                      if (c != 0) return c;
+                      return b.id.compareTo(a.id);
+                    });
+                  return _body(month, month);
+                },
+              ),
+      ),
     );
   }
 

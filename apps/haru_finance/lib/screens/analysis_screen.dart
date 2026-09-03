@@ -10,6 +10,7 @@ import '../widgets/settings_button.dart';
 import '../widgets/simple_pie_chart.dart';
 import 'category_trend_screen.dart';
 
+import '../widgets/web_layout.dart';
 /// 分析：月で見るか年で見るかを、上のボタンで切り替える（自前描画・依存なし）。
 ///
 /// - 月で見る：直近6ヶ月の収支と、今月のカテゴリ内訳
@@ -35,25 +36,28 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     return Scaffold(
       appBar: AppBar(
           title: const Text('分析'), actions: const [SettingsButton()]),
-      body: hid == null
-          ? const Center(child: CircularProgressIndicator())
-          : StreamBuilder<List<core.Transaction>>(
-              stream: TxRepository.instance.watch(hid),
-              builder: (context, snap) {
-                final all = snap.data ?? const <core.Transaction>[];
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                  children: [
-                    _modeSwitch(),
-                    const SizedBox(height: 16),
-                    if (_yearly)
-                      ..._yearlyBody(context, all)
-                    else
-                      ..._monthlyBody(context, all),
-                  ],
-                );
-              },
-            ),
+      body: WebCenterFill(
+        maxWidth: 1040,
+        child: hid == null
+            ? const Center(child: CircularProgressIndicator())
+            : StreamBuilder<List<core.Transaction>>(
+                stream: TxRepository.instance.watch(hid),
+                builder: (context, snap) {
+                  final all = snap.data ?? const <core.Transaction>[];
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                    children: [
+                      _modeSwitch(),
+                      const SizedBox(height: 16),
+                      if (_yearly)
+                        ..._yearlyBody(context, all)
+                      else
+                        ..._monthlyBody(context, all),
+                    ],
+                  );
+                },
+              ),
+      ),
     );
   }
 

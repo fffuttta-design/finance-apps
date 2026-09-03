@@ -13,6 +13,7 @@ import '../utils/format.dart';
 import 'receipt_edit_screen.dart';
 import 'receipt_image_screen.dart';
 
+import '../widgets/web_layout.dart';
 /// レシート1枚＝1画面の詳細。
 ///
 /// 上部にレシートの概要（店名・日付・支払元・合計・レシート画像）、その下に
@@ -92,7 +93,10 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
       },
       child: Scaffold(
         appBar: AppBar(title: const Text('レシート')),
-        body: SingleChildScrollView(child: _header()),
+        body: WebCenterFill(
+          maxWidth: 720,
+          child: SingleChildScrollView(child: _header()),
+        ),
       ),
     );
   }

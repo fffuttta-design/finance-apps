@@ -9,6 +9,7 @@ import '../utils/format.dart';
 import '../widgets/receipt_group.dart';
 import 'add_transaction_screen.dart';
 
+import '../widgets/web_layout.dart';
 /// 収支カレンダー：日ごとの支出/収入をカレンダー表示。日タップで明細。
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -39,39 +40,42 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final hid = HouseholdService.instance.householdId;
     return Scaffold(
       appBar: AppBar(title: const Text('カレンダー')),
-      body: hid == null
-          ? const Center(child: CircularProgressIndicator())
-          : StreamBuilder<List<core.Transaction>>(
-              stream: TxRepository.instance.watch(hid),
-              builder: (context, snap) {
-                final all = snap.data ?? const <core.Transaction>[];
-                final month = all
-                    .where((t) =>
-                        t.date.year == _month.year &&
-                        t.date.month == _month.month)
-                    .toList();
-                // 日 → 支出/収入
-                final exp = <int, int>{};
-                final inc = <int, int>{};
-                for (final t in month) {
-                  if (t.type == core.TransactionType.expense) {
-                    exp[t.date.day] = (exp[t.date.day] ?? 0) + t.amount;
-                  } else if (t.type == core.TransactionType.income) {
-                    inc[t.date.day] = (inc[t.date.day] ?? 0) + t.amount;
+      body: WebCenterFill(
+        maxWidth: 1040,
+        child: hid == null
+            ? const Center(child: CircularProgressIndicator())
+            : StreamBuilder<List<core.Transaction>>(
+                stream: TxRepository.instance.watch(hid),
+                builder: (context, snap) {
+                  final all = snap.data ?? const <core.Transaction>[];
+                  final month = all
+                      .where((t) =>
+                          t.date.year == _month.year &&
+                          t.date.month == _month.month)
+                      .toList();
+                  // 日 → 支出/収入
+                  final exp = <int, int>{};
+                  final inc = <int, int>{};
+                  for (final t in month) {
+                    if (t.type == core.TransactionType.expense) {
+                      exp[t.date.day] = (exp[t.date.day] ?? 0) + t.amount;
+                    } else if (t.type == core.TransactionType.income) {
+                      inc[t.date.day] = (inc[t.date.day] ?? 0) + t.amount;
+                    }
                   }
-                }
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
-                  children: [
-                    _monthBar(),
-                    const SizedBox(height: 8),
-                    _grid(exp, inc),
-                    const SizedBox(height: 16),
-                    if (_selected != null) _dayDetail(month),
-                  ],
-                );
-              },
-            ),
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+                    children: [
+                      _monthBar(),
+                      const SizedBox(height: 8),
+                      _grid(exp, inc),
+                      const SizedBox(height: 16),
+                      if (_selected != null) _dayDetail(month),
+                    ],
+                  );
+                },
+              ),
+      ),
     );
   }
 

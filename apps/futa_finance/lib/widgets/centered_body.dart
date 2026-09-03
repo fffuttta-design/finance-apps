@@ -11,21 +11,32 @@ class CenteredBody extends StatelessWidget {
     required this.child,
     this.maxWidth = 1000,
     this.breakpoint = 900,
+    this.fill = false,
   });
 
   final Widget child;
   final double maxWidth;
   final double breakpoint;
 
+  /// 高さを画面いっぱいのまま保つか。
+  ///
+  /// 既定（false）は縦にも中央寄せするので、中身が `Column`＋`Expanded` や
+  /// 「左レール＋右内容」のように**高さいっぱいを前提にした作り**だと崩れる。
+  /// そういう画面には `fill: true` を渡す＝横幅だけを抑え、高さは元のまま。
+  final bool fill;
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (ctx, constraints) {
         if (constraints.maxWidth < breakpoint) return child;
-        return Center(
+        return Align(
+          alignment: fill ? Alignment.topCenter : Alignment.center,
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxWidth),
-            child: child,
+            child: fill
+                ? SizedBox(height: double.infinity, child: child)
+                : child,
           ),
         );
       },

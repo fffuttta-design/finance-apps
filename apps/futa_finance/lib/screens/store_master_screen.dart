@@ -527,6 +527,8 @@ class _StoreMasterScreenState extends State<StoreMasterScreen> {
   Future<void> _moveToSection(String store) async {
     final current = _repo.sectionOf(store);
     final choice = await showModalBottomSheet<String>(
+      // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+      constraints: const BoxConstraints(maxWidth: 560),
       context: context,
       builder: (sctx) => SafeArea(
         child: Column(
@@ -598,6 +600,8 @@ class _StoreMasterScreenState extends State<StoreMasterScreen> {
       return a + signed;
     });
     await showModalBottomSheet<void>(
+      // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+      constraints: const BoxConstraints(maxWidth: 560),
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,

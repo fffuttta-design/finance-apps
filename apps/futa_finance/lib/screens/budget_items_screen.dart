@@ -5,6 +5,7 @@ import '../data/budget_item_repository.dart';
 import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
 
+import '../widgets/centered_body.dart';
 /// 税金・保険マスタ画面。
 ///
 /// 法人税・消費税・社会保険料などの「支払予定」を登録する。ここで登録した
@@ -34,16 +35,20 @@ class _BudgetItemsScreenState extends State<BudgetItemsScreen> {
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF111827))),
       ),
-      body: AnimatedBuilder(
-        animation: BudgetItemRepository.instance,
-        builder: (context, _) => FutureBuilder<BudgetItemsConfig>(
-          future: BudgetItemRepository.instance.load(),
-          builder: (context, snap) {
-            if (!snap.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            return _body(snap.data!);
-          },
+      body: CenteredBody(
+        maxWidth: 1000,
+        fill: true,
+        child: AnimatedBuilder(
+          animation: BudgetItemRepository.instance,
+          builder: (context, _) => FutureBuilder<BudgetItemsConfig>(
+            future: BudgetItemRepository.instance.load(),
+            builder: (context, snap) {
+              if (!snap.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              return _body(snap.data!);
+            },
+          ),
         ),
       ),
     );
@@ -284,6 +289,8 @@ class _BudgetItemsScreenState extends State<BudgetItemsScreen> {
     }
 
     await showModalBottomSheet<void>(
+      // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+      constraints: const BoxConstraints(maxWidth: 560),
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,

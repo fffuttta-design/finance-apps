@@ -25,6 +25,7 @@ import '../utils/thousands_separator_input_formatter.dart';
 import 'invoice_import_screen.dart';
 import 'paste_import_screen.dart';
 
+import '../widgets/centered_body.dart';
 /// 🧪 開発中ラボ（事業モード専用）
 ///
 /// PL/BS/予算管理など、まだ正式機能化していないプロトタイプを並べる場所。
@@ -108,12 +109,16 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
           ],
         ),
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _viewToggle(),
-            Expanded(child: _buildBody()),
-          ],
+      body: CenteredBody(
+        maxWidth: 1140,
+        fill: true,
+        child: SafeArea(
+          child: Column(
+            children: [
+              _viewToggle(),
+              Expanded(child: _buildBody()),
+            ],
+          ),
         ),
       ),
     );
@@ -2078,6 +2083,8 @@ class _DevLabScreenState extends State<DevLabScreen> with ModeAwareMixin {
     final scheduleItems = [...(initial?.schedule ?? <ScheduledPayment>[])];
 
     final saved = await showModalBottomSheet<BudgetItem?>(
+      // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+      constraints: const BoxConstraints(maxWidth: 560),
       context: context,
       isScrollControlled: true,
       useSafeArea: true,

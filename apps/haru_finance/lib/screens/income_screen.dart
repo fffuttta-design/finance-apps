@@ -12,6 +12,7 @@ import '../utils/format.dart';
 import 'add_transaction_screen.dart';
 import 'receipt_image_screen.dart';
 
+import '../widgets/web_layout.dart';
 /// 収入タブ：月切替＋収入合計＋カテゴリ内訳＋収入一覧（可愛い系）。
 class IncomeScreen extends StatefulWidget {
   const IncomeScreen({super.key});
@@ -70,6 +71,8 @@ class _IncomeScreenState extends State<IncomeScreen> {
         ),
         actions: const [SettingsButton()],
       ),
+      // 広い画面では、中央に寄せた本文の右端にボタンを合わせる。
+      floatingActionButtonLocation: const WebEndFloatFabLocation(),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openAdd(),
         backgroundColor: AppColors.income,
@@ -77,24 +80,27 @@ class _IncomeScreenState extends State<IncomeScreen> {
         label: const Text('収入をきろく',
             style: TextStyle(fontWeight: FontWeight.w700)),
       ),
-      body: hid == null
-          ? const Center(child: CircularProgressIndicator())
-          : StreamBuilder<List<core.Transaction>>(
-              stream: TxRepository.instance.watch(hid),
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting &&
-                    !snap.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final all = snap.data ?? const <core.Transaction>[];
-                final month = all
-                    .where((t) => t.type == core.TransactionType.income)
-                    .where(_inMonth)
-                    .toList()
-                  ..sort((a, b) => b.date.compareTo(a.date));
-                return _body(month);
-              },
-            ),
+      body: WebCenterFill(
+        maxWidth: 1040,
+        child: hid == null
+            ? const Center(child: CircularProgressIndicator())
+            : StreamBuilder<List<core.Transaction>>(
+                stream: TxRepository.instance.watch(hid),
+                builder: (context, snap) {
+                  if (snap.connectionState == ConnectionState.waiting &&
+                      !snap.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final all = snap.data ?? const <core.Transaction>[];
+                  final month = all
+                      .where((t) => t.type == core.TransactionType.income)
+                      .where(_inMonth)
+                      .toList()
+                    ..sort((a, b) => b.date.compareTo(a.date));
+                  return _body(month);
+                },
+              ),
+      ),
     );
   }
 

@@ -7,6 +7,7 @@ import '../data/app_mode.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 
+import '../widgets/centered_body.dart';
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
 
@@ -84,6 +85,8 @@ class _CalendarScreenState extends State<CalendarScreen> with ModeAwareMixin {
     if (txns.isEmpty) return;
     final date = DateTime(_focused.year, _focused.month, day);
     showModalBottomSheet<void>(
+      // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+      constraints: const BoxConstraints(maxWidth: 560),
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
@@ -139,14 +142,18 @@ class _CalendarScreenState extends State<CalendarScreen> with ModeAwareMixin {
               color: Color(0xFF111827)),
         ),
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _header(),
-            _weekdaysRow(),
-            Expanded(child: _grid()),
-            _monthSummary(),
-          ],
+      body: CenteredBody(
+        maxWidth: 1000,
+        fill: true,
+        child: SafeArea(
+          child: Column(
+            children: [
+              _header(),
+              _weekdaysRow(),
+              Expanded(child: _grid()),
+              _monthSummary(),
+            ],
+          ),
         ),
       ),
     );

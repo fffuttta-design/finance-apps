@@ -14,6 +14,8 @@ Future<String?> showDriveReceiptPicker(
   required bool isBusiness,
 }) {
   return showModalBottomSheet<String>(
+    // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+    constraints: const BoxConstraints(maxWidth: 560),
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.white,

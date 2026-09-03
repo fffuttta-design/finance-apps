@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/ui_preferences.dart';
 
+import '../widgets/centered_body.dart';
 /// サイドバー（広い画面の左ナビ）の並び順を編集する画面。
 /// ドラッグでアイテムを並び替え → UiPreferences に永続化。
 /// 並び順は root_screen の _SideNav が listen して即時反映。
@@ -123,114 +124,118 @@ class _SidebarOrderScreenState extends State<SidebarOrderScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // 説明バナー
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEEF2FF),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.drag_indicator,
-                      size: 16, color: Color(0xFF1A237E)),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '右側の ⋮ をドラッグして並び替え。\n'
-                      '広い画面（PC/タブレット）のサイドバー表示に反映されます。',
-                      style: TextStyle(
-                          fontSize: 11, color: Color(0xFF1E3A8A)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // 並び替えリスト
-            Expanded(
-              child: ReorderableListView.builder(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 8),
-                itemCount: _order.length,
-                onReorder: (oldIdx, newIdx) {
-                  setState(() {
-                    if (newIdx > oldIdx) newIdx--;
-                    final id = _order.removeAt(oldIdx);
-                    _order.insert(newIdx, id);
-                  });
-                },
-                itemBuilder: (context, i) {
-                  final id = _order[i];
-                  final item = _items[id];
-                  if (item == null) {
-                    // 未知の識別子（将来追加 or 削除済）はスキップ表示
-                    return SizedBox(
-                      key: ValueKey('unknown-$id'),
-                    );
-                  }
-                  return Container(
-                    key: ValueKey(id),
-                    margin: const EdgeInsets.only(bottom: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          color: const Color(0xFFE5E7EB)),
-                    ),
-                    child: ListTile(
-                      leading: Container(
-                        width: 28,
-                        height: 28,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF3F4F6),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text('${i + 1}',
-                            style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF6B7280))),
+      body: CenteredBody(
+        maxWidth: 760,
+        fill: true,
+        child: SafeArea(
+          child: Column(
+            children: [
+              // 説明バナー
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF2FF),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.drag_indicator,
+                        size: 16, color: Color(0xFF1A237E)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '右側の ⋮ をドラッグして並び替え。\n'
+                        '広い画面（PC/タブレット）のサイドバー表示に反映されます。',
+                        style: TextStyle(
+                            fontSize: 11, color: Color(0xFF1E3A8A)),
                       ),
-                      title: Row(
-                        children: [
-                          Icon(item.icon,
-                              size: 18,
-                              color: const Color(0xFF1A237E)),
-                          const SizedBox(width: 8),
-                          Text(item.label,
+                    ),
+                  ],
+                ),
+              ),
+              // 並び替えリスト
+              Expanded(
+                child: ReorderableListView.builder(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 8),
+                  itemCount: _order.length,
+                  onReorder: (oldIdx, newIdx) {
+                    setState(() {
+                      if (newIdx > oldIdx) newIdx--;
+                      final id = _order.removeAt(oldIdx);
+                      _order.insert(newIdx, id);
+                    });
+                  },
+                  itemBuilder: (context, i) {
+                    final id = _order[i];
+                    final item = _items[id];
+                    if (item == null) {
+                      // 未知の識別子（将来追加 or 削除済）はスキップ表示
+                      return SizedBox(
+                        key: ValueKey('unknown-$id'),
+                      );
+                    }
+                    return Container(
+                      key: ValueKey(id),
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: const Color(0xFFE5E7EB)),
+                      ),
+                      child: ListTile(
+                        leading: Container(
+                          width: 28,
+                          height: 28,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF3F4F6),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text('${i + 1}',
                               style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF111827))),
-                        ],
-                      ),
-                      subtitle: Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(item.hint,
-                            style: const TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF9CA3AF))),
-                      ),
-                      trailing: ReorderableDragStartListener(
-                        index: i,
-                        child: const Padding(
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 4),
-                          child: Icon(Icons.drag_indicator,
-                              color: Color(0xFFD1D5DB)),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF6B7280))),
+                        ),
+                        title: Row(
+                          children: [
+                            Icon(item.icon,
+                                size: 18,
+                                color: const Color(0xFF1A237E)),
+                            const SizedBox(width: 8),
+                            Text(item.label,
+                                style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF111827))),
+                          ],
+                        ),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(item.hint,
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF9CA3AF))),
+                        ),
+                        trailing: ReorderableDragStartListener(
+                          index: i,
+                          child: const Padding(
+                            padding:
+                                EdgeInsets.symmetric(horizontal: 4),
+                            child: Icon(Icons.drag_indicator,
+                                color: Color(0xFFD1D5DB)),
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

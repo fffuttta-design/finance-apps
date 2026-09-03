@@ -62,6 +62,8 @@ class _AccountEditorScreenState extends State<AccountEditorScreen> {
     final initialLast4 = initial?.last4;
 
     final result = await showModalBottomSheet<RegisteredBankAccount?>(
+      // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+      constraints: const BoxConstraints(maxWidth: 560),
       context: context,
       isScrollControlled: true,
       useSafeArea: true,

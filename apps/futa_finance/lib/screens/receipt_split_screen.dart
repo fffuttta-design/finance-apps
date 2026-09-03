@@ -8,6 +8,7 @@ import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 import '../utils/thousands_separator_input_formatter.dart';
 
+import '../widgets/centered_body.dart';
 /// 支払元のカテゴリ。表示順 = クレカ・電子・現金・銀行。
 enum _PayCat { card, emoney, cash, bank }
 
@@ -407,215 +408,219 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: !loaded
-          ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-              child: Column(
-                children: [
-                  Expanded(
-                    child: ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        _label('日付'),
-                        InkWell(
-                          onTap: _pickDate,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 14),
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                  color: const Color(0xFFE5E7EB)),
-                              borderRadius: BorderRadius.circular(8),
+      body: CenteredBody(
+        maxWidth: 760,
+        fill: true,
+        child: !loaded
+            ? const Center(child: CircularProgressIndicator())
+            : SafeArea(
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.all(16),
+                        children: [
+                          _label('日付'),
+                          InkWell(
+                            onTap: _pickDate,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 14),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                    color: const Color(0xFFE5E7EB)),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(children: [
+                                const Icon(Icons.calendar_today,
+                                    size: 18, color: Color(0xFF6B7280)),
+                                const SizedBox(width: 8),
+                                Text(
+                                    '${_date.year}年${_date.month}月${_date.day}日'),
+                              ]),
                             ),
-                            child: Row(children: [
-                              const Icon(Icons.calendar_today,
-                                  size: 18, color: Color(0xFF6B7280)),
-                              const SizedBox(width: 8),
-                              Text(
-                                  '${_date.year}年${_date.month}月${_date.day}日'),
-                            ]),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        // 手入力（明細を分けて記録）では「支出名」、レシート読取では「店舗」。
-                        _label(widget.manual ? '支出名（共通）' : '店舗（共通）'),
-                        TextField(
-                          controller: _storeCtrl,
-                          decoration: _dec(widget.manual
-                                  ? '例: Amazonまとめ買い'
-                                  : '例: ファミリーマート')
-                              .copyWith(
-                            prefixIcon: const Icon(Icons.storefront_outlined,
-                                size: 18),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _label('支払方法（共通）'),
-                        // 1段目: カテゴリ選択（クレカ/電子/現金/銀行）。
-                        SegmentedButton<_PayCat>(
-                          segments: _PayCat.values
-                              .map((c) => ButtonSegment<_PayCat>(
-                                    value: c,
-                                    icon: Icon(c.icon, size: 16),
-                                    label: Text(c.label,
-                                        style: const TextStyle(fontSize: 12)),
-                                  ))
-                              .toList(),
-                          selected: {_payCat},
-                          showSelectedIcon: false,
-                          onSelectionChanged: (s) => setState(() {
-                            _payCat = s.first;
-                            _applyPayCategoryDefault();
-                          }),
-                          style: const ButtonStyle(
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        // 2段目: そのカテゴリの項目プルダウン。
-                        if (_methodsFor(_payCat).isEmpty)
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFEF3C7),
-                              borderRadius: BorderRadius.circular(8),
+                          const SizedBox(height: 12),
+                          // 手入力（明細を分けて記録）では「支出名」、レシート読取では「店舗」。
+                          _label(widget.manual ? '支出名（共通）' : '店舗（共通）'),
+                          TextField(
+                            controller: _storeCtrl,
+                            decoration: _dec(widget.manual
+                                    ? '例: Amazonまとめ買い'
+                                    : '例: ファミリーマート')
+                                .copyWith(
+                              prefixIcon: const Icon(Icons.storefront_outlined,
+                                  size: 18),
                             ),
-                            child: Text(
-                              '${_payCat.label}が未登録です。設定で登録してください。',
-                              style: const TextStyle(
-                                  fontSize: 12, color: Color(0xFF92400E)),
+                          ),
+                          const SizedBox(height: 12),
+                          _label('支払方法（共通）'),
+                          // 1段目: カテゴリ選択（クレカ/電子/現金/銀行）。
+                          SegmentedButton<_PayCat>(
+                            segments: _PayCat.values
+                                .map((c) => ButtonSegment<_PayCat>(
+                                      value: c,
+                                      icon: Icon(c.icon, size: 16),
+                                      label: Text(c.label,
+                                          style: const TextStyle(fontSize: 12)),
+                                    ))
+                                .toList(),
+                            selected: {_payCat},
+                            showSelectedIcon: false,
+                            onSelectionChanged: (s) => setState(() {
+                              _payCat = s.first;
+                              _applyPayCategoryDefault();
+                            }),
+                            style: const ButtonStyle(
+                              visualDensity: VisualDensity.compact,
                             ),
-                          )
-                        else
+                          ),
+                          const SizedBox(height: 8),
+                          // 2段目: そのカテゴリの項目プルダウン。
+                          if (_methodsFor(_payCat).isEmpty)
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF3C7),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '${_payCat.label}が未登録です。設定で登録してください。',
+                                style: const TextStyle(
+                                    fontSize: 12, color: Color(0xFF92400E)),
+                              ),
+                            )
+                          else
+                            DropdownButtonFormField<String>(
+                              key: ValueKey('pay-${_payCat.name}'),
+                              initialValue:
+                                  _methodsFor(_payCat).contains(_paymentMethod)
+                                      ? _paymentMethod
+                                      : null,
+                              items: _methodsFor(_payCat)
+                                  .map((m) => DropdownMenuItem(
+                                      value: m, child: Text(_bareName(m))))
+                                  .toList(),
+                              onChanged: (v) =>
+                                  setState(() => _paymentMethod = v),
+                              decoration: _dec('選択してください'),
+                            ),
+                          const SizedBox(height: 12),
+                          _label('大カテゴリ（共通・各品目の初期値）'),
                           DropdownButtonFormField<String>(
-                            key: ValueKey('pay-${_payCat.name}'),
+                            key: ValueKey('maj-${_major ?? ''}'),
                             initialValue:
-                                _methodsFor(_payCat).contains(_paymentMethod)
-                                    ? _paymentMethod
-                                    : null,
-                            items: _methodsFor(_payCat)
+                                _majorNames.contains(_major) ? _major : null,
+                            items: _majorNames
                                 .map((m) => DropdownMenuItem(
                                     value: m, child: Text(_bareName(m))))
                                 .toList(),
-                            onChanged: (v) =>
-                                setState(() => _paymentMethod = v),
+                            onChanged: (v) => setState(() {
+                              _major = v;
+                              _sub = null;
+                            }),
                             decoration: _dec('選択してください'),
                           ),
-                        const SizedBox(height: 12),
-                        _label('大カテゴリ（共通・各品目の初期値）'),
-                        DropdownButtonFormField<String>(
-                          key: ValueKey('maj-${_major ?? ''}'),
-                          initialValue:
-                              _majorNames.contains(_major) ? _major : null,
-                          items: _majorNames
-                              .map((m) => DropdownMenuItem(
-                                  value: m, child: Text(_bareName(m))))
-                              .toList(),
-                          onChanged: (v) => setState(() {
-                            _major = v;
-                            _sub = null;
-                          }),
-                          decoration: _dec('選択してください'),
-                        ),
-                        const SizedBox(height: 12),
-                        _label('小カテゴリ（共通・各品目の初期値）'),
-                        DropdownButtonFormField<String>(
-                          key: ValueKey('sub-${_major ?? ''}-${_sub ?? ''}'),
-                          initialValue:
-                              _subNames.contains(_sub) ? _sub : null,
-                          items: _subNames
-                              .map((s) => DropdownMenuItem(
-                                  value: s, child: Text(s)))
-                              .toList(),
-                          onChanged: (v) => setState(() => _sub = v),
-                          decoration: _dec(
-                              _major == null ? '先に大カテゴリを選択' : '選択してください'),
-                        ),
-                        const SizedBox(height: 16),
-                        // 合計を大きく目立たせる。
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFEF2F2),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                                color: const Color(0xFFFECACA)),
+                          const SizedBox(height: 12),
+                          _label('小カテゴリ（共通・各品目の初期値）'),
+                          DropdownButtonFormField<String>(
+                            key: ValueKey('sub-${_major ?? ''}-${_sub ?? ''}'),
+                            initialValue:
+                                _subNames.contains(_sub) ? _sub : null,
+                            items: _subNames
+                                .map((s) => DropdownMenuItem(
+                                    value: s, child: Text(s)))
+                                .toList(),
+                            onChanged: (v) => setState(() => _sub = v),
+                            decoration: _dec(
+                                _major == null ? '先に大カテゴリを選択' : '選択してください'),
                           ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Text('合計',
-                                      style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: Color(0xFF6B7280))),
-                                  Text('$_includedCount件',
-                                      style: const TextStyle(
-                                          fontSize: 11,
-                                          color: Color(0xFF9CA3AF))),
-                                ],
-                              ),
-                              const Spacer(),
-                              Text(
-                                formatYen(_includedTotal),
-                                style: const TextStyle(
-                                    fontSize: 30,
-                                    fontWeight: FontWeight.w900,
-                                    color: Color(0xFFDC2626),
-                                    fontFamily: 'monospace'),
-                              ),
-                            ],
+                          const SizedBox(height: 16),
+                          // 合計を大きく目立たせる。
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF2F2),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                  color: const Color(0xFFFECACA)),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text('合計',
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF6B7280))),
+                                    Text('$_includedCount件',
+                                        style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Color(0xFF9CA3AF))),
+                                  ],
+                                ),
+                                const Spacer(),
+                                Text(
+                                  formatYen(_includedTotal),
+                                  style: const TextStyle(
+                                      fontSize: 30,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFFDC2626),
+                                      fontFamily: 'monospace'),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        _label('品目'),
-                        for (final r in _rows) _itemRow(r),
-                        const SizedBox(height: 4),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton.icon(
-                            onPressed: _addRow,
-                            icon: const Icon(Icons.add, size: 18),
-                            label: const Text('品目を追加'),
-                            style: TextButton.styleFrom(
-                                foregroundColor: const Color(0xFF1A237E)),
+                          const SizedBox(height: 12),
+                          _label('品目'),
+                          for (final r in _rows) _itemRow(r),
+                          const SizedBox(height: 4),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: _addRow,
+                              icon: const Icon(Icons.add, size: 18),
+                              label: const Text('品目を追加'),
+                              style: TextButton.styleFrom(
+                                  foregroundColor: const Color(0xFF1A237E)),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  SafeArea(
-                    top: false,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: _saving ? null : _save,
-                          icon: const Icon(Icons.check),
-                          label: Text(_saving
-                              ? '保存中…'
-                              : (widget.editingMembers.isNotEmpty
-                                  ? '$_includedCount 件で保存'
-                                  : '$_includedCount 件を記録する')),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF1A237E),
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 14),
+                    SafeArea(
+                      top: false,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: _saving ? null : _save,
+                            icon: const Icon(Icons.check),
+                            label: Text(_saving
+                                ? '保存中…'
+                                : (widget.editingMembers.isNotEmpty
+                                    ? '$_includedCount 件で保存'
+                                    : '$_includedCount 件を記録する')),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF1A237E),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 

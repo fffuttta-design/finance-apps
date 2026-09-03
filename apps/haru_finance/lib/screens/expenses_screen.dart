@@ -13,6 +13,7 @@ import 'add_transaction_screen.dart';
 import 'record_menu.dart';
 import 'subscriptions_screen.dart';
 
+import '../widgets/web_layout.dart';
 /// 支出タブ：月切替＋支出合計＋カテゴリ内訳＋支出一覧（可愛い系）。
 class ExpensesScreen extends StatefulWidget {
   const ExpensesScreen({super.key});
@@ -105,6 +106,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         ),
         actions: const [SettingsButton()],
       ),
+      // 広い画面では、中央に寄せた本文の右端にボタンを合わせる。
+      floatingActionButtonLocation: const WebEndFloatFabLocation(),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           final changed = await showRecordMenu(context);
@@ -115,24 +118,27 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         label: const Text('きろく',
             style: TextStyle(fontWeight: FontWeight.w700)),
       ),
-      body: hid == null
-          ? const Center(child: CircularProgressIndicator())
-          : StreamBuilder<List<core.Transaction>>(
-              stream: TxRepository.instance.watch(hid),
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting &&
-                    !snap.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final all = snap.data ?? const <core.Transaction>[];
-                final month = all
-                    .where((t) => t.type == core.TransactionType.expense)
-                    .where(_inMonth)
-                    .toList()
-                  ..sort((a, b) => b.date.compareTo(a.date));
-                return _body(month);
-              },
-            ),
+      body: WebCenterFill(
+        maxWidth: 1040,
+        child: hid == null
+            ? const Center(child: CircularProgressIndicator())
+            : StreamBuilder<List<core.Transaction>>(
+                stream: TxRepository.instance.watch(hid),
+                builder: (context, snap) {
+                  if (snap.connectionState == ConnectionState.waiting &&
+                      !snap.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final all = snap.data ?? const <core.Transaction>[];
+                  final month = all
+                      .where((t) => t.type == core.TransactionType.expense)
+                      .where(_inMonth)
+                      .toList()
+                    ..sort((a, b) => b.date.compareTo(a.date));
+                  return _body(month);
+                },
+              ),
+      ),
     );
   }
 

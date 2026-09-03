@@ -24,6 +24,7 @@ import 'receipt_group_detail_screen.dart';
 import 'transaction_detail_screen.dart';
 import 'subscription_list_screen.dart';
 
+import '../widgets/centered_body.dart';
 /// クレジットカード詳細（利用明細）画面。
 /// 銀行通帳の AccountDetailScreen に相当するクレカ版。
 ///
@@ -360,135 +361,139 @@ class _CardDetailScreenState extends State<CardDetailScreen>
           ),
         ],
       ),
-      body: LayoutBuilder(
-        builder: (ctx, constraints) {
-          final content = Column(
-            children: [
-              // 共通: サマリー（利用合計/件数/引落予定日）
-              _summaryCard(monthTotal),
-              // タブバー（コンパクト：アイコン＋テキストを横並びで低く）
-              Container(
-                color: Colors.white,
-                child: TabBar(
-                  controller: _tabController,
-                  labelColor: const Color(0xFFDC2626),
-                  unselectedLabelColor: const Color(0xFF6B7280),
-                  indicatorColor: const Color(0xFFDC2626),
-                  labelStyle: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w700),
-                  unselectedLabelStyle: const TextStyle(fontSize: 13),
-                  tabs: const [
-                    Tab(
-                      height: 38,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.receipt_long_outlined, size: 16),
-                          SizedBox(width: 6),
-                          Text('明細'),
-                        ],
-                      ),
-                    ),
-                    Tab(
-                      height: 38,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.show_chart, size: 16),
-                          SizedBox(width: 6),
-                          Text('請求推移'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  // タブ横スワイプを無効化（明細タブの左右スワイプを「月の切替」に
-                  // 使うため）。タブはタブバーのタップで切り替える。
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    // ── タブ1: その月の明細 ──
-                    Column(
-                      children: [
-                        _monthSelector(),
-                        const Divider(height: 1),
-                        Expanded(
-                          // PC幅は支出明細と同じ表（検索・並び替え・列幅）。
-                          // スマホ幅は従来のカード型リスト。
-                          child: constraints.maxWidth >= 900
-                              ? Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                      16, 16, 16, 0),
-                                  child: ExpenseDetailTable(
-                                    // タイトル＋検索ボックスを上部に固定し、
-                                    // 明細本体だけをスクロールさせる。
-                                    stickyHeader: true,
-                                    title: '明細',
-                                    rows: monthTxns,
-                                    onEditTxn: _editCardTxn,
-                                    onOpenGroup: _openCardGroup,
-                                    accent: const Color(0xFFDC2626),
-                                    // 固定費は月モードのときだけ混ぜる
-                                    // （範囲指定はまたぐ月が曖昧なので出さない）。
-                                    fixedRows: cardFixed,
-                                    onEditFixed: (f) => f.pending
-                                        ? _inputCardVariableAmount(f.id)
-                                        : _editCardFixed(f.id),
-                                    // 領収書チェック（事業モードのみ・税理士提出用）。
-                                    // 支出タブの明細表と同じ列をクレカ明細にも出す。
-                                    showReceiptCheck:
-                                        AppModeManager.instance.current ==
-                                            AppMode.business,
-                                    onToggleReceipt: (t, v) async {
-                                      await TransactionRepository.instance
-                                          .update(t.copyWith(receiptSaved: v));
-                                      if (mounted) await _load();
-                                    },
-                                    // クレジット明細そのままの順（日付の新しい順・
-                                    // 同日はCSVの並び）を正とする。手動並び替え
-                                    // （カスタム順）は廃止＝並びは固定表示。
-                                    customOrder: false,
-                                    emptyHint: 'この期間の利用はありません',
-                                  ),
-                                )
-                              // スマホ幅：カード型リスト。左右スワイプで月を切替。
-                              : GestureDetector(
-                                  behavior: HitTestBehavior.opaque,
-                                  onHorizontalDragEnd: (details) {
-                                    if (_range != null) return;
-                                    final v = details.primaryVelocity ?? 0;
-                                    if (v == 0) return;
-                                    // 左スワイプ＝次の月／右スワイプ＝前の月。
-                                    _shiftCardMonth(v < 0 ? 1 : -1);
-                                  },
-                                  child: _historyList(monthTxns),
-                                ),
-                        ),
-                      ],
-                    ),
-                    // ── タブ2: 月別請求推移 ──
-                    _monthlyBillingPage(),
-                  ],
-                ),
-              ),
-            ],
-          );
-          if (constraints.maxWidth >= 900) {
-            // Row+Spacer で中央寄せ（Align+SizedBox(height) より安定）
-            return Row(
+      body: CenteredBody(
+        maxWidth: 1140,
+        fill: true,
+        child: LayoutBuilder(
+          builder: (ctx, constraints) {
+            final content = Column(
               children: [
-                const Spacer(),
-                SizedBox(width: _kContentMaxWidth, child: content),
-                const Spacer(),
+                // 共通: サマリー（利用合計/件数/引落予定日）
+                _summaryCard(monthTotal),
+                // タブバー（コンパクト：アイコン＋テキストを横並びで低く）
+                Container(
+                  color: Colors.white,
+                  child: TabBar(
+                    controller: _tabController,
+                    labelColor: const Color(0xFFDC2626),
+                    unselectedLabelColor: const Color(0xFF6B7280),
+                    indicatorColor: const Color(0xFFDC2626),
+                    labelStyle: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w700),
+                    unselectedLabelStyle: const TextStyle(fontSize: 13),
+                    tabs: const [
+                      Tab(
+                        height: 38,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.receipt_long_outlined, size: 16),
+                            SizedBox(width: 6),
+                            Text('明細'),
+                          ],
+                        ),
+                      ),
+                      Tab(
+                        height: 38,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.show_chart, size: 16),
+                            SizedBox(width: 6),
+                            Text('請求推移'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    // タブ横スワイプを無効化（明細タブの左右スワイプを「月の切替」に
+                    // 使うため）。タブはタブバーのタップで切り替える。
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: [
+                      // ── タブ1: その月の明細 ──
+                      Column(
+                        children: [
+                          _monthSelector(),
+                          const Divider(height: 1),
+                          Expanded(
+                            // PC幅は支出明細と同じ表（検索・並び替え・列幅）。
+                            // スマホ幅は従来のカード型リスト。
+                            child: constraints.maxWidth >= 900
+                                ? Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        16, 16, 16, 0),
+                                    child: ExpenseDetailTable(
+                                      // タイトル＋検索ボックスを上部に固定し、
+                                      // 明細本体だけをスクロールさせる。
+                                      stickyHeader: true,
+                                      title: '明細',
+                                      rows: monthTxns,
+                                      onEditTxn: _editCardTxn,
+                                      onOpenGroup: _openCardGroup,
+                                      accent: const Color(0xFFDC2626),
+                                      // 固定費は月モードのときだけ混ぜる
+                                      // （範囲指定はまたぐ月が曖昧なので出さない）。
+                                      fixedRows: cardFixed,
+                                      onEditFixed: (f) => f.pending
+                                          ? _inputCardVariableAmount(f.id)
+                                          : _editCardFixed(f.id),
+                                      // 領収書チェック（事業モードのみ・税理士提出用）。
+                                      // 支出タブの明細表と同じ列をクレカ明細にも出す。
+                                      showReceiptCheck:
+                                          AppModeManager.instance.current ==
+                                              AppMode.business,
+                                      onToggleReceipt: (t, v) async {
+                                        await TransactionRepository.instance
+                                            .update(t.copyWith(receiptSaved: v));
+                                        if (mounted) await _load();
+                                      },
+                                      // クレジット明細そのままの順（日付の新しい順・
+                                      // 同日はCSVの並び）を正とする。手動並び替え
+                                      // （カスタム順）は廃止＝並びは固定表示。
+                                      customOrder: false,
+                                      emptyHint: 'この期間の利用はありません',
+                                    ),
+                                  )
+                                // スマホ幅：カード型リスト。左右スワイプで月を切替。
+                                : GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onHorizontalDragEnd: (details) {
+                                      if (_range != null) return;
+                                      final v = details.primaryVelocity ?? 0;
+                                      if (v == 0) return;
+                                      // 左スワイプ＝次の月／右スワイプ＝前の月。
+                                      _shiftCardMonth(v < 0 ? 1 : -1);
+                                    },
+                                    child: _historyList(monthTxns),
+                                  ),
+                          ),
+                        ],
+                      ),
+                      // ── タブ2: 月別請求推移 ──
+                      _monthlyBillingPage(),
+                    ],
+                  ),
+                ),
               ],
             );
-          }
-          return content;
-        },
+            if (constraints.maxWidth >= 900) {
+              // Row+Spacer で中央寄せ（Align+SizedBox(height) より安定）
+              return Row(
+                children: [
+                  const Spacer(),
+                  SizedBox(width: _kContentMaxWidth, child: content),
+                  const Spacer(),
+                ],
+              );
+            }
+            return content;
+          },
+        ),
       ),
     );
   }

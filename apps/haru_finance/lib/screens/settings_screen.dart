@@ -9,6 +9,7 @@ import 'accounts_screen.dart';
 import 'paste_import_screen.dart';
 import 'replacements_screen.dart';
 
+import '../widgets/web_layout.dart';
 /// 設定：お金（口座・支払方法）・データ・アプリ。
 /// 個人用アプリなので世帯・メンバー・通知の設定は無い。
 class SettingsScreen extends StatefulWidget {
@@ -75,47 +76,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('設定')),
-      body: LayoutBuilder(builder: (context, c) {
-        final double railWidth = c.maxWidth < 480 ? 92 : 132;
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              width: railWidth,
-              decoration: const BoxDecoration(
-                color: AppColors.bg,
-                border: Border(
-                  right: BorderSide(color: AppColors.divider),
+      body: WebCenterFill(
+        maxWidth: 900,
+        child: LayoutBuilder(builder: (context, c) {
+          final double railWidth = c.maxWidth < 480 ? 92 : 132;
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                width: railWidth,
+                decoration: const BoxDecoration(
+                  color: AppColors.bg,
+                  border: Border(
+                    right: BorderSide(color: AppColors.divider),
+                  ),
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < _navItems.length; i++)
+                        _NavTile(
+                          icon: _navItems[i].icon,
+                          label: _navItems[i].label,
+                          selected: _tab == i,
+                          onTap: () => setState(() => _tab = i),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Column(
+              Expanded(
+                child: IndexedStack(
+                  index: _tab,
                   children: [
-                    for (var i = 0; i < _navItems.length; i++)
-                      _NavTile(
-                        icon: _navItems[i].icon,
-                        label: _navItems[i].label,
-                        selected: _tab == i,
-                        onTap: () => setState(() => _tab = i),
-                      ),
+                    _moneyTab(),
+                    _dataTab(),
+                    _appTab(),
                   ],
                 ),
               ),
-            ),
-            Expanded(
-              child: IndexedStack(
-                index: _tab,
-                children: [
-                  _moneyTab(),
-                  _dataTab(),
-                  _appTab(),
-                ],
-              ),
-            ),
-          ],
-        );
-      }),
+            ],
+          );
+        }),
+      ),
     );
   }
 

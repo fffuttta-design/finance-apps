@@ -7,6 +7,7 @@ import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 
+import '../widgets/web_layout.dart';
 /// 貼り付け取込：TSV（日付 タブ カテゴリ タブ 内容 タブ 金額）を貼って一括登録。
 class PasteImportScreen extends StatefulWidget {
   const PasteImportScreen({super.key});
@@ -128,87 +129,90 @@ class _PasteImportScreenState extends State<PasteImportScreen> {
     final errCount = _rows.length - okCount;
     return Scaffold(
       appBar: AppBar(title: const Text('貼り付けで取り込み')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            const Text(
-              '1行 = 「日付（タブ）カテゴリ（タブ）内容（タブ）金額」で貼り付け。\n'
-              '日付は 2026/6/5 または 6/5（年は下で指定）。',
-              style: TextStyle(fontSize: 12, color: AppColors.textSub),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                ChoiceChip(
-                  label: const Text('支出'),
-                  selected: _type == core.TransactionType.expense,
-                  onSelected: (_) =>
-                      setState(() => _type = core.TransactionType.expense),
-                  selectedColor: AppColors.pinkSoft,
-                ),
-                const SizedBox(width: 8),
-                ChoiceChip(
-                  label: const Text('収入'),
-                  selected: _type == core.TransactionType.income,
-                  onSelected: (_) =>
-                      setState(() => _type = core.TransactionType.income),
-                  selectedColor: AppColors.pinkSoft,
-                ),
-                const Spacer(),
-                SizedBox(
-                  width: 90,
-                  child: TextField(
-                    controller: _yearCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                        labelText: '年', isDense: true, suffixText: '年'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _ctrl,
-              maxLines: 8,
-              decoration: const InputDecoration(
-                hintText: '例:\n6/5\t食費\tスーパー\t1280\n6/5\t外食\tカフェ\t680',
-                border: OutlineInputBorder(),
+      body: WebCenterFill(
+        maxWidth: 720,
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              const Text(
+                '1行 = 「日付（タブ）カテゴリ（タブ）内容（タブ）金額」で貼り付け。\n'
+                '日付は 2026/6/5 または 6/5（年は下で指定）。',
+                style: TextStyle(fontSize: 12, color: AppColors.textSub),
               ),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: _parse,
-              icon: const Icon(Icons.search_rounded, size: 18),
-              label: const Text('解析する'),
-            ),
-            if (_rows.isNotEmpty) ...[
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Text('OK $okCount件',
-                      style: const TextStyle(
-                          color: AppColors.income,
-                          fontWeight: FontWeight.w700)),
-                  const SizedBox(width: 12),
-                  if (errCount > 0)
-                    Text('エラー $errCount件',
-                        style: const TextStyle(
-                            color: AppColors.expense,
-                            fontWeight: FontWeight.w700)),
+                  ChoiceChip(
+                    label: const Text('支出'),
+                    selected: _type == core.TransactionType.expense,
+                    onSelected: (_) =>
+                        setState(() => _type = core.TransactionType.expense),
+                    selectedColor: AppColors.pinkSoft,
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('収入'),
+                    selected: _type == core.TransactionType.income,
+                    onSelected: (_) =>
+                        setState(() => _type = core.TransactionType.income),
+                    selectedColor: AppColors.pinkSoft,
+                  ),
+                  const Spacer(),
+                  SizedBox(
+                    width: 90,
+                    child: TextField(
+                      controller: _yearCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                          labelText: '年', isDense: true, suffixText: '年'),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 8),
-              for (final r in _rows) _rowTile(r),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: (_saving || okCount == 0) ? null : _import,
-                style:
-                    FilledButton.styleFrom(backgroundColor: AppColors.pink),
-                child: Text(_saving ? '取り込み中…' : '$okCount件を取り込む ♡'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _ctrl,
+                maxLines: 8,
+                decoration: const InputDecoration(
+                  hintText: '例:\n6/5\t食費\tスーパー\t1280\n6/5\t外食\tカフェ\t680',
+                  border: OutlineInputBorder(),
+                ),
               ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _parse,
+                icon: const Icon(Icons.search_rounded, size: 18),
+                label: const Text('解析する'),
+              ),
+              if (_rows.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Text('OK $okCount件',
+                        style: const TextStyle(
+                            color: AppColors.income,
+                            fontWeight: FontWeight.w700)),
+                    const SizedBox(width: 12),
+                    if (errCount > 0)
+                      Text('エラー $errCount件',
+                          style: const TextStyle(
+                              color: AppColors.expense,
+                              fontWeight: FontWeight.w700)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                for (final r in _rows) _rowTile(r),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: (_saving || okCount == 0) ? null : _import,
+                  style:
+                      FilledButton.styleFrom(backgroundColor: AppColors.pink),
+                  child: Text(_saving ? '取り込み中…' : '$okCount件を取り込む ♡'),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

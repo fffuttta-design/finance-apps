@@ -9,6 +9,7 @@ import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 
+import '../widgets/web_layout.dart';
 /// 口座・クレカマスタ＋残高管理。
 /// 登録した口座/クレカの現在残高（初期残高±収支）を表示。記録の支払元に使う。
 class AccountsScreen extends StatelessWidget {
@@ -19,42 +20,47 @@ class AccountsScreen extends StatelessWidget {
     final hid = HouseholdService.instance.householdId;
     return Scaffold(
       appBar: AppBar(title: const Text('口座・残高')),
+      // 広い画面では、中央に寄せた本文の右端にボタンを合わせる。
+      floatingActionButtonLocation: const WebEndFloatFabLocation(),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openEdit(context),
         icon: const Icon(Icons.add_rounded),
         label: const Text('追加', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
-      body: hid == null
-          ? const Center(child: CircularProgressIndicator())
-          : StreamBuilder<List<Account>>(
-              stream: AccountRepository.instance.watch(hid),
-              builder: (context, accSnap) {
-                final accounts = accSnap.data ?? const <Account>[];
-                return StreamBuilder<List<core.Transaction>>(
-                  stream: TxRepository.instance.watch(hid),
-                  builder: (context, txSnap) {
-                    final txns = txSnap.data ?? const <core.Transaction>[];
-                    final balances = {
-                      for (final a in accounts) a.id: a.balanceFrom(txns)
-                    };
-                    final total =
-                        balances.values.fold<int>(0, (s, b) => s + b);
-                    if (accounts.isEmpty) {
-                      return _empty();
-                    }
-                    return ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                      children: [
-                        _totalCard(total),
-                        const SizedBox(height: 16),
-                        ...accounts.map((a) =>
-                            _tile(context, a, balances[a.id] ?? 0)),
-                      ],
-                    );
-                  },
-                );
-              },
-            ),
+      body: WebCenterFill(
+        maxWidth: 1040,
+        child: hid == null
+            ? const Center(child: CircularProgressIndicator())
+            : StreamBuilder<List<Account>>(
+                stream: AccountRepository.instance.watch(hid),
+                builder: (context, accSnap) {
+                  final accounts = accSnap.data ?? const <Account>[];
+                  return StreamBuilder<List<core.Transaction>>(
+                    stream: TxRepository.instance.watch(hid),
+                    builder: (context, txSnap) {
+                      final txns = txSnap.data ?? const <core.Transaction>[];
+                      final balances = {
+                        for (final a in accounts) a.id: a.balanceFrom(txns)
+                      };
+                      final total =
+                          balances.values.fold<int>(0, (s, b) => s + b);
+                      if (accounts.isEmpty) {
+                        return _empty();
+                      }
+                      return ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                        children: [
+                          _totalCard(total),
+                          const SizedBox(height: 16),
+                          ...accounts.map((a) =>
+                              _tile(context, a, balances[a.id] ?? 0)),
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
+      ),
     );
   }
 
@@ -133,6 +139,8 @@ class AccountsScreen extends StatelessWidget {
 
   Future<void> _openEdit(BuildContext context, [Account? editing]) async {
     final result = await showModalBottomSheet<Account>(
+      // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+      constraints: const BoxConstraints(maxWidth: 560),
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(

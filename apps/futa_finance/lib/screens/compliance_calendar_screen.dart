@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/compliance_task.dart';
 import '../data/compliance_task_repository.dart';
 
+import '../widgets/centered_body.dart';
 /// 手続き・届出カレンダー画面。
 ///
 /// 算定基礎届・労働保険の年度更新・申告期限など、会社の手続き締切を管理する。
@@ -35,16 +36,20 @@ class _ComplianceCalendarScreenState extends State<ComplianceCalendarScreen> {
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF111827))),
       ),
-      body: AnimatedBuilder(
-        animation: _repo,
-        builder: (context, _) => FutureBuilder<ComplianceTasksConfig>(
-          future: _repo.load(),
-          builder: (context, snap) {
-            if (!snap.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            return _body(snap.data!);
-          },
+      body: CenteredBody(
+        maxWidth: 1000,
+        fill: true,
+        child: AnimatedBuilder(
+          animation: _repo,
+          builder: (context, _) => FutureBuilder<ComplianceTasksConfig>(
+            future: _repo.load(),
+            builder: (context, snap) {
+              if (!snap.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              return _body(snap.data!);
+            },
+          ),
         ),
       ),
     );
@@ -332,6 +337,8 @@ class _ComplianceCalendarScreenState extends State<ComplianceCalendarScreen> {
     var day = existing?.day ?? lastDayOfMonth(month);
 
     await showModalBottomSheet<void>(
+      // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+      constraints: const BoxConstraints(maxWidth: 560),
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,

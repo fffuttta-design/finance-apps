@@ -5,6 +5,7 @@ import '../data/app_mode.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 
+import '../widgets/centered_body.dart';
 /// 表計算からコピーした明細（タブ区切り）を貼り付けて、取引を**追記**する画面。
 ///
 /// 対応フォーマット（1行=1取引、タブ区切り）:
@@ -212,170 +213,174 @@ class _PasteImportScreenState extends State<PasteImportScreen> {
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF111827))),
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE0E7FF),
-                borderRadius: BorderRadius.circular(8),
+      body: CenteredBody(
+        maxWidth: 760,
+        fill: true,
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0E7FF),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline,
+                        size: 18, color: Color(0xFF1A237E)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '現在の「${mode.label}」モードに追加します（既存データは消えません）。',
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF1A237E)),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: Row(
+              const SizedBox(height: 12),
+              // 種別（支出 / 収入）
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(
+                      value: false,
+                      icon: Icon(Icons.south_west, size: 16),
+                      label: Text('支出')),
+                  ButtonSegment(
+                      value: true,
+                      icon: Icon(Icons.north_east, size: 16),
+                      label: Text('収入（売上）')),
+                ],
+                selected: {_income},
+                showSelectedIcon: false,
+                onSelectionChanged: (s) => setState(() => _income = s.first),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 4, left: 2),
+                child: Text(
+                  _income
+                      ? '収入: 大カテゴリ=収入源/売上区分、支払方法=受取方法 として取り込みます。'
+                      : '支出として取り込みます。',
+                  style: const TextStyle(
+                      fontSize: 11, color: Color(0xFF9CA3AF)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
                 children: [
-                  const Icon(Icons.info_outline,
-                      size: 18, color: Color(0xFF1A237E)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '現在の「${mode.label}」モードに追加します（既存データは消えません）。',
+                  const Text('年: ',
+                      style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600)),
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline),
+                    onPressed: () => setState(() => _year--),
+                  ),
+                  Text('$_year',
                       style: const TextStyle(
-                          fontSize: 12, color: Color(0xFF1A237E)),
+                          fontSize: 16, fontWeight: FontWeight.w700)),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline),
+                    onPressed: () => setState(() => _year++),
+                  ),
+                  const Spacer(),
+                  const Text('USD→円 ',
+                      style: TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600)),
+                  SizedBox(
+                    width: 64,
+                    child: TextField(
+                      controller: _rateCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      textAlign: TextAlign.center,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        prefixText: '¥',
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 12),
-            // 種別（支出 / 収入）
-            SegmentedButton<bool>(
-              segments: const [
-                ButtonSegment(
-                    value: false,
-                    icon: Icon(Icons.south_west, size: 16),
-                    label: Text('支出')),
-                ButtonSegment(
-                    value: true,
-                    icon: Icon(Icons.north_east, size: 16),
-                    label: Text('収入（売上）')),
-              ],
-              selected: {_income},
-              showSelectedIcon: false,
-              onSelectionChanged: (s) => setState(() => _income = s.first),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 4, left: 2),
-              child: Text(
-                _income
-                    ? '収入: 大カテゴリ=収入源/売上区分、支払方法=受取方法 として取り込みます。'
-                    : '支出として取り込みます。',
-                style: const TextStyle(
-                    fontSize: 11, color: Color(0xFF9CA3AF)),
+              const Padding(
+                padding: EdgeInsets.only(left: 4, top: 4),
+                child: Text('（日付に年が無いため指定。＄/\$表記は上のレートで円換算）',
+                    style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Text('年: ',
-                    style: TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600)),
-                IconButton(
-                  icon: const Icon(Icons.remove_circle_outline),
-                  onPressed: () => setState(() => _year--),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _textCtrl,
+                maxLines: 10,
+                minLines: 6,
+                onChanged: (_) => setState(() {}),
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                decoration: InputDecoration(
+                  hintText:
+                      '表計算からコピーしてここに貼り付け\n例: 01/01\t木\t0.固定費\tソフトウェア料金\tChatGPT\tライフカード\t3,582円',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  filled: true,
+                  fillColor: Colors.white,
                 ),
-                Text('$_year',
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700)),
-                IconButton(
-                  icon: const Icon(Icons.add_circle_outline),
-                  onPressed: () => setState(() => _year++),
-                ),
-                const Spacer(),
-                const Text('USD→円 ',
-                    style: TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w600)),
-                SizedBox(
-                  width: 64,
-                  child: TextField(
-                    controller: _rateCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true),
-                    textAlign: TextAlign.center,
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      prefixText: '¥',
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const Padding(
-              padding: EdgeInsets.only(left: 4, top: 4),
-              child: Text('（日付に年が無いため指定。＄/\$表記は上のレートで円換算）',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _textCtrl,
-              maxLines: 10,
-              minLines: 6,
-              onChanged: (_) => setState(() {}),
-              style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
-              decoration: InputDecoration(
-                hintText:
-                    '表計算からコピーしてここに貼り付け\n例: 01/01\t木\t0.固定費\tソフトウェア料金\tChatGPT\tライフカード\t3,582円',
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8)),
-                filled: true,
-                fillColor: Colors.white,
               ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _parse,
-                icon: const Icon(Icons.search, size: 18),
-                label: const Text('解析してプレビュー'),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _parse,
+                  icon: const Icon(Icons.search, size: 18),
+                  label: const Text('解析してプレビュー'),
+                ),
               ),
-            ),
-            if (_parsed) ...[
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Text('取り込み可能 $_validCount件',
-                      style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1A237E))),
-                  const SizedBox(width: 12),
-                  if (_errorCount > 0)
-                    Text('エラー $_errorCount件',
+              if (_parsed) ...[
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Text('取り込み可能 $_validCount件',
                         style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFFDC2626))),
-                  const Spacer(),
-                  Text('合計 ${formatYen(_total)}',
-                      style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          fontFamily: 'monospace')),
-                ],
-              ),
-              const SizedBox(height: 8),
-              for (final r in _rows) _previewRow(r),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed:
-                      (_validCount == 0 || _importing) ? null : _import,
-                  icon: const Icon(Icons.download_done, size: 18),
-                  label: Text(_importing
-                      ? '取り込み中…'
-                      : '$_validCount件を取り込む'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF1A237E),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                            color: Color(0xFF1A237E))),
+                    const SizedBox(width: 12),
+                    if (_errorCount > 0)
+                      Text('エラー $_errorCount件',
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFFDC2626))),
+                    const Spacer(),
+                    Text('合計 ${formatYen(_total)}',
+                        style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'monospace')),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                for (final r in _rows) _previewRow(r),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed:
+                        (_validCount == 0 || _importing) ? null : _import,
+                    icon: const Icon(Icons.download_done, size: 18),
+                    label: Text(_importing
+                        ? '取り込み中…'
+                        : '$_validCount件を取り込む'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A237E),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

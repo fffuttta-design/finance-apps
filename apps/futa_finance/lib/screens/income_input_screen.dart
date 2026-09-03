@@ -15,6 +15,8 @@ import 'income_master_screen.dart';
 /// 収入入力モーダルを表示する。保存成功時は true を返す。
 Future<bool?> showIncomeInputModal(BuildContext context) {
   return showModalBottomSheet<bool>(
+    // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+    constraints: const BoxConstraints(maxWidth: 560),
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

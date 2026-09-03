@@ -11,6 +11,7 @@ import '../utils/formatters.dart';
 import '../utils/kana.dart';
 import '../v2/widgets/month_nav_bar.dart';
 
+import '../widgets/centered_body.dart';
 /// 銀行の入出金明細CSVを、指定した月ぶんだけ取り込む画面。
 ///
 /// 仕様（ユーザー要件）:
@@ -343,90 +344,94 @@ class _BankCsvImportScreenState extends State<BankCsvImportScreen> {
         title: Text('${widget.account.name} CSV取り込み',
             style: const TextStyle(fontWeight: FontWeight.w700)),
       ),
-      body: Column(
-        children: [
-          // 対象月セレクタ。
-          Container(
-            color: const Color(0xFFF7F8FA),
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: Row(
-              children: [
-                const Text('取り込む月: ',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF6B7280))),
-                MonthNavBar(
-                  label: '${_month.year}年${_month.month}月',
-                  onPrev: () => setState(
-                      () => _month = DateTime(_month.year, _month.month - 1)),
-                  onNext: () => setState(
-                      () => _month = DateTime(_month.year, _month.month + 1)),
-                ),
-                const Spacer(),
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _pick,
-                  icon: const Icon(Icons.upload_file, size: 18),
-                  label: Text(_fileName == null ? 'CSVを選ぶ' : 'CSVを選び直す'),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          // 説明バナー。
-          Container(
-            width: double.infinity,
-            color: const Color(0xFFFFF7ED),
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: Text(
-              _fileName == null
-                  ? 'CSVを選ぶと、その月の明細だけを取り込みます。'
-                      '（新生銀行・GMOあおぞらネット銀行のCSVに自動対応）'
-                  : '取り込むと、この月の「${widget.account.name}」の既存明細は消えて置き換わります。'
-                      '「振替」ON の行は収支に入りません（口座間の移動）。',
-              style: const TextStyle(fontSize: 12, color: Color(0xFF9A3412)),
-            ),
-          ),
-          if (_fileName != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      body: CenteredBody(
+        maxWidth: 760,
+        fill: true,
+        child: Column(
+          children: [
+            // 対象月セレクタ。
+            Container(
+              color: const Color(0xFFF7F8FA),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: Row(
                 children: [
-                  const Icon(Icons.description_outlined,
-                      size: 16, color: Color(0xFF6B7280)),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                        _bankLabel == null
-                            ? '$_fileName'
-                            : '$_fileName（$_bankLabel）',
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 12, color: Color(0xFF6B7280))),
+                  const Text('取り込む月: ',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF6B7280))),
+                  MonthNavBar(
+                    label: '${_month.year}年${_month.month}月',
+                    onPrev: () => setState(
+                        () => _month = DateTime(_month.year, _month.month - 1)),
+                    onNext: () => setState(
+                        () => _month = DateTime(_month.year, _month.month + 1)),
                   ),
-                  Text('${rows.length}件（振替 $transferCount）',
-                      style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF111827))),
+                  const Spacer(),
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _pick,
+                    icon: const Icon(Icons.upload_file, size: 18),
+                    label: Text(_fileName == null ? 'CSVを選ぶ' : 'CSVを選び直す'),
+                  ),
                 ],
               ),
             ),
-          Expanded(
-            child: rows.isEmpty
-                ? Center(
-                    child: Text(
-                        _fileName == null
-                            ? 'CSVファイルを選んでください'
-                            : 'この月の明細はありません',
-                        style: const TextStyle(color: Color(0xFF9CA3AF))),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(8, 8, 8, 96),
-                    itemCount: rows.length,
-                    separatorBuilder: (_, _) =>
-                        const Divider(height: 1, color: Color(0xFFF1F2F4)),
-                    itemBuilder: (_, i) => _rowTile(rows[i]),
-                  ),
-          ),
-        ],
+            const Divider(height: 1),
+            // 説明バナー。
+            Container(
+              width: double.infinity,
+              color: const Color(0xFFFFF7ED),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Text(
+                _fileName == null
+                    ? 'CSVを選ぶと、その月の明細だけを取り込みます。'
+                        '（新生銀行・GMOあおぞらネット銀行のCSVに自動対応）'
+                    : '取り込むと、この月の「${widget.account.name}」の既存明細は消えて置き換わります。'
+                        '「振替」ON の行は収支に入りません（口座間の移動）。',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF9A3412)),
+              ),
+            ),
+            if (_fileName != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Row(
+                  children: [
+                    const Icon(Icons.description_outlined,
+                        size: 16, color: Color(0xFF6B7280)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                          _bankLabel == null
+                              ? '$_fileName'
+                              : '$_fileName（$_bankLabel）',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 12, color: Color(0xFF6B7280))),
+                    ),
+                    Text('${rows.length}件（振替 $transferCount）',
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF111827))),
+                  ],
+                ),
+              ),
+            Expanded(
+              child: rows.isEmpty
+                  ? Center(
+                      child: Text(
+                          _fileName == null
+                              ? 'CSVファイルを選んでください'
+                              : 'この月の明細はありません',
+                          style: const TextStyle(color: Color(0xFF9CA3AF))),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(8, 8, 8, 96),
+                      itemCount: rows.length,
+                      separatorBuilder: (_, _) =>
+                          const Divider(height: 1, color: Color(0xFFF1F2F4)),
+                      itemBuilder: (_, i) => _rowTile(rows[i]),
+                    ),
+            ),
+          ],
+        ),
       ),
       bottomSheet: (rows.isEmpty)
           ? null

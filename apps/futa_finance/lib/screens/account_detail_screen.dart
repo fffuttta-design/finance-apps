@@ -19,6 +19,7 @@ import 'income_input_screen.dart';
 import 'bank_csv_import_screen.dart';
 import 'transfer_input_screen.dart';
 
+import '../widgets/centered_body.dart';
 /// 口座詳細（通帳）画面。
 /// 単一口座に関連する取引を時系列で表示し、各時点の残高を逆算する。
 /// 新生銀行などの実通帳と同じ列構成（取引日 / 摘要 / 出金 / 入金 / 残高）。
@@ -433,67 +434,71 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
           ],
         ),
         // メインカラムレイアウト: 広い画面では中央寄せ + 最大幅
-        body: _wrapFind(LayoutBuilder(
-          builder: (ctx, constraints) {
-            final content = Column(
-              children: [
-                _monthSelector(),
-                Expanded(
-                  child: Column(
-                      children: [
-                        _summaryCard(
-                          inSum: inSum,
-                          outSum: outSum,
-                          netDelta: netDelta,
-                          realIn: realIn,
-                          realOut: realOut,
-                          transferNet: transferNet,
-                          startBalance: dispStart,
-                          endBalance: dispEnd,
-                          wide: constraints.maxWidth >= 900,
-                        ),
-                        const Divider(height: 1),
-                        Expanded(
-                          // 銀行明細そのままの順（日付の新しい順・同日はCSVの並び）を
-                          // 正とする。手動並び替え（カスタム順）は廃止＝並びは固定表示。
-                          // PC幅は列そろえの表、スマホ幅は崩れない1行リスト。
-                          // 幅広の固定列 Table を狭い画面に押し込むと「摘要」や
-                          // 残高が1文字ずつ縦に折れて崩れるため、幅で出し分ける。
-                          child: constraints.maxWidth >= 900
-                              ? _ledgerTable(
-                                  displayRows: shownRows,
-                                  monthStartBalance: dispStart,
-                                  monthEndBalance: dispEnd,
-                                )
-                              : _ledgerMobileList(
-                                  displayRows: shownRows,
-                                  monthStartBalance: dispStart,
-                                  monthEndBalance: dispEnd,
-                                ),
-                        ),
-                      ],
-                    ),
-                ),
-              ],
-            );
-            if (constraints.maxWidth >= 900) {
-              // Row+Spacer で中央寄せ。SizedBoxは幅だけ指定して高さは
-              // 親(Row)から受け取る形にすると、内側Columnの Expanded が
-              // finite な親制約を持って正常に動作する。
-              return Row(
+        body: CenteredBody(
+          maxWidth: 1140,
+          fill: true,
+          child: _wrapFind(LayoutBuilder(
+            builder: (ctx, constraints) {
+              final content = Column(
                 children: [
-                  const Spacer(),
-                  SizedBox(
-                    width: _kContentMaxWidth,
-                    child: content,
+                  _monthSelector(),
+                  Expanded(
+                    child: Column(
+                        children: [
+                          _summaryCard(
+                            inSum: inSum,
+                            outSum: outSum,
+                            netDelta: netDelta,
+                            realIn: realIn,
+                            realOut: realOut,
+                            transferNet: transferNet,
+                            startBalance: dispStart,
+                            endBalance: dispEnd,
+                            wide: constraints.maxWidth >= 900,
+                          ),
+                          const Divider(height: 1),
+                          Expanded(
+                            // 銀行明細そのままの順（日付の新しい順・同日はCSVの並び）を
+                            // 正とする。手動並び替え（カスタム順）は廃止＝並びは固定表示。
+                            // PC幅は列そろえの表、スマホ幅は崩れない1行リスト。
+                            // 幅広の固定列 Table を狭い画面に押し込むと「摘要」や
+                            // 残高が1文字ずつ縦に折れて崩れるため、幅で出し分ける。
+                            child: constraints.maxWidth >= 900
+                                ? _ledgerTable(
+                                    displayRows: shownRows,
+                                    monthStartBalance: dispStart,
+                                    monthEndBalance: dispEnd,
+                                  )
+                                : _ledgerMobileList(
+                                    displayRows: shownRows,
+                                    monthStartBalance: dispStart,
+                                    monthEndBalance: dispEnd,
+                                  ),
+                          ),
+                        ],
+                      ),
                   ),
-                  const Spacer(),
                 ],
               );
-            }
-            return content;
-          },
-        )),
+              if (constraints.maxWidth >= 900) {
+                // Row+Spacer で中央寄せ。SizedBoxは幅だけ指定して高さは
+                // 親(Row)から受け取る形にすると、内側Columnの Expanded が
+                // finite な親制約を持って正常に動作する。
+                return Row(
+                  children: [
+                    const Spacer(),
+                    SizedBox(
+                      width: _kContentMaxWidth,
+                      child: content,
+                    ),
+                    const Spacer(),
+                  ],
+                );
+              }
+              return content;
+            },
+          )),
+        ),
       ),
     );
   }

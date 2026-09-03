@@ -11,6 +11,7 @@ import '../utils/format.dart';
 import '../widgets/settings_button.dart';
 import 'accounts_screen.dart';
 
+import '../widgets/web_layout.dart';
 /// 資産タブ：**ためた合計**（記録し始めてからの 収入−支出）を主役にした画面。
 ///
 /// 口座ごとの残高管理は使っていないので、口座を登録していないときは
@@ -70,25 +71,28 @@ class _AssetScreenState extends State<AssetScreen> {
           const SettingsButton(),
         ],
       ),
-      body: hid == null
-          ? const Center(child: CircularProgressIndicator())
-          : StreamBuilder<List<Account>>(
-              stream: AccountRepository.instance.watch(hid),
-              builder: (context, accSnap) {
-                if (accSnap.connectionState == ConnectionState.waiting &&
-                    !accSnap.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final accounts = accSnap.data ?? const <Account>[];
-                return StreamBuilder<List<core.Transaction>>(
-                  stream: TxRepository.instance.watch(hid),
-                  builder: (context, txSnap) {
-                    final txns = txSnap.data ?? const <core.Transaction>[];
-                    return _body(accounts, txns);
-                  },
-                );
-              },
-            ),
+      body: WebCenterFill(
+        maxWidth: 1040,
+        child: hid == null
+            ? const Center(child: CircularProgressIndicator())
+            : StreamBuilder<List<Account>>(
+                stream: AccountRepository.instance.watch(hid),
+                builder: (context, accSnap) {
+                  if (accSnap.connectionState == ConnectionState.waiting &&
+                      !accSnap.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final accounts = accSnap.data ?? const <Account>[];
+                  return StreamBuilder<List<core.Transaction>>(
+                    stream: TxRepository.instance.watch(hid),
+                    builder: (context, txSnap) {
+                      final txns = txSnap.data ?? const <core.Transaction>[];
+                      return _body(accounts, txns);
+                    },
+                  );
+                },
+              ),
+      ),
     );
   }
 

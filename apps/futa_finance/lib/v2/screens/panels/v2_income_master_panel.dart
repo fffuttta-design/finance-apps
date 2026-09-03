@@ -397,6 +397,8 @@ Future<_IncomeSheetResult?> _showSourceSheet(BuildContext context,
   final isEdit = initial != null;
 
   return showModalBottomSheet<_IncomeSheetResult?>(
+    // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+    constraints: const BoxConstraints(maxWidth: 560),
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

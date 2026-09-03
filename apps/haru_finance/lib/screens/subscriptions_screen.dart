@@ -11,6 +11,7 @@ import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 
+import '../widgets/web_layout.dart';
 /// 「一緒に（折半）」を表す paidBy のセンチネル値。
 const String kPaidByBoth = 'both';
 
@@ -85,6 +86,8 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
 
   Future<void> _openEdit([Subscription? editing]) async {
     final result = await showModalBottomSheet<Subscription>(
+      // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+      constraints: const BoxConstraints(maxWidth: 560),
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -219,48 +222,53 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     final hid = HouseholdService.instance.householdId;
     return Scaffold(
       appBar: AppBar(title: const Text('固定費・サブスク')),
+      // 広い画面では、中央に寄せた本文の右端にボタンを合わせる。
+      floatingActionButtonLocation: const WebEndFloatFabLocation(),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openEdit(),
         icon: const Icon(Icons.add_rounded),
         label: const Text('追加', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
-      body: hid == null
-          ? const Center(child: CircularProgressIndicator())
-          : StreamBuilder<List<Subscription>>(
-              stream: SubscriptionRepository.instance.watch(hid),
-              builder: (context, snap) {
-                final subs = snap.data ?? const <Subscription>[];
-                final monthly = subs
-                    .where((s) => s.appliesTo(_now.year, _now.month))
-                    .fold<int>(
-                        0,
-                        (t, s) =>
-                            t + s.amountForMonth(_now.year, _now.month));
-                final fixed = subs.where((s) => !s.variable).toList();
-                final variable = subs.where((s) => s.variable).toList();
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                  children: [
-                    _header(monthly, subs),
-                    const SizedBox(height: 16),
-                    if (subs.isEmpty)
-                      _empty()
-                    else ...[
-                      if (fixed.isNotEmpty) ...[
-                        _sectionLabel('金額固定', Icons.lock_outline_rounded),
-                        ...fixed.map(_tile),
-                        const SizedBox(height: 8),
-                      ],
-                      if (variable.isNotEmpty) ...[
-                        _sectionLabel(
-                            '変動費（毎月入力）', Icons.show_chart_rounded),
-                        ...variable.map(_tile),
+      body: WebCenterFill(
+        maxWidth: 1040,
+        child: hid == null
+            ? const Center(child: CircularProgressIndicator())
+            : StreamBuilder<List<Subscription>>(
+                stream: SubscriptionRepository.instance.watch(hid),
+                builder: (context, snap) {
+                  final subs = snap.data ?? const <Subscription>[];
+                  final monthly = subs
+                      .where((s) => s.appliesTo(_now.year, _now.month))
+                      .fold<int>(
+                          0,
+                          (t, s) =>
+                              t + s.amountForMonth(_now.year, _now.month));
+                  final fixed = subs.where((s) => !s.variable).toList();
+                  final variable = subs.where((s) => s.variable).toList();
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                    children: [
+                      _header(monthly, subs),
+                      const SizedBox(height: 16),
+                      if (subs.isEmpty)
+                        _empty()
+                      else ...[
+                        if (fixed.isNotEmpty) ...[
+                          _sectionLabel('金額固定', Icons.lock_outline_rounded),
+                          ...fixed.map(_tile),
+                          const SizedBox(height: 8),
+                        ],
+                        if (variable.isNotEmpty) ...[
+                          _sectionLabel(
+                              '変動費（毎月入力）', Icons.show_chart_rounded),
+                          ...variable.map(_tile),
+                        ],
                       ],
                     ],
-                  ],
-                );
-              },
-            ),
+                  );
+                },
+              ),
+      ),
     );
   }
 

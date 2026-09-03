@@ -26,6 +26,7 @@ import 'sidebar_order_screen.dart';
 import 'subscription_list_screen.dart';
 import 'ai_usage_screen.dart';
 
+import '../widgets/centered_body.dart';
 /// 設定のトップ画面。各サブ設定への入り口を並べる。
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -193,14 +194,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               color: Color(0xFF111827)),
         ),
       ),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth >= _wideBreakpoint) {
-              return _buildWideLayout();
-            }
-            return _buildNarrowLayout();
-          },
+      body: CenteredBody(
+        maxWidth: 1000,
+        fill: true,
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth >= _wideBreakpoint) {
+                return _buildWideLayout();
+              }
+              return _buildNarrowLayout();
+            },
+          ),
         ),
       ),
     );
@@ -965,6 +970,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     final selected = await showModalBottomSheet<AutoSnapshotInfo>(
+      // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+      constraints: const BoxConstraints(maxWidth: 560),
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,

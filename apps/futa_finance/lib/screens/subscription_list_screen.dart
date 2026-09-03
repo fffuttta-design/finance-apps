@@ -236,6 +236,8 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     Future<void> pickAnnualDate(StateSetter setLocal) async {
       DateTime temp = nextDate ?? DateTime.now();
       final picked = await showModalBottomSheet<DateTime>(
+        // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+        constraints: const BoxConstraints(maxWidth: 560),
         context: context,
         backgroundColor: Colors.white,
         shape: const RoundedRectangleBorder(
@@ -287,6 +289,8 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
               int.parse(startYm!.split('-')[1]))
           : DateTime.now();
       final picked = await showModalBottomSheet<DateTime>(
+        // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+        constraints: const BoxConstraints(maxWidth: 560),
         context: context,
         backgroundColor: Colors.white,
         shape: const RoundedRectangleBorder(
@@ -341,6 +345,8 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
               int.parse(endYm!.split('-')[1]))
           : DateTime.now();
       final picked = await showModalBottomSheet<DateTime>(
+        // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+        constraints: const BoxConstraints(maxWidth: 560),
         context: context,
         backgroundColor: Colors.white,
         shape: const RoundedRectangleBorder(
@@ -394,6 +400,8 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     // - 高さは画面の92%、内部は SingleChildScrollView でスクロール
     // - 「キャンセル/保存」は下端に固定（スクロールしても常に見える）
     return showModalBottomSheet<Subscription?>(
+      // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+      constraints: const BoxConstraints(maxWidth: 560),
       context: context,
       isScrollControlled: true,
       useSafeArea: true,

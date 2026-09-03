@@ -10,6 +10,7 @@ import '../data/settings_repository.dart';
 import '../data/transaction_repository.dart';
 import '../utils/formatters.dart';
 
+import '../widgets/centered_body.dart';
 /// 請求書PDFを複数選択 → Gemini が抽出 → プレビューで確認・修正 → 一括記帳する画面。
 ///
 /// - 売上(入金)請求書 → 収入に記帳 / 支払・外注請求書 → 支出に記帳。
@@ -266,128 +267,132 @@ class _InvoiceImportScreenState extends State<InvoiceImportScreen> {
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF111827))),
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE0E7FF),
-                borderRadius: BorderRadius.circular(8),
+      body: CenteredBody(
+        maxWidth: 760,
+        fill: true,
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0E7FF),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline,
+                        size: 18, color: Color(0xFF1A237E)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '請求書PDF（複数可）を選ぶと、AIが取引先・日付・金額を読み取ります。'
+                        '内容を確認・修正して「${mode.label}」モードへまとめて記帳します。',
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF1A237E)),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: Row(
+              const SizedBox(height: 12),
+              // 種別の初期値（次に読み込む請求書に適用）。
+              Row(
                 children: [
-                  const Icon(Icons.info_outline,
-                      size: 18, color: Color(0xFF1A237E)),
-                  const SizedBox(width: 8),
+                  const Text('読み込む請求書の種別: ',
+                      style: TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600)),
+                  const SizedBox(width: 4),
                   Expanded(
-                    child: Text(
-                      '請求書PDF（複数可）を選ぶと、AIが取引先・日付・金額を読み取ります。'
-                      '内容を確認・修正して「${mode.label}」モードへまとめて記帳します。',
-                      style: const TextStyle(
-                          fontSize: 12, color: Color(0xFF1A237E)),
+                    child: SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(
+                            value: false,
+                            icon: Icon(Icons.south_west, size: 15),
+                            label: Text('支払/外注')),
+                        ButtonSegment(
+                            value: true,
+                            icon: Icon(Icons.north_east, size: 15),
+                            label: Text('売上')),
+                      ],
+                      selected: {_defaultIncome},
+                      showSelectedIcon: false,
+                      onSelectionChanged: (s) =>
+                          setState(() => _defaultIncome = s.first),
+                      style: ButtonStyle(
+                        visualDensity: VisualDensity.compact,
+                        textStyle: WidgetStateProperty.all(
+                            const TextStyle(fontSize: 12)),
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 12),
-            // 種別の初期値（次に読み込む請求書に適用）。
-            Row(
-              children: [
-                const Text('読み込む請求書の種別: ',
-                    style: TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w600)),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment(
-                          value: false,
-                          icon: Icon(Icons.south_west, size: 15),
-                          label: Text('支払/外注')),
-                      ButtonSegment(
-                          value: true,
-                          icon: Icon(Icons.north_east, size: 15),
-                          label: Text('売上')),
+              const Padding(
+                padding: EdgeInsets.only(top: 4, left: 2),
+                child: Text('（読み取り後も1件ごとに種別を切り替えられます）',
+                    style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _picking ? null : _pickAndExtract,
+                  icon: const Icon(Icons.picture_as_pdf, size: 18),
+                  label: Text(_picking ? '選択中…' : 'PDFを選ぶ（複数可）'),
+                ),
+              ),
+              if (_rows.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Text('記帳できる $_validCount件',
+                        style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1A237E))),
+                    if (_busyCount > 0) ...[
+                      const SizedBox(width: 12),
+                      Text('解析中 $_busyCount件',
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFFEA580C))),
                     ],
-                    selected: {_defaultIncome},
-                    showSelectedIcon: false,
-                    onSelectionChanged: (s) =>
-                        setState(() => _defaultIncome = s.first),
-                    style: ButtonStyle(
-                      visualDensity: VisualDensity.compact,
-                      textStyle: WidgetStateProperty.all(
-                          const TextStyle(fontSize: 12)),
+                    const Spacer(),
+                    Text('合計 ${formatYen(_total)}',
+                        style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'monospace')),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                for (final r in _rows) _previewRow(r),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed:
+                        (_validCount == 0 || _importing || _busyCount > 0)
+                            ? null
+                            : _import,
+                    icon: const Icon(Icons.download_done, size: 18),
+                    label: Text(_importing
+                        ? '記帳中…'
+                        : (_busyCount > 0
+                            ? '解析の完了を待っています…'
+                            : '$_validCount件を記帳する')),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A237E),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                   ),
                 ),
               ],
-            ),
-            const Padding(
-              padding: EdgeInsets.only(top: 4, left: 2),
-              child: Text('（読み取り後も1件ごとに種別を切り替えられます）',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _picking ? null : _pickAndExtract,
-                icon: const Icon(Icons.picture_as_pdf, size: 18),
-                label: Text(_picking ? '選択中…' : 'PDFを選ぶ（複数可）'),
-              ),
-            ),
-            if (_rows.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Text('記帳できる $_validCount件',
-                      style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1A237E))),
-                  if (_busyCount > 0) ...[
-                    const SizedBox(width: 12),
-                    Text('解析中 $_busyCount件',
-                        style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFFEA580C))),
-                  ],
-                  const Spacer(),
-                  Text('合計 ${formatYen(_total)}',
-                      style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          fontFamily: 'monospace')),
-                ],
-              ),
-              const SizedBox(height: 8),
-              for (final r in _rows) _previewRow(r),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed:
-                      (_validCount == 0 || _importing || _busyCount > 0)
-                          ? null
-                          : _import,
-                  icon: const Icon(Icons.download_done, size: 18),
-                  label: Text(_importing
-                      ? '記帳中…'
-                      : (_busyCount > 0
-                          ? '解析の完了を待っています…'
-                          : '$_validCount件を記帳する')),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF1A237E),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                ),
-              ),
             ],
-          ],
+          ),
         ),
       ),
     );
