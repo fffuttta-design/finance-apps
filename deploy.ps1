@@ -162,7 +162,10 @@ Get-ChildItem -LiteralPath (Join-Path $appDir 'build') -Filter 'futa-finance-v*.
 gh release create $tag $apkRenamed `
   --repo $repo `
   --title "FutaFinance v$fullVersion" `
-  --notes $ReleaseNotes
+  --notes $ReleaseNotes `
+  --prerelease
+# --prerelease は必須。付けないと futa- タグが finance-apps の "Latest" になり、
+# Windows版(electron-updater)が Android の APK リリースを最新版と誤検知しうる（CLAUDE.md 参照）。
 if ($LASTEXITCODE -ne 0) {
   Write-Error "gh release create 失敗"
   exit 1
