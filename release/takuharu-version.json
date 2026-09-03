@@ -1,6 +1,6 @@
 {
-    "version": "0.2.113",
-    "buildNumber": "118",
-    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.113/takuharu-finance-v0.2.113.apk",
-    "releaseNotes": "・特別支出を下のメニューの「特別」タブに独立させました。旅行やライブのたびに開くものなので、支出タブの中ではなくホーム・支出の隣に常に出ます。"
+  "version": "0.2.114",
+  "buildNumber": "119",
+  "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/takuharu-v0.2.114/takuharu-finance-v0.2.114.apk",
+  "releaseNotes": "Web版（パソコンの大きい画面）の中央寄せを全画面に横展開。Androidの見え方は変わりません。"
 }
