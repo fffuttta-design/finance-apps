@@ -21,6 +21,7 @@ import '../theme/app_theme.dart';
 import '../utils/format.dart';
 import 'receipt_image_screen.dart';
 
+import '../widgets/web_layout.dart';
 /// 収支を1件記録／編集する画面（可愛い系）。
 class AddTransactionScreen extends StatefulWidget {
   /// 編集対象（null なら新規）。
@@ -452,208 +453,211 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             ),
         ],
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-          children: [
-            // 支出/収入トグル（新規記録時のみ。編集では種別は変えない）
-            if (widget.editing == null) ...[
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: AppColors.pinkSoft,
-                  borderRadius: BorderRadius.circular(20),
+      body: WebCenterFill(
+        maxWidth: 720,
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+            children: [
+              // 支出/収入トグル（新規記録時のみ。編集では種別は変えない）
+              if (widget.editing == null) ...[
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppColors.pinkSoft,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      _typeTab('支出', core.TransactionType.expense,
+                          AppColors.expense),
+                      _typeTab('収入', core.TransactionType.income,
+                          AppColors.income),
+                    ],
+                  ),
                 ),
-                child: Row(
+                const SizedBox(height: 20),
+              ],
+              // 金額
+              Center(
+                child: Column(
                   children: [
-                    _typeTab('支出', core.TransactionType.expense,
-                        AppColors.expense),
-                    _typeTab('収入', core.TransactionType.income,
-                        AppColors.income),
+                    const Text('いくら？',
+                        style: TextStyle(
+                            fontSize: 13, color: AppColors.textSub)),
+                    const SizedBox(height: 4),
+                    IntrinsicWidth(
+                      child: TextField(
+                        controller: _amountCtrl,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        style: TextStyle(
+                          fontSize: 40,
+                          fontWeight: FontWeight.w800,
+                          color: accent,
+                        ),
+                        decoration: const InputDecoration(
+                          prefixText: '¥ ',
+                          prefixStyle: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textSub),
+                          hintText: '0',
+                          filled: false,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-            ],
-            // 金額
-            Center(
-              child: Column(
-                children: [
-                  const Text('いくら？',
-                      style: TextStyle(
-                          fontSize: 13, color: AppColors.textSub)),
-                  const SizedBox(height: 4),
-                  IntrinsicWidth(
-                    child: TextField(
-                      controller: _amountCtrl,
-                      keyboardType: TextInputType.number,
-                      textAlign: TextAlign.center,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      style: TextStyle(
-                        fontSize: 40,
-                        fontWeight: FontWeight.w800,
-                        color: accent,
-                      ),
-                      decoration: const InputDecoration(
-                        prefixText: '¥ ',
-                        prefixStyle: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textSub),
-                        hintText: '0',
-                        filled: false,
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                      ),
-                    ),
+              const SizedBox(height: 12),
+              // 日付
+              _section('いつ？'),
+              InkWell(
+                onTap: _pickDate,
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.divider),
                   ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today_rounded,
+                          size: 18, color: AppColors.pinkDark),
+                      const SizedBox(width: 10),
+                      Text(
+                          '${_date.year}年${_date.month}月${_date.day}日',
+                          style: const TextStyle(fontSize: 15)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              // なにを買った？（購入物の品名＝一番大事なので日付の次に置く）
+              _section('なにを買った？'),
+              TextField(
+                controller: _memoCtrl,
+                decoration:
+                    const InputDecoration(hintText: '例: たまご・牛乳 / ランチ'),
+              ),
+              // レシートの品目（メモ）プレビュー。まとめて1件にぶら下がる内訳。
+              if (_receiptMemo != null && _receiptMemo!.trim().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.pinkSoft.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.receipt_long_rounded,
+                              size: 15, color: AppColors.pinkDark),
+                          SizedBox(width: 5),
+                          Text('レシートの品目',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.pinkDark)),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(_receiptMemo!.trim(),
+                          style: const TextStyle(
+                              fontSize: 12, color: AppColors.text, height: 1.5)),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 18),
+              // カテゴリ
+              _section('カテゴリ'),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  ..._cats.map(_catChip),
+                  _addCatChip(),
                 ],
               ),
-            ),
-            const SizedBox(height: 12),
-            // 日付
-            _section('いつ？'),
-            InkWell(
-              onTap: _pickDate,
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.divider),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.calendar_today_rounded,
-                        size: 18, color: AppColors.pinkDark),
-                    const SizedBox(width: 10),
-                    Text(
-                        '${_date.year}年${_date.month}月${_date.day}日',
-                        style: const TextStyle(fontSize: 15)),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            // なにを買った？（購入物の品名＝一番大事なので日付の次に置く）
-            _section('なにを買った？'),
-            TextField(
-              controller: _memoCtrl,
-              decoration:
-                  const InputDecoration(hintText: '例: たまご・牛乳 / ランチ'),
-            ),
-            // レシートの品目（メモ）プレビュー。まとめて1件にぶら下がる内訳。
-            if (_receiptMemo != null && _receiptMemo!.trim().isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.pinkSoft.withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.receipt_long_rounded,
-                            size: 15, color: AppColors.pinkDark),
-                        SizedBox(width: 5),
-                        Text('レシートの品目',
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.pinkDark)),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(_receiptMemo!.trim(),
-                        style: const TextStyle(
-                            fontSize: 12, color: AppColors.text, height: 1.5)),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 18),
-            // カテゴリ
-            _section('カテゴリ'),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                ..._cats.map(_catChip),
-                _addCatChip(),
+              // 個人の食費わく（カテゴリが「食費」「日用品」のときだけ表示）。
+              // カテゴリのすぐ下に、目立つ形で出す（探さなくても気づく位置）。
+              if (_canPersonalFood) ...[
+                const SizedBox(height: 18),
+                _section('個人の食費わく'),
+                _personalFoodToggle(),
               ],
-            ),
-            // 個人の食費わく（カテゴリが「食費」「日用品」のときだけ表示）。
-            // カテゴリのすぐ下に、目立つ形で出す（探さなくても気づく位置）。
-            if (_canPersonalFood) ...[
               const SizedBox(height: 18),
-              _section('個人の食費わく'),
-              _personalFoodToggle(),
-            ],
-            const SizedBox(height: 18),
-            // 支払元（登録した口座/クレカから選択。残高がそこから増減する）
-            _section('支払元'),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (_accounts.isNotEmpty)
-                  ..._accounts.map((a) => _payChip(a.name, a.name))
-                else
-                  ...HouseholdService.instance.paymentMethods
-                      .map((m) => _payChip(m, m)),
-              ],
-            ),
-            const SizedBox(height: 18),
-            // だれ（記録者／支払者。相手が登録したものでも変更できる）
-            _section('だれ'),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final e in HouseholdService.instance.memberNames.entries)
-                  _personChip(e.key, e.value),
-              ],
-            ),
-            // 特別支出（旅行・引っ越しなど）。支出のときだけ出す。
-            if (_type == core.TransactionType.expense &&
-                _specials.isNotEmpty) ...[
-              const SizedBox(height: 18),
-              _section('特別支出'),
+              // 支払元（登録した口座/クレカから選択。残高がそこから増減する）
+              _section('支払元'),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _specialChip(null, 'なし'),
-                  ..._specials.map((e) => _specialChip(e.id, e.name)),
+                  if (_accounts.isNotEmpty)
+                    ..._accounts.map((a) => _payChip(a.name, a.name))
+                  else
+                    ...HouseholdService.instance.paymentMethods
+                        .map((m) => _payChip(m, m)),
                 ],
               ),
-              if (_specialExpenseId != null) ...[
-                const SizedBox(height: 10),
-                _pendingToggle(),
+              const SizedBox(height: 18),
+              // だれ（記録者／支払者。相手が登録したものでも変更できる）
+              _section('だれ'),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final e in HouseholdService.instance.memberNames.entries)
+                    _personChip(e.key, e.value),
+                ],
+              ),
+              // 特別支出（旅行・引っ越しなど）。支出のときだけ出す。
+              if (_type == core.TransactionType.expense &&
+                  _specials.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                _section('特別支出'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _specialChip(null, 'なし'),
+                    ..._specials.map((e) => _specialChip(e.id, e.name)),
+                  ],
+                ),
+                if (_specialExpenseId != null) ...[
+                  const SizedBox(height: 10),
+                  _pendingToggle(),
+                ],
               ],
+              const SizedBox(height: 18),
+              // くわしい情報（画像）。手入力でも写真を1枚ぶら下げられる。
+              _section('くわしい情報（画像）'),
+              _detailImageSection(),
+              const SizedBox(height: 28),
+              FilledButton(
+                onPressed: _saving ? null : _save,
+                style: FilledButton.styleFrom(backgroundColor: accent),
+                child: Text(_saving
+                    ? '保存中…'
+                    : (widget.editing != null ? '更新する' : 'きろくする ♡')),
+              ),
             ],
-            const SizedBox(height: 18),
-            // くわしい情報（画像）。手入力でも写真を1枚ぶら下げられる。
-            _section('くわしい情報（画像）'),
-            _detailImageSection(),
-            const SizedBox(height: 28),
-            FilledButton(
-              onPressed: _saving ? null : _save,
-              style: FilledButton.styleFrom(backgroundColor: accent),
-              child: Text(_saving
-                  ? '保存中…'
-                  : (widget.editing != null ? '更新する' : 'きろくする ♡')),
-            ),
-          ],
+          ),
         ),
       ),
     );

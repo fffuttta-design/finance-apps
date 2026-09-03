@@ -61,44 +61,50 @@ class _LoginScreenState extends State<LoginScreen> {
                 left: 28,
                 right: 28,
                 bottom: 24,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (_error != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFE0E6),
-                          borderRadius: BorderRadius.circular(14),
+                // 広い画面ではボタンが横いっぱいに伸びるので、幅を抑えて中央に置く。
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 380),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (_error != null) ...[
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFE0E6),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Text(_error!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                    color: AppColors.pinkDark, fontSize: 13)),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        FilledButton.icon(
+                          onPressed: _signingIn ? null : _signIn,
+                          icon: _signingIn
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2.4, color: Colors.white),
+                                )
+                              : const Icon(Icons.login_rounded),
+                          label:
+                              Text(_signingIn ? 'サインイン中…' : 'Googleではじめる'),
                         ),
-                        child: Text(_error!,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                                color: AppColors.pinkDark, fontSize: 13)),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    FilledButton.icon(
-                      onPressed: _signingIn ? null : _signIn,
-                      icon: _signingIn
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2.4, color: Colors.white),
-                            )
-                          : const Icon(Icons.login_rounded),
-                      label:
-                          Text(_signingIn ? 'サインイン中…' : 'Googleではじめる'),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'ふたりとも同じ画面・同じデータを見られます',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 11, color: AppColors.textSub),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'ふたりとも同じ画面・同じデータを見られます',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 11, color: AppColors.textSub),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ],

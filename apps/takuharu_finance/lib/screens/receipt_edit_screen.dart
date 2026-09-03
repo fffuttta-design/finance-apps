@@ -13,6 +13,7 @@ import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 
+import '../widgets/web_layout.dart';
 /// 差額調整の品目名（レシート税込合計と品目合計の差を埋める1行）。
 /// この名前の品目は編集画面では通常の品目リストに出さず、差額調整カードで管理する。
 const _kAdjPlus = '消費税・調整'; // 税込合計 > 品目合計（外税レシートの消費税ぶん）
@@ -240,6 +241,8 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
 
   Future<void> _pickCategory(int index) async {
     final chosen = await showModalBottomSheet<String>(
+      // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+      constraints: const BoxConstraints(maxWidth: 560),
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -508,161 +511,164 @@ class _ReceiptEditScreenState extends State<ReceiptEditScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('レシートを編集')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          children: [
-            // 共通情報（このレシート全体に効く）
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 店名（編集可）
-                    Row(children: [
-                      const Icon(Icons.storefront_rounded,
-                          size: 18, color: AppColors.pinkDark),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: _storeCtrl,
-                          decoration: const InputDecoration(
-                            isDense: true,
-                            border: InputBorder.none,
-                            hintText: '店名（任意）',
+      body: WebCenterFill(
+        maxWidth: 720,
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            children: [
+              // 共通情報（このレシート全体に効く）
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 店名（編集可）
+                      Row(children: [
+                        const Icon(Icons.storefront_rounded,
+                            size: 18, color: AppColors.pinkDark),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _storeCtrl,
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              border: InputBorder.none,
+                              hintText: '店名（任意）',
+                            ),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
-                          style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
-                      ),
-                    ]),
-                    const SizedBox(height: 10),
-                    // 日付（タップで変更できると分かる見た目に）
-                    const Text('日付',
-                        style:
-                            TextStyle(fontSize: 12, color: AppColors.textSub)),
-                    const SizedBox(height: 6),
-                    InkWell(
-                      onTap: _pickDate,
-                      borderRadius: BorderRadius.circular(14),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.divider),
-                        ),
-                        child: Row(children: [
-                          const Icon(Icons.calendar_today_rounded,
-                              size: 18, color: AppColors.pinkDark),
-                          const SizedBox(width: 8),
-                          Text('${_date.year}年${_date.month}月${_date.day}日',
-                              style: const TextStyle(
-                                  fontSize: 14, fontWeight: FontWeight.w600)),
-                          const Spacer(),
-                          const Icon(Icons.edit_calendar_rounded,
-                              size: 18, color: AppColors.pinkDark),
-                        ]),
-                      ),
-                    ),
-                    if (_members.length >= 2) ...[
+                      ]),
                       const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          const Text('だれが払った？',
-                              style: TextStyle(
-                                  fontSize: 12, color: AppColors.textSub)),
-                          const SizedBox(width: 8),
-                          ..._members.entries.map((e) {
-                            final sel = _payer == e.key;
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 6),
-                              child: ChoiceChip(
-                                label: Text(e.value),
-                                selected: sel,
-                                onSelected: (_) =>
-                                    setState(() => _payer = e.key),
-                                selectedColor: AppColors.pinkSoft,
-                              ),
-                            );
-                          }),
-                        ],
+                      // 日付（タップで変更できると分かる見た目に）
+                      const Text('日付',
+                          style:
+                              TextStyle(fontSize: 12, color: AppColors.textSub)),
+                      const SizedBox(height: 6),
+                      InkWell(
+                        onTap: _pickDate,
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.divider),
+                          ),
+                          child: Row(children: [
+                            const Icon(Icons.calendar_today_rounded,
+                                size: 18, color: AppColors.pinkDark),
+                            const SizedBox(width: 8),
+                            Text('${_date.year}年${_date.month}月${_date.day}日',
+                                style: const TextStyle(
+                                    fontSize: 14, fontWeight: FontWeight.w600)),
+                            const Spacer(),
+                            const Icon(Icons.edit_calendar_rounded,
+                                size: 18, color: AppColors.pinkDark),
+                          ]),
+                        ),
+                      ),
+                      if (_members.length >= 2) ...[
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            const Text('だれが払った？',
+                                style: TextStyle(
+                                    fontSize: 12, color: AppColors.textSub)),
+                            const SizedBox(width: 8),
+                            ..._members.entries.map((e) {
+                              final sel = _payer == e.key;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: ChoiceChip(
+                                  label: Text(e.value),
+                                  selected: sel,
+                                  onSelected: (_) =>
+                                      setState(() => _payer = e.key),
+                                  selectedColor: AppColors.pinkSoft,
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('支払元',
+                                style: TextStyle(
+                                    fontSize: 12, color: AppColors.textSub)),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                if (_accounts.isNotEmpty)
+                                  ..._accounts.map((a) => _payChip(a.name))
+                                else
+                                  ...HouseholdService.instance.paymentMethods
+                                      .map(_payChip),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ],
-                    const SizedBox(height: 10),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('支払元',
-                              style: TextStyle(
-                                  fontSize: 12, color: AppColors.textSub)),
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              if (_accounts.isNotEmpty)
-                                ..._accounts.map((a) => _payChip(a.name))
-                              else
-                                ...HouseholdService.instance.paymentMethods
-                                    .map(_payChip),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Text('品目（${_items.length}件）',
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w800)),
-                // 食費があるレシートだけ、見出しの横に一括トグルのチップを出す。
-                if (_hasFoodItem) ...[
-                  const SizedBox(width: 8),
-                  _bulkPersonalFoodChip(),
-                ],
-                const Spacer(),
-                Text('合計 ${formatYen(_total)}',
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.expense)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            for (int i = 0; i < _items.length; i++) _itemCard(i),
-            const SizedBox(height: 4),
-            OutlinedButton.icon(
-              onPressed: () =>
-                  setState(() => _items.add(_EItem(n: '', p: 0, category: '食費'))),
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('品目を追加'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.pinkDark,
-                side: const BorderSide(color: AppColors.pinkSoft),
-              ),
-            ),
-            if (_hasUsage) ...[
               const SizedBox(height: 12),
-              _usageCard(),
+              Row(
+                children: [
+                  Text('品目（${_items.length}件）',
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w800)),
+                  // 食費があるレシートだけ、見出しの横に一括トグルのチップを出す。
+                  if (_hasFoodItem) ...[
+                    const SizedBox(width: 8),
+                    _bulkPersonalFoodChip(),
+                  ],
+                  const Spacer(),
+                  Text('合計 ${formatYen(_total)}',
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.expense)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              for (int i = 0; i < _items.length; i++) _itemCard(i),
+              const SizedBox(height: 4),
+              OutlinedButton.icon(
+                onPressed: () =>
+                    setState(() => _items.add(_EItem(n: '', p: 0, category: '食費'))),
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('品目を追加'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.pinkDark,
+                  side: const BorderSide(color: AppColors.pinkSoft),
+                ),
+              ),
+              if (_hasUsage) ...[
+                const SizedBox(height: 12),
+                _usageCard(),
+              ],
+              const SizedBox(height: 16),
+              _reconCard(),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: _saving ? null : _save,
+                style: FilledButton.styleFrom(backgroundColor: AppColors.pink),
+                child: Text(_saving ? '保存中…' : '保存する ♡'),
+              ),
             ],
-            const SizedBox(height: 16),
-            _reconCard(),
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: _saving ? null : _save,
-              style: FilledButton.styleFrom(backgroundColor: AppColors.pink),
-              child: Text(_saving ? '保存中…' : '保存する ♡'),
-            ),
-          ],
+          ),
         ),
       ),
     );

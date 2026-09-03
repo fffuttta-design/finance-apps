@@ -13,6 +13,7 @@ import '../data/push_service.dart';
 import '../theme/app_theme.dart';
 import 'receipt_image_screen.dart';
 
+import '../widgets/web_layout.dart';
 /// プランニング項目の詳細＋コメント（たく＆はるの会話）。
 class PlanDetailScreen extends StatefulWidget {
   final PlanItem item;
@@ -204,57 +205,60 @@ class _PlanDetailScreenState extends State<PlanDetailScreen> {
             ),
           ],
         ),
-        body: Column(
-          children: [
-            Expanded(
-              child: hid == null
-                  ? ListView(
-                      controller: _scroll,
-                      children: [_header(), _commentHeaderBar()],
-                    )
-                  : StreamBuilder<List<TxComment>>(
-                      stream:
-                          PlanCommentRepository.instance.watch(hid, _item.id),
-                      builder: (context, snap) {
-                        final msgs = snap.data ?? const <TxComment>[];
-                        _maybeScrollAfterBuild(msgs.length);
-                        return ListView(
-                          controller: _scroll,
-                          padding: const EdgeInsets.only(bottom: 12),
-                          children: [
-                            _header(),
-                            _commentHeaderBar(),
-                            if (msgs.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.all(40),
-                                child: Text(
-                                    'この項目について話そう ♡\n「いつ行く？」「ここ気になってた！」',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                        color: AppColors.textSub,
-                                        fontSize: 13)),
-                              )
-                            else ...[
-                              const SizedBox(height: 12),
-                              ...msgs.map((m) => Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12),
-                                    child: _bubble(m),
-                                  )),
+        body: WebCenterFill(
+          maxWidth: 1040,
+          child: Column(
+            children: [
+              Expanded(
+                child: hid == null
+                    ? ListView(
+                        controller: _scroll,
+                        children: [_header(), _commentHeaderBar()],
+                      )
+                    : StreamBuilder<List<TxComment>>(
+                        stream:
+                            PlanCommentRepository.instance.watch(hid, _item.id),
+                        builder: (context, snap) {
+                          final msgs = snap.data ?? const <TxComment>[];
+                          _maybeScrollAfterBuild(msgs.length);
+                          return ListView(
+                            controller: _scroll,
+                            padding: const EdgeInsets.only(bottom: 12),
+                            children: [
+                              _header(),
+                              _commentHeaderBar(),
+                              if (msgs.isEmpty)
+                                const Padding(
+                                  padding: EdgeInsets.all(40),
+                                  child: Text(
+                                      'この項目について話そう ♡\n「いつ行く？」「ここ気になってた！」',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                          color: AppColors.textSub,
+                                          fontSize: 13)),
+                                )
+                              else ...[
+                                const SizedBox(height: 12),
+                                ...msgs.map((m) => Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12),
+                                      child: _bubble(m),
+                                    )),
+                              ],
+                              if (_uploadingImage)
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(12, 6, 12, 6),
+                                  child: _uploadingBubble(),
+                                ),
                             ],
-                            if (_uploadingImage)
-                              Padding(
-                                padding:
-                                    const EdgeInsets.fromLTRB(12, 6, 12, 6),
-                                child: _uploadingBubble(),
-                              ),
-                          ],
-                        );
-                      },
-                    ),
-            ),
-            _inputBar(),
-          ],
+                          );
+                        },
+                      ),
+              ),
+              _inputBar(),
+            ],
+          ),
         ),
       ),
     );

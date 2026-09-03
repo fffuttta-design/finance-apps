@@ -17,6 +17,7 @@ import '../widgets/comment_thread.dart';
 import 'receipt_edit_screen.dart';
 import 'receipt_image_screen.dart';
 
+import '../widgets/web_layout.dart';
 /// レシート1枚＝1画面の詳細。
 ///
 /// 上部にレシートの概要（店名・日付・支払者・支払元・合計・レシート画像）、
@@ -160,10 +161,13 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
             ),
           ],
         ),
-        body: CommentThread(
-          source: _source,
-          header: _header(),
-          emptyHint: 'このレシートについて話そう ♡\n「これ何買った？」「立て替えありがと！」',
+        body: WebCenterFill(
+          maxWidth: 720,
+          child: CommentThread(
+            source: _source,
+            header: _header(),
+            emptyHint: 'このレシートについて話そう ♡\n「これ何買った？」「立て替えありがと！」',
+          ),
         ),
       ),
     );

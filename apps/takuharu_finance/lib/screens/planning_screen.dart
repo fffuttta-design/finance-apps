@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../widgets/settings_button.dart';
 import 'plan_detail_screen.dart';
 
+import '../widgets/web_layout.dart';
 /// プランニング：やりたいこと／行きたい場所／行きたいお店（世帯共有）。
 class PlanningScreen extends StatelessWidget {
   const PlanningScreen({super.key});
@@ -24,26 +25,29 @@ class PlanningScreen extends StatelessWidget {
         ),
         actions: const [SettingsButton()],
       ),
-      body: hid == null
-          ? const Center(child: CircularProgressIndicator())
-          : StreamBuilder<List<PlanItem>>(
-              stream: PlanRepository.instance.watch(hid),
-              builder: (context, snap) {
-                final all = snap.data ?? const <PlanItem>[];
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
-                  children: [
-                    for (final kind in PlanKind.values)
-                      _KindSection(
-                        hid: hid,
-                        kind: kind,
-                        items: all.where((e) => e.kind == kind).toList()
-                          ..sort((a, b) => a.order.compareTo(b.order)),
-                      ),
-                  ],
-                );
-              },
-            ),
+      body: WebCenterFill(
+        maxWidth: 1040,
+        child: hid == null
+            ? const Center(child: CircularProgressIndicator())
+            : StreamBuilder<List<PlanItem>>(
+                stream: PlanRepository.instance.watch(hid),
+                builder: (context, snap) {
+                  final all = snap.data ?? const <PlanItem>[];
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
+                    children: [
+                      for (final kind in PlanKind.values)
+                        _KindSection(
+                          hid: hid,
+                          kind: kind,
+                          items: all.where((e) => e.kind == kind).toList()
+                            ..sort((a, b) => a.order.compareTo(b.order)),
+                        ),
+                    ],
+                  );
+                },
+              ),
+      ),
     );
   }
 }

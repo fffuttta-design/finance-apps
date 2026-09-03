@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/household_service.dart';
 import '../theme/app_theme.dart';
 
+import '../widgets/web_layout.dart';
 /// 変換マスタ：レシート読み取りの表記ゆれ（この語→この語）辞書を編集。
 class ReplacementsScreen extends StatefulWidget {
   const ReplacementsScreen({super.key});
@@ -61,30 +62,33 @@ class _ReplacementsScreenState extends State<ReplacementsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('変換マスタ')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            const Text(
-              'レシート読み取りで出る読みにくい語を、登録する言葉に置き換えます。\n'
-              '例: 「ｱﾏｿﾞﾝ」→「Amazon」、「ｾﾌﾞﾝ-ｲﾚﾌﾞﾝ」→「セブンイレブン」',
-              style: TextStyle(fontSize: 12, color: AppColors.textSub),
-            ),
-            const SizedBox(height: 12),
-            for (int i = 0; i < _rows.length; i++) _ruleRow(i),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () => setState(() => _rows.add(_Row('', ''))),
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('行を追加'),
-            ),
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: _saving ? null : _save,
-              style: FilledButton.styleFrom(backgroundColor: AppColors.pink),
-              child: Text(_saving ? '保存中…' : '保存する'),
-            ),
-          ],
+      body: WebCenterFill(
+        maxWidth: 720,
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              const Text(
+                'レシート読み取りで出る読みにくい語を、登録する言葉に置き換えます。\n'
+                '例: 「ｱﾏｿﾞﾝ」→「Amazon」、「ｾﾌﾞﾝ-ｲﾚﾌﾞﾝ」→「セブンイレブン」',
+                style: TextStyle(fontSize: 12, color: AppColors.textSub),
+              ),
+              const SizedBox(height: 12),
+              for (int i = 0; i < _rows.length; i++) _ruleRow(i),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () => setState(() => _rows.add(_Row('', ''))),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('行を追加'),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: _saving ? null : _save,
+                style: FilledButton.styleFrom(backgroundColor: AppColors.pink),
+                child: Text(_saving ? '保存中…' : '保存する'),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -106,6 +106,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         ),
         actions: const [SettingsButton()],
       ),
+      // 広い画面では、中央に寄せた本文の右端にボタンを合わせる。
+      floatingActionButtonLocation: const WebEndFloatFabLocation(),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           final changed = await showRecordMenu(context);

@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../widgets/settings_button.dart';
 import 'special_expense_detail_screen.dart';
 
+import '../widgets/web_layout.dart';
 /// 特別支出の一覧。進行中と、精算が済んだものを分けて出す。
 class SpecialExpensesScreen extends StatefulWidget {
   const SpecialExpensesScreen({super.key});
@@ -19,6 +20,8 @@ class SpecialExpensesScreen extends StatefulWidget {
 class _SpecialExpensesScreenState extends State<SpecialExpensesScreen> {
   Future<void> _openEdit() async {
     final result = await showModalBottomSheet<SpecialExpense>(
+      // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+      constraints: const BoxConstraints(maxWidth: 560),
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -46,38 +49,43 @@ class _SpecialExpensesScreenState extends State<SpecialExpensesScreen> {
         title: const Text('特別支出'),
         actions: const [SettingsButton()],
       ),
+      // 広い画面では、中央に寄せた本文の右端にボタンを合わせる。
+      floatingActionButtonLocation: const WebEndFloatFabLocation(),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openEdit,
         icon: const Icon(Icons.add_rounded),
         label: const Text('作る'),
       ),
-      body: hid == null
-          ? const SizedBox.shrink()
-          : StreamBuilder<List<SpecialExpense>>(
-              stream: SpecialExpenseRepository.instance.watch(hid),
-              builder: (context, snap) {
-                final all = snap.data ?? const <SpecialExpense>[];
-                if (all.isEmpty) return _empty();
-                final open = all.where((e) => !e.settled).toList();
-                final done = all.where((e) => e.settled).toList();
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-                  children: [
-                    if (open.isNotEmpty) ...[
-                      _sectionTitle('進行中'),
-                      const SizedBox(height: 8),
-                      ...open.map(_tile),
+      body: WebCenterFill(
+        maxWidth: 1040,
+        child: hid == null
+            ? const SizedBox.shrink()
+            : StreamBuilder<List<SpecialExpense>>(
+                stream: SpecialExpenseRepository.instance.watch(hid),
+                builder: (context, snap) {
+                  final all = snap.data ?? const <SpecialExpense>[];
+                  if (all.isEmpty) return _empty();
+                  final open = all.where((e) => !e.settled).toList();
+                  final done = all.where((e) => e.settled).toList();
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+                    children: [
+                      if (open.isNotEmpty) ...[
+                        _sectionTitle('進行中'),
+                        const SizedBox(height: 8),
+                        ...open.map(_tile),
+                      ],
+                      if (done.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        _sectionTitle('精算が済んだもの'),
+                        const SizedBox(height: 8),
+                        ...done.map(_tile),
+                      ],
                     ],
-                    if (done.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      _sectionTitle('精算が済んだもの'),
-                      const SizedBox(height: 8),
-                      ...done.map(_tile),
-                    ],
-                  ],
-                );
-              },
-            ),
+                  );
+                },
+              ),
+      ),
     );
   }
 

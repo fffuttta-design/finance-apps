@@ -13,6 +13,7 @@ import '../data/tx_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 
+import '../widgets/web_layout.dart';
 /// レシートを品目ごとに1件ずつ記録する画面。
 class ReceiptSplitScreen extends StatefulWidget {
   final ReceiptResult result;
@@ -197,6 +198,8 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
 
   Future<void> _pickCategory(int index) async {
     final chosen = await showModalBottomSheet<String>(
+      // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+      constraints: const BoxConstraints(maxWidth: 560),
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -339,142 +342,145 @@ class _ReceiptSplitScreenState extends State<ReceiptSplitScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('品目ごとに記録')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          children: [
-            // 共通情報
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  children: [
-                    // 店名（読み取り結果を編集できる）
-                    Row(children: [
-                      const Icon(Icons.storefront_rounded,
-                          size: 18, color: AppColors.pinkDark),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: _storeCtrl,
-                          decoration: const InputDecoration(
-                            isDense: true,
-                            border: InputBorder.none,
-                            hintText: '店名（任意）',
-                          ),
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                    ]),
-                    const SizedBox(height: 8),
-                    InkWell(
-                      onTap: _pickDate,
-                      child: Row(children: [
-                        const Icon(Icons.calendar_today_rounded,
+      body: WebCenterFill(
+        maxWidth: 720,
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            children: [
+              // 共通情報
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    children: [
+                      // 店名（読み取り結果を編集できる）
+                      Row(children: [
+                        const Icon(Icons.storefront_rounded,
                             size: 18, color: AppColors.pinkDark),
                         const SizedBox(width: 8),
-                        Text('${_date.year}年${_date.month}月${_date.day}日'),
+                        Expanded(
+                          child: TextField(
+                            controller: _storeCtrl,
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              border: InputBorder.none,
+                              hintText: '店名（任意）',
+                            ),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
                       ]),
-                    ),
-                    if (_members.length >= 2) ...[
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          const Text('だれが払った？',
-                              style: TextStyle(
-                                  fontSize: 12, color: AppColors.textSub)),
+                      const SizedBox(height: 8),
+                      InkWell(
+                        onTap: _pickDate,
+                        child: Row(children: [
+                          const Icon(Icons.calendar_today_rounded,
+                              size: 18, color: AppColors.pinkDark),
                           const SizedBox(width: 8),
-                          ..._members.entries.map((e) {
-                            final sel = _payer == e.key;
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 6),
-                              child: ChoiceChip(
-                                label: Text(e.value),
-                                selected: sel,
-                                onSelected: (_) =>
-                                    setState(() => _payer = e.key),
-                                selectedColor: AppColors.pinkSoft,
-                              ),
-                            );
-                          }),
-                        ],
+                          Text('${_date.year}年${_date.month}月${_date.day}日'),
+                        ]),
+                      ),
+                      if (_members.length >= 2) ...[
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            const Text('だれが払った？',
+                                style: TextStyle(
+                                    fontSize: 12, color: AppColors.textSub)),
+                            const SizedBox(width: 8),
+                            ..._members.entries.map((e) {
+                              final sel = _payer == e.key;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: ChoiceChip(
+                                  label: Text(e.value),
+                                  selected: sel,
+                                  onSelected: (_) =>
+                                      setState(() => _payer = e.key),
+                                  selectedColor: AppColors.pinkSoft,
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      // 支払元（既定ワンバンク・未選択では登録できない）
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('支払元',
+                                style: TextStyle(
+                                    fontSize: 12, color: AppColors.textSub)),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                if (_accounts.isNotEmpty)
+                                  ..._accounts.map((a) => _payChip(a.name))
+                                else
+                                  ...HouseholdService.instance.paymentMethods
+                                      .map(_payChip),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ],
-                    const SizedBox(height: 10),
-                    // 支払元（既定ワンバンク・未選択では登録できない）
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('支払元',
-                              style: TextStyle(
-                                  fontSize: 12, color: AppColors.textSub)),
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              if (_accounts.isNotEmpty)
-                                ..._accounts.map((a) => _payChip(a.name))
-                              else
-                                ...HouseholdService.instance.paymentMethods
-                                    .map(_payChip),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Text('品目（${_items.length}件）',
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w800)),
-                // 食費があるレシートだけ、見出しの横に一括トグルのチップを出す。
-                if (_hasFoodItem) ...[
-                  const SizedBox(width: 8),
-                  _bulkPersonalFoodChip(),
-                ],
-                const Spacer(),
-                Text('合計 ${formatYen(_total)}',
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.expense)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            for (int i = 0; i < _items.length; i++) _itemCard(i),
-            const SizedBox(height: 4),
-            OutlinedButton.icon(
-              onPressed: () => setState(
-                  () => _items.add(_Item('', 0, widget.result.category))),
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('品目を追加'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.pinkDark,
-                side: const BorderSide(color: AppColors.pinkSoft),
-              ),
-            ),
-            if (_hasUsage) ...[
               const SizedBox(height: 12),
-              _usageCard(),
+              Row(
+                children: [
+                  Text('品目（${_items.length}件）',
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w800)),
+                  // 食費があるレシートだけ、見出しの横に一括トグルのチップを出す。
+                  if (_hasFoodItem) ...[
+                    const SizedBox(width: 8),
+                    _bulkPersonalFoodChip(),
+                  ],
+                  const Spacer(),
+                  Text('合計 ${formatYen(_total)}',
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.expense)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              for (int i = 0; i < _items.length; i++) _itemCard(i),
+              const SizedBox(height: 4),
+              OutlinedButton.icon(
+                onPressed: () => setState(
+                    () => _items.add(_Item('', 0, widget.result.category))),
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('品目を追加'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.pinkDark,
+                  side: const BorderSide(color: AppColors.pinkSoft),
+                ),
+              ),
+              if (_hasUsage) ...[
+                const SizedBox(height: 12),
+                _usageCard(),
+              ],
+              const SizedBox(height: 16),
+              _reconCard(),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: _saving ? null : _save,
+                style:
+                    FilledButton.styleFrom(backgroundColor: AppColors.expense),
+                child: Text(_saving ? '保存中…' : '${_items.length}件をきろくする ♡'),
+              ),
             ],
-            const SizedBox(height: 16),
-            _reconCard(),
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: _saving ? null : _save,
-              style:
-                  FilledButton.styleFrom(backgroundColor: AppColors.expense),
-              child: Text(_saving ? '保存中…' : '${_items.length}件をきろくする ♡'),
-            ),
-          ],
+          ),
         ),
       ),
     );

@@ -14,6 +14,7 @@ import '../widgets/comment_thread.dart';
 import 'add_transaction_screen.dart';
 import 'receipt_image_screen.dart';
 
+import '../widgets/web_layout.dart';
 /// 取引（単品）1件の明細＋チャット（たく＆はるの会話）。
 /// チャット部分は共通ウィジェット [CommentThread] に委譲し、この画面は
 /// 明細ヘッダー（金額・日付・カテゴリ…）と編集/削除だけを持つ。
@@ -94,9 +95,12 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
       },
       child: Scaffold(
         appBar: AppBar(title: const Text('明細')),
-        body: CommentThread(
-          source: hid == null ? null : TxCommentSource(hid, t.id),
-          header: _detailHeader(t, income),
+        body: WebCenterFill(
+          maxWidth: 720,
+          child: CommentThread(
+            source: hid == null ? null : TxCommentSource(hid, t.id),
+            header: _detailHeader(t, income),
+          ),
         ),
       ),
     );

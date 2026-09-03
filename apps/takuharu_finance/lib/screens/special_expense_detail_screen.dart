@@ -13,6 +13,7 @@ import '../utils/format.dart';
 import 'add_transaction_screen.dart';
 import 'special_expenses_screen.dart';
 
+import '../widgets/web_layout.dart';
 /// 特別支出1件の中身。合計・精算・明細をここで見る。
 class SpecialExpenseDetailScreen extends StatefulWidget {
   const SpecialExpenseDetailScreen({super.key, required this.item});
@@ -47,6 +48,8 @@ class _SpecialExpenseDetailScreenState
 
   Future<void> _edit() async {
     final result = await showModalBottomSheet<SpecialExpense>(
+      // 広い画面ではシートが横いっぱいに伸びるので、幅を抑えて中央に置く。
+      constraints: const BoxConstraints(maxWidth: 560),
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -143,6 +146,8 @@ class _SpecialExpenseDetailScreenState
               icon: const Icon(Icons.delete_outline_rounded)),
         ],
       ),
+      // 広い画面では、中央に寄せた本文の右端にボタンを合わせる。
+      floatingActionButtonLocation: const WebEndFloatFabLocation(),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.push(
           context,
@@ -159,46 +164,49 @@ class _SpecialExpenseDetailScreenState
         icon: const Icon(Icons.add_rounded),
         label: const Text('この特別支出に足す'),
       ),
-      body: hid == null
-          ? const SizedBox.shrink()
-          : StreamBuilder<List<core.Transaction>>(
-              stream: TxRepository.instance
-                  .watchBySpecialExpense(hid, _item.id),
-              builder: (context, snap) {
-                final txns = snap.data ?? const <core.Transaction>[];
-                final sum =
-                    SpecialExpenseSummary.of(txns, _memberUids);
-                final pendingCount =
-                    txns.where((t) => t.isPending).length;
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-                  children: [
-                    _headerCard(k, sum),
-                    const SizedBox(height: 16),
-                    _sectionTitle('精算'),
-                    const SizedBox(height: 8),
-                    _settleCard(sum),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        _sectionTitle('明細'),
-                        const Spacer(),
-                        if (pendingCount > 0)
-                          TextButton(
-                            onPressed: () => _confirmPending(pendingCount),
-                            child: Text('予定$pendingCount件を払った'),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    if (txns.isEmpty)
-                      _emptyTxns()
-                    else
-                      ...txns.map(_txTile),
-                  ],
-                );
-              },
-            ),
+      body: WebCenterFill(
+        maxWidth: 1040,
+        child: hid == null
+            ? const SizedBox.shrink()
+            : StreamBuilder<List<core.Transaction>>(
+                stream: TxRepository.instance
+                    .watchBySpecialExpense(hid, _item.id),
+                builder: (context, snap) {
+                  final txns = snap.data ?? const <core.Transaction>[];
+                  final sum =
+                      SpecialExpenseSummary.of(txns, _memberUids);
+                  final pendingCount =
+                      txns.where((t) => t.isPending).length;
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+                    children: [
+                      _headerCard(k, sum),
+                      const SizedBox(height: 16),
+                      _sectionTitle('精算'),
+                      const SizedBox(height: 8),
+                      _settleCard(sum),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          _sectionTitle('明細'),
+                          const Spacer(),
+                          if (pendingCount > 0)
+                            TextButton(
+                              onPressed: () => _confirmPending(pendingCount),
+                              child: Text('予定$pendingCount件を払った'),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      if (txns.isEmpty)
+                        _emptyTxns()
+                      else
+                        ...txns.map(_txTile),
+                    ],
+                  );
+                },
+              ),
+      ),
     );
   }
 

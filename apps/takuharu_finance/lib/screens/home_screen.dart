@@ -195,6 +195,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+      // 広い画面では、中央に寄せた本文の右端にボタンを合わせる。
+      floatingActionButtonLocation: const WebEndFloatFabLocation(),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openRecordMenu(),
         icon: const Icon(Icons.add_rounded),
