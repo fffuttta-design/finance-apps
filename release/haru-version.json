@@ -1,6 +1,6 @@
 {
-    "version": "1.0.7",
-    "buildNumber": "8",
-    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/haru-v1.0.7/haru-finance-v1.0.7.apk",
-    "releaseNotes": "支払元をクレカ／現金にしました。資産タブが「ためた合計」の画面になり、分析タブでは「年で見る」ができます。給与明細などの画像が保存できていなかった不具合も直しました。使っていない口座は自動で片づきます。"
+    "version": "1.0.8",
+    "buildNumber": "9",
+    "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/haru-v1.0.8/haru-finance-v1.0.8.apk",
+    "releaseNotes": "大きい画面（タブレットなど）で開いたときに、一覧や入力欄が横に間延びせず中央にまとまるようにしました。スマホでの見え方は変わりません。"
 }
