@@ -4,7 +4,7 @@
 #   so Cloud Functions / Blaze are NOT required.
 #
 # How to run: paste this into Explorer's address bar and press Enter:
-#   powershell -NoExit -ExecutionPolicy Bypass -File "C:\dev\CoreBusinessTools\finance-apps\firebase\takuharu\deploy_firebase.ps1"
+#   powershell -NoExit -ExecutionPolicy Bypass -File "C:\dev\CompanyOps\Application\finance-apps\firebase\takuharu\deploy_firebase.ps1"
 
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot

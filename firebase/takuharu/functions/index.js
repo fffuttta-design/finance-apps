@@ -123,4 +123,4 @@ exports.onCommentCreated = onDocumentCreated(
 
 // 注: プランニング（plan_items）の追加・コメント通知は、Blaze不要で動かすため
 //     Cloud Functions ではなく VPS 常駐の takuharu-notifier 側で送っている。
-//     （C:\dev\CoreBusinessTools\takuharu-notifier\notifier.py）
+//     （C:\dev\CompanyOps\Application\takuharu-notifier\notifier.py）

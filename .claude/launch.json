@@ -9,7 +9,7 @@
         "http.server",
         "8099",
         "--directory",
-        "C:/dev/CoreBusinessTools/finance-apps/apps/futa_finance/build/web"
+        "C:/dev/CompanyOps/Application/finance-apps/apps/futa_finance/build/web"
       ],
       "port": 8099
     }
