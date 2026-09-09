@@ -11,6 +11,9 @@ import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/tax_estimate_repository.dart';
 import '../../data/transaction_repository.dart';
+import '../../data/income_history_repository.dart';
+import '../../data/income_year.dart';
+import '../../screens/income_history_screen.dart';
 import '../../screens/transaction_search_screen.dart';
 import '../../utils/formatters.dart';
 import '../theme/colors.dart';
@@ -393,26 +396,8 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     MonthCursor.instance.month = _selMonth; // タブ横断で共有
   }
 
-  /// 「明細を検索・一括編集」への入口（集計タブ上部）。
-  Widget _searchEntry() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: V2Spacing.md),
-      child: SizedBox(
-        width: double.infinity,
-        child: OutlinedButton.icon(
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => const TransactionSearchScreen()),
-          ),
-          icon: const Icon(Icons.manage_search, size: 18),
-          label: const Text('明細を検索・一括編集'),
-          style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 12)),
-        ),
-      ),
-    );
-  }
+  // ※「明細を検索・一括編集」の入口ボタンは廃止（2026-09-09 本人指示）。
+  //   マトリクスのセルタップ→明細のドリルダウンは残してある（_openMatrixDrilldown）。
 
   @override
   Widget build(BuildContext context) {
@@ -439,7 +424,6 @@ class _V2ReportScreenState extends State<V2ReportScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _searchEntry(),
           _viewToggle(),
           if (_matrixView) ...[
             // マトリクスは常に年度12ヶ月。年度ナビだけ出す。
@@ -576,14 +560,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     final savingsRate = yearIncome > 0 ? yearNet / yearIncome : 0.0;
     final prevSavingsRate = prevIncome > 0 ? prevNet / prevIncome : 0.0;
 
-    // 大きい出費 TOP5（その年の支出取引・実質コスト降順）。
-    final top5 = _transactions
-        .where((t) =>
-            t.date.year == year &&
-            t.type == core.TransactionType.expense &&
-            t.effectiveAmount > 0)
-        .toList()
-      ..sort((a, b) => b.effectiveAmount.compareTo(a.effectiveAmount));
+    // ※「大きい出費 TOP5」は廃止（2026-09-09 本人指示）。
 
     // 支出の内訳（その年・大カテゴリ別・実質コスト）。円グラフ用。
     final byMajor = <String, int>{};
@@ -621,7 +598,6 @@ class _V2ReportScreenState extends State<V2ReportScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _searchEntry(),
           // 年ナビ（暦年）
           Padding(
             padding: const EdgeInsets.only(bottom: V2Spacing.md),
@@ -664,8 +640,9 @@ class _V2ReportScreenState extends State<V2ReportScreen>
           const SizedBox(height: V2Spacing.lg),
           // ※「月別の収支（収入 − 支出）」の棒グラフは廃止（2026-07-15）。
           //   年間の収支・貯蓄率は上の「$year年のサマリー」で見えるので不要。
-          // 大きい出費 TOP5。
-          _topExpensesCard(top5),
+          // ※「大きい出費 TOP5」は廃止（2026-09-09）。
+          // 年収の記録（生涯の年収・税金・社会保険）。
+          _incomeHistoryCard(year),
           const SizedBox(height: V2Spacing.lg),
           // 税金・保険料（税目ごとの月次表）。対象の記録が無い年は出さない。
           if (taxCard != null) ...[
@@ -954,72 +931,243 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     );
   }
 
-  /// 大きい出費 TOP5。
-  Widget _topExpensesCard(List<core.Transaction> top5) {
-    return V2Card(
+  /// 年収の記録（業績タブ・個人モード）。
+  ///
+  /// 「その年いくら稼いで、税金と社会保険でいくら持っていかれて、いくら残ったか」を
+  /// 年ごとに並べる。数字の入力・編集は 設定 ＞ マスタデータ ＞ 年収の記録 と同じ
+  /// [IncomeHistoryRepository] を見ているので、どちらで直しても同じものが出る。
+  Widget _incomeHistoryCard(int selectedYear) {
+    return AnimatedBuilder(
+      animation: IncomeHistoryRepository.instance,
+      builder: (context, _) => FutureBuilder<IncomeHistoryConfig>(
+        future: IncomeHistoryRepository.instance.load(),
+        builder: (context, snap) {
+          final cfg = snap.data;
+          return V2Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text('年収の記録',
+                          style: V2Typography.h2
+                              .copyWith(color: V2Colors.textPrimary)),
+                    ),
+                    TextButton.icon(
+                      onPressed: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const IncomeHistoryScreen()),
+                        );
+                        if (mounted) setState(() {});
+                      },
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      label: const Text('編集'),
+                      style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: V2Spacing.sm),
+                if (cfg == null)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (cfg.years.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Column(
+                      children: [
+                        Text('年収の記録がまだありません',
+                            style: V2Typography.caption
+                                .copyWith(color: V2Colors.textSecondary)),
+                        const SizedBox(height: 10),
+                        FilledButton.icon(
+                          onPressed: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const IncomeHistoryScreen()),
+                            );
+                            if (mounted) setState(() {});
+                          },
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('年収の記録を作る'),
+                        ),
+                      ],
+                    ),
+                  )
+                else ...[
+                  _incomeLifetime(cfg),
+                  const SizedBox(height: V2Spacing.md),
+                  _incomeTable(cfg, selectedYear),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// 生涯の合計（稼いだ額・税金・社会保険・残った額）。
+  Widget _incomeLifetime(IncomeHistoryConfig cfg) {
+    final gross = cfg.lifetimeGross;
+    final rate = gross == 0 ? 0.0 : cfg.lifetimeBurden / gross;
+    Widget tile(String label, String value, Color color) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label,
+                style: V2Typography.micro
+                    .copyWith(color: V2Colors.textSecondary)),
+            const SizedBox(height: 2),
+            Text(value,
+                style: V2Typography.h2.copyWith(
+                    color: color,
+                    fontFeatures: V2Typography.tabularNums)),
+          ],
+        );
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: V2Colors.surfaceMuted,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Wrap(
+        spacing: 22,
+        runSpacing: 12,
+        children: [
+          tile('これまで稼いだ合計', formatYen(cfg.lifetimeGross),
+              V2Colors.textPrimary),
+          tile('税金', formatYen(cfg.lifetimeTax), V2Colors.negative),
+          tile('社会保険', formatYen(cfg.lifetimeInsurance),
+              V2Colors.badgeBlue),
+          tile('残った合計', formatYen(cfg.lifetimeNet), V2Colors.positive),
+          tile('持っていかれた率',
+              '${(rate * 100).toStringAsFixed(1)}%', V2Colors.textSecondary),
+        ],
+      ),
+    );
+  }
+
+  /// 年ごとの明細（新しい年が上）。選んでいる年の行を強調する。
+  Widget _incomeTable(IncomeHistoryConfig cfg, int selectedYear) {
+    Widget cell(String text,
+            {Color? color, bool bold = false, double width = 92}) =>
+        SizedBox(
+          width: width,
+          child: Text(text,
+              textAlign: TextAlign.right,
+              style: V2Typography.caption.copyWith(
+                color: color ?? V2Colors.textBody,
+                fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+                fontFeatures: V2Typography.tabularNums,
+              )),
+        );
+    Widget head(String text, {double width = 92}) => SizedBox(
+          width: width,
+          child: Text(text,
+              textAlign: TextAlign.right,
+              style: V2Typography.micro
+                  .copyWith(color: V2Colors.textSecondary)),
+        );
+    String yen(int v) => v == 0 ? '—' : formatYen(v);
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('大きい出費 TOP5',
-              style: V2Typography.h2.copyWith(color: V2Colors.textPrimary)),
-          const SizedBox(height: V2Spacing.sm),
-          if (top5.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Center(
-                child: Text('支出がまだありません',
-                    style: V2Typography.caption
-                        .copyWith(color: V2Colors.textSecondary)),
-              ),
-            )
-          else
-            for (int i = 0; i < top5.length; i++) ...[
-              if (i > 0) const Divider(height: 1, color: V2Colors.divider),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 22,
-                      height: 22,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: V2Colors.surfaceMuted,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text('${i + 1}',
-                          style: V2Typography.micro.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: V2Colors.textSecondary)),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                              top5[i].description.trim().isEmpty
-                                  ? (top5[i].store ?? '（無題）')
-                                  : top5[i].description.trim(),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: V2Typography.body),
-                          Text(
-                              '${formatMonthDay(top5[i].date)}・${top5[i].category.major}',
-                              style: V2Typography.micro
-                                  .copyWith(color: V2Colors.textMuted)),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(formatYen(top5[i].effectiveAmount),
-                        style: V2Typography.bodyStrong.copyWith(
-                            color: V2Colors.negative,
-                            fontFeatures: V2Typography.tabularNums)),
-                  ],
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 168,
+                  child: Text('年 ／ 立場',
+                      style: V2Typography.micro
+                          .copyWith(color: V2Colors.textSecondary)),
                 ),
+                head('年収（額面）', width: 104),
+                head('所得税'),
+                head('住民税'),
+                head('事業税'),
+                head('厚生年金'),
+                head('国民年金'),
+                head('健康保険'),
+                head('国保'),
+                head('雇用保険'),
+                head('残った額', width: 104),
+                head('負担率', width: 62),
+              ],
+            ),
+          ),
+          for (final y in cfg.sortedDesc) ...[
+            const Divider(height: 1, color: V2Colors.divider),
+            Container(
+              color: y.year == selectedYear
+                  ? V2Colors.accentSoft
+                  : Colors.transparent,
+              padding: const EdgeInsets.symmetric(vertical: 7),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 168,
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 62,
+                          child: Text(
+                            y.age == null
+                                ? '${y.year}年'
+                                : '${y.year}年',
+                            style: V2Typography.bodyStrong.copyWith(
+                                color: V2Colors.textPrimary,
+                                fontFeatures: V2Typography.tabularNums),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            y.age == null
+                                ? y.status.label
+                                : '${y.age}歳・${y.status.label}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: V2Typography.micro
+                                .copyWith(color: V2Colors.textSecondary),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  cell(yen(y.grossIncome),
+                      color: V2Colors.textPrimary, bold: true, width: 104),
+                  cell(yen(y.incomeTax), color: V2Colors.negative),
+                  cell(yen(y.residentTax), color: V2Colors.negative),
+                  cell(yen(y.businessTax), color: V2Colors.negative),
+                  cell(yen(y.pension), color: V2Colors.badgeBlue),
+                  cell(yen(y.nationalPension), color: V2Colors.badgeBlue),
+                  cell(yen(y.healthInsurance), color: V2Colors.badgeBlue),
+                  cell(yen(y.nationalHealthInsurance),
+                      color: V2Colors.badgeBlue),
+                  cell(yen(y.employmentInsurance),
+                      color: V2Colors.badgeBlue),
+                  cell(yen(y.netIncome),
+                      color: V2Colors.positive, bold: true, width: 104),
+                  cell(
+                      y.grossIncome == 0
+                          ? '—'
+                          : '${(y.burdenRate * 100).toStringAsFixed(1)}%',
+                      width: 62),
+                ],
               ),
-            ],
+            ),
+          ],
         ],
       ),
     );
