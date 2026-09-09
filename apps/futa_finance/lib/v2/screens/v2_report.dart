@@ -946,6 +946,18 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     );
   }
 
+  /// 調査結果が更新されたとき、シードで入れた行だけを最新に置き換える。
+  Future<void> _refreshIncomeSeed() async {
+    final n = await loadIncomeHistorySeed(refreshSeeded: true);
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(n > 0 ? '$n年ぶんを最新の調査結果に更新しました' : '更新はありませんでした'),
+      ),
+    );
+  }
+
   /// 年収の記録（業績タブ・個人モード）。
   ///
   /// 「その年いくら稼いで、税金と社会保険でいくら持っていかれて、いくら残ったか」を
@@ -969,6 +981,13 @@ class _V2ReportScreenState extends State<V2ReportScreen>
                           style: V2Typography.h2
                               .copyWith(color: V2Colors.textPrimary)),
                     ),
+                    if (cfg != null && hasSeededYears(cfg))
+                      IconButton(
+                        tooltip: '調査結果を最新に更新（自分で足した年はそのまま）',
+                        icon: const Icon(Icons.refresh, size: 18),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: _refreshIncomeSeed,
+                      ),
                     TextButton.icon(
                       onPressed: () async {
                         await Navigator.push(
@@ -1027,6 +1046,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
                   )
                 else ...[
                   _incomeLifetime(cfg),
+                  ..._incomePendingDocs(cfg),
                   const SizedBox(height: V2Spacing.md),
                   _incomeTable(cfg, selectedYear),
                 ],
@@ -1077,6 +1097,50 @@ class _V2ReportScreenState extends State<V2ReportScreen>
         ],
       ),
     );
+  }
+
+  /// まだ手元に無い書類（依頼済み・未取得）があれば、その待ちを上に出す。
+  /// 「誰に何を頼んで、何が足りないか」を毎回思い出さなくて済むようにするため。
+  List<Widget> _incomePendingDocs(IncomeHistoryConfig cfg) {
+    final pending = <MapEntry<int, IncomeDoc>>[];
+    for (final y in cfg.sortedDesc) {
+      for (final d in y.documents) {
+        if (d.status != IncomeDocStatus.onHand) {
+          pending.add(MapEntry(y.year, d));
+        }
+      }
+    }
+    if (pending.isEmpty) return const [];
+    return [
+      const SizedBox(height: V2Spacing.sm),
+      Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: V2Colors.badgeAmberSoft,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('待っている書類 ${pending.length}件',
+                style: V2Typography.bodyStrong
+                    .copyWith(color: V2Colors.textPrimary)),
+            const SizedBox(height: 6),
+            for (final e in pending)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  '${e.value.status.emoji} ${e.key}年 ${e.value.title}'
+                  '${(e.value.issuer ?? '').isEmpty ? '' : '（${e.value.issuer}）'}'
+                  '${(e.value.memo ?? '').isEmpty ? '' : ' ／ ${e.value.memo}'}',
+                  style: V2Typography.caption
+                      .copyWith(color: V2Colors.textBody),
+                ),
+              ),
+          ],
+        ),
+      ),
+    ];
   }
 
   /// 年ごとの明細（新しい年が上）。選んでいる年の行を強調する。
@@ -1157,9 +1221,13 @@ class _V2ReportScreenState extends State<V2ReportScreen>
                         ),
                         Expanded(
                           child: Text(
-                            y.age == null
-                                ? y.status.label
-                                : '${y.age}歳・${y.status.label}',
+                            [
+                              if (y.age != null) '${y.age}歳',
+                              y.status.label,
+                              if (y.documents.isNotEmpty)
+                                '📎${y.documents.length}'
+                                    '${y.docsPending > 0 ? '(待${y.docsPending})' : ''}',
+                            ].join('・'),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: V2Typography.micro

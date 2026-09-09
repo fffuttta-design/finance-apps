@@ -469,6 +469,7 @@ class _IncomeYearDialog extends StatefulWidget {
 class _IncomeYearDialogState extends State<_IncomeYearDialog> {
   late final Map<String, TextEditingController> _c;
   late WorkStatus _status;
+  late List<IncomeDoc> _docs;
 
   static const _moneyFields = <String, String>{
     'salary': '給与収入（役員報酬も）',
@@ -491,6 +492,7 @@ class _IncomeYearDialogState extends State<_IncomeYearDialog> {
     super.initState();
     final s = widget.src;
     _status = s?.status ?? WorkStatus.employee;
+    _docs = [...(s?.documents ?? const <IncomeDoc>[])];
     String yen(int v) => v == 0 ? '' : v.toString();
     _c = {
       'year': TextEditingController(
@@ -531,6 +533,101 @@ class _IncomeYearDialogState extends State<_IncomeYearDialog> {
   int _int(String key) {
     final raw = _c[key]!.text.replaceAll(',', '').trim();
     return int.tryParse(raw) ?? 0;
+  }
+
+  /// この年にぶら下がっている書類の一覧（追加・編集・削除）。
+  Widget _docsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text('書類',
+                style: TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w700)),
+            const SizedBox(width: 8),
+            Text('（源泉徴収票・控除証明書など。まだ手元に無いものも登録できます）',
+                style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: () => _editDoc(null),
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('追加'),
+              style:
+                  TextButton.styleFrom(visualDensity: VisualDensity.compact),
+            ),
+          ],
+        ),
+        if (_docs.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Text('まだありません',
+                style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+          )
+        else
+          for (final d in _docs)
+            InkWell(
+              onTap: () => _editDoc(d),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    Text(d.status.emoji,
+                        style: const TextStyle(fontSize: 14)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(d.title.isEmpty ? d.kind.label : d.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12)),
+                          Text(
+                              [
+                                d.kind.label,
+                                if ((d.issuer ?? '').isNotEmpty) d.issuer!,
+                                if (d.status != IncomeDocStatus.onHand)
+                                  d.status.label,
+                                if ((d.url ?? '').isNotEmpty) '保存先あり',
+                              ].join('・'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontSize: 10, color: Colors.grey[600])),
+                        ],
+                      ),
+                    ),
+                    if (d.amount > 0)
+                      Text(formatYen(d.amount),
+                          style: const TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+      ],
+    );
+  }
+
+  Future<void> _editDoc(IncomeDoc? src) async {
+    final result = await showDialog<_DocResult>(
+      context: context,
+      builder: (_) => _IncomeDocDialog(src: src),
+    );
+    if (result == null) return;
+    setState(() {
+      if (result.delete) {
+        _docs.removeWhere((d) => d.id == src!.id);
+      } else {
+        final idx = _docs.indexWhere((d) => d.id == result.doc!.id);
+        if (idx >= 0) {
+          _docs[idx] = result.doc!;
+        } else {
+          _docs.add(result.doc!);
+        }
+      }
+    });
   }
 
   @override
@@ -599,6 +696,8 @@ class _IncomeYearDialogState extends State<_IncomeYearDialog> {
                 const SizedBox(height: 8),
               ],
               const SizedBox(height: 6),
+              _docsSection(),
+              const SizedBox(height: 14),
               TextField(
                 controller: _c['source'],
                 decoration: const InputDecoration(
@@ -659,8 +758,200 @@ class _IncomeYearDialogState extends State<_IncomeYearDialog> {
               source: _c['source']!.text.trim().isEmpty
                   ? null
                   : _c['source']!.text.trim(),
+              documents: _docs,
             );
             Navigator.pop(context, _EditResult(item: item));
+          },
+          child: const Text('保存'),
+        ),
+      ],
+    );
+  }
+}
+
+class _DocResult {
+  const _DocResult({this.doc, this.delete = false});
+  final IncomeDoc? doc;
+  final bool delete;
+}
+
+/// 書類1枚の入力ダイアログ。
+///
+/// 実物のPDFはGoogleドライブに置く前提で、ここは「どこに何があるか」を控える。
+/// **手元に無い書類も登録できる**ので、「ゲオに依頼済み・来週着」のような待ちも管理できる。
+class _IncomeDocDialog extends StatefulWidget {
+  const _IncomeDocDialog({this.src});
+  final IncomeDoc? src;
+
+  @override
+  State<_IncomeDocDialog> createState() => _IncomeDocDialogState();
+}
+
+class _IncomeDocDialogState extends State<_IncomeDocDialog> {
+  late final TextEditingController _title;
+  late final TextEditingController _issuer;
+  late final TextEditingController _amount;
+  late final TextEditingController _url;
+  late final TextEditingController _memo;
+  late IncomeDocKind _kind;
+  late IncomeDocStatus _status;
+  DateTime? _issuedOn;
+
+  @override
+  void initState() {
+    super.initState();
+    final d = widget.src;
+    _title = TextEditingController(text: d?.title ?? '');
+    _issuer = TextEditingController(text: d?.issuer ?? '');
+    _amount =
+        TextEditingController(text: (d?.amount ?? 0) == 0 ? '' : '${d!.amount}');
+    _url = TextEditingController(text: d?.url ?? '');
+    _memo = TextEditingController(text: d?.memo ?? '');
+    _kind = d?.kind ?? IncomeDocKind.withholdingSlip;
+    _status = d?.status ?? IncomeDocStatus.onHand;
+    _issuedOn = d?.issuedOn;
+  }
+
+  @override
+  void dispose() {
+    for (final c in [_title, _issuer, _amount, _url, _memo]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.src == null ? '書類を追加' : '書類'),
+      content: SizedBox(
+        width: 460,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DropdownButtonFormField<IncomeDocKind>(
+                initialValue: _kind,
+                isDense: true,
+                decoration: const InputDecoration(labelText: '種類'),
+                items: [
+                  for (final k in IncomeDocKind.values)
+                    DropdownMenuItem(value: k, child: Text(k.label)),
+                ],
+                onChanged: (v) =>
+                    setState(() => _kind = v ?? IncomeDocKind.other),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _title,
+                decoration: const InputDecoration(
+                    labelText: '書類の名前', isDense: true),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _issuer,
+                decoration: const InputDecoration(
+                    labelText: '発行元（日本年金機構・ゲオHD・名古屋市 など）',
+                    isDense: true),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<IncomeDocStatus>(
+                initialValue: _status,
+                isDense: true,
+                decoration: const InputDecoration(labelText: '状態'),
+                items: [
+                  for (final s in IncomeDocStatus.values)
+                    DropdownMenuItem(
+                        value: s, child: Text('${s.emoji} ${s.label}')),
+                ],
+                onChanged: (v) =>
+                    setState(() => _status = v ?? IncomeDocStatus.onHand),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _issuedOn == null
+                          ? '発行日：未設定'
+                          : '発行日：${_issuedOn!.year}/${_issuedOn!.month}/${_issuedOn!.day}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      final now = DateTime.now();
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: _issuedOn ?? now,
+                        firstDate: DateTime(2010),
+                        lastDate: DateTime(now.year + 2),
+                      );
+                      if (picked != null) setState(() => _issuedOn = picked);
+                    },
+                    child: const Text('日付を選ぶ'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _amount,
+                keyboardType: TextInputType.number,
+                inputFormatters: [ThousandsSeparatorInputFormatter()],
+                decoration: const InputDecoration(
+                    labelText: 'この書類が示す金額（無ければ空でOK）',
+                    isDense: true,
+                    prefixText: '¥ '),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _url,
+                decoration: const InputDecoration(
+                    labelText: '保存先（Googleドライブのリンクやフォルダ）',
+                    isDense: true),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _memo,
+                maxLines: 3,
+                decoration:
+                    const InputDecoration(labelText: 'メモ', isDense: true),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        if (widget.src != null)
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(context, const _DocResult(delete: true)),
+            child: const Text('削除',
+                style: TextStyle(color: Color(0xFFDC2626))),
+          ),
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('キャンセル')),
+        FilledButton(
+          onPressed: () {
+            final doc = IncomeDoc(
+              id: widget.src?.id ??
+                  'doc-${DateTime.now().millisecondsSinceEpoch}',
+              kind: _kind,
+              title: _title.text.trim().isEmpty
+                  ? _kind.label
+                  : _title.text.trim(),
+              issuer:
+                  _issuer.text.trim().isEmpty ? null : _issuer.text.trim(),
+              issuedOn: _issuedOn,
+              amount:
+                  int.tryParse(_amount.text.replaceAll(',', '').trim()) ?? 0,
+              url: _url.text.trim().isEmpty ? null : _url.text.trim(),
+              status: _status,
+              memo: _memo.text.trim().isEmpty ? null : _memo.text.trim(),
+            );
+            Navigator.pop(context, _DocResult(doc: doc));
           },
           child: const Text('保存'),
         ),
