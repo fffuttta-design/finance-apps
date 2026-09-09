@@ -1,6 +1,6 @@
 {
-  "version": "1.0.596",
-  "buildNumber": "597",
-  "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.596/futa-finance-v1.0.596.apk",
-  "releaseNotes": "個人モードの「業績」タブにある年収の記録が空のとき、その場で「調査した実績を読み込む」ボタンを押すだけで2017〜2026年の記録が入るようにしました。"
+  "version": "1.0.597",
+  "buildNumber": "598",
+  "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.597/futa-finance-v1.0.597.apk",
+  "releaseNotes": "年収の記録に「書類」を登録できるようにしました。源泉徴収票・控除証明書・確定申告書などを年ごとにぶら下げられて、まだ手元に無い書類（依頼中）も待ちとして管理できます。国民年金と国民健康保険の金額を実額に更新しました。"
 }
