@@ -1,6 +1,6 @@
 {
-  "version": "1.0.593",
-  "buildNumber": "594",
-  "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.593/futa-finance-v1.0.593.apk",
-  "releaseNotes": "パソコンの大きい画面で開いたときに、通帳・設定・取込などの画面が横に間延びせず中央にまとまるようにしました。スマホでの見え方は変わりません。"
+  "version": "1.0.594",
+  "buildNumber": "595",
+  "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.594/futa-finance-v1.0.594.apk",
+  "releaseNotes": "「年収の記録」を追加しました（設定 ＞ マスタデータ ＞ 年収の記録）。年ごとの年収・所得税・住民税・年金・健康保険と、手元に残った額をまとめて見られます。"
 }
