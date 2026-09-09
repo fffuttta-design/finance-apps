@@ -2,6 +2,7 @@ import 'app_mode.dart';
 import 'budget_item_repository.dart';
 import 'compliance_task_repository.dart';
 import 'furusato_repository.dart';
+import 'income_history_repository.dart';
 import 'income_source_repository.dart';
 import 'monthly_snapshot_repository.dart';
 import 'settings_repository.dart';
@@ -33,6 +34,7 @@ class RepositoryProvider {
     IncomeSourceRepository.useFirestore(uid);
     MonthlySnapshotRepository.useFirestore(uid);
     BudgetItemRepository.instance.useFirestore(uid);
+    IncomeHistoryRepository.instance.useFirestore(uid);
     ComplianceTaskRepository.instance.useFirestore(uid);
     AiUsageRepository.instance.useFirestore(uid);
     FurusatoRepository.useFirestore(uid);
@@ -48,6 +50,7 @@ class RepositoryProvider {
     IncomeSourceRepository.useLocal();
     MonthlySnapshotRepository.useLocal();
     BudgetItemRepository.instance.useLocal();
+    IncomeHistoryRepository.instance.useLocal();
     ComplianceTaskRepository.instance.useLocal();
     AiUsageRepository.instance.useLocal();
     FurusatoRepository.useLocal();

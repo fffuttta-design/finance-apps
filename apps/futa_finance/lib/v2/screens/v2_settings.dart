@@ -11,6 +11,7 @@ import '../../data/windows_update.dart';
 import '../../screens/account_editor_screen.dart';
 import '../../screens/budget_items_screen.dart';
 import '../../screens/compliance_calendar_screen.dart';
+import '../../screens/income_history_screen.dart';
 import '../../screens/card_editor_screen.dart';
 import '../../screens/category_editor_screen.dart';
 import '../../screens/store_master_screen.dart';
@@ -92,6 +93,8 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
           desc: '法人税・消費税・社保などの予定（資金繰りに反映）'),
       _MenuItem('compliance', '手続き・届出カレンダー', Icons.event_note_outlined,
           desc: '算定基礎届・年度更新・申告期限などの締切'),
+      _MenuItem('incomeHistory', '年収の記録', Icons.timeline,
+          desc: '年ごとの年収・税金・社会保険をまとめて残す'),
       _MenuItem('replacements', '変換マスタ', Icons.find_replace,
           desc: 'レシートの表記ゆれを置換'),
       _MenuItem('furusato', 'ふるさと納税管理',
@@ -259,6 +262,14 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
                 '会社の手続きの締切を管理します。',
             icon: Icons.event_note_outlined,
             iconColor: V2Colors.info);
+      case 'incomeHistory':
+        return _embedV1(const IncomeHistoryScreen(),
+            title: '年収の記録',
+            note: '年ごとの「稼いだ額・税金・社会保険・手取り」を1行で残します。'
+                '確定申告書・源泉徴収票・マイナポータル・ねんきんネットから拾った'
+                '実績を読み込めます。',
+            icon: Icons.timeline,
+            iconColor: V2Colors.badgeGreen);
       case 'replacements':
         return const V2ReplacementPanel();
       case 'furusato':
