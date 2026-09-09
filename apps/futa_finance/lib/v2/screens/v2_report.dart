@@ -1049,6 +1049,13 @@ class _V2ReportScreenState extends State<V2ReportScreen>
                   ..._incomePendingDocs(cfg),
                   const SizedBox(height: V2Spacing.md),
                   _incomeTable(cfg, selectedYear),
+                  const SizedBox(height: 8),
+                  Text(
+                    '「年収（額面）」は給与＋事業の売上、「所得」は経費や給与所得控除を引いたあとの'
+                    '税金の計算のもとになる金額です。事業の年は、売上が大きくても所得は小さくなります。',
+                    style: V2Typography.micro
+                        .copyWith(color: V2Colors.textSecondary),
+                  ),
                 ],
               ],
             ),
@@ -1182,6 +1189,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
                           .copyWith(color: V2Colors.textSecondary)),
                 ),
                 head('年収（額面）', width: 104),
+                head('所得', width: 104),
                 head('所得税'),
                 head('住民税'),
                 head('事業税'),
@@ -1239,6 +1247,8 @@ class _V2ReportScreenState extends State<V2ReportScreen>
                   ),
                   cell(yen(y.grossIncome),
                       color: V2Colors.textPrimary, bold: true, width: 104),
+                  cell(yen(y.totalIncome),
+                      color: V2Colors.textSecondary, width: 104),
                   cell(yen(y.incomeTax), color: V2Colors.negative),
                   cell(yen(y.residentTax), color: V2Colors.negative),
                   cell(yen(y.businessTax), color: V2Colors.negative),
