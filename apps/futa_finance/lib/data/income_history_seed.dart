@@ -1,3 +1,4 @@
+import 'income_history_repository.dart';
 import 'income_year.dart';
 
 /// 二村さんの年収・税・社会保険の実績（2026-09-09 調査）。
@@ -180,3 +181,24 @@ List<IncomeYear> buildIncomeHistorySeed() => const [
         source: '給与明細（RunStrategy）＋ねんきんネット',
       ),
     ];
+
+/// 調査済みの実績を流し込む。**既にある年は触らない**ので何度呼んでも壊れない。
+///
+/// 業績タブのカードと、設定の「年収の記録」画面の両方から呼ぶ（入口を1つにすると
+/// 「どっちのボタンを押せば入るのか」で迷うため、見えている場所で必ず入るようにした）。
+Future<int> loadIncomeHistorySeed() async {
+  final cfg = await IncomeHistoryRepository.instance.load();
+  final existing = {for (final y in cfg.years) y.year};
+  final merged = [...cfg.years];
+  var added = 0;
+  for (final s in buildIncomeHistorySeed()) {
+    if (existing.contains(s.year)) continue;
+    merged.add(s);
+    added++;
+  }
+  if (added > 0) {
+    await IncomeHistoryRepository.instance
+        .save(IncomeHistoryConfig(years: merged));
+  }
+  return added;
+}

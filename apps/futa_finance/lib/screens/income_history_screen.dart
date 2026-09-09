@@ -103,15 +103,7 @@ class _IncomeHistoryScreenState extends State<IncomeHistoryScreen> {
       );
 
   Future<void> _loadSeed() async {
-    final cfg = await IncomeHistoryRepository.instance.load();
-    final existing = {for (final y in cfg.years) y.year: y};
-    final merged = [...cfg.years];
-    for (final s in buildIncomeHistorySeed()) {
-      if (existing.containsKey(s.year)) continue; // 既にある年は触らない
-      merged.add(s);
-    }
-    await IncomeHistoryRepository.instance
-        .save(IncomeHistoryConfig(years: merged));
+    await loadIncomeHistorySeed(); // 既にある年は触らない
     if (mounted) setState(() {});
   }
 

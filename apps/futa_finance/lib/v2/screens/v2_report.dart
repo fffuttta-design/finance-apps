@@ -12,6 +12,7 @@ import '../../data/subscription_repository.dart';
 import '../../data/tax_estimate_repository.dart';
 import '../../data/transaction_repository.dart';
 import '../../data/income_history_repository.dart';
+import '../../data/income_history_seed.dart';
 import '../../data/income_year.dart';
 import '../../screens/income_history_screen.dart';
 import '../../screens/transaction_search_screen.dart';
@@ -931,6 +932,20 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     );
   }
 
+  /// 調べた年収の実績を、業績タブのカードから直接読み込む。
+  Future<void> _loadIncomeSeed() async {
+    final added = await loadIncomeHistorySeed();
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(added > 0
+            ? '$added年ぶんの記録を読み込みました'
+            : '追加できる年はありませんでした（すでに入っています）'),
+      ),
+    );
+  }
+
   /// 年収の記録（業績タブ・個人モード）。
   ///
   /// 「その年いくら稼いで、税金と社会保険でいくら持っていかれて、いくら残ったか」を
@@ -981,11 +996,21 @@ class _V2ReportScreenState extends State<V2ReportScreen>
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     child: Column(
                       children: [
-                        Text('年収の記録がまだありません',
+                        Text(
+                            '調べた実績（2017〜2026年の年収・税金・年金・健康保険）を'
+                            'ここに入れられます',
+                            textAlign: TextAlign.center,
                             style: V2Typography.caption
                                 .copyWith(color: V2Colors.textSecondary)),
                         const SizedBox(height: 10),
+                        // 🔥 この場で入る。別画面へ飛ばしてもう1回押させない。
                         FilledButton.icon(
+                          onPressed: _loadIncomeSeed,
+                          icon: const Icon(Icons.download_outlined, size: 18),
+                          label: const Text('調査した実績を読み込む'),
+                        ),
+                        const SizedBox(height: 4),
+                        TextButton(
                           onPressed: () async {
                             await Navigator.push(
                               context,
@@ -995,8 +1020,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
                             );
                             if (mounted) setState(() {});
                           },
-                          icon: const Icon(Icons.add, size: 18),
-                          label: const Text('年収の記録を作る'),
+                          child: const Text('自分で1年ずつ入力する'),
                         ),
                       ],
                     ),
