@@ -6,7 +6,6 @@ import 'package:finance_core/finance_core.dart' as core;
 
 import '../../data/app_mode.dart';
 import '../../data/month_cursor.dart';
-import '../../data/monthly_snapshot_repository.dart';
 import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/tax_estimate_repository.dart';
@@ -123,8 +122,6 @@ class _V2ReportScreenState extends State<V2ReportScreen>
   List<core.Transaction> _transactions = [];
   // 会計科目(plMajor)を割り当てたサブスク（固定費/変動費）を PL に合算する。
   List<core.Subscription> _subs = [];
-  // 家庭用の「貯金（月初残高）の推移」で使う月初残高スナップショット。
-  core.MonthlySnapshotConfig _snapshots = core.MonthlySnapshotConfig.empty();
   // 家庭用グラフの表示年（暦年）。
   int _personalYear = DateTime.now().year;
   bool _loading = true;
@@ -202,13 +199,11 @@ class _V2ReportScreenState extends State<V2ReportScreen>
     final txns = await _txRepo.loadAll();
     final subs =
         (await SubscriptionRepository.instance.load()).subscriptions;
-    final snaps = await MonthlySnapshotRepository.instance.load();
     final cats = await SettingsRepository().loadCategories();
     if (!mounted) return;
     setState(() {
       _transactions = txns;
       _subs = subs;
-      _snapshots = snaps;
       _categories = cats;
       _loading = false;
     });
@@ -519,8 +514,6 @@ class _V2ReportScreenState extends State<V2ReportScreen>
   // ── 家庭用：貯金の推移＋月別収支（暦年・棒グラフ）──────────────
   Widget _personalReport() {
     final year = _personalYear;
-    final balances = <int?>[];
-    final labels = <String>[];
     var yearNet = 0;
     var yearIncome = 0, yearExpense = 0;
     var hasAnyTx = false;
@@ -539,10 +532,7 @@ class _V2ReportScreenState extends State<V2ReportScreen>
       yearNet += net;
       yearIncome += inc;
       yearExpense += exp;
-      balances.add(_snapshots.forMonth(year, m)?.initialBalance);
-      labels.add('$m');
     }
-    final hasAnyBalance = balances.any((b) => b != null);
     // 税金・保険料の月次表（対象の記録が無ければ null＝セクションごと出さない）。
     final taxCard = _taxTableCard(year);
 
@@ -689,18 +679,6 @@ class _V2ReportScreenState extends State<V2ReportScreen>
             ),
           ),
           const SizedBox(height: V2Spacing.lg),
-          // 日別支出のカレンダーヒートマップ（濃いほど多い）。
-          _heatmapCard(year),
-          const SizedBox(height: V2Spacing.lg),
-          _chartCard(
-            title: '貯金（月初残高）の推移',
-            empty: !hasAnyBalance,
-            emptyText: '月初残高がまだ記録されていません'
-                '（ホームの総資産カードで月初残高を入れると推移が出ます）',
-            child: _MiniBarChart(
-                values: balances, labels: labels, signed: false),
-          ),
-          const SizedBox(height: V2Spacing.lg),
           ],
         ],
       ),
@@ -805,129 +783,6 @@ class _V2ReportScreenState extends State<V2ReportScreen>
                 style: V2Typography.micro.copyWith(color: deltaColor)),
           ],
         ),
-      ),
-    );
-  }
-
-  /// 日別支出のカレンダーヒートマップ（GitHub風・その年）。濃いほど支出が多い。
-  Widget _heatmapCard(int year) {
-    // 日別の支出合計（実質コスト）。
-    final daily = <String, int>{};
-    for (final t in _transactions) {
-      if (t.date.year != year) continue;
-      if (t.type != core.TransactionType.expense) continue;
-      final k = '${t.date.month}-${t.date.day}';
-      daily[k] = (daily[k] ?? 0) + t.effectiveAmount;
-    }
-    final maxDaily = daily.values.fold<int>(0, (m, v) => v > m ? v : m);
-    Color cellColor(int amount) {
-      if (amount <= 0 || maxDaily <= 0) return const Color(0xFFEFF1F4);
-      final r = amount / maxDaily;
-      if (r < 0.25) return const Color(0xFFFBD0D0);
-      if (r < 0.5) return const Color(0xFFF39A9A);
-      if (r < 0.75) return const Color(0xFFE85D5D);
-      return const Color(0xFFDC2626);
-    }
-
-    final firstDay = DateTime(year, 1, 1);
-    final lead = firstDay.weekday - 1; // 月曜=0
-    final totalDays = DateTime(year, 12, 31).difference(firstDay).inDays + 1;
-    final weeks = ((lead + totalDays) / 7).ceil();
-    // 週(列)ごとに7日(行)を並べる。
-    final columns = <Widget>[];
-    for (int w = 0; w < weeks; w++) {
-      final cells = <Widget>[];
-      for (int dow = 0; dow < 7; dow++) {
-        final di = w * 7 + dow - lead;
-        Widget cell;
-        if (di < 0 || di >= totalDays) {
-          cell = const SizedBox(width: 11, height: 11);
-        } else {
-          final d = firstDay.add(Duration(days: di));
-          final amt = daily['${d.month}-${d.day}'] ?? 0;
-          cell = Container(
-            width: 11,
-            height: 11,
-            decoration: BoxDecoration(
-              color: cellColor(amt),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          );
-        }
-        cells.add(Padding(padding: const EdgeInsets.all(1.5), child: cell));
-      }
-      columns.add(Column(mainAxisSize: MainAxisSize.min, children: cells));
-    }
-
-    return V2Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text('日別の支出（濃いほど多い）',
-                    style: V2Typography.h2
-                        .copyWith(color: V2Colors.textPrimary)),
-              ),
-              if (maxDaily > 0)
-                Text('最多 ${formatYen(maxDaily)}/日',
-                    style: V2Typography.micro
-                        .copyWith(color: V2Colors.textSecondary)),
-            ],
-          ),
-          const SizedBox(height: V2Spacing.sm),
-          if (maxDaily <= 0)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Center(
-                child: Text('$year年の支出がまだありません',
-                    style: V2Typography.caption
-                        .copyWith(color: V2Colors.textSecondary)),
-              ),
-            )
-          else ...[
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: columns,
-              ),
-            ),
-            const SizedBox(height: V2Spacing.sm),
-            // 凡例（少 → 多）。
-            Row(
-              children: [
-                Text('少',
-                    style: V2Typography.micro
-                        .copyWith(color: V2Colors.textMuted)),
-                const SizedBox(width: 6),
-                for (final c in const [
-                  Color(0xFFEFF1F4),
-                  Color(0xFFFBD0D0),
-                  Color(0xFFF39A9A),
-                  Color(0xFFE85D5D),
-                  Color(0xFFDC2626),
-                ])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 3),
-                    child: Container(
-                      width: 11,
-                      height: 11,
-                      decoration: BoxDecoration(
-                        color: c,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 3),
-                Text('多',
-                    style: V2Typography.micro
-                        .copyWith(color: V2Colors.textMuted)),
-              ],
-            ),
-          ],
-        ],
       ),
     );
   }
@@ -2285,123 +2140,6 @@ class _BodyRow extends StatelessWidget {
   }
 }
 
-/// 家庭用レポートの簡易棒グラフ（依存ライブラリ無し・自前描画）。
-/// signed=true: 中央基線で +緑/−赤。signed=false: 下基線で上のみ（藍）。
-class _MiniBarChart extends StatelessWidget {
-  final List<int?> values;
-  final List<String> labels;
-  final bool signed;
-  const _MiniBarChart({
-    required this.values,
-    required this.labels,
-    this.signed = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final nonNull = values.whereType<int>().toList();
-    final maxAbs = nonNull.isEmpty
-        ? 1
-        : nonNull
-            .map((v) => v.abs())
-            .fold<int>(1, (a, b) => a > b ? a : b);
-    const h = 150.0;
-    return Column(
-      children: [
-        SizedBox(
-          height: h,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (int i = 0; i < values.length; i++)
-                Expanded(child: _bar(values[i], maxAbs)),
-            ],
-          ),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            for (final l in labels)
-              Expanded(
-                child: Text(l,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        fontSize: 10, color: Color(0xFF9CA3AF))),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _bar(int? v, int maxAbs) {
-    if (v == null) return const SizedBox();
-    final frac = (v.abs() / maxAbs).clamp(0.0, 1.0);
-    if (!signed) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 3),
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          child: FractionallySizedBox(
-            heightFactor: frac == 0 ? 0.01 : frac,
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Color(0xFF6366F1),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(3)),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-    final color =
-        v < 0 ? const Color(0xFFDC2626) : const Color(0xFF16A34A);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 3),
-      child: Column(
-        children: [
-          Expanded(
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: v > 0
-                  ? FractionallySizedBox(
-                      heightFactor: frac,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: color,
-                          borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(3)),
-                        ),
-                      ),
-                    )
-                  : const SizedBox(),
-            ),
-          ),
-          Container(height: 1, color: const Color(0xFFE5E7EB)),
-          Expanded(
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: v < 0
-                  ? FractionallySizedBox(
-                      heightFactor: frac,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: color,
-                          borderRadius: const BorderRadius.vertical(
-                              bottom: Radius.circular(3)),
-                        ),
-                      ),
-                    )
-                  : const SizedBox(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 家庭用レポートの支出内訳（ドーナツ円グラフ＋凡例）。依存ライブラリ無し・自前描画。
 class _PieBreakdown extends StatelessWidget {
   final List<MapEntry<String, int>> entries;
   final int total;
