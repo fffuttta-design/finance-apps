@@ -1,6 +1,6 @@
 {
-  "version": "1.0.600",
-  "buildNumber": "601",
-  "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.600/futa-finance-v1.0.600.apk",
-  "releaseNotes": "年収の記録の国民年金を「実際に払った年」に直しました。2021年分は翌年にまとめて納付していたため、2022年の行に移しています。"
+  "version": "1.0.601",
+  "buildNumber": "602",
+  "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.601/futa-finance-v1.0.601.apk",
+  "releaseNotes": "毎月の固定費やクレカ引落を自動で明細にするとき、個人と事業の帳簿を取り違えて書き込むことがある不具合を直しました。"
 }
