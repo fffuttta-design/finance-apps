@@ -1,6 +1,7 @@
 import 'package:finance_core/finance_core.dart' as core;
 
 import '../utils/jp_holidays.dart';
+import 'app_mode.dart';
 import 'settings_repository.dart';
 import 'subscription_repository.dart';
 import 'transaction_repository.dart';
@@ -32,17 +33,30 @@ class CardSettlementService {
     if (_ranModes.contains(modeKey)) return const [];
     _ranModes.add(modeKey);
     try {
-      return await run();
+      return await run(modeKey);
     } catch (_) {
       return const [];
+    } finally {
+      // モードが切り替わって中断したぶんは、次の機会にやり直せるよう解除する。
+      if (_modeChanged(modeKey)) _ranModes.remove(modeKey);
     }
   }
 
+  /// 🔥 走っている途中でアプリのモードが切り替わっていないか。
+  /// リポジトリは読み書きのたびに「いま開いているモード」をグローバルから引くので、
+  /// 処理中に切り替わると **片方の帳簿の設定を読んだまま、もう片方へ書く**。
+  /// 固定費の自動計上で実際に事故が起きた（2026-09-10）ため、こちらも同じ砦を置く。
+  static bool _modeChanged(String modeKey) =>
+      AppModeManager.instance.current.name != modeKey;
+
   /// 未処理の自動引落を生成し、作成した振替のリストを返す。
-  static Future<List<core.Transaction>> run() async {
+  static Future<List<core.Transaction>> run(String modeKey) async {
     final cfg = await SettingsRepository.instance.loadPayments();
+    if (_modeChanged(modeKey)) return const [];
     final txns = await TransactionRepository.instance.loadAll();
+    if (_modeChanged(modeKey)) return const [];
     final subs = (await SubscriptionRepository.instance.load()).subscriptions;
+    if (_modeChanged(modeKey)) return const [];
 
     final today = DateTime.now();
     final todayD = DateTime(today.year, today.month, today.day);
@@ -117,6 +131,8 @@ class CardSettlementService {
           transferToAccount: card.name,
           memo: '自動引落',
         );
+        // 🔥 書き込む直前が最後の砦。モードが変わっていたら別の帳簿へ入るので中断する。
+        if (_modeChanged(modeKey)) return created;
         await TransactionRepository.instance.add(tx);
         existingIds.add(id);
         created.add(tx);

@@ -29,23 +29,41 @@ class FixedCostMaterializer {
     if (_ranModes.contains(modeKey)) return const [];
     _ranModes.add(modeKey);
     try {
-      return await run();
+      return await run(modeKey);
     } catch (_) {
       return const [];
+    } finally {
+      // モードが切り替わって中断したぶんは、次の機会にやり直せるよう解除する。
+      if (_modeChanged(modeKey)) _ranModes.remove(modeKey);
     }
   }
+
+  /// 🔥 走っている途中でアプリのモードが切り替わっていないか。
+  /// リポジトリは読み書きのたびに「いま開いているモード」をグローバルから引くので、
+  /// 処理中に切り替わると **個人の固定費を読んだまま事業の帳簿へ書く**（逆も同様）。
+  /// 2026-09-10、これで個人のジム・YouTubeメンバーシップ等26件が事業側に入り、
+  /// 事業の経費が約20万円水増しされた。以降、awaitのたびに確認して中断する。
+  static bool _modeChanged(String modeKey) =>
+      AppModeManager.instance.current.name != modeKey;
+
+  /// modeKey（'business'/'personal'）に対応する AppMode。
+  static AppMode _modeOf(String modeKey) =>
+      modeKey == AppMode.business.name ? AppMode.business : AppMode.personal;
 
   static String _ym(int y, int m) => '$y-${m.toString().padLeft(2, '0')}';
   static String _norm(String s) =>
       s.toLowerCase().replaceAll(RegExp(r'[（）()【】\[\]・:：\s　]'), '');
 
-  static Future<List<core.Transaction>> run() async {
+  static Future<List<core.Transaction>> run(String modeKey) async {
     final txns = await TransactionRepository.instance.loadAll();
+    if (_modeChanged(modeKey)) return const [];
     final subs = (await SubscriptionRepository.instance.load()).subscriptions;
+    if (_modeChanged(modeKey)) return const [];
     // 登録口座（カード＋銀行）払いの固定費は自動生成しない。引落・利用はカード/銀行の
     // CSV取り込み（通帳ミラー）で本物が入るため、自動生成すると二重計上になる。
     // 例：VS税務顧問（三井住友銀行払い）は銀行ミラーに引落が入るので自動生成しない。
     final pm = await SettingsRepository.instance.loadPayments();
+    if (_modeChanged(modeKey)) return const [];
     final cardNames = {
       ...pm.creditCards.map((c) => c.name.trim()),
       ...pm.bankAccounts.map((b) => b.name.trim()),
@@ -58,7 +76,8 @@ class FixedCostMaterializer {
     // 生成の下限は「記録開始(_floorYm)」と「現在モードの表示下限(minDate)」の
     // 遅い方。minDate より前に作ると読み戻し(loadAll)で除外され、存在判定が
     // 効かず毎回作り直してしまう（＝起動のたびにスナックバーが出る不具合の原因）。
-    final md = AppModeManager.instance.current.minDate;
+    // 🔥 表示下限も「いま開いているモード」ではなく、この処理が担当するモードから引く。
+    final md = _modeOf(modeKey).minDate;
     final modeFloor = _ym(md.year, md.month);
     final floorYm = _floorYm.compareTo(modeFloor) > 0 ? _floorYm : modeFloor;
 
@@ -143,6 +162,9 @@ class FixedCostMaterializer {
             receiptSaved: rk == 'paper',
             receiptType: (rk == 'paper' || rk == 'drive') ? rk : null,
           );
+          // 🔥 書き込む直前が最後の砦。ここでモードが変わっていたら、この1件は
+          //    別の帳簿へ入ってしまうので、作らずに中断する。
+          if (_modeChanged(modeKey)) return created;
           await TransactionRepository.instance.add(tx);
           existingIds.add(id);
           created.add(tx);
