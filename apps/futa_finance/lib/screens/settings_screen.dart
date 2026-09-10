@@ -354,8 +354,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           _tile(
             icon: Icons.query_stats,
-            title: 'Claude使用量',
-            subtitle: 'Claudeをどのツールがいくら使ったか',
+            title: 'AI使用量',
+            subtitle: 'Claude・ChatGPTをどのツールがいくら使ったか',
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AiUsageScreen()),

@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import '../data/ai_usage_repository.dart';
 
 import '../widgets/centered_body.dart';
-/// Claude API の使用量（どのツールがいくら使ったか）を見る画面。
+/// AIのAPI使用量（どのツールがいくら使ったか）を見る画面。**Claude と ChatGPT の両方**を扱う。
+///
+/// 🔥 **AIごとに分けて見せる**（2026-09-10〜）。支払い先が別なので、合算すると
+/// 「どちらにいくら払ったか」が消えるため。仕分けはモデル名（`claude-*` / `gpt-*`）で自動。
 ///
 /// 🔥 数字の出どころ
 /// - **消費**: 各アプリが呼び出しのたびに二村秘書VPSへ自己申告 → VPSが集計 → Firestore
@@ -76,7 +79,7 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Claude使用量'),
+        title: const Text('AI使用量'),
         actions: [
           IconButton(
             tooltip: '再読み込み',
@@ -187,13 +190,21 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
     );
   }
 
+  /// 今月のまとめ。**AIごとに1段**にする（Claude / ChatGPT …）。
+  ///
+  /// 🔥 合算しない理由＝**支払い先が別**だから。1本にすると「どっちに払ったのか」が消える。
   Widget _summaryCard() {
     final p = _purchases;
-    final chargedJpy = p?.chargeTotal ?? 0;
-    final subJpy = p?.subscriptionTotal ?? 0;
-    final chargedUsd =
-        (p?.charges ?? const <AiPurchase>[]).fold<double>(0, (a, b) => a + b.usd);
-    final subUsd = (p?.subscriptions ?? const <AiPurchase>[])
+    final usageByVendor = {
+      for (final v in _usage?.vendors ?? const <AiUsageVendor>[]) v.id: v
+    };
+    // 「払った」か「使った」のどちらかがあるAIを、支払いの多い順に並べる。
+    final ids = <String>[
+      ...?p?.vendors,
+      ...usageByVendor.keys.where((k) => !(p?.vendors ?? const []).contains(k)),
+    ];
+    final totalJpy = (p?.chargeTotal ?? 0) + (p?.subscriptionTotal ?? 0);
+    final totalUsd = [...?p?.charges, ...?p?.subscriptions]
         .fold<double>(0, (a, b) => a + b.usd);
 
     return _card(
@@ -202,29 +213,72 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 主役は「Claudeに実際いくら払ったか」＝APIのチャージ + Maxサブスク。
+          // 主役は「実際いくら払ったか」＝APIのチャージ + 月額サブスク。
           // API利用ぶんの概算は、その内訳として下に添える。
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              const Text('Claudeにかかった額  ',
+              const Text('AIにかかった額  ',
                   style: TextStyle(fontSize: 12, color: Colors.grey)),
-              Text('¥${_fmt((chargedJpy + subJpy).toDouble())}',
+              Text('¥${_fmt(totalJpy.toDouble())}',
                   style: const TextStyle(
                       fontSize: 28, fontWeight: FontWeight.bold)),
               const SizedBox(width: 8),
-              Text('(\$${(chargedUsd + subUsd).toStringAsFixed(2)})',
+              Text('(\$${totalUsd.toStringAsFixed(2)})',
                   style: const TextStyle(fontSize: 13, color: Colors.grey)),
             ],
           ),
-          const SizedBox(height: 12),
-          _kv('├ APIクレジット購入', _money(chargedJpy, chargedUsd),
-              note: 'API利用ぶんのチャージ（実額）'),
-          _kv('└ Claude Max サブスク', _money(subJpy, subUsd),
-              note: '月額プラン（実額）'),
+          if (ids.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: Text('この月の支払いの記録はありません。',
+                  style: TextStyle(fontSize: 12, color: Colors.grey)),
+            ),
+          for (final id in ids) ...[
+            const SizedBox(height: 14),
+            _vendorBlock(id, p, usageByVendor[id]),
+          ],
         ],
       ),
+    );
+  }
+
+  /// AI1つぶんの内訳（チャージ / 月額 / 利用ぶんの概算）。
+  Widget _vendorBlock(String id, AiPurchases? p, AiUsageVendor? u) {
+    final chargeJpy = p?.chargeTotalOf(id) ?? 0;
+    final subJpy = p?.subscriptionTotalOf(id) ?? 0;
+    final chargeUsd = p?.chargeUsdOf(id) ?? 0;
+    final subUsd = p?.subscriptionUsdOf(id) ?? 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(aiVendorName(id),
+                style: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.bold)),
+            const Spacer(),
+            Text('¥${_fmt((chargeJpy + subJpy).toDouble())}',
+                style: const TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        const Divider(height: 12),
+        _kv('├ APIクレジット購入', _money(chargeJpy, chargeUsd),
+            note: 'API利用ぶんのチャージ（実額）'),
+        _kv('└ ${aiSubscriptionName(id)}', _money(subJpy, subUsd),
+            note: '月額プラン（実額）'),
+        // 「実際に払った額」と「今月どれだけ使ったか」は別物なので、概算はここに小さく添える。
+        Text(
+          u == null
+              ? '今月の利用: まだ記録がありません'
+              : '今月の利用ぶん（概算）: ¥${_fmt(u.totals.jpy)} ・ ${_fmt(u.totals.calls.toDouble())}回',
+          style: const TextStyle(fontSize: 10, color: Colors.grey),
+        ),
+      ],
     );
   }
 
@@ -278,7 +332,13 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
                   const SizedBox(height: 4),
                   _bar(max <= 0 ? 0 : a.totals.jpy / max),
                   const SizedBox(height: 2),
-                  Text('${_fmt(a.totals.calls.toDouble())}回',
+                  // 🔥 ランキングはAIを合算する（知りたいのは「このツールが合計いくら食うか」）。
+                  //    ただし2つ以上のAIを使っているツールは、その内訳をここに小さく出す。
+                  Text(
+                      a.vendors.length > 1
+                          ? '${_fmt(a.totals.calls.toDouble())}回 ・ '
+                              '${a.vendors.map((v) => '${v.name} ¥${_fmt(v.totals.jpy)}').join(' / ')}'
+                          : '${_fmt(a.totals.calls.toDouble())}回',
                       style:
                           const TextStyle(fontSize: 10, color: Colors.grey)),
                 ],
@@ -392,24 +452,31 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
       title: 'モデル別',
       icon: Icons.memory_outlined,
       child: Column(
-        children: [
-          for (final m in models)
-            _kv(m.model.isEmpty ? '(不明)' : m.model, '¥${_fmt(m.totals.jpy)}',
-                note: total > 0
-                    ? '${(m.totals.jpy / total * 100).toStringAsFixed(0)}% / ${_fmt(m.totals.calls.toDouble())}回'
-                    : null),
-        ],
+        children: [for (final m in models) _modelRow(m, total)],
       ),
     );
+  }
+
+  Widget _modelRow(AiUsageModel m, double total) {
+    final name = m.model.isEmpty
+        ? '(不明)'
+        : (m.vendor.isEmpty ? m.model : '${m.model}（${aiVendorName(m.vendor)}）');
+    final notes = <String>[
+      if (total > 0)
+        '${(m.totals.jpy / total * 100).toStringAsFixed(0)}% / ${_fmt(m.totals.calls.toDouble())}回',
+      // 🔥 単価表に無いモデルは概算がズレる。黙って出さずに、その場で分かるようにする。
+      if (m.estimated) '⚠ 単価は推定（VPSの単価表に無いモデル）',
+    ];
+    return _kv(name, '¥${_fmt(m.totals.jpy)}',
+        note: notes.isEmpty ? null : notes.join('　'));
   }
 
 
   Widget _purchaseCard() {
     final p = _purchases;
-    final all = [...?p?.charges, ...?p?.subscriptions]
-      ..sort((a, b) => a.date.compareTo(b.date));
+    final all = [...?p?.charges, ...?p?.subscriptions];
     return _card(
-      title: '支払い履歴（Anthropic）',
+      title: '支払い履歴',
       icon: Icons.receipt_long_outlined,
       child: all.isEmpty
           ? const Text('この月の記録はありません。',
@@ -417,24 +484,33 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (p!.charges.isNotEmpty) ...[
-                  const Text('APIクレジット購入',
-                      style: TextStyle(
-                          fontSize: 11, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  for (final t in p.charges)
-                    _kv('${t.date.month}/${t.date.day}  ${t.label}',
-                        _money(t.amountJpy, t.usd)),
-                ],
-                if (p.subscriptions.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  const Text('Claude Max サブスク（API課金ではない）',
-                      style: TextStyle(
-                          fontSize: 11, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  for (final t in p.subscriptions)
-                    _kv('${t.date.month}/${t.date.day}  ${t.label}',
-                        _money(t.amountJpy, t.usd)),
+                for (final id in p!.vendors) ...[
+                  Text(aiVendorName(id),
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.bold)),
+                  const Divider(height: 10),
+                  if (p.chargesOf(id).isNotEmpty) ...[
+                    const Text('APIクレジット購入',
+                        style: TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    for (final t in p.chargesOf(id)
+                      ..sort((a, b) => a.date.compareTo(b.date)))
+                      _kv('${t.date.month}/${t.date.day}  ${t.label}',
+                          _money(t.amountJpy, t.usd)),
+                  ],
+                  if (p.subscriptionsOf(id).isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text('${aiSubscriptionName(id)}（API課金ではない）',
+                        style: const TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    for (final t in p.subscriptionsOf(id)
+                      ..sort((a, b) => a.date.compareTo(b.date)))
+                      _kv('${t.date.month}/${t.date.day}  ${t.label}',
+                          _money(t.amountJpy, t.usd)),
+                  ],
+                  const SizedBox(height: 12),
                 ],
               ],
             ),
@@ -448,6 +524,7 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
       child: Text(
         '※「使った額」は各アプリの自己申告をトークン数×公式単価で計算した概算です。'
         'Anthropicの公式使用量APIは個人アカウントでは使えないため、この方式にしています。'
+        'ChatGPT（OpenAI）も同じ仕組みで、モデル名から自動でAI別に分けています。'
         '「クレジット購入」はカードの実額です。'
         '${at != null ? '\n最終更新: ${at.month}/${at.day} ${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}（10分おきに自動更新）' : ''}',
         style: const TextStyle(fontSize: 10, color: Colors.grey),

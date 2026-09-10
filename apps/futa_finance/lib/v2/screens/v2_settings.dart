@@ -105,8 +105,8 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
       _MenuItem('backup', 'バックアップ / 取り込み',
           Icons.cloud_upload_outlined,
           desc: 'データの書き出し・取り込み'),
-      _MenuItem('aiUsage', 'Claude使用量', Icons.query_stats,
-          desc: 'Claudeをどのツールがいくら使ったか'),
+      _MenuItem('aiUsage', 'AI使用量', Icons.query_stats,
+          desc: 'Claude・ChatGPTをどのツールがいくら使ったか'),
     ]),
     _MenuGroup(title: 'アプリ情報', items: [
       _MenuItem('about', 'バージョン・更新確認', Icons.info_outline,
@@ -276,9 +276,9 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
         return const V2FurusatoPanel();
       case 'aiUsage':
         return _embedV1(const AiUsageScreen(),
-            title: 'Claude使用量',
-            note: 'Claude を どのツールが いくら使ったか。金額はトークン数×公式単価の概算で、'
-                'クレジット購入額はカードの実額です（Anthropicの公式使用量APIは個人アカウントでは'
+            title: 'AI使用量',
+            note: 'Claude・ChatGPT を どのツールが いくら使ったか。金額はトークン数×公式単価の概算で、'
+                'クレジット購入額はカードの実額です（公式の使用量APIは個人アカウントでは'
                 '使えないため、各アプリからの自己申告を集計しています）。',
             icon: Icons.query_stats,
             iconColor: V2Colors.info);
