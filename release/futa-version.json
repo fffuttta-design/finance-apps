@@ -1,6 +1,6 @@
 {
-  "version": "1.0.599",
-  "buildNumber": "600",
-  "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.599/futa-finance-v1.0.599.apk",
-  "releaseNotes": "業績データから、使っていなかった「日別の支出」のカレンダーと「貯金の推移」のグラフを消して、画面をすっきりさせました。"
+  "version": "1.0.600",
+  "buildNumber": "601",
+  "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.600/futa-finance-v1.0.600.apk",
+  "releaseNotes": "年収の記録の国民年金を「実際に払った年」に直しました。2021年分は翌年にまとめて納付していたため、2022年の行に移しています。"
 }
