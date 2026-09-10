@@ -1,6 +1,6 @@
 {
-  "version": "1.0.601",
-  "buildNumber": "602",
-  "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.601/futa-finance-v1.0.601.apk",
-  "releaseNotes": "毎月の固定費やクレカ引落を自動で明細にするとき、個人と事業の帳簿を取り違えて書き込むことがある不具合を直しました。"
+  "version": "1.0.602",
+  "buildNumber": "603",
+  "downloadUrl": "https://github.com/fffuttta-design/finance-apps/releases/download/futa-v1.0.602/futa-finance-v1.0.602.apk",
+  "releaseNotes": "「Claude使用量」を「AI使用量」に広げました。ClaudeとChatGPTの両方を1画面で見られます。支払い先ごとに分けて表示し、これまで拾えていなかったOpenAIへの支払いも「かかった額」に出るようになりました。"
 }
