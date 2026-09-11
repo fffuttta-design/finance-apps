@@ -1351,7 +1351,23 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                 ),
                 const SizedBox(height: V2Spacing.xl),
               ],
-              // ポイント利用（Vポイント・ファミペイ）— 🔴 支出合計には入れない。
+              // ウォレット（クレカ引落照合・棚卸し）— カテゴリ内訳の下
+              if (showFixedAndCard) ...[
+                CreditCardBillingSection(
+                  // 全カード/口座を渡し、表示可否はウィジェット側で判定する
+                  // （アクティブ=常に表示／休眠=当月に動きがある時だけ表示）。
+                  cards: _payments.creditCards,
+                  bankAccounts: _payments.bankAccounts,
+                  transactions: _transactions,
+                  subscriptions: _subs,
+                  ym: _ymKey,
+                  onOpenReconcile: _openCardReconcile,
+                ),
+                const SizedBox(height: V2Spacing.xl),
+              ],
+              // ポイント利用（Vポイント・ファミペイ）— ウォレットの下。
+              // 🔴 支出合計には入れない。カード払いの一覧（ウォレット）の並びで見るのが
+              //    自然だが、こちらは請求が立たない＝実際にお金は動いていない。
               // 資産の動かない支払いなので、収支の外に「何に使ったか」だけを置く。
               // 記録は二村秘書Botが自動で入れる（カード下4桁で判定）＝手入力は無い。
               if (monthPoints.isNotEmpty) ...[
@@ -1455,20 +1471,6 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                       ],
                     ],
                   ),
-                ),
-                const SizedBox(height: V2Spacing.xl),
-              ],
-              // ウォレット（クレカ引落照合・棚卸し）— カテゴリ内訳の下
-              if (showFixedAndCard) ...[
-                CreditCardBillingSection(
-                  // 全カード/口座を渡し、表示可否はウィジェット側で判定する
-                  // （アクティブ=常に表示／休眠=当月に動きがある時だけ表示）。
-                  cards: _payments.creditCards,
-                  bankAccounts: _payments.bankAccounts,
-                  transactions: _transactions,
-                  subscriptions: _subs,
-                  ym: _ymKey,
-                  onOpenReconcile: _openCardReconcile,
                 ),
                 const SizedBox(height: V2Spacing.xl),
               ],
