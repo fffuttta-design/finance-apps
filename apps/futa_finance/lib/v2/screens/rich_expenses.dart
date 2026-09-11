@@ -6,6 +6,7 @@ import 'package:finance_core/finance_core.dart' as core;
 import '../../data/app_mode.dart';
 import '../../data/month_cursor.dart';
 import '../../data/nav_history.dart';
+import '../../data/point_usage_repository.dart';
 import '../../data/settings_repository.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/transaction_repository.dart';
@@ -13,6 +14,7 @@ import '../../data/ui_preferences.dart';
 import '../../screens/account_detail_screen.dart';
 import '../../screens/card_detail_screen.dart';
 import '../../screens/expense_input_screen.dart';
+import '../../screens/point_usage_screen.dart';
 import '../../screens/receipt_group_detail_screen.dart';
 import '../../screens/subscription_list_screen.dart';
 import '../../screens/transaction_detail_screen.dart';
@@ -62,6 +64,13 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
 
   /// 「必須・非消費」小計セクションを展開しているか（既定は控えめに畳む）。
   bool _nonConsumOpen = false;
+
+  /// ポイント利用（Vポイント・ファミペイ）の記録。
+  /// 🔴 支出合計にも残高にも足さない。「何にポイントを使ったか」を見せるだけ。
+  List<PointUsage> _pointUsages = [];
+
+  /// 「ポイント利用」カードを展開しているか（既定は畳む）。
+  bool _pointOpen = false;
 
   /// 事業モードの諸経費/制作原価サブタブ（個人モードは null）。
   TabController? _subTab;
@@ -164,6 +173,14 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     final subs = await SubscriptionRepository.instance.load();
     final payments = await _settings.loadPayments();
     final cats = await _settings.loadCategories();
+    // ポイント利用は「あれば出す」おまけなので、読めなくても支出タブは壊さない。
+    List<PointUsage> points = const [];
+    try {
+      points = await PointUsageRepository.instance
+          .fetchAll(mode: _isBusiness ? 'business' : 'personal');
+    } catch (_) {
+      points = const [];
+    }
     if (!mounted) return;
     setState(() {
       _transactions = txns;
@@ -174,6 +191,7 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
         for (final m in cats.majors)
           if (m.nonConsumption) _bareMajor(m.name),
       };
+      _pointUsages = points;
       _loading = false;
     });
   }
@@ -603,6 +621,18 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     }
   }
 
+  /// 「ポイント利用」の全履歴（月をまたぐ累計）を開く。
+  /// PointUsageScreen は設定画面に埋め込む前提で Scaffold を持たないので、ここで枠を付ける。
+  void _openPointUsage() {
+    NavHistory.instance.push(
+      context,
+      (_) => Scaffold(
+        appBar: AppBar(title: const Text('ポイント利用')),
+        body: const PointUsageScreen(),
+      ),
+    );
+  }
+
   /// ウォレットの行をタップ → まず詳細画面（明細一覧）へ。
   /// クレカ＝CardDetailScreen（そこから「突合」を選べる）。
   /// 銀行/現金/電子マネー＝AccountDetailScreen（通帳）。突合は不要・自力で追える。
@@ -880,6 +910,19 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
     // 支出合計（消費＋非消費）＝実際に出て行ったお金。必ずどこかで分かるよう表示する。
     final grandTotal = total + nonConsumTotal;
     final hasNonConsum = nonConsumTotal > 0;
+    // ── ポイント利用（表示月ぶん）──
+    // 🔴 total / grandTotal には足さない。ポイントは資産として持っていないので、
+    //    使っても現金・カードは動かない＝収支に混ぜると会計が狂う。
+    final monthPoints = _pointUsages
+        .where((u) => u.date.year == _month.year && u.date.month == _month.month)
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+    final pointTotal = monthPoints.fold<int>(0, (s, u) => s + u.amount);
+    final pointByType = <String, int>{};
+    for (final u in monthPoints) {
+      final k = u.pointType.trim().isEmpty ? 'その他' : u.pointType.trim();
+      pointByType[k] = (pointByType[k] ?? 0) + u.amount;
+    }
     final emptyFixedLines = <({
       String id,
       String name,
@@ -1300,6 +1343,113 @@ class _RichExpensesScreenState extends State<RichExpensesScreen>
                                         ],
                                 ),
                             ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: V2Spacing.xl),
+              ],
+              // ポイント利用（Vポイント・ファミペイ）— 🔴 支出合計には入れない。
+              // 資産の動かない支払いなので、収支の外に「何に使ったか」だけを置く。
+              // 記録は二村秘書Botが自動で入れる（カード下4桁で判定）＝手入力は無い。
+              if (monthPoints.isNotEmpty) ...[
+                Container(
+                  decoration: BoxDecoration(
+                    color: V2Colors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: V2Colors.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      InkWell(
+                        onTap: () =>
+                            setState(() => _pointOpen = !_pointOpen),
+                        borderRadius: BorderRadius.circular(14),
+                        child: Padding(
+                          padding: const EdgeInsets.all(V2Spacing.md),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.confirmation_number_outlined,
+                                  size: 16, color: V2Colors.textSecondary),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                    'ポイント利用（支出には含めない・${monthPoints.length}件）',
+                                    style: V2Typography.caption.copyWith(
+                                        color: V2Colors.textSecondary,
+                                        fontWeight: FontWeight.w700)),
+                              ),
+                              Text(formatYen(pointTotal),
+                                  style: V2Typography.caption.copyWith(
+                                      color: V2Colors.textSecondary,
+                                      fontWeight: FontWeight.w700,
+                                      fontFeatures: V2Typography.tabularNums)),
+                              const SizedBox(width: 4),
+                              Icon(
+                                  _pointOpen
+                                      ? Icons.expand_less
+                                      : Icons.expand_more,
+                                  size: 16,
+                                  color: V2Colors.textSecondary),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (_pointOpen) ...[
+                        const Divider(height: 1, color: V2Colors.divider),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: V2Spacing.md, vertical: 4),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // ポイントの種類ごとの小計（Vポイント／ファミペイ）。
+                              if (pointByType.length > 1) ...[
+                                for (final e in pointByType.entries)
+                                  _summaryLine(e.key, e.value),
+                                const Divider(
+                                    height: 13, color: V2Colors.divider),
+                              ],
+                              // 何を買ったか（新しい順）。
+                              for (final u in monthPoints)
+                                _summaryLine(
+                                  '${formatMonthDay(u.date)}  '
+                                  '${u.description.trim().isEmpty ? (u.store ?? '（品目不明）') : u.description.trim()}',
+                                  u.amount,
+                                ),
+                              const SizedBox(height: 6),
+                              Text(
+                                  'ポイントは資産として持っていないので、使っても残高は動きません。'
+                                  '金額は「いくらの価値の物を手に入れたか」の目安です。',
+                                  style: V2Typography.micro.copyWith(
+                                      color: V2Colors.textSecondary)),
+                              const SizedBox(height: 6),
+                            ],
+                          ),
+                        ),
+                        const Divider(height: 1, color: V2Colors.divider),
+                        InkWell(
+                          onTap: _openPointUsage,
+                          borderRadius: const BorderRadius.vertical(
+                              bottom: Radius.circular(14)),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: V2Spacing.md, vertical: 11),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text('すべての履歴を見る',
+                                      style: V2Typography.caption.copyWith(
+                                          color: V2Colors.textSecondary,
+                                          fontWeight: FontWeight.w600)),
+                                ),
+                                const Icon(Icons.chevron_right,
+                                    size: 16, color: V2Colors.textSecondary),
+                              ],
+                            ),
                           ),
                         ),
                       ],
