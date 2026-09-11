@@ -27,6 +27,7 @@ import '../theme/spacing.dart';
 import '../theme/typography.dart';
 import '../widgets/v2_card.dart';
 import '../../screens/ai_usage_screen.dart';
+import '../../screens/point_usage_screen.dart';
 
 /// v2.1 ネイティブ設定タブ。
 /// 左メニュー（カテゴリ別） + 右コンテンツのマスター/ディテール構成。
@@ -102,6 +103,8 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
           desc: '枠の残りと受領証明書の回収状況'),
     ]),
     _MenuGroup(title: 'データ管理', items: [
+      _MenuItem('pointUsage', 'ポイント利用', Icons.confirmation_number_outlined,
+          desc: 'Vポイント・ファミペイで何を買ったか（収支には含まない）'),
       _MenuItem('backup', 'バックアップ / 取り込み',
           Icons.cloud_upload_outlined,
           desc: 'データの書き出し・取り込み'),
@@ -282,6 +285,13 @@ class _V2SettingsScreenState extends State<V2SettingsScreen> {
                 '使えないため、各アプリからの自己申告を集計しています）。',
             icon: Icons.query_stats,
             iconColor: V2Colors.info);
+      case 'pointUsage':
+        return _embedV1(const PointUsageScreen(),
+            title: 'ポイント利用',
+            note: 'Vポイント・ファミペイで買ったものの記録。'
+                '🔴 ここの金額は収支・残高・業績に含まれていません'
+                '（ポイントは資産として持っていないため、使っても資産は動かない）。'
+                '記録は二村秘書Botがカード下4桁から自動で入れます＝手で登録する必要はありません。');
       case 'backup':
         return const V2BackupPanel();
       case 'about':
